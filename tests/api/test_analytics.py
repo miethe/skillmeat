@@ -140,15 +140,12 @@ class TestAnalyticsSummary:
     ):
         """Test getting analytics summary."""
         with patch(
-            "skillmeat.api.routers.analytics.ConfigManagerDep",
-            return_value=mock_config_manager,
-        ), patch(
-            "skillmeat.storage.analytics.AnalyticsDB",
+            "skillmeat.api.routers.analytics.get_analytics_db",
             return_value=mock_analytics_db,
         ), patch(
-            "skillmeat.api.routers.analytics.CollectionManager"
+            "skillmeat.core.collection.CollectionManager"
         ) as mock_coll_mgr_class, patch(
-            "skillmeat.api.routers.analytics.ArtifactManager"
+            "skillmeat.core.artifact.ArtifactManager"
         ) as mock_art_mgr_class:
             # Mock collection and artifact managers
             mock_coll_mgr = MagicMock()
@@ -185,12 +182,17 @@ class TestAnalyticsSummary:
 
     def test_get_summary_analytics_disabled(self, client):
         """Test getting summary when analytics is disabled."""
-        mock_mgr = MagicMock()
-        mock_mgr.is_analytics_enabled.return_value = False
+        from fastapi import HTTPException as FastAPIHTTPException
+
+        def raise_503(*args, **kwargs):
+            raise FastAPIHTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Analytics is disabled. Enable it in config to use this endpoint.",
+            )
 
         with patch(
-            "skillmeat.api.routers.analytics.ConfigManagerDep",
-            return_value=mock_mgr,
+            "skillmeat.api.routers.analytics.get_analytics_db",
+            side_effect=raise_503,
         ):
             response = client.get("/api/v1/analytics/summary")
 
@@ -205,15 +207,12 @@ class TestTopArtifacts:
     ):
         """Test getting top artifacts."""
         with patch(
-            "skillmeat.api.routers.analytics.ConfigManagerDep",
-            return_value=mock_config_manager,
-        ), patch(
-            "skillmeat.storage.analytics.AnalyticsDB",
+            "skillmeat.api.routers.analytics.get_analytics_db",
             return_value=mock_analytics_db,
         ), patch(
-            "skillmeat.api.routers.analytics.CollectionManager"
+            "skillmeat.core.collection.CollectionManager"
         ) as mock_coll_mgr_class, patch(
-            "skillmeat.api.routers.analytics.ArtifactManager"
+            "skillmeat.core.artifact.ArtifactManager"
         ) as mock_art_mgr_class:
             # Mock managers
             mock_coll_mgr = MagicMock()
@@ -251,15 +250,12 @@ class TestTopArtifacts:
     ):
         """Test pagination for top artifacts."""
         with patch(
-            "skillmeat.api.routers.analytics.ConfigManagerDep",
-            return_value=mock_config_manager,
-        ), patch(
-            "skillmeat.storage.analytics.AnalyticsDB",
+            "skillmeat.api.routers.analytics.get_analytics_db",
             return_value=mock_analytics_db,
         ), patch(
-            "skillmeat.api.routers.analytics.CollectionManager"
+            "skillmeat.core.collection.CollectionManager"
         ) as mock_coll_mgr_class, patch(
-            "skillmeat.api.routers.analytics.ArtifactManager"
+            "skillmeat.core.artifact.ArtifactManager"
         ) as mock_art_mgr_class:
             mock_coll_mgr = MagicMock()
             mock_coll_mgr.list_collections.return_value = ["default"]
@@ -283,15 +279,12 @@ class TestTopArtifacts:
     ):
         """Test filtering top artifacts by type."""
         with patch(
-            "skillmeat.api.routers.analytics.ConfigManagerDep",
-            return_value=mock_config_manager,
-        ), patch(
-            "skillmeat.storage.analytics.AnalyticsDB",
+            "skillmeat.api.routers.analytics.get_analytics_db",
             return_value=mock_analytics_db,
         ), patch(
-            "skillmeat.api.routers.analytics.CollectionManager"
+            "skillmeat.core.collection.CollectionManager"
         ) as mock_coll_mgr_class, patch(
-            "skillmeat.api.routers.analytics.ArtifactManager"
+            "skillmeat.core.artifact.ArtifactManager"
         ) as mock_art_mgr_class:
             mock_coll_mgr = MagicMock()
             mock_coll_mgr.list_collections.return_value = ["default"]

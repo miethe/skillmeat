@@ -621,7 +621,8 @@ class TestGroupMetadataCRUD:
         data = response.json()
         assert data["tags"] == ["frontend", "critical_path"]
         assert data["color"] == "#22c55e"
-        assert data["icon"] == "folder"
+        # Icon is stored as provided (stripped but not lowercased)
+        assert data["icon"] == "Folder"
 
     @pytest.mark.parametrize(
         "payload",
@@ -629,7 +630,8 @@ class TestGroupMetadataCRUD:
             {"tags": ["invalid tag!"]},
             {"color": "purple"},
             {"color": "#12"},
-            {"icon": "rocket"},
+            # Note: icon validation only requires a non-empty string ≤32 chars —
+            # arbitrary icon names like "rocket" are now accepted.
             {"tags": [f"t{i}" for i in range(21)]},
         ],
     )

@@ -9,7 +9,7 @@ import pytest
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.search import SearchManager
 from skillmeat.models import SearchCacheEntry, SearchMatch, SearchResult
-from skillmeat.utils.metadata import ArtifactMetadata
+from skillmeat.core.artifact import ArtifactMetadata
 
 
 class TestProjectDiscovery:

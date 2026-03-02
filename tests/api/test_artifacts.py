@@ -8,6 +8,7 @@ This module tests the /api/v1/artifacts endpoints, including:
 
 import pytest
 from datetime import datetime
+from pathlib import Path
 from fastapi import status
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, patch
@@ -20,6 +21,11 @@ from skillmeat.core.artifact import (
     ArtifactMetadata,
     UpdateFetchResult,
 )
+from skillmeat.api.dependencies import (
+    get_artifact_manager,
+    get_collection_manager,
+)
+from skillmeat.api.routers.artifacts import get_db_session
 
 
 @pytest.fixture
@@ -256,18 +262,34 @@ class TestListArtifacts:
 class TestGetArtifact:
     """Test GET /api/v1/artifacts/{artifact_id} endpoint."""
 
+    def _make_mock_db_session(self):
+        """Create a mock DB session that returns None for artifact queries."""
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter.return_value.first.return_value = None
+        return mock_session
+
     def test_get_artifact_success(
-        self, client, mock_artifact_manager, mock_collection_manager
+        self, app, client, mock_artifact_manager, mock_collection_manager
     ):
         """Test getting a specific artifact."""
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_artifact_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
-            response = client.get("/api/v1/artifacts/skill:pdf-skill")
+        mock_session = self._make_mock_db_session()
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_artifact_manager
+        app.dependency_overrides[get_collection_manager] = (
+            lambda: mock_collection_manager
+        )
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+
+        try:
+            with patch(
+                "skillmeat.api.routers.artifacts.CollectionService"
+            ) as mock_coll_svc_cls:
+                mock_coll_svc = MagicMock()
+                mock_coll_svc.get_collection_membership_single.return_value = []
+                mock_coll_svc_cls.return_value = mock_coll_svc
+
+                response = client.get("/api/v1/artifacts/skill:pdf-skill")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -283,21 +305,24 @@ class TestGetArtifact:
         metadata = data["metadata"]
         assert metadata["title"] == "PDF Skill"
         assert metadata["description"] == "Process PDF files"
-        assert "tags" in metadata
+        # Note: tags are managed via the tag service, not embedded in metadata response
 
-    def test_get_artifact_not_found(self, client, mock_collection_manager):
+    def test_get_artifact_not_found(self, app, client, mock_collection_manager):
         """Test getting a non-existent artifact."""
         mock_art_mgr = MagicMock()
         mock_art_mgr.show.side_effect = ValueError("Artifact not found")
+        mock_session = self._make_mock_db_session()
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_art_mgr,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_art_mgr
+        app.dependency_overrides[get_collection_manager] = (
+            lambda: mock_collection_manager
+        )
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+
+        try:
             response = client.get("/api/v1/artifacts/skill:nonexistent")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -307,17 +332,29 @@ class TestGetArtifact:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_get_artifact_with_collection_filter(
-        self, client, mock_artifact_manager, mock_collection_manager
+        self, app, client, mock_artifact_manager, mock_collection_manager
     ):
         """Test getting artifact with collection filter."""
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_artifact_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
-            response = client.get("/api/v1/artifacts/skill:pdf-skill?collection=default")
+        mock_session = self._make_mock_db_session()
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_artifact_manager
+        app.dependency_overrides[get_collection_manager] = (
+            lambda: mock_collection_manager
+        )
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+
+        try:
+            with patch(
+                "skillmeat.api.routers.artifacts.CollectionService"
+            ) as mock_coll_svc_cls:
+                mock_coll_svc = MagicMock()
+                mock_coll_svc.get_collection_membership_single.return_value = []
+                mock_coll_svc_cls.return_value = mock_coll_svc
+
+                response = client.get(
+                    "/api/v1/artifacts/skill:pdf-skill?collection=default"
+                )
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
 
@@ -326,19 +363,15 @@ class TestCheckArtifactUpstream:
     """Test GET /api/v1/artifacts/{artifact_id}/upstream endpoint."""
 
     def test_check_upstream_success(
-        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+        self, app, client, mock_artifact, mock_artifact_manager, mock_collection_manager
     ):
         """Test checking upstream status for an artifact."""
-        # Mock fetch_update result
-        from skillmeat.sources.base import UpdateInfo
-
-        update_info = UpdateInfo(
-            has_update=True,
-            upstream_version="v1.1.0",
-            upstream_sha="def789ghi012",
-            current_sha="abc123def456",
-            has_local_modifications=False,
-        )
+        # Mock fetch_update result using MagicMock to match the attribute names
+        # the endpoint looks for (upstream_sha, upstream_version via getattr)
+        update_info = MagicMock()
+        update_info.upstream_sha = "def789ghi012"
+        update_info.upstream_version = "v1.1.0"
+        update_info.has_local_modifications = False
 
         fetch_result = UpdateFetchResult(
             artifact=mock_artifact,
@@ -348,14 +381,13 @@ class TestCheckArtifactUpstream:
 
         mock_artifact_manager.fetch_update.return_value = fetch_result
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_artifact_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_artifact_manager
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
             response = client.get("/api/v1/artifacts/skill:pdf-skill/upstream")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -369,7 +401,7 @@ class TestCheckArtifactUpstream:
         assert "last_checked" in data
 
     def test_check_upstream_no_update(
-        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+        self, app, client, mock_artifact, mock_artifact_manager, mock_collection_manager
     ):
         """Test checking upstream when no update available."""
         fetch_result = UpdateFetchResult(
@@ -379,21 +411,20 @@ class TestCheckArtifactUpstream:
 
         mock_artifact_manager.fetch_update.return_value = fetch_result
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_artifact_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_artifact_manager
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
             response = client.get("/api/v1/artifacts/skill:pdf-skill/upstream")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["update_available"] is False
 
     def test_check_upstream_local_artifact(
-        self, client, mock_collection_manager
+        self, app, client, mock_collection_manager
     ):
         """Test checking upstream for local artifact (not supported)."""
         # Create local artifact (no upstream tracking)
@@ -409,30 +440,28 @@ class TestCheckArtifactUpstream:
         mock_art_mgr = MagicMock()
         mock_art_mgr.show.return_value = local_artifact
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_art_mgr,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_art_mgr
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
             response = client.get("/api/v1/artifacts/skill:local-skill/upstream")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_check_upstream_artifact_not_found(self, client, mock_collection_manager):
+    def test_check_upstream_artifact_not_found(self, app, client, mock_collection_manager):
         """Test checking upstream for non-existent artifact."""
         mock_art_mgr = MagicMock()
         mock_art_mgr.show.side_effect = ValueError("Artifact not found")
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_art_mgr,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_art_mgr
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
             response = client.get("/api/v1/artifacts/skill:nonexistent/upstream")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -441,7 +470,7 @@ class TestUpdateArtifact:
     """Test PUT /api/v1/artifacts/{artifact_id} endpoint."""
 
     def test_update_artifact_tags_success(
-        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+        self, app, client, mock_artifact, mock_artifact_manager, mock_collection_manager
     ):
         """Test updating artifact tags."""
         # Mock collection loading
@@ -449,33 +478,33 @@ class TestUpdateArtifact:
         mock_collection.name = "default"
         mock_collection.find_artifact.return_value = mock_artifact
         mock_collection_manager.load_collection.return_value = mock_collection
-        mock_collection_manager.config.get_collection_path.return_value = "/path/to/collection"
+        mock_collection_manager.config.get_collection_path.return_value = Path("/path/to/collection")
 
         # Mock save
         mock_collection_manager.save_collection.return_value = None
         mock_collection_manager.lock_mgr.update_entry.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_artifact_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.compute_content_hash",
-            return_value="abc123hash",
-        ):
-            response = client.put(
-                "/api/v1/artifacts/skill:pdf-skill",
-                json={"tags": ["updated", "tags"]},
-            )
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_artifact_manager
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
+            with patch(
+                "skillmeat.utils.filesystem.compute_content_hash",
+                return_value="abc123hash",
+            ):
+                response = client.put(
+                    "/api/v1/artifacts/skill:pdf-skill",
+                    json={"tags": ["updated", "tags"]},
+                )
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == "pdf-skill"
 
     def test_update_artifact_metadata_success(
-        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+        self, app, client, mock_artifact, mock_artifact_manager, mock_collection_manager
     ):
         """Test updating artifact metadata."""
         # Mock collection loading
@@ -483,33 +512,33 @@ class TestUpdateArtifact:
         mock_collection.name = "default"
         mock_collection.find_artifact.return_value = mock_artifact
         mock_collection_manager.load_collection.return_value = mock_collection
-        mock_collection_manager.config.get_collection_path.return_value = "/path/to/collection"
+        mock_collection_manager.config.get_collection_path.return_value = Path("/path/to/collection")
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_artifact_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.compute_content_hash",
-            return_value="abc123hash",
-        ):
-            response = client.put(
-                "/api/v1/artifacts/skill:pdf-skill",
-                json={
-                    "metadata": {
-                        "title": "Updated PDF Skill",
-                        "description": "Updated description",
-                    }
-                },
-            )
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_artifact_manager
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
+            with patch(
+                "skillmeat.utils.filesystem.compute_content_hash",
+                return_value="abc123hash",
+            ):
+                response = client.put(
+                    "/api/v1/artifacts/skill:pdf-skill",
+                    json={
+                        "metadata": {
+                            "title": "Updated PDF Skill",
+                            "description": "Updated description",
+                        }
+                    },
+                )
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == "pdf-skill"
 
-    def test_update_artifact_not_found(self, client, mock_collection_manager):
+    def test_update_artifact_not_found(self, app, client, mock_collection_manager):
         """Test updating a non-existent artifact."""
         mock_collection = MagicMock()
         mock_collection.find_artifact.return_value = None
@@ -517,17 +546,16 @@ class TestUpdateArtifact:
 
         mock_art_mgr = MagicMock()
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_art_mgr,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_art_mgr
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
             response = client.put(
                 "/api/v1/artifacts/skill:nonexistent",
                 json={"tags": ["test"]},
             )
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -540,7 +568,7 @@ class TestUpdateArtifact:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_update_artifact_with_aliases_warning(
-        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+        self, app, client, mock_artifact, mock_artifact_manager, mock_collection_manager
     ):
         """Test updating artifact aliases logs warning (not implemented yet)."""
         # Mock collection loading
@@ -548,23 +576,23 @@ class TestUpdateArtifact:
         mock_collection.name = "default"
         mock_collection.find_artifact.return_value = mock_artifact
         mock_collection_manager.load_collection.return_value = mock_collection
-        mock_collection_manager.config.get_collection_path.return_value = "/path/to/collection"
+        mock_collection_manager.config.get_collection_path.return_value = Path("/path/to/collection")
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_artifact_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.compute_content_hash",
-            return_value="abc123hash",
-        ):
-            # Aliases should be accepted but not applied (logged warning)
-            response = client.put(
-                "/api/v1/artifacts/skill:pdf-skill",
-                json={"aliases": ["pdf-processor"]},
-            )
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_artifact_manager
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
+            with patch(
+                "skillmeat.utils.filesystem.compute_content_hash",
+                return_value="abc123hash",
+            ):
+                # Aliases should be accepted but not applied (logged warning)
+                response = client.put(
+                    "/api/v1/artifacts/skill:pdf-skill",
+                    json={"aliases": ["pdf-processor"]},
+                )
+        finally:
+            app.dependency_overrides.clear()
 
         # Should succeed but aliases not applied
         assert response.status_code == status.HTTP_200_OK
@@ -574,7 +602,7 @@ class TestDeleteArtifact:
     """Test DELETE /api/v1/artifacts/{artifact_id} endpoint."""
 
     def test_delete_artifact_success(
-        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+        self, app, client, mock_artifact, mock_artifact_manager, mock_collection_manager
     ):
         """Test deleting an artifact."""
         # Mock collection loading
@@ -586,18 +614,17 @@ class TestDeleteArtifact:
         # Mock remove operation
         mock_artifact_manager.remove.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_artifact_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_artifact_manager
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
             response = client.delete("/api/v1/artifacts/skill:pdf-skill")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    def test_delete_artifact_not_found(self, client, mock_collection_manager):
+    def test_delete_artifact_not_found(self, app, client, mock_collection_manager):
         """Test deleting a non-existent artifact."""
         # Mock collection loading with no artifact found
         mock_collection = MagicMock()
@@ -606,14 +633,13 @@ class TestDeleteArtifact:
 
         mock_art_mgr = MagicMock()
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_art_mgr,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_art_mgr
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
             response = client.delete("/api/v1/artifacts/skill:nonexistent")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -623,7 +649,7 @@ class TestDeleteArtifact:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_delete_artifact_with_collection_filter(
-        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+        self, app, client, mock_artifact, mock_artifact_manager, mock_collection_manager
     ):
         """Test deleting artifact with collection filter."""
         # Mock collection loading
@@ -635,21 +661,20 @@ class TestDeleteArtifact:
         # Mock remove operation
         mock_artifact_manager.remove.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_artifact_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_artifact_manager
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
             response = client.delete(
                 "/api/v1/artifacts/skill:pdf-skill?collection=default"
             )
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
     def test_delete_artifact_manager_error(
-        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+        self, app, client, mock_artifact, mock_artifact_manager, mock_collection_manager
     ):
         """Test delete when artifact manager raises error."""
         # Mock collection loading
@@ -661,14 +686,13 @@ class TestDeleteArtifact:
         # Mock remove operation to raise ValueError
         mock_artifact_manager.remove.side_effect = ValueError("Artifact not found")
 
-        with patch(
-            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
-            return_value=mock_artifact_manager,
-        ), patch(
-            "skillmeat.api.routers.artifacts.CollectionManagerDep",
-            return_value=mock_collection_manager,
-        ):
+        app.dependency_overrides[get_artifact_manager] = lambda: mock_artifact_manager
+        app.dependency_overrides[get_collection_manager] = lambda: mock_collection_manager
+
+        try:
             response = client.delete("/api/v1/artifacts/skill:pdf-skill")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 

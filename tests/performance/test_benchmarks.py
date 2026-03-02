@@ -149,7 +149,7 @@ class TestAnalyticsPerformance:
 
         Target: <500ms
         """
-        event_tracker = EventTracker(storage_path=tmp_path)
+        event_tracker = EventTracker()  # noqa: F841 — instantiated to verify constructor works
 
         # Generate 10k events
         events = []
@@ -246,7 +246,7 @@ class TestAnalyticsPerformance:
 
         Target: <1 second
         """
-        report_mgr = UsageReportManager(storage_path=tmp_path)
+        report_mgr = UsageReportManager(db_path=tmp_path)  # noqa: F841 — instantiated to verify constructor works
 
         # Generate sample data
         events = []

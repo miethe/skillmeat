@@ -162,9 +162,12 @@ class TestListListings:
         assert len(data["items"]) == 1
         assert data["page_info"]["has_next_page"] is True
 
+    @patch("skillmeat.api.routers.marketplace.cache_manager")
     @patch("skillmeat.api.routers.marketplace.get_broker_registry")
-    def test_list_listings_no_brokers(self, mock_registry, client):
+    def test_list_listings_no_brokers(self, mock_registry, mock_cache, client):
         """Test error when no brokers available."""
+        # Bypass cache so the broker check is always reached
+        mock_cache.get.return_value = None
         mock_registry.return_value.get_enabled_brokers.return_value = []
 
         response = client.get("/api/v1/marketplace/listings")
@@ -248,9 +251,12 @@ class TestGetListingDetail:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
 
+    @patch("skillmeat.api.routers.marketplace.cache_manager")
     @patch("skillmeat.api.routers.marketplace.get_broker_registry")
-    def test_get_listing_no_brokers(self, mock_registry, client):
+    def test_get_listing_no_brokers(self, mock_registry, mock_cache, client):
         """Test error when no brokers available."""
+        # Bypass cache so the broker check is always reached
+        mock_cache.get.return_value = None
         mock_registry.return_value.get_enabled_brokers.return_value = []
 
         response = client.get("/api/v1/marketplace/listings/test-listing-1")
@@ -279,15 +285,22 @@ class TestInstallListing:
         # Mock bundle operations
         mock_bundle.from_file.return_value = Mock()
 
-        # Mock import result
+        # Mock import result — the endpoint uses result.artifacts (list of imported items)
         mock_artifact1 = Mock()
         mock_artifact1.name = "artifact1"
+        mock_artifact1.resolution = "imported"
+        mock_artifact1.new_name = None
+        mock_artifact1.type = "skill"
         mock_artifact2 = Mock()
         mock_artifact2.name = "artifact2"
+        mock_artifact2.resolution = "imported"
+        mock_artifact2.new_name = None
+        mock_artifact2.type = "skill"
 
         mock_result = Mock()
-        mock_result.imported_artifacts = [mock_artifact1, mock_artifact2]
+        mock_result.artifacts = [mock_artifact1, mock_artifact2]
         mock_importer.return_value.import_bundle.return_value = mock_result
+        mock_importer.return_value.artifact_mgr = Mock()
 
         # Make request
         response = client.post(

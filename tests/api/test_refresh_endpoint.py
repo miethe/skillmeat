@@ -384,13 +384,13 @@ class TestRefreshRequestBodyValidation:
         assert data["dry_run"] is False
 
     def test_refresh_request_body_valid_check_only(
-        self, client, mock_collection_manager, mock_refresh_result_dry_run
+        self, client, mock_collection_manager
     ):
-        """Valid RefreshRequest with check_only mode deserializes correctly."""
+        """Valid RefreshRequest with check_only mode returns UpdateCheckResponse."""
         with patch.object(
             CollectionRefresher,
-            "refresh_collection",
-            return_value=mock_refresh_result_dry_run,
+            "check_updates",
+            return_value=[],
         ):
             response = client.post(
                 "/api/v1/user-collections/default/refresh",
@@ -399,7 +399,9 @@ class TestRefreshRequestBodyValidation:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["mode"] == "check_only"
+        # check_only mode returns UpdateCheckResponse (no "mode" field)
+        assert "collection_id" in data
+        assert "updates_available" in data
 
     def test_refresh_request_body_valid_sync(
         self, client, mock_collection_manager, mock_refresh_result_success
@@ -547,14 +549,14 @@ class TestRefreshQueryParamModeOverride:
         assert call_kwargs.get("mode") == RefreshMode.SYNC
 
     def test_refresh_query_param_check_only_override(
-        self, client, mock_collection_manager, mock_refresh_result_dry_run
+        self, client, mock_collection_manager
     ):
-        """Query param ?mode=check_only overrides body."""
+        """Query param ?mode=check_only overrides body and returns UpdateCheckResponse."""
         with patch.object(
             CollectionRefresher,
-            "refresh_collection",
-            return_value=mock_refresh_result_dry_run,
-        ) as mock_refresh:
+            "check_updates",
+            return_value=[],
+        ) as mock_check:
             response = client.post(
                 "/api/v1/user-collections/default/refresh?mode=check_only",
                 json={"mode": "sync"},
@@ -562,17 +564,16 @@ class TestRefreshQueryParamModeOverride:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["mode"] == "check_only"
+        # check_only mode returns UpdateCheckResponse (no "mode" field)
+        assert "collection_id" in data
+        assert "updates_available" in data
 
-        mock_refresh.assert_called_once()
-        call_kwargs = mock_refresh.call_args.kwargs
-        assert call_kwargs.get("mode") == RefreshMode.CHECK_ONLY
+        mock_check.assert_called_once()
 
     @pytest.mark.parametrize(
         "query_mode,expected_core_mode",
         [
             ("metadata_only", RefreshMode.METADATA_ONLY),
-            ("check_only", RefreshMode.CHECK_ONLY),
             ("sync", RefreshMode.SYNC),
         ],
     )
@@ -584,7 +585,7 @@ class TestRefreshQueryParamModeOverride:
         query_mode,
         expected_core_mode,
     ):
-        """Query param works for all valid mode values."""
+        """Query param works for metadata_only and sync mode values."""
         with patch.object(
             CollectionRefresher,
             "refresh_collection",
@@ -599,6 +600,27 @@ class TestRefreshQueryParamModeOverride:
         mock_refresh.assert_called_once()
         call_kwargs = mock_refresh.call_args.kwargs
         assert call_kwargs.get("mode") == expected_core_mode
+
+    def test_refresh_query_param_check_only_mode(
+        self,
+        client,
+        mock_collection_manager,
+    ):
+        """Query param ?mode=check_only routes to check_updates and returns UpdateCheckResponse."""
+        with patch.object(
+            CollectionRefresher,
+            "check_updates",
+            return_value=[],
+        ) as mock_check:
+            response = client.post(
+                "/api/v1/user-collections/default/refresh?mode=check_only",
+                json={"mode": "metadata_only"},
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "updates_available" in data
+        mock_check.assert_called_once()
 
     def test_refresh_query_param_invalid_mode(self, client, mock_collection_manager):
         """Invalid query param mode returns 422."""

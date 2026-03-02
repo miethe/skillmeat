@@ -8,12 +8,55 @@
 - External DTOs still use `type:name` format — resolve via join: `Artifact.id.in_(ids)` + join on `artifact_uuid == Artifact.uuid`
 - See: `skillmeat/cache/models.py` lines 983-1270, fix in `skillmeat/api/routers/artifacts.py` ~line 2255
 
+### CLI Deploy/Undeploy Non-TTY Patterns
+- Deploy outputs JSON in non-TTY (CliRunner); assert `"test-skill" in result.output` and `"success" in result.output` instead of `"Deployed" in result.output`
+- `undeploy` command requires `--force` in non-TTY mode (exit 2 otherwise); all test invocations must pass `--force`
+- Deploy with already-deployed artifact in non-TTY: prompts for overwrite (EOFError) — pass `--overwrite` to skip
+- Deploy nonexistent artifact: returns exit 0 with `{"deployments": []}` — check empty deployments, not exit 1
+- Bug fixed: `DeploymentManager.undeploy()` called `artifact_type.value` when `artifact_type=None` — fixed via `find_deployment_by_name()` in `DeploymentTracker`
+- New method: `DeploymentTracker.find_deployment_by_name()` in `skillmeat/storage/deployment.py` — searches all types by name only
+
+### CLI add Command Bug (FIXED)
+- `_format_artifact_output` in `skillmeat/cli/__init__.py` used `artifact.artifact_type.value` — wrong attribute name
+- `Artifact` dataclass (in `skillmeat/core/artifact.py`) uses `artifact.type` (not `artifact_type`)
+- Fix: changed both lines in `_format_artifact_output` to use `artifact.type.value`
+- GitHub test mocks in `tests/cli/test_add.py` must return `FetchResult` (not a tuple); import from `skillmeat.sources.base`
+- GitHub test mock `side_effect` receives `(spec, artifact_type)` — NOT `(self, spec, artifact_type)` — mock strips `self`
+- Correct import for `ArtifactMetadata` in tests: `from skillmeat.core.artifact import ArtifactMetadata`
+
 ### Pre-existing Test Failures (not our concern)
 - `tests/test_claude_marketplace.py` — ModuleNotFoundError: `skillman`
 - `tests/test_duplicate_detection.py` — ImportError: `ArtifactMetadata` from `skillmeat.utils.metadata`
 - `tests/test_search_projects.py` — same ImportError
 - `tests/unit/api/test_perform_scan_clone_integration.py` — ImportError: `_convert_manifest_to_search_metadata`
+- `tests/cli/test_add.py` — failures: `'Artifact' object has no attribute 'artifact_type'` (production bug) + github tests
+- `tests/cli/test_list_show_remove.py` — remove/show failures: `--force` required in non-TTY (same pattern as undeploy)
+- `tests/cli/test_deploy.py` — FIXED (was 10 failures, now 0)
+- `tests/cli/test_collection_refresh.py::TestFieldsOption::test_fields_option_multiple_fields` — pre-existing
 - Several `tests/api/` tests fail due to fixture/mock issues — pre-existing
+
+### CLI Test Isolation Pattern
+- `ConfigManager.DEFAULT_CONFIG_DIR` is a class variable evaluated at import time (caches `Path.home()`)
+- `monkeypatch.setenv("HOME", ...)` alone does NOT fix it — must also patch the class attr
+- Fix: `monkeypatch.setattr(ConfigManager, "DEFAULT_CONFIG_DIR", home_dir / ".skillmeat")`
+- Applied to both `isolated_cli_runner` and `temp_home` fixtures in `tests/conftest.py`
+- Also patch Rich console: `monkeypatch.setattr(cli_module, "console", Console(no_color=True, highlight=False))`
+  to prevent ANSI codes from breaking `"text in result.output"` assertions
+- `Console(force_terminal=True)` in `skillmeat/cli/__init__.py` line 40 ignores NO_COLOR env var
+
+### CLI JSON Output Format (SmartDefaults)
+- `SmartDefaults.detect_output_format()` returns `"json"` when `sys.stdout.isatty()` is False
+- CliRunner is non-TTY, so ALL CLI tests using output assertions must account for JSON format
+- `config list` in JSON mode: `{"status":"success","config":{...}}` — NOT "Configuration" table title
+- `config get nonexistent` in JSON mode: `{"status":"success","key":"nonexistent","value":null}` — NOT "not set"
+- Test assertions should check for key strings present in JSON instead of human-readable table text
+
+### Alembic + create_tables() Race Condition
+- `CacheRepository.__init__` calls `create_tables()` (Base.metadata.create_all) WITHOUT running Alembic
+- This creates all ORM tables but does NOT create `alembic_version` table
+- Later `CacheManager.initialize_cache()` → `run_migrations()` → Alembic sees no revision → tries to run `001_initial_schema` → FAILS with "table projects already exists"
+- Fix: `CacheManager._stamp_untracked_db_if_needed()` — detects `projects` table + no `alembic_version` → stamps DB at head via `alembic command.stamp`
+- In `skillmeat/cache/manager.py` — called in `initialize_cache()` before `run_migrations()`
 
 ### Key File Locations
 - Models: `skillmeat/cache/models.py`

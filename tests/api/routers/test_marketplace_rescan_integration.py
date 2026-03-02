@@ -84,6 +84,14 @@ def mock_source():
     source.last_error = None
     source.created_at = datetime(2025, 1, 6, 12, 0, 0)
     source.updated_at = datetime(2025, 1, 6, 12, 0, 0)
+    source.repo_description = None
+    source.repo_readme = None
+    source.single_artifact_mode = False
+    source.single_artifact_type = None
+    source.indexing_enabled = None
+    source.deep_indexing_enabled = False
+    source.clone_target = None
+    source.clone_target_json = None
 
     # Add methods
     def get_manual_map_dict():
@@ -96,6 +104,8 @@ def mock_source():
 
     source.get_manual_map_dict = get_manual_map_dict
     source.set_manual_map_dict = set_manual_map_dict
+    source.get_counts_by_type_dict = Mock(return_value={})
+    source.get_tags_list = Mock(return_value=[])
 
     return source
 

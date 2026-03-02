@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 from skillmeat.core.search import SearchManager
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.models import ArtifactFingerprint, DuplicatePair
-from skillmeat.utils.metadata import ArtifactMetadata
+from skillmeat.core.artifact import ArtifactMetadata
 
 
 @pytest.fixture

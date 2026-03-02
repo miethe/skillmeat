@@ -228,7 +228,7 @@ class TestScanPerformance:
 
         def run_scan():
             """Simulate scanning small repo."""
-            with patch.object(scanner, "_fetch_tree", return_value=mock_small_repo_tree):
+            with patch.object(scanner, "_fetch_tree", return_value=(mock_small_repo_tree, "main")):
                 with patch.object(scanner, "_get_ref_sha", return_value="abc123"):
                     with patch(
                         "skillmeat.core.marketplace.github_scanner.detect_artifacts_in_tree",
@@ -263,7 +263,7 @@ class TestScanPerformance:
 
         def run_scan():
             """Simulate scanning medium repo."""
-            with patch.object(scanner, "_fetch_tree", return_value=mock_medium_repo_tree):
+            with patch.object(scanner, "_fetch_tree", return_value=(mock_medium_repo_tree, "main")):
                 with patch.object(scanner, "_get_ref_sha", return_value="abc123456"):
                     with patch(
                         "skillmeat.core.marketplace.github_scanner.detect_artifacts_in_tree",
@@ -300,7 +300,7 @@ class TestScanPerformance:
 
         def run_scan():
             """Simulate scanning large repo."""
-            with patch.object(scanner, "_fetch_tree", return_value=mock_large_repo_tree):
+            with patch.object(scanner, "_fetch_tree", return_value=(mock_large_repo_tree, "main")):
                 with patch.object(scanner, "_get_ref_sha", return_value="abc1234567"):
                     with patch(
                         "skillmeat.core.marketplace.github_scanner.detect_artifacts_in_tree",
@@ -336,7 +336,7 @@ class TestScanPerformance:
         def run_scan():
             """Simulate scanning very large repo with pagination."""
             # Simulate paginated response
-            with patch.object(scanner, "_fetch_tree", return_value=mock_very_large_repo_tree):
+            with patch.object(scanner, "_fetch_tree", return_value=(mock_very_large_repo_tree, "main")):
                 with patch.object(scanner, "_get_ref_sha", return_value="abc12345678"):
                     # Mock empty artifacts for performance test
                     with patch(
@@ -801,7 +801,7 @@ class TestMemoryUsage:
 
         # Run 10 scans
         for i in range(10):
-            with patch.object(scanner, "_fetch_tree", return_value=mock_medium_repo_tree):
+            with patch.object(scanner, "_fetch_tree", return_value=(mock_medium_repo_tree, "main")):
                 with patch.object(scanner, "_get_ref_sha", return_value=f"sha-{i}"):
                     with patch(
                         "skillmeat.core.marketplace.github_scanner.detect_artifacts_in_tree",

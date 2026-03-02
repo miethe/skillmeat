@@ -59,7 +59,7 @@ def client(app):
 def mock_source():
     """Create a mock MarketplaceSource."""
     return MarketplaceSource(
-        id="src_test_123",
+        id="src-test-123",
         repo_url="https://github.com/anthropics/anthropic-quickstarts",
         owner="anthropics",
         repo_name="anthropic-quickstarts",
@@ -81,7 +81,7 @@ def mock_catalog_entry():
     """Create a mock MarketplaceCatalogEntry."""
     return MarketplaceCatalogEntry(
         id="cat_test_456",
-        source_id="src_test_123",
+        source_id="src-test-123",
         artifact_type="skill",
         name="canvas-design",
         path="skills/canvas-design",
@@ -138,7 +138,7 @@ def mock_scanner():
     """Create mock GitHubScanner."""
     mock = MagicMock()
     scan_result = ScanResultDTO(
-        source_id="src_test_123",
+        source_id="src-test-123",
         status="success",
         artifacts_found=5,
         new_count=3,
@@ -156,35 +156,39 @@ def mock_scanner():
 @pytest.fixture
 def mock_import_coordinator():
     """Create mock ImportCoordinator."""
+    from datetime import datetime as dt
+
     from skillmeat.core.marketplace.import_coordinator import (
+        ImportEntry,
         ImportResult,
-        ImportedEntry,
         ImportStatus,
     )
 
     mock = MagicMock()
     import_result = ImportResult(
         import_id="imp_test_789",
-        success_count=2,
-        skipped_count=1,
-        error_count=0,
+        source_id="src-test-123",
+        started_at=dt(2025, 12, 6, 10, 30, 0),
         entries=[
-            ImportedEntry(
+            ImportEntry(
                 catalog_entry_id="cat_test_456",
-                artifact_name="canvas-design",
+                name="canvas-design",
                 artifact_type="skill",
+                upstream_url="https://github.com/anthropics/anthropic-quickstarts/tree/main/skills/canvas-design",
                 status=ImportStatus.SUCCESS,
             ),
-            ImportedEntry(
+            ImportEntry(
                 catalog_entry_id="cat_test_457",
-                artifact_name="another-skill",
+                name="another-skill",
                 artifact_type="skill",
+                upstream_url="https://github.com/anthropics/anthropic-quickstarts/tree/main/skills/another-skill",
                 status=ImportStatus.SUCCESS,
             ),
-            ImportedEntry(
+            ImportEntry(
                 catalog_entry_id="cat_test_458",
-                artifact_name="existing-skill",
+                name="existing-skill",
                 artifact_type="skill",
+                upstream_url="https://github.com/anthropics/anthropic-quickstarts/tree/main/skills/existing-skill",
                 status=ImportStatus.SKIPPED,
                 error_message="Already exists in collection",
             ),
@@ -210,7 +214,7 @@ class TestCreateSource:
             mock_source.scan_status = "success"
             mock_source.artifact_count = 5
             return ScanResultDTO(
-                source_id="src_test_123",
+                source_id="src-test-123",
                 status="success",
                 artifacts_found=5,
                 new_count=5,
@@ -246,7 +250,7 @@ class TestCreateSource:
         data = response.json()
 
         # Verify response structure
-        assert data["id"] == "src_test_123"
+        assert data["id"] == "src-test-123"
         assert data["repo_url"] == "https://github.com/anthropics/anthropic-quickstarts"
         assert data["owner"] == "anthropics"
         assert data["repo_name"] == "anthropic-quickstarts"
@@ -262,7 +266,7 @@ class TestCreateSource:
         async def mock_perform_scan(*args, **kwargs):
             mock_source.scan_status = "success"
             return ScanResultDTO(
-                source_id="src_test_123",
+                source_id="src-test-123",
                 status="success",
                 artifacts_found=2,
                 new_count=2,
@@ -371,7 +375,7 @@ class TestCreateSource:
             mock_source.scan_status = "success"
             mock_source.artifact_count = 0
             return ScanResultDTO(
-                source_id="src_test_123",
+                source_id="src-test-123",
                 status="success",
                 artifacts_found=0,
                 new_count=0,
@@ -433,7 +437,7 @@ class TestListSources:
 
         # Verify source structure
         source = data["items"][0]
-        assert source["id"] == "src_test_123"
+        assert source["id"] == "src-test-123"
         assert source["owner"] == "anthropics"
         assert source["repo_name"] == "anthropic-quickstarts"
 
@@ -444,7 +448,7 @@ class TestListSources:
             return_value=mock_source_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources?limit=10&cursor=src_test_123"
+                "/api/v1/marketplace/sources?limit=10&cursor=src-test-123"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -503,12 +507,12 @@ class TestGetSource:
             "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
             return_value=mock_source_repo,
         ):
-            response = client.get("/api/v1/marketplace/sources/src_test_123")
+            response = client.get("/api/v1/marketplace/sources/src-test-123")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
-        assert data["id"] == "src_test_123"
+        assert data["id"] == "src-test-123"
         assert data["owner"] == "anthropics"
         assert data["repo_name"] == "anthropic-quickstarts"
         assert data["scan_status"] == "success"
@@ -562,7 +566,7 @@ class TestUpdateSource:
             return_value=mock_source_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123",
+                "/api/v1/marketplace/sources/src-test-123",
                 json={"ref": "v1.0.0"}
             )
 
@@ -595,7 +599,7 @@ class TestUpdateSource:
             return_value=mock_source_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123",
+                "/api/v1/marketplace/sources/src-test-123",
                 json={"root_hint": "artifacts"}
             )
 
@@ -628,7 +632,7 @@ class TestUpdateSource:
             return_value=mock_source_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123",
+                "/api/v1/marketplace/sources/src-test-123",
                 json={"trust_level": "official"}
             )
 
@@ -661,7 +665,7 @@ class TestUpdateSource:
             return_value=mock_source_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123",
+                "/api/v1/marketplace/sources/src-test-123",
                 json={"ref": "develop", "trust_level": "verified"}
             )
 
@@ -677,7 +681,7 @@ class TestUpdateSource:
             return_value=mock_source_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123",
+                "/api/v1/marketplace/sources/src-test-123",
                 json={}  # Empty body - no update parameters
             )
 
@@ -724,13 +728,13 @@ class TestRescanSource:
             "skillmeat.api.routers.marketplace_sources.GitHubScanner",
             return_value=mock_scanner,
         ):
-            response = client.post("/api/v1/marketplace/sources/src_test_123/rescan")
+            response = client.post("/api/v1/marketplace/sources/src-test-123/rescan")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
         # Verify scan result structure
-        assert data["source_id"] == "src_test_123"
+        assert data["source_id"] == "src-test-123"
         assert data["status"] == "success"
         assert data["artifacts_found"] == 5
         assert data["new_count"] == 3
@@ -756,7 +760,7 @@ class TestRescanSource:
             return_value=mock_scanner,
         ):
             response = client.post(
-                "/api/v1/marketplace/sources/src_test_123/rescan",
+                "/api/v1/marketplace/sources/src-test-123/rescan",
                 json={"force": True},
             )
 
@@ -793,7 +797,7 @@ class TestRescanSource:
             "skillmeat.api.routers.marketplace_sources.GitHubScanner",
             return_value=mock_scanner,
         ):
-            response = client.post("/api/v1/marketplace/sources/src_test_123/rescan")
+            response = client.post("/api/v1/marketplace/sources/src-test-123/rescan")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -822,7 +826,7 @@ class TestListArtifacts:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -838,7 +842,7 @@ class TestListArtifacts:
         assert len(data["items"]) == 1
         entry = data["items"][0]
         assert entry["id"] == "cat_test_456"
-        assert entry["source_id"] == "src_test_123"
+        assert entry["source_id"] == "src-test-123"
         assert entry["artifact_type"] == "skill"
         assert entry["name"] == "canvas-design"
         assert entry["confidence_score"] == 95
@@ -860,7 +864,7 @@ class TestListArtifacts:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?artifact_type=skill"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?artifact_type=skill"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -877,7 +881,7 @@ class TestListArtifacts:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?status=new"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?status=new"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -894,7 +898,7 @@ class TestListArtifacts:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?min_confidence=80"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=80"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -911,7 +915,7 @@ class TestListArtifacts:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?artifact_type=skill&status=new&min_confidence=90"
             )
 
@@ -929,7 +933,7 @@ class TestListArtifacts:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?limit=10&cursor=cat_test_456"
             )
 
@@ -950,19 +954,19 @@ class TestListArtifacts:
         ):
             # Valid range
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?min_confidence=50"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=50"
             )
             assert response.status_code == status.HTTP_200_OK
 
             # Too low
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?min_confidence=-1"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=-1"
             )
             assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
             # Too high
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?min_confidence=101"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=101"
             )
             assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -1051,7 +1055,7 @@ class TestConfidenceFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?min_confidence=50"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=50"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -1087,7 +1091,7 @@ class TestConfidenceFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?max_confidence=70"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?max_confidence=70"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -1126,7 +1130,7 @@ class TestConfidenceFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?min_confidence=40&max_confidence=80"
             )
 
@@ -1170,7 +1174,7 @@ class TestConfidenceFiltering:
         ):
             # No parameters - should apply default threshold via get_source_catalog
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -1193,9 +1197,8 @@ class TestConfidenceFiltering:
         mock_catalog_repo = MagicMock()
 
         # include_below_threshold=True - show ALL entries
-        mock_catalog_repo.list_paginated.return_value = MagicMock(
-            items=mock_catalog_entries_with_scores, has_more=False
-        )
+        # Router calls get_source_catalog because include_excluded=False triggers needs_filtered_query
+        mock_catalog_repo.get_source_catalog.return_value = mock_catalog_entries_with_scores
         mock_catalog_repo.count_by_status.return_value = {"new": len(mock_catalog_entries_with_scores)}
         mock_catalog_repo.count_by_type.return_value = {"skill": len(mock_catalog_entries_with_scores)}
 
@@ -1207,7 +1210,7 @@ class TestConfidenceFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?include_below_threshold=true"
             )
 
@@ -1224,9 +1227,8 @@ class TestConfidenceFiltering:
     ):
         """Test API response includes raw_score field."""
         mock_catalog_repo = MagicMock()
-        mock_catalog_repo.list_paginated.return_value = MagicMock(
-            items=[mock_catalog_entries_with_scores[0]], has_more=False
-        )
+        # Router calls get_source_catalog because include_excluded=False triggers needs_filtered_query
+        mock_catalog_repo.get_source_catalog.return_value = [mock_catalog_entries_with_scores[0]]
         mock_catalog_repo.count_by_status.return_value = {"new": 1}
         mock_catalog_repo.count_by_type.return_value = {"skill": 1}
 
@@ -1238,7 +1240,7 @@ class TestConfidenceFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?include_below_threshold=true"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?include_below_threshold=true"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -1254,9 +1256,8 @@ class TestConfidenceFiltering:
     ):
         """Test API response includes score_breakdown field."""
         mock_catalog_repo = MagicMock()
-        mock_catalog_repo.list_paginated.return_value = MagicMock(
-            items=[mock_catalog_entries_with_scores[0]], has_more=False
-        )
+        # Router calls get_source_catalog because include_excluded=False triggers needs_filtered_query
+        mock_catalog_repo.get_source_catalog.return_value = [mock_catalog_entries_with_scores[0]]
         mock_catalog_repo.count_by_status.return_value = {"new": 1}
         mock_catalog_repo.count_by_type.return_value = {"skill": 1}
 
@@ -1268,7 +1269,7 @@ class TestConfidenceFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?include_below_threshold=true"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?include_below_threshold=true"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -1315,7 +1316,7 @@ class TestConfidenceFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?min_confidence=20&include_below_threshold=false"
             )
 
@@ -1353,7 +1354,7 @@ class TestConfidenceFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?min_confidence=40&include_below_threshold=false"
             )
 
@@ -1379,7 +1380,7 @@ class TestConfidenceFiltering:
             return_value=mock_source_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?min_confidence=-1"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=-1"
             )
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -1393,7 +1394,7 @@ class TestConfidenceFiltering:
             return_value=mock_source_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?min_confidence=101"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=101"
             )
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -1407,7 +1408,7 @@ class TestConfidenceFiltering:
             return_value=mock_source_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?max_confidence=-1"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?max_confidence=-1"
             )
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -1421,7 +1422,7 @@ class TestConfidenceFiltering:
             return_value=mock_source_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?max_confidence=101"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?max_confidence=101"
             )
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -1458,7 +1459,7 @@ class TestImportArtifacts:
             return_value=mock_import_coordinator,
         ):
             response = client.post(
-                "/api/v1/marketplace/sources/src_test_123/import",
+                "/api/v1/marketplace/sources/src-test-123/import",
                 json={
                     "entry_ids": ["cat_test_456"],
                     "conflict_strategy": "skip",
@@ -1484,10 +1485,20 @@ class TestImportArtifacts:
         mock_catalog_entry,
     ):
         """Test importing multiple artifacts at once."""
-        # Mock multiple catalog entries
-        entry2 = MarketplaceCatalogEntry(**mock_catalog_entry.__dict__)
-        entry2.id = "cat_test_457"
-        entry2.name = "another-skill"
+        # Mock multiple catalog entries — create a fresh instance to avoid SQLAlchemy state
+        entry2 = MarketplaceCatalogEntry(
+            id="cat_test_457",
+            source_id=mock_catalog_entry.source_id,
+            artifact_type=mock_catalog_entry.artifact_type,
+            name="another-skill",
+            path="skills/another-skill",
+            upstream_url="https://github.com/anthropics/anthropic-quickstarts/tree/main/skills/another-skill",
+            detected_version=mock_catalog_entry.detected_version,
+            detected_sha=mock_catalog_entry.detected_sha,
+            detected_at=mock_catalog_entry.detected_at,
+            confidence_score=mock_catalog_entry.confidence_score,
+            status=mock_catalog_entry.status,
+        )
 
         mock_catalog_repo.get_by_id.side_effect = lambda id: {
             "cat_test_456": mock_catalog_entry,
@@ -1508,7 +1519,7 @@ class TestImportArtifacts:
             return_value=mock_import_coordinator,
         ):
             response = client.post(
-                "/api/v1/marketplace/sources/src_test_123/import",
+                "/api/v1/marketplace/sources/src-test-123/import",
                 json={
                     "entry_ids": ["cat_test_456", "cat_test_457"],
                     "conflict_strategy": "overwrite",
@@ -1520,21 +1531,20 @@ class TestImportArtifacts:
         assert data["imported_count"] == 2
 
     def test_import_empty_entry_ids(self, client, mock_source_repo):
-        """Test importing with empty entry_ids list fails."""
+        """Test importing with empty entry_ids list fails with validation error."""
         with patch(
             "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
             return_value=mock_source_repo,
         ):
             response = client.post(
-                "/api/v1/marketplace/sources/src_test_123/import",
+                "/api/v1/marketplace/sources/src-test-123/import",
                 json={
                     "entry_ids": [],
                     "conflict_strategy": "skip",
                 },
             )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "entry_ids cannot be empty" in response.json()["detail"]
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_import_entry_not_found(
         self, client, mock_source_repo, mock_catalog_repo
@@ -1550,7 +1560,7 @@ class TestImportArtifacts:
             return_value=mock_catalog_repo,
         ):
             response = client.post(
-                "/api/v1/marketplace/sources/src_test_123/import",
+                "/api/v1/marketplace/sources/src-test-123/import",
                 json={
                     "entry_ids": ["nonexistent"],
                     "conflict_strategy": "skip",
@@ -1564,9 +1574,20 @@ class TestImportArtifacts:
         self, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry
     ):
         """Test importing entry that belongs to different source."""
-        # Entry belongs to different source
-        wrong_entry = MarketplaceCatalogEntry(**mock_catalog_entry.__dict__)
-        wrong_entry.source_id = "different_source"
+        # Entry belongs to different source — create a fresh instance to avoid SQLAlchemy state
+        wrong_entry = MarketplaceCatalogEntry(
+            id=mock_catalog_entry.id,
+            source_id="different-source",
+            artifact_type=mock_catalog_entry.artifact_type,
+            name=mock_catalog_entry.name,
+            path=mock_catalog_entry.path,
+            upstream_url=mock_catalog_entry.upstream_url,
+            detected_version=mock_catalog_entry.detected_version,
+            detected_sha=mock_catalog_entry.detected_sha,
+            detected_at=mock_catalog_entry.detected_at,
+            confidence_score=mock_catalog_entry.confidence_score,
+            status=mock_catalog_entry.status,
+        )
         mock_catalog_repo.get_by_id.return_value = wrong_entry
 
         with patch(
@@ -1577,7 +1598,7 @@ class TestImportArtifacts:
             return_value=mock_catalog_repo,
         ):
             response = client.post(
-                "/api/v1/marketplace/sources/src_test_123/import",
+                "/api/v1/marketplace/sources/src-test-123/import",
                 json={
                     "entry_ids": ["cat_test_456"],
                     "conflict_strategy": "skip",
@@ -1613,7 +1634,7 @@ class TestImportArtifacts:
                 return_value=mock_import_coordinator,
             ):
                 response = client.post(
-                    "/api/v1/marketplace/sources/src_test_123/import",
+                    "/api/v1/marketplace/sources/src-test-123/import",
                     json={
                         "entry_ids": ["cat_test_456"],
                         "conflict_strategy": strategy,
@@ -1663,7 +1684,7 @@ class TestImportArtifacts:
             return_value=mock_import_coordinator,
         ):
             response = client.post(
-                "/api/v1/marketplace/sources/src_test_123/import",
+                "/api/v1/marketplace/sources/src-test-123/import",
                 json={
                     "entry_ids": ["cat_test_456"],
                     # conflict_strategy defaults to "skip"
@@ -1713,7 +1734,7 @@ class TestErrorHandling:
             "skillmeat.api.routers.marketplace_sources.GitHubScanner",
             return_value=mock_scanner,
         ):
-            response = client.post("/api/v1/marketplace/sources/src_test_123/rescan")
+            response = client.post("/api/v1/marketplace/sources/src-test-123/rescan")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -1765,7 +1786,7 @@ class TestGetFileTree:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -1778,14 +1799,14 @@ class TestGetFileTree:
 
         # Verify artifact metadata
         assert data["artifact_path"] == "skills/canvas"
-        assert data["source_id"] == "src_test_123"
+        assert data["source_id"] == "src-test-123"
 
         # Verify file tree entries
         assert len(data["entries"]) == 4
 
-        # Check entry structure
+        # Check entry structure — router maps "blob" to "file" via _map_tree_entry_type()
         skill_md = next(e for e in data["entries"] if e["path"] == "SKILL.md")
-        assert skill_md["type"] == "blob"
+        assert skill_md["type"] == "file"
         assert skill_md["size"] == 2048
         assert skill_md["sha"] == "abc123def456"
 
@@ -1827,7 +1848,7 @@ class TestGetFileTree:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/nonexistent/path/files"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/nonexistent/path/files"
             )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -1852,7 +1873,7 @@ class TestGetFileTree:
         ):
             # First request - cache miss
             response1 = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
             )
             assert response1.status_code == status.HTTP_200_OK
 
@@ -1861,7 +1882,7 @@ class TestGetFileTree:
 
             # Second request - cache hit (scanner should not be called again)
             response2 = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
             )
             assert response2.status_code == status.HTTP_200_OK
 
@@ -1889,7 +1910,7 @@ class TestGetFileTree:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
             )
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1913,7 +1934,7 @@ class TestGetFileTree:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/deep/nested/path/artifact/files"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/deep/nested/path/artifact/files"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -1984,7 +2005,7 @@ class TestGetFileContent:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -2008,7 +2029,7 @@ class TestGetFileContent:
         assert data["name"] == "SKILL.md"
         assert data["is_binary"] is False
         assert data["artifact_path"] == "skills/canvas"
-        assert data["source_id"] == "src_test_123"
+        assert data["source_id"] == "src-test-123"
 
     def test_get_file_content_binary_file(
         self, client, mock_source_repo, mock_binary_file_content, mock_github_file_cache
@@ -2028,7 +2049,7 @@ class TestGetFileContent:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/assets/logo.png"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/assets/logo.png"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -2074,7 +2095,7 @@ class TestGetFileContent:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/nonexistent.md"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/nonexistent.md"
             )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -2099,7 +2120,7 @@ class TestGetFileContent:
         ):
             # First request - cache miss
             response1 = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
             )
             assert response1.status_code == status.HTTP_200_OK
 
@@ -2108,7 +2129,7 @@ class TestGetFileContent:
 
             # Second request - cache hit
             response2 = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
             )
             assert response2.status_code == status.HTTP_200_OK
 
@@ -2136,7 +2157,7 @@ class TestGetFileContent:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
             )
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -2160,7 +2181,7 @@ class TestGetFileContent:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/src/components/deep/nested/file.tsx"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/src/components/deep/nested/file.tsx"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -2204,7 +2225,7 @@ class TestGetFileContent:
                 return_value=mock_github_file_cache,
             ):
                 response = client.get(
-                    f"/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/{filename}"
+                    f"/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/{filename}"
                 )
 
             assert response.status_code == status.HTTP_200_OK
@@ -2234,7 +2255,7 @@ class TestGitHubCacheIntegration:
         """Test cache key format for tree requests."""
         from skillmeat.api.utils.github_cache import build_tree_key
 
-        source_id = "src_test_123"
+        source_id = "src-test-123"
         artifact_path = "skills/canvas"
         sha = "main"
 
@@ -2249,7 +2270,7 @@ class TestGitHubCacheIntegration:
         """Test cache key format for content requests."""
         from skillmeat.api.utils.github_cache import build_content_key
 
-        source_id = "src_test_123"
+        source_id = "src-test-123"
         artifact_path = "skills/canvas"
         file_path = "SKILL.md"
         sha = "main"
@@ -2344,7 +2365,7 @@ class TestDeleteSource:
             "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
             return_value=mock_source_repo,
         ):
-            response = client.delete("/api/v1/marketplace/sources/src_test_123")
+            response = client.delete("/api/v1/marketplace/sources/src-test-123")
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
@@ -2400,7 +2421,7 @@ class TestFileEndpointsRateLimiting:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
             )
 
         # Verify 429 status code
@@ -2438,7 +2459,7 @@ class TestFileEndpointsRateLimiting:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
             )
 
         # Verify 429 status code
@@ -2477,7 +2498,7 @@ class TestFileEndpointsRateLimiting:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
             )
 
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
@@ -2506,7 +2527,7 @@ class TestFileEndpointsRateLimiting:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
             )
 
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
@@ -2538,7 +2559,7 @@ class TestFileEndpointsRateLimiting:
             return_value=mock_github_file_cache,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
             )
 
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
@@ -2568,7 +2589,7 @@ class TestExcludeArtifact:
         """Create a mock catalog entry for exclusion tests."""
         entry = MarketplaceCatalogEntry(
             id="cat_test_456",
-            source_id="src_test_123",
+            source_id="src-test-123",
             artifact_type="skill",
             name="canvas-design",
             path="skills/canvas-design",
@@ -2588,7 +2609,7 @@ class TestExcludeArtifact:
         """Create a mock catalog entry that is already excluded."""
         entry = MarketplaceCatalogEntry(
             id="cat_test_789",
-            source_id="src_test_123",
+            source_id="src-test-123",
             artifact_type="skill",
             name="excluded-skill",
             path="skills/excluded-skill",
@@ -2621,7 +2642,7 @@ class TestExcludeArtifact:
             return_value=mock_catalog_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_456/exclude",
+                "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_456/exclude",
                 json={
                     "excluded": True,
                     "reason": "False positive - documentation file",
@@ -2656,7 +2677,7 @@ class TestExcludeArtifact:
             return_value=mock_catalog_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_456/exclude",
+                "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_456/exclude",
                 json={"excluded": True},
             )
 
@@ -2684,7 +2705,7 @@ class TestExcludeArtifact:
             return_value=mock_catalog_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_789/exclude",
+                "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_789/exclude",
                 json={
                     "excluded": True,
                     "reason": "New reason",
@@ -2711,7 +2732,7 @@ class TestExcludeArtifact:
             return_value=mock_catalog_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/nonexistent/exclude",
+                "/api/v1/marketplace/sources/src-test-123/artifacts/nonexistent/exclude",
                 json={"excluded": True},
             )
 
@@ -2751,7 +2772,7 @@ class TestExcludeArtifact:
             return_value=mock_catalog_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_999/exclude",
+                "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_999/exclude",
                 json={"excluded": True},
             )
 
@@ -2791,7 +2812,7 @@ class TestRestoreExcludedArtifact:
         """Create a mock excluded catalog entry."""
         return MarketplaceCatalogEntry(
             id="cat_test_789",
-            source_id="src_test_123",
+            source_id="src-test-123",
             artifact_type="skill",
             name="excluded-skill",
             path="skills/excluded-skill",
@@ -2811,7 +2832,7 @@ class TestRestoreExcludedArtifact:
         """Create a mock excluded catalog entry that was previously imported."""
         return MarketplaceCatalogEntry(
             id="cat_test_800",
-            source_id="src_test_123",
+            source_id="src-test-123",
             artifact_type="skill",
             name="imported-then-excluded-skill",
             path="skills/imported-then-excluded-skill",
@@ -2844,7 +2865,7 @@ class TestRestoreExcludedArtifact:
             return_value=mock_catalog_repo,
         ):
             response = client.delete(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_789/exclude"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_789/exclude"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -2876,7 +2897,7 @@ class TestRestoreExcludedArtifact:
             return_value=mock_catalog_repo,
         ):
             response = client.delete(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_800/exclude"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_800/exclude"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -2894,7 +2915,7 @@ class TestRestoreExcludedArtifact:
         # Create entry that is NOT excluded
         non_excluded_entry = MarketplaceCatalogEntry(
             id="cat_test_456",
-            source_id="src_test_123",
+            source_id="src-test-123",
             artifact_type="skill",
             name="active-skill",
             path="skills/active-skill",
@@ -2922,7 +2943,7 @@ class TestRestoreExcludedArtifact:
             return_value=mock_catalog_repo,
         ):
             response = client.delete(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_456/exclude"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_456/exclude"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -2944,7 +2965,7 @@ class TestRestoreExcludedArtifact:
             return_value=mock_catalog_repo,
         ):
             response = client.delete(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/nonexistent/exclude"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/nonexistent/exclude"
             )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -2983,7 +3004,7 @@ class TestRestoreExcludedArtifact:
             return_value=mock_catalog_repo,
         ):
             response = client.delete(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_999/exclude"
+                "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_999/exclude"
             )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -3084,7 +3105,7 @@ class TestListArtifactsExclusionFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -3124,7 +3145,7 @@ class TestListArtifactsExclusionFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?include_excluded=true&include_below_threshold=true"
             )
 
@@ -3154,7 +3175,7 @@ class TestListArtifactsExclusionFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?status=excluded"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?status=excluded"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -3181,7 +3202,7 @@ class TestListArtifactsExclusionFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts?include_excluded=false"
+                "/api/v1/marketplace/sources/src-test-123/artifacts?include_excluded=false"
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -3219,7 +3240,7 @@ class TestListArtifactsExclusionFiltering:
             return_value=mock_catalog_repo,
         ):
             response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?include_excluded=true&include_below_threshold=true"
             )
 
