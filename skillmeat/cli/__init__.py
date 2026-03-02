@@ -1058,7 +1058,7 @@ def _format_artifact_output(artifact, output_format: str = "table") -> None:
             "command": "add",
             "artifact": {
                 "name": artifact.name,
-                "type": artifact.artifact_type.value,
+                "type": artifact.type.value,
                 "collection": getattr(artifact, "collection_name", "default")
                 or "default",
             },
@@ -1066,7 +1066,7 @@ def _format_artifact_output(artifact, output_format: str = "table") -> None:
         click.echo(json.dumps(output, indent=2))
     else:
         console.print(
-            f"[green]Added {artifact.artifact_type.value}: {artifact.name}[/green]"
+            f"[green]Added {artifact.type.value}: {artifact.name}[/green]"
         )
 
 

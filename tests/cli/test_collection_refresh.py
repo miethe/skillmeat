@@ -768,14 +768,14 @@ class TestFieldsOption:
         mock_refresher_class.return_value = mock_refresher
 
         result = runner.invoke(
-            main, ["collection", "refresh", "--fields", "description,tags,author"]
+            main, ["collection", "refresh", "--fields", "description,license,author"]
         )
 
         assert result.exit_code == 0
 
         # Verify fields were parsed and passed
         call_kwargs = mock_refresher.refresh_collection.call_args[1]
-        assert call_kwargs["fields"] == ["description", "tags", "author"]
+        assert call_kwargs["fields"] == ["description", "license", "author"]
 
 
 # =============================================================================

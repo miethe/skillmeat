@@ -188,19 +188,24 @@ class TestAddSkillCommand:
         runner = isolated_cli_runner
 
         # Mock GitHub fetch to return local fixture
-        from skillmeat.models.metadata import ArtifactMetadata
+        from skillmeat.core.artifact import ArtifactMetadata
+        from skillmeat.sources.base import FetchResult
 
-        def mock_fetch_impl(spec, artifact_type, dest_dir):
-            # Copy skill to dest_dir
+        def mock_fetch_impl(spec, artifact_type):
             import shutil
+            import tempfile
 
+            dest_dir = Path(tempfile.mkdtemp(prefix="skillmeat_test_"))
             dest_path = dest_dir / "test-skill"
             shutil.copytree(sample_skill_dir, dest_path)
 
-            return dest_path, ArtifactMetadata(
-                title="Test Skill",
-                description="A test skill",
-                version="1.0.0",
+            return FetchResult(
+                artifact_path=dest_path,
+                metadata=ArtifactMetadata(
+                    title="Test Skill",
+                    description="A test skill",
+                    version="1.0.0",
+                ),
             )
 
         mock_fetch.side_effect = mock_fetch_impl
@@ -318,17 +323,23 @@ class TestAddCommandCommand:
         """Test adding command from GitHub spec."""
         runner = isolated_cli_runner
 
-        from skillmeat.models.metadata import ArtifactMetadata
+        from skillmeat.core.artifact import ArtifactMetadata
+        from skillmeat.sources.base import FetchResult
         import shutil
+        import tempfile
 
-        def mock_fetch_impl(spec, artifact_type, dest_dir):
+        def mock_fetch_impl(spec, artifact_type):
+            dest_dir = Path(tempfile.mkdtemp(prefix="skillmeat_test_"))
             dest_path = dest_dir / "test-command.md"
             shutil.copy2(sample_command_file, dest_path)
 
-            return dest_path, ArtifactMetadata(
-                title="Test Command",
-                description="A test command",
-                version="1.0.0",
+            return FetchResult(
+                artifact_path=dest_path,
+                metadata=ArtifactMetadata(
+                    title="Test Command",
+                    description="A test command",
+                    version="1.0.0",
+                ),
             )
 
         mock_fetch.side_effect = mock_fetch_impl
@@ -408,17 +419,23 @@ class TestAddAgentCommand:
         """Test adding agent from GitHub spec."""
         runner = isolated_cli_runner
 
-        from skillmeat.models.metadata import ArtifactMetadata
+        from skillmeat.core.artifact import ArtifactMetadata
+        from skillmeat.sources.base import FetchResult
         import shutil
+        import tempfile
 
-        def mock_fetch_impl(spec, artifact_type, dest_dir):
+        def mock_fetch_impl(spec, artifact_type):
+            dest_dir = Path(tempfile.mkdtemp(prefix="skillmeat_test_"))
             dest_path = dest_dir / "test-agent.md"
             shutil.copy2(sample_agent_file, dest_path)
 
-            return dest_path, ArtifactMetadata(
-                title="Test Agent",
-                description="A test agent",
-                version="1.0.0",
+            return FetchResult(
+                artifact_path=dest_path,
+                metadata=ArtifactMetadata(
+                    title="Test Agent",
+                    description="A test agent",
+                    version="1.0.0",
+                ),
             )
 
         mock_fetch.side_effect = mock_fetch_impl

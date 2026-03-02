@@ -869,18 +869,30 @@ class DeploymentManager:
         # Backward compatibility: ensure default profile metadata exists.
         self._resolve_target_profiles(project_path=project_path, profile_id=profile_id)
 
-        # Get deployment record
-        deployment = DeploymentTracker.get_deployment(
-            project_path,
-            artifact_name,
-            artifact_type.value,
-            profile_id=profile_id,
-        )
+        # Get deployment record — when artifact_type is None, search by name only
+        if artifact_type is not None:
+            deployment = DeploymentTracker.get_deployment(
+                project_path,
+                artifact_name,
+                artifact_type.value,
+                profile_id=profile_id,
+            )
+        else:
+            deployment = DeploymentTracker.find_deployment_by_name(
+                project_path,
+                artifact_name,
+                profile_id=profile_id,
+            )
 
         if not deployment:
             raise ValueError(
                 f"Artifact '{artifact_name}' is not deployed to this project"
             )
+
+        # Resolve effective artifact type from deployment record when not specified
+        effective_type_str = (
+            artifact_type.value if artifact_type is not None else deployment.artifact_type
+        )
 
         # Remove files
         artifact_path = resolve_deployment_path(
@@ -894,14 +906,14 @@ class DeploymentManager:
         if artifact_path.exists():
             self.filesystem_mgr.remove_artifact(artifact_path)
             console.print(
-                f"[green][/green] Removed {artifact_type.value}/{artifact_name}"
+                f"[green][/green] Removed {effective_type_str}/{artifact_name}"
             )
 
         # Remove deployment record
         DeploymentTracker.remove_deployment(
             project_path,
             artifact_name,
-            artifact_type.value,
+            effective_type_str,
             profile_id=profile_id or deployment.deployment_profile_id,
         )
 
@@ -912,7 +924,7 @@ class DeploymentManager:
             with EventTracker() as tracker:
                 tracker.track_remove(
                     artifact_name=artifact_name,
-                    artifact_type=artifact_type.value,
+                    artifact_type=effective_type_str,
                     collection_name=deployment.from_collection,
                     reason="user_action",
                     from_project=True,

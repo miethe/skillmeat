@@ -17,6 +17,8 @@ from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, patch, Mock
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.schemas.tags import TagListResponse, TagResponse
+from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.server import create_app
 
 
@@ -115,6 +117,7 @@ def mock_tag_service(mock_tag):
         tag_mock.created_at = datetime.fromisoformat(mock_tag["created_at"])
         tag_mock.updated_at = datetime.fromisoformat(mock_tag["updated_at"])
         tag_mock.artifact_count = mock_tag["artifact_count"]
+        tag_mock.deployment_set_count = 0
 
         # Set up mock methods - note router calls get_tag_by_id, not get_tag
         mock_service.create_tag.return_value = tag_mock
@@ -125,8 +128,29 @@ def mock_tag_service(mock_tag):
         mock_service.delete_tag.return_value = True
         mock_service.get_tag_artifact_count.return_value = 5
 
-        # Mock list_tags to return list of tag mocks (router expects this format)
-        mock_service.list_tags.return_value = [tag_mock]
+        # Build a proper TagResponse for list/search endpoints
+        tag_response = TagResponse(
+            id=mock_tag["id"],
+            name=mock_tag["name"],
+            slug=mock_tag["slug"],
+            color=mock_tag["color"],
+            created_at=datetime.fromisoformat(mock_tag["created_at"]),
+            updated_at=datetime.fromisoformat(mock_tag["updated_at"]),
+            artifact_count=mock_tag["artifact_count"],
+            deployment_set_count=0,
+        )
+
+        # Mock list_tags to return a TagListResponse (router calls response.items)
+        mock_service.list_tags.return_value = TagListResponse(
+            items=[tag_response],
+            page_info=PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=None,
+                end_cursor=None,
+                total_count=1,
+            ),
+        )
 
         # Mock search response
         mock_service.search_tags.return_value = [tag_mock]
@@ -468,14 +492,10 @@ class TestSearchTags:
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_search_tags_empty_query(self, client, mock_tag_service):
-        """Test searching tags with empty query."""
-        mock_tag_service.search_tags.return_value = []
-
+        """Test searching tags with empty query returns 422 (min_length=1 enforced)."""
         response = client.get("/api/v1/tags/search?q=")
 
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert len(data) == 0
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_search_tags_with_limit(self, client, mock_tag_service):
         """Test searching tags with limit parameter."""
