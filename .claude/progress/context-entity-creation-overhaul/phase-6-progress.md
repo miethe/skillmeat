@@ -2,70 +2,113 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "context-entity-creation-overhaul"
-feature_slug: "context-entity-creation-overhaul"
-prd_ref: "docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/context-entity-creation-overhaul-v1.md"
+prd: context-entity-creation-overhaul
+feature_slug: context-entity-creation-overhaul
+prd_ref: docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/context-entity-creation-overhaul-v1.md
 phase: 6
-title: "Integration and Polish"
-status: "planning"
+title: Integration and Polish
+status: completed
 started: null
 completed: null
 commit_refs: []
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 2
-completed_tasks: 0
+completed_tasks: 2
 in_progress_tasks: 0
-blocked_tasks: 2
+blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer", "ui-engineer-enhanced"]
-contributors: ["api-documenter", "documentation-writer", "task-completion-validator"]
-
+owners:
+- python-backend-engineer
+- ui-engineer-enhanced
+contributors:
+- api-documenter
+- documentation-writer
+- task-completion-validator
 tasks:
-  - id: "CECO-6.1"
-    description: "Remove entity_type_config_enabled feature flag (promote DB validator to default); add deprecation entry for Artifact.category scalar column to deprecation registry; regenerate openapi.json for all new endpoints; update skillmeat/api/CLAUDE.md router table; update skillmeat/web/CLAUDE.md with new hook and component patterns; update validator module docstring"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "documentation-writer"]
-    dependencies: ["CECO-1.1", "CECO-1.2", "CECO-1.3", "CECO-1.4", "CECO-2.1", "CECO-2.2", "CECO-2.3", "CECO-3.1", "CECO-3.2", "CECO-3.3", "CECO-3.4", "CECO-4.1", "CECO-5.1", "CECO-5.2"]
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "CECO-6.2"
-    description: "Write Playwright/pytest E2E tests for 3 critical paths: (1) spec_file first-attempt success with template pre-populated, (2) custom type lifecycle (Settings → creation form → save), (3) multi-platform deploy with correct path derivation; accessibility audit on creation form; performance test POST /context-entities latency with DB validator (target ≤20ms added at p95)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced", "python-backend-engineer"]
-    dependencies: ["CECO-6.1"]
-    estimated_effort: "4 pts"
-    priority: "high"
-
+- id: CECO-6.1
+  description: Remove entity_type_config_enabled feature flag (promote DB validator
+    to default); add deprecation entry for Artifact.category scalar column to deprecation
+    registry; regenerate openapi.json for all new endpoints; update skillmeat/api/CLAUDE.md
+    router table; update skillmeat/web/CLAUDE.md with new hook and component patterns;
+    update validator module docstring
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  - documentation-writer
+  dependencies:
+  - CECO-1.1
+  - CECO-1.2
+  - CECO-1.3
+  - CECO-1.4
+  - CECO-2.1
+  - CECO-2.2
+  - CECO-2.3
+  - CECO-3.1
+  - CECO-3.2
+  - CECO-3.3
+  - CECO-3.4
+  - CECO-4.1
+  - CECO-5.1
+  - CECO-5.2
+  estimated_effort: 3 pts
+  priority: high
+- id: CECO-6.2
+  description: 'Write Playwright/pytest E2E tests for 3 critical paths: (1) spec_file
+    first-attempt success with template pre-populated, (2) custom type lifecycle (Settings
+    → creation form → save), (3) multi-platform deploy with correct path derivation;
+    accessibility audit on creation form; performance test POST /context-entities
+    latency with DB validator (target ≤20ms added at p95)'
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  - python-backend-engineer
+  dependencies:
+  - CECO-6.1
+  estimated_effort: 4 pts
+  priority: high
 parallelization:
-  batch_1: ["CECO-6.1"]
-  batch_2: ["CECO-6.2"]
-  critical_path: ["CECO-6.1", "CECO-6.2"]
-  estimated_total_time: "4-5 days"
-
+  batch_1:
+  - CECO-6.1
+  batch_2:
+  - CECO-6.2
+  critical_path:
+  - CECO-6.1
+  - CECO-6.2
+  estimated_total_time: 4-5 days
 blockers: []
-
 success_criteria:
-  - { id: "SC-6.1", description: "entity_type_config_enabled flag removed; other flags documented for future cleanup", status: "pending" }
-  - { id: "SC-6.2", description: "Deprecation entry for Artifact.category in deprecation registry", status: "pending" }
-  - { id: "SC-6.3", description: "openapi.json regenerated; all new endpoints documented", status: "pending" }
-  - { id: "SC-6.4", description: "E2E tests for 3 critical paths pass in CI", status: "pending" }
-  - { id: "SC-6.5", description: "Accessibility: keyboard navigation, ARIA attributes, focus management verified", status: "pending" }
-  - { id: "SC-6.6", description: "Performance: DB-backed validator adds ≤20ms at p95 vs baseline", status: "pending" }
-
+- id: SC-6.1
+  description: entity_type_config_enabled flag removed; other flags documented for
+    future cleanup
+  status: pending
+- id: SC-6.2
+  description: Deprecation entry for Artifact.category in deprecation registry
+  status: pending
+- id: SC-6.3
+  description: openapi.json regenerated; all new endpoints documented
+  status: pending
+- id: SC-6.4
+  description: E2E tests for 3 critical paths pass in CI
+  status: pending
+- id: SC-6.5
+  description: 'Accessibility: keyboard navigation, ARIA attributes, focus management
+    verified'
+  status: pending
+- id: SC-6.6
+  description: 'Performance: DB-backed validator adds ≤20ms at p95 vs baseline'
+  status: pending
 files_modified:
-  - "skillmeat/core/validators/context_entity.py"
-  - "skillmeat/api/openapi.json"
-  - "skillmeat/api/CLAUDE.md"
-  - "skillmeat/web/CLAUDE.md"
-  - ".claude/context/key-context/deprecation-and-sunset-registry.md"
-  - "tests/e2e/"
+- skillmeat/core/validators/context_entity.py
+- skillmeat/api/openapi.json
+- skillmeat/api/CLAUDE.md
+- skillmeat/web/CLAUDE.md
+- .claude/context/key-context/deprecation-and-sunset-registry.md
+- tests/e2e/
+progress: 100
+updated: '2026-03-01'
 ---
 
 # Context Entity Creation Overhaul - Phase 6: Integration and Polish

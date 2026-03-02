@@ -9,6 +9,9 @@ import type {
   ContextEntityListResponse,
   ContextEntityDeployRequest,
   ContextEntityDeployResponse,
+  EntityTypeConfig,
+  EntityTypeConfigCreate,
+  EntityTypeConfigUpdate,
 } from '@/types/context-entity';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -185,4 +188,217 @@ export async function deployContextEntity(
   }
 
   return response.json();
+}
+
+// ============================================================================
+// Entity Type Config API Methods
+// ============================================================================
+
+/**
+ * Fetch all entity type configurations
+ */
+export async function fetchEntityTypeConfigs(): Promise<EntityTypeConfig[]> {
+  const response = await fetch(buildUrl('/settings/entity-type-configs'));
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to fetch entity type configs: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new entity type configuration
+ */
+export async function createEntityTypeConfig(
+  data: EntityTypeConfigCreate
+): Promise<EntityTypeConfig> {
+  const response = await fetch(buildUrl('/settings/entity-type-configs'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to create entity type config: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Update an existing entity type configuration by slug
+ */
+export async function updateEntityTypeConfig(
+  slug: string,
+  data: EntityTypeConfigUpdate
+): Promise<EntityTypeConfig> {
+  const response = await fetch(buildUrl(`/settings/entity-type-configs/${slug}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to update entity type config: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete an entity type configuration by slug
+ */
+export async function deleteEntityTypeConfig(slug: string): Promise<void> {
+  const response = await fetch(buildUrl(`/settings/entity-type-configs/${slug}`), {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to delete entity type config: ${response.statusText}`
+    );
+  }
+
+  // DELETE returns 204 No Content
+}
+
+// ============================================================================
+// Entity Category API Methods
+// ============================================================================
+
+export interface EntityCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  color?: string;
+  entity_type_slug?: string;
+  platform?: string;
+  sort_order: number;
+  is_builtin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntityCategoryCreateRequest {
+  name: string;
+  slug?: string;
+  description?: string;
+  color?: string;
+  entity_type_slug?: string;
+  platform?: string;
+  sort_order?: number;
+}
+
+export interface EntityCategoryFilters {
+  entity_type_slug?: string;
+  platform?: string;
+}
+
+/**
+ * Fetch all entity categories with optional filters
+ */
+export async function fetchEntityCategories(
+  filters?: EntityCategoryFilters
+): Promise<EntityCategory[]> {
+  const params = new URLSearchParams();
+  if (filters?.entity_type_slug) params.set('entity_type_slug', filters.entity_type_slug);
+  if (filters?.platform) params.set('platform', filters.platform);
+
+  const qs = params.toString();
+  const url = buildUrl(`/settings/entity-categories${qs ? `?${qs}` : ''}`);
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to fetch entity categories: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new entity category
+ */
+export async function createEntityCategory(
+  data: EntityCategoryCreateRequest
+): Promise<EntityCategory> {
+  const response = await fetch(buildUrl('/settings/entity-categories'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to create entity category: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+export interface EntityCategoryUpdateRequest {
+  name?: string;
+  slug?: string;
+  description?: string;
+  color?: string;
+  entity_type_slug?: string;
+  platform?: string;
+  sort_order?: number;
+}
+
+/**
+ * Update an existing entity category by slug
+ */
+export async function updateEntityCategory(
+  slug: string,
+  data: EntityCategoryUpdateRequest
+): Promise<EntityCategory> {
+  const response = await fetch(buildUrl(`/settings/entity-categories/${slug}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to update entity category: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete an entity category by slug
+ */
+export async function deleteEntityCategory(slug: string): Promise<void> {
+  const response = await fetch(buildUrl(`/settings/entity-categories/${slug}`), {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to delete entity category: ${response.statusText}`
+    );
+  }
+
+  // DELETE returns 204 No Content
 }

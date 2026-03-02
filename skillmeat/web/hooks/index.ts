@@ -479,6 +479,33 @@ export {
 } from './use-context-entities';
 
 // ============================================================================
+// ENTITY TYPE CONFIGS (4 hooks)
+// ============================================================================
+// Entity type configuration CRUD (built-in and custom entity type definitions)
+export {
+  entityTypeConfigKeys,
+  useEntityTypeConfigs,
+  useCreateEntityTypeConfig,
+  useUpdateEntityTypeConfig,
+  useDeleteEntityTypeConfig,
+} from './use-entity-type-configs';
+
+// ============================================================================
+// ENTITY CATEGORIES (4 hooks)
+// ============================================================================
+// Entity category CRUD for multi-select categorisation in the creation form
+export {
+  entityCategoryKeys,
+  useEntityCategories,
+  useCreateEntityCategory,
+  useUpdateEntityCategory,
+  useDeleteEntityCategory,
+  type EntityCategory,
+  type EntityCategoryCreateRequest,
+  type EntityCategoryUpdateRequest,
+} from './use-entity-categories';
+
+// ============================================================================
 // CONTEXT SYNC (5 hooks)
 // ============================================================================
 // Context synchronization, change tracking, and conflict resolution

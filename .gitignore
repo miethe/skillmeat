@@ -191,3 +191,4 @@ docs/architecture/codebase-graph
 scripts/code_map/*
 !scripts/code_map/
 !scripts/code_map/CLAUDE.md
+test-results

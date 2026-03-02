@@ -65,6 +65,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+#### Context Entity Creation Overhaul (2026-03-01)
+
+**Phase 1: Entity Type Configuration**
+- DB-backed `EntityTypeConfig` model for managing entity type metadata and settings
+- Idempotent seeding system for default entity type configurations
+- TTL caching layer for configuration queries with automatic invalidation
+
+**Phase 2: Entity Type Management UI**
+- Entity Types settings tab in Artifact Details with grid view of all configurations
+- Inline CRUD operations: create, edit, and delete entity type configurations
+- Content template field with inline editor for template customization
+
+**Phase 3: Creation Form Redesign v2**
+- Multi-select platform picker with field-level platform applicability hints
+- Automatic path derivation based on selected platforms
+- Template injection from entity type configs with preview support
+- Structured validation hints (field + hint keys) in 400 error responses
+- Inline validation feedback for all input fields
+
+**Phase 4: Multi-Select Categories System**
+- New `ContextEntityCategory` model and `entity_category_associations` join table
+- Category management: create, read, list operations
+- Category combobox with inline create in creation form
+- Deprecates legacy `Artifact.category` scalar string column (now multi-select)
+
+**Phase 5: Custom Entity Type Support**
+- Full custom entity type field set with applicable platforms configuration
+- JSONSchema-based frontmatter validation with error reporting
+- Custom types appear in creation form alongside built-in types
+- Template injection and platform-specific hints for custom types
+
+**Phase 6: Content Assembly Engine**
+- `core_content` column on artifacts for assembled content metadata
+- `assemble_content()` function for deploy-time platform composition
+- Integration with entity type configs for content template application
+
+### Changed
+
+- `validate_context_entity()` now uses DB-backed configuration by default (previously gated behind feature flag)
+- Validator error responses include structured field+hint format for improved user guidance
+- Regenerated `openapi.json` with 226 total paths (expanded entity type, category, and content APIs)
+
+### Deprecated
+
+- `Artifact.category` scalar string column — use multi-select categories via `entity_category_associations` join table instead
+
+### Fixed
+
+- FastAPI workflows router: DELETE endpoints now correctly omit response body (was asserting body with 204 status)
+
+---
+
 #### Similarity Scoring Overhaul (2026-02-26)
 
 **Phase 1: Scoring Algorithm Fix**

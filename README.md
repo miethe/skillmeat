@@ -1,5 +1,5 @@
 <!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
-<!-- GENERATED: 2026-02-28T03:27:01.125Z -->
+<!-- GENERATED: 2026-03-01T17:59:42.251Z -->
 <!-- VERSION: 0.3.0-beta -->
 
 <!-- BEGIN:hero -->
@@ -288,6 +288,11 @@ _Project configuration artifacts_
 | **Memory Inbox** | Review project memory |
 | Context Modules | Reusable context modules |
 | Context Pack Preview | Budgeted context packs |
+| **Entity Type Configuration** | Configurable entity types |
+| Custom Entity Types | User-defined types |
+| **Enhanced Creation Form** | Smart entity creation |
+| Multi-Select Categories | Flexible categorization |
+| Platform-Aware Deployment | Multi-platform assembly |
 
 ### Team Collaboration
 

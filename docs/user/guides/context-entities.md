@@ -347,6 +347,175 @@ skillmeat context search "API patterns"
 5. **See References**: Context files show linked files with validation status
 6. **Search**: Use search bar to find entities by title or content
 
+## Managing Entity Types (Settings)
+
+SkillMeat allows you to configure entity types and create custom types without modifying code.
+
+### Viewing Entity Type Configuration
+
+1. **Open Web Interface**: Launch with `skillmeat web dev`
+2. **Navigate to Settings**: Click "Settings" in the top navigation
+3. **Select Entity Types Tab**: Click on "Entity Types"
+4. **Browse Configurations**: See all built-in and custom entity types with:
+   - Display name and slug
+   - Path prefix patterns (with `{PLATFORM}` token support)
+   - Required frontmatter fields
+   - Content template
+   - Applicable platforms
+
+### Built-In Entity Types
+
+The system includes 5 built-in entity types with pre-configured validation requirements:
+
+**1. Project Config (project_config)**
+- Path: `CLAUDE.md` (project root)
+- No required frontmatter
+- Use for: Project-wide agent guidance
+
+**2. Spec File (spec_file)**
+- Path: `.claude/specs/*.md`
+- Required frontmatter: `title` field
+- Use for: Technical specifications
+
+**3. Rule File (rule_file)**
+- Path: `.claude/rules/**/*.md`
+- No required frontmatter
+- Use for: Path-specific development rules
+
+**4. Context File (context_file)**
+- Path: `.claude/context/*.md`
+- Required frontmatter: `references` list (references to specific files)
+- Use for: Deep-dive architectural documentation
+
+**5. Progress Template (progress_template)**
+- Path: `.claude/progress/[prd-name]/phase-N-progress.md`
+- Required frontmatter: `type: progress` field
+- Use for: Orchestrated implementation tracking
+
+### Creating Custom Entity Types
+
+Power users and team leads can define custom entity types in Settings:
+
+1. **Open Settings → Entity Types**
+2. **Click "Add Custom Type"**
+3. **Fill in configuration:**
+   - **Slug** (identifier): e.g., `adr_file` — Must match `^[a-z][a-z0-9_]{0,63}$`
+   - **Display Name**: e.g., "Architecture Decision Record"
+   - **Path Prefix**: e.g., `.claude/decisions/` (supports `{PLATFORM}` token)
+   - **Required Frontmatter Fields**: List of keys that must exist (e.g., `status`, `date`)
+   - **Content Template**: Markdown with frontmatter scaffold (auto-inserted in creation form)
+   - **Applicable Platforms**: Checkboxes for `claude_code`, `codex`, `gemini`, `cursor`, etc.
+4. **Click Save**
+5. **New type appears immediately in creation form**
+
+### Example: Creating an ADR (Architecture Decision Record) Type
+
+```bash
+# Via Settings web UI:
+# Name: Architecture Decision Record
+# Slug: adr_file
+# Path Prefix: .claude/decisions/
+# Required Frontmatter: ["status", "date", "context"]
+# Template:
+# ---
+# status: proposed  # proposed | accepted | deprecated
+# date: 2025-12-15
+# context: |
+#   Problem statement...
+# ---
+#
+# # Decision
+#
+# [Your decision here]
+#
+# ## Consequences
+#
+# [Positive/negative impacts]
+```
+
+After saving, the new `adr_file` type appears in the creation form with:
+- Inline validation hints (required fields: `status`, `date`, `context`)
+- Pre-populated content template with frontmatter scaffold
+- Path suggestions like `.claude/decisions/my-decision.md`
+
+## Creating Context Entities
+
+The enhanced creation form helps you create valid entities on your first attempt with inline validation hints, automatic content templates, and platform-aware path suggestions.
+
+### Creation Form Guide
+
+When you open the "Create Context Entity" dialog:
+
+**1. Select Entity Type**
+- Choose from built-in types or custom types you've defined
+- The form immediately shows required validation hints
+- Example hint for `spec_file`: "Requires frontmatter with `title` key"
+
+**2. Select Target Platforms** (Optional)
+- Select which platforms this entity targets: `claude_code`, `codex`, `gemini`, `cursor`
+- If unselected, the entity applies to all platforms
+- Platform selection affects the suggested path pattern
+
+**3. Review/Edit Path Pattern**
+- The path pattern auto-populates based on entity type and selected platforms
+- `{PLATFORM}` token resolves to platform-specific root directories at deploy time
+- Examples:
+  - Spec file on Claude Code: `.claude/specs/my-spec.md`
+  - Spec file on Codex: `.codex/specs/my-spec.md` (at deploy time)
+- You can edit the pattern if needed; validation happens at save time
+
+**4. Content Template Auto-Injection**
+- The content editor pre-fills with the entity type's template
+- Templates include required frontmatter scaffold and example structure
+- Edit the content as needed; the scaffold ensures required fields are present
+
+**5. Add Categories**
+- Multi-select categories from existing options or create new ones inline
+- Categories help organize and discover related entities
+- Existing categories appear in the combobox; start typing to create a new one
+- Example categories: `api`, `architecture`, `debugging`, `security`
+
+**6. Complete Optional Fields**
+- **Name**: Display name for the entity
+- **Description**: Brief description (appears in search results)
+- **Version**: Semantic version (e.g., `1.0.0`)
+- **Auto-Load**: Enable to automatically include in agent context for projects using this entity
+
+**7. Submit**
+- Click "Create" to save the entity
+- If validation fails, inline field-level hints tell you what's missing
+
+### Example: Creating a Spec File
+
+```
+1. Select Type: "Spec File"
+   (Form shows: "Requires frontmatter with 'title' key")
+
+2. Select Platforms: ["claude_code", "codex"]
+
+3. Path Pattern: (auto-populated to .claude/specs/)
+
+4. Content: (pre-filled with template)
+   ---
+   title:
+   description:
+   audience: [developers]
+   tags: []
+   created: 2025-12-15
+   updated: 2025-12-15
+   category: specification
+   status: published
+   ---
+
+   # [Your Spec Title]
+
+   [Content...]
+
+5. Categories: Select "api", "specification"
+
+6. Click Create → Entity saved successfully on first attempt
+```
+
 ## Deploying Entities
 
 Deploy entities from your collection to specific projects. This copies the entity to the project's `.claude` directory structure.
@@ -441,6 +610,42 @@ skillmeat template deploy "FastAPI + Next.js" \
 # ~/projects/skillmeat-fork/.claude/rules/web/hooks.md
 # etc.
 ```
+
+## Multi-Platform Entity Deployment
+
+When deploying entities to multiple platforms, SkillMeat automatically adapts the entity for each platform's conventions using the content assembly engine.
+
+### How It Works
+
+1. **Stored Content**: Core content is stored once in your collection, platform-agnostic
+2. **Assembly at Deploy**: When deploying to a specific platform, SkillMeat applies platform-specific transformations:
+   - Path patterns: `.claude/specs/` becomes `.codex/specs/` for Codex platform
+   - Frontmatter: Platform-specific fields are added to the frontmatter
+   - Wrappers: Platform-specific content sections are appended (optional)
+3. **Deployed Content**: Each platform receives an optimized version while the source remains clean
+
+### Example: Deploy Spec File to Multiple Platforms
+
+**Create entity**:
+```bash
+skillmeat context create --type spec_file \
+  --name api-patterns \
+  --platforms claude_code,codex,gemini
+```
+
+**Deploy**:
+```bash
+skillmeat context deploy api-patterns \
+  --to-project ~/my-project \
+  --profiles claude_code codex gemini
+```
+
+**Result**:
+- `~/.claude/specs/api-patterns.md` (claude_code)
+- `~/.codex/specs/api-patterns.md` (codex)
+- `~/.gemini/specs/api-patterns.md` (gemini)
+
+Core content remains identical; only paths and platform-specific frontmatter change.
 
 ## Syncing Changes
 
@@ -568,16 +773,15 @@ version: 1.2.0  # MAJOR.MINOR.PATCH
 - **MINOR** (1.2.0): New optional patterns or clarifications
 - **PATCH** (1.2.3): Typo fixes, grammar improvements
 
-### Organize with Categories
+### Organize with Multi-Select Categories
 
-Group related entities using frontmatter categories:
+Assign multiple categories to entities for flexible organization and discovery:
 
-```yaml
----
-title: Debugging Strategy
-category: debugging  # All debugging files
----
-```
+**Category Management**:
+- **Multi-select combobox**: Choose multiple categories when creating or editing entities
+- **Inline category creation**: Type a new category name to create it on the fly
+- **Global categories**: All categories are shared across your SkillMeat instance (project-scoped categories coming in future versions)
+- **Optional scoping**: Categories can optionally be scoped to an entity type or platform for fine-grained organization
 
 **Suggested Categories**:
 - `specification` - Technical specs (APIs, schemas, algorithms)
@@ -586,6 +790,21 @@ category: debugging  # All debugging files
 - `debugging` - Debugging methodology and patterns
 - `workflow` - Development workflows and processes
 - `configuration` - Configuration and environment setup
+- `security` - Security-related patterns and practices
+- `testing` - Testing strategies and guidelines
+- `performance` - Performance optimization patterns
+- `onboarding` - Onboarding and getting-started guides
+
+**Example**: A spec file for API authentication might have categories: `["specification", "security", "api"]`
+
+**Browsing by Category**:
+```bash
+# CLI: Filter entities by category
+skillmeat context list --category specification
+
+# Web UI: Use category filter in Context Entities page sidebar
+# Navigate to Context Entities → Filter by category → Select "specification"
+```
 
 ### Sync Regularly
 

@@ -340,6 +340,7 @@ async def update_workflow(
     summary="Delete workflow",
     description="Delete a workflow and all its stages.",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
 )
 async def delete_workflow(workflow_id: str) -> None:
     """Delete a workflow by ID.

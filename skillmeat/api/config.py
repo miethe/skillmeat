@@ -217,6 +217,19 @@ class APISettings(BaseSettings):
         "Configurable via SKILLMEAT_WORKFLOW_ENGINE_ENABLED env var.",
     )
 
+    # Modular Content Architecture feature flag (CECO-4.1)
+    modular_content_architecture: bool = Field(
+        default=False,
+        description=(
+            "Enable Modular Content Architecture for context entities. "
+            "When enabled, create/update endpoints split incoming content into "
+            "platform-agnostic core_content and an assembled `content` output. "
+            "The deploy endpoint assembles platform-specific content at deploy "
+            "time via skillmeat.core.content_assembly.assemble_content(). "
+            "Configurable via SKILLMEAT_MODULAR_CONTENT_ARCHITECTURE env var."
+        ),
+    )
+
     memory_auto_extract: bool = Field(
         default=False,
         description="Enable automatic memory extraction from conversations (Phase 5 feature)",

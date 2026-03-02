@@ -1,25 +1,150 @@
 """Context entity validation module.
 
-Provides validators for all 5 context entity types with security considerations
-for path traversal prevention and content validation.
+Provides validators for all 5 built-in context entity types plus custom
+entity types defined in the ``entity_type_configs`` DB table.
 
-Entity Types:
+Entity Types (built-in):
 - ProjectConfig: CLAUDE.md files (markdown with optional frontmatter)
 - SpecFile: .claude/specs/ files (YAML frontmatter + markdown)
 - RuleFile: .claude/rules/ files (markdown with path scope comments)
 - ContextFile: .claude/context/ files (YAML frontmatter with references + markdown)
 - ProgressTemplate: .claude/progress/ files (YAML frontmatter + markdown hybrid)
+
+DB-backed validation:
+Entity type configuration is loaded from the ``entity_type_configs`` DB table
+with a 60-second in-memory TTL cache.  On any DB error the validator falls back
+to the hardcoded dispatch map (built-in types only) with a WARNING log.
+
+Custom entity types (those not in the hardcoded map) are only available when
+the DB is reachable and the type has a row in ``entity_type_configs``.
+
+Call ``invalidate_entity_type_cache()`` to force immediate cache refresh after
+writing to the ``entity_type_configs`` table.
+
+Error format:
+All validators return a list of dicts with ``field`` and ``hint`` keys::
+
+    [{"field": "content", "hint": "Add frontmatter with 'title' key"}]
+
+Valid ``field`` values: ``content``, ``path_pattern``, ``frontmatter``, ``type``.
 """
 
+import logging
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
+
+# Type alias for structured validation errors returned by all validators.
+ValidationErrorDict = Dict[str, str]
 
 import yaml
 
+try:
+    import jsonschema as _jsonschema  # noqa: PLC0415
+    _JSONSCHEMA_AVAILABLE = True
+except ImportError:  # pragma: no cover — jsonschema is in pyproject.toml
+    _jsonschema = None  # type: ignore[assignment]
+    _JSONSCHEMA_AVAILABLE = False
+
 from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
 from skillmeat.core.validators.context_path_validator import validate_context_path
+
+logger = logging.getLogger(__name__)
+
+# =============================================================================
+# TTL cache for EntityTypeConfig rows
+# =============================================================================
+
+_CACHE_TTL_SECONDS: int = 60
+
+# Cache state — keyed by slug, value is the EntityTypeConfig row as a dict.
+# None means the cache has never been populated.
+_entity_type_cache: Optional[Dict[str, Any]] = None
+_entity_type_cache_loaded_at: float = 0.0
+
+
+def invalidate_entity_type_cache() -> None:
+    """Immediately invalidate the in-memory entity type cache.
+
+    Call this after writing to the ``entity_type_configs`` table so the next
+    call to ``validate_context_entity`` reloads from the DB.
+    """
+    global _entity_type_cache, _entity_type_cache_loaded_at
+    _entity_type_cache = None
+    _entity_type_cache_loaded_at = 0.0
+    logger.debug("entity_type_cache: invalidated")
+
+
+def _is_cache_fresh() -> bool:
+    """Return True if the cache is populated and within the TTL window."""
+    if _entity_type_cache is None:
+        return False
+    return (time.time() - _entity_type_cache_loaded_at) < _CACHE_TTL_SECONDS
+
+
+def _load_entity_type_cache() -> Optional[Dict[str, Any]]:
+    """Load all EntityTypeConfig rows from the DB into a slug-keyed dict.
+
+    Returns None on any DB error, which triggers fallback to hardcoded validators.
+    """
+    global _entity_type_cache, _entity_type_cache_loaded_at
+
+    try:
+        # Import here to avoid circular imports at module load time.
+        from skillmeat.cache.models import EntityTypeConfig, get_session  # noqa: PLC0415
+
+        session = get_session()
+        try:
+            rows = session.query(EntityTypeConfig).all()
+            cache: Dict[str, Any] = {}
+            for row in rows:
+                cache[row.slug] = {
+                    "slug": row.slug,
+                    "display_name": row.display_name,
+                    "is_builtin": row.is_builtin,
+                    "path_prefix": row.path_prefix,
+                    "required_frontmatter_keys": row.required_frontmatter_keys or [],
+                    "optional_frontmatter_keys": row.optional_frontmatter_keys or [],
+                    "validation_rules": row.validation_rules or {},
+                    "applicable_platforms": row.applicable_platforms,
+                    "frontmatter_schema": row.frontmatter_schema,
+                }
+            _entity_type_cache = cache
+            _entity_type_cache_loaded_at = time.time()
+            logger.debug(
+                "entity_type_cache: loaded %d type(s) from DB", len(cache)
+            )
+            return cache
+        finally:
+            session.close()
+    except Exception as exc:
+        logger.warning(
+            "entity_type_cache: DB load failed, falling back to hardcoded validators: %s",
+            exc,
+        )
+        return None
+
+
+def _get_entity_type_config(entity_type: str) -> Optional[Dict[str, Any]]:
+    """Return the DB config dict for entity_type, or None if unavailable.
+
+    Respects the 60-second TTL cache.  Returns None on cache miss or DB error.
+    """
+    if not _is_cache_fresh():
+        cache = _load_entity_type_cache()
+    else:
+        cache = _entity_type_cache
+
+    if cache is None:
+        return None
+    return cache.get(entity_type)
+
+
+# =============================================================================
+# Data classes
+# =============================================================================
 
 
 @dataclass
@@ -40,10 +165,15 @@ class ValidationError:
         return f"[{self.severity.upper()}] {self.field}: {self.message}"
 
 
+# =============================================================================
+# Shared helpers
+# =============================================================================
+
+
 def _validate_path_security(
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate path for security issues.
 
     Prevents path traversal attacks by checking for:
@@ -53,11 +183,13 @@ def _validate_path_security(
 
     Args:
         path: File path to validate
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     try:
         validate_context_path(
@@ -67,7 +199,7 @@ def _validate_path_security(
             else [f"{root.rstrip('/')}/" for root in DEFAULT_PROFILE_ROOTS],
         )
     except ValueError as exc:
-        errors.append(str(exc))
+        errors.append({"field": "path_pattern", "hint": str(exc)})
 
     return errors
 
@@ -136,11 +268,157 @@ def _extract_frontmatter(content: str) -> tuple[Optional[Dict], str]:
         return None, content
 
 
+# =============================================================================
+# DB-backed validation path
+# =============================================================================
+
+
+def _validate_from_db_config(
+    config: Dict[str, Any],
+    content: str,
+    path: str,
+    allowed_prefixes: Optional[Sequence[str]] = None,
+) -> List[ValidationErrorDict]:
+    """Run validation using an EntityTypeConfig dict loaded from DB.
+
+    Implements the generic validation logic driven by the config's
+    ``required_frontmatter_keys``, ``validation_rules``, and ``path_prefix``.
+
+    Args:
+        config: Dict with keys ``path_prefix``, ``required_frontmatter_keys``,
+                ``validation_rules`` (as loaded by ``_get_entity_type_config``).
+        content: File content to validate.
+        path: File path to validate.
+        allowed_prefixes: Optional path prefix whitelist.
+
+    Returns:
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
+    """
+    errors: List[ValidationErrorDict] = []
+
+    # Path security
+    path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
+    errors.extend(path_errors)
+
+    rules: Dict[str, Any] = config.get("validation_rules") or {}
+    path_prefix: Optional[str] = config.get("path_prefix")
+
+    # Enforce path prefix when the rule requires it
+    if rules.get("path_prefix_required") and path_prefix:
+        # Build candidate prefixes from allowed_prefixes roots + config path_prefix
+        suffix = path_prefix.lstrip("/").rstrip("/") + "/"
+        candidate_prefixes = _entity_prefixes(suffix, allowed_prefixes=allowed_prefixes)
+        # Also accept the raw path_prefix itself (for tests that supply absolute paths)
+        candidate_prefixes.append(path_prefix.rstrip("/") + "/")
+        if not any(path.startswith(p) for p in candidate_prefixes):
+            errors.append({
+                "field": "path_pattern",
+                "hint": f"Path must start with one of: {', '.join(candidate_prefixes)}",
+            })
+
+    # Content empty check
+    if not content or not content.strip():
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
+        return errors
+
+    min_len: int = rules.get("min_content_length", 0)
+    frontmatter_required: bool = bool(rules.get("frontmatter_required", False))
+
+    # Extract frontmatter
+    frontmatter, remaining = _extract_frontmatter(content)
+
+    if frontmatter_required and frontmatter is None:
+        errors.append({
+            "field": "frontmatter",
+            "hint": "YAML frontmatter is required but not found",
+        })
+        return errors
+
+    # Validate required frontmatter keys
+    required_keys: List[str] = config.get("required_frontmatter_keys") or []
+    if frontmatter is not None:
+        for key in required_keys:
+            if key not in frontmatter:
+                errors.append({
+                    "field": "frontmatter",
+                    "hint": f"Frontmatter must include '{key}' field",
+                })
+
+        # Special rule: references must be a list
+        if rules.get("references_must_be_list") and "references" in frontmatter:
+            if not isinstance(frontmatter.get("references"), list):
+                errors.append({
+                    "field": "frontmatter",
+                    "hint": "'references' field must be a list",
+                })
+
+        # Special rule: type field must equal a specific value
+        type_must_equal: Optional[str] = rules.get("type_must_equal")
+        if type_must_equal is not None and "type" in frontmatter:
+            if frontmatter.get("type") != type_must_equal:
+                errors.append({
+                    "field": "type",
+                    "hint": f"Frontmatter 'type' field must be '{type_must_equal}'",
+                })
+
+        # JSON Schema validation for custom (non-built-in) types.
+        # Built-in types rely exclusively on hardcoded logic above; custom
+        # types may supply a ``frontmatter_schema`` JSON Schema subset.
+        is_builtin: bool = bool(config.get("is_builtin", True))
+        frontmatter_schema: Optional[Dict[str, Any]] = config.get("frontmatter_schema")
+        if (
+            not is_builtin
+            and frontmatter_schema
+            and _JSONSCHEMA_AVAILABLE
+        ):
+            try:
+                _jsonschema.validate(instance=frontmatter, schema=frontmatter_schema)
+            except _jsonschema.ValidationError as exc:
+                # Convert jsonschema path to a dotted field name for display.
+                field_path = ".".join(str(p) for p in exc.absolute_path) or "frontmatter"
+                errors.append({
+                    "field": "frontmatter",
+                    "hint": (
+                        f"Frontmatter field '{field_path}' failed schema validation: "
+                        f"{exc.message}"
+                    ),
+                })
+            except _jsonschema.SchemaError as exc:
+                # The stored schema itself is malformed — log and skip.
+                logger.warning(
+                    "_validate_from_db_config: invalid frontmatter_schema for slug=%r: %s",
+                    config.get("slug"),
+                    exc.message,
+                )
+
+    # Check content after frontmatter is not empty (when frontmatter was present)
+    if frontmatter is not None and not remaining.strip():
+        errors.append({
+            "field": "content",
+            "hint": "Markdown content after frontmatter cannot be empty",
+        })
+
+    # Minimum length check (on full stripped content)
+    if min_len > 0 and len(content.strip()) < min_len:
+        errors.append({
+            "field": "content",
+            "hint": "Content too short to be valid markdown",
+        })
+
+    return errors
+
+
+# =============================================================================
+# Hardcoded validators (fallback path)
+# =============================================================================
+
+
 def validate_project_config(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate ProjectConfig entity (CLAUDE.md).
 
     Requirements:
@@ -152,11 +430,13 @@ def validate_project_config(
     Args:
         content: File content
         path: File path (for path validation)
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     # Validate path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -164,7 +444,7 @@ def validate_project_config(
 
     # Must not be empty
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     # Extract frontmatter (optional, just validate if present)
@@ -176,7 +456,10 @@ def validate_project_config(
 
     # Basic markdown validation: should have some text
     if len(content.strip()) < 10:
-        errors.append("Content too short to be valid markdown")
+        errors.append({
+            "field": "content",
+            "hint": "Content too short to be valid markdown",
+        })
 
     return errors
 
@@ -185,7 +468,7 @@ def validate_spec_file(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate SpecFile entity (.claude/specs/).
 
     Requirements:
@@ -197,11 +480,13 @@ def validate_spec_file(
     Args:
         content: File content
         path: File path
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     # Validate path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -210,27 +495,39 @@ def validate_spec_file(
     # Path must start with {profile_root}/specs/
     prefixes = _entity_prefixes("specs/", allowed_prefixes=allowed_prefixes)
     if not any(path.startswith(prefix) for prefix in prefixes):
-        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
+        errors.append({
+            "field": "path_pattern",
+            "hint": f"Path must start with one of: {', '.join(prefixes)}",
+        })
 
     # Must not be empty
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     # Extract frontmatter (REQUIRED)
     frontmatter, remaining = _extract_frontmatter(content)
 
     if frontmatter is None:
-        errors.append("YAML frontmatter is required but not found")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "YAML frontmatter is required but not found — add frontmatter with 'title' key",
+        })
         return errors
 
     # Must have 'title' field
     if "title" not in frontmatter:
-        errors.append("Frontmatter must include 'title' field")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "Frontmatter must include 'title' field",
+        })
 
     # Validate remaining content is not empty
     if not remaining.strip():
-        errors.append("Markdown content after frontmatter cannot be empty")
+        errors.append({
+            "field": "content",
+            "hint": "Markdown content after frontmatter cannot be empty",
+        })
 
     return errors
 
@@ -239,7 +536,7 @@ def validate_rule_file(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate RuleFile entity (.claude/rules/).
 
     Requirements:
@@ -250,11 +547,13 @@ def validate_rule_file(
     Args:
         content: File content
         path: File path
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     # Validate path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -263,11 +562,14 @@ def validate_rule_file(
     # Path must start with {profile_root}/rules/
     prefixes = _entity_prefixes("rules/", allowed_prefixes=allowed_prefixes)
     if not any(path.startswith(prefix) for prefix in prefixes):
-        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
+        errors.append({
+            "field": "path_pattern",
+            "hint": f"Path must start with one of: {', '.join(prefixes)}",
+        })
 
     # Must not be empty
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     # Check for path scope comment (optional but recommended)
@@ -280,7 +582,10 @@ def validate_rule_file(
 
     # Basic markdown validation
     if len(content.strip()) < 10:
-        errors.append("Content too short to be valid markdown")
+        errors.append({
+            "field": "content",
+            "hint": "Content too short to be valid markdown",
+        })
 
     return errors
 
@@ -289,7 +594,7 @@ def validate_context_file(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate ContextFile entity (.claude/context/).
 
     Requirements:
@@ -300,11 +605,13 @@ def validate_context_file(
     Args:
         content: File content
         path: File path
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     # Validate path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -313,29 +620,44 @@ def validate_context_file(
     # Path must start with {profile_root}/context/
     prefixes = _entity_prefixes("context/", allowed_prefixes=allowed_prefixes)
     if not any(path.startswith(prefix) for prefix in prefixes):
-        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
+        errors.append({
+            "field": "path_pattern",
+            "hint": f"Path must start with one of: {', '.join(prefixes)}",
+        })
 
     # Must not be empty
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     # Extract frontmatter (REQUIRED)
     frontmatter, remaining = _extract_frontmatter(content)
 
     if frontmatter is None:
-        errors.append("YAML frontmatter is required but not found")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "YAML frontmatter is required but not found — add frontmatter with 'references' list",
+        })
         return errors
 
     # Must have 'references' field as a list
     if "references" not in frontmatter:
-        errors.append("Frontmatter must include 'references' field")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "Frontmatter must include 'references' field",
+        })
     elif not isinstance(frontmatter.get("references"), list):
-        errors.append("'references' field must be a list")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "'references' field must be a list",
+        })
 
     # Validate remaining content is not empty
     if not remaining.strip():
-        errors.append("Markdown content after frontmatter cannot be empty")
+        errors.append({
+            "field": "content",
+            "hint": "Markdown content after frontmatter cannot be empty",
+        })
 
     return errors
 
@@ -344,7 +666,7 @@ def validate_progress_template(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate ProgressTemplate entity (.claude/progress/).
 
     Requirements:
@@ -356,11 +678,13 @@ def validate_progress_template(
     Args:
         content: File content
         path: File path
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     # Validate path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -369,31 +693,61 @@ def validate_progress_template(
     # Path must start with {profile_root}/progress/
     prefixes = _entity_prefixes("progress/", allowed_prefixes=allowed_prefixes)
     if not any(path.startswith(prefix) for prefix in prefixes):
-        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
+        errors.append({
+            "field": "path_pattern",
+            "hint": f"Path must start with one of: {', '.join(prefixes)}",
+        })
 
     # Must not be empty
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     # Extract frontmatter (REQUIRED)
     frontmatter, remaining = _extract_frontmatter(content)
 
     if frontmatter is None:
-        errors.append("YAML frontmatter is required but not found")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "YAML frontmatter is required but not found — add frontmatter with 'type: progress'",
+        })
         return errors
 
     # Must have 'type: progress' field
     if "type" not in frontmatter:
-        errors.append("Frontmatter must include 'type' field")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "Frontmatter must include 'type' field",
+        })
     elif frontmatter.get("type") != "progress":
-        errors.append("Frontmatter 'type' field must be 'progress'")
+        errors.append({
+            "field": "type",
+            "hint": "Frontmatter 'type' field must be 'progress'",
+        })
 
     # Validate remaining content is not empty
     if not remaining.strip():
-        errors.append("Markdown content after frontmatter cannot be empty")
+        errors.append({
+            "field": "content",
+            "hint": "Markdown content after frontmatter cannot be empty",
+        })
 
     return errors
+
+
+# Hardcoded dispatch map — used as fallback when the DB is unavailable.
+_HARDCODED_VALIDATORS = {
+    "project_config": validate_project_config,
+    "spec_file": validate_spec_file,
+    "rule_file": validate_rule_file,
+    "context_file": validate_context_file,
+    "progress_template": validate_progress_template,
+}
+
+
+# =============================================================================
+# Public entry point
+# =============================================================================
 
 
 def validate_context_entity(
@@ -401,34 +755,57 @@ def validate_context_entity(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Unified validation function for all context entity types.
+
+    Loads entity type configuration from the ``entity_type_configs`` DB table
+    (60-second in-memory TTL cache) and delegates to
+    ``_validate_from_db_config``.
+
+    Falls back to the hardcoded dispatch map when the DB query fails (with a
+    WARNING log).  Custom entity types are only available when the DB is
+    reachable; built-in types are always available via the hardcoded fallback.
 
     Args:
         entity_type: Type of entity ("project_config", "spec_file", "rule_file",
-                     "context_file", "progress_template")
+                     "context_file", "progress_template", or any custom slug
+                     present in the ``entity_type_configs`` DB table).
         content: File content to validate
         path: File path (for path validation and type checking)
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).  Valid ``field`` values are: ``content``,
+        ``path_pattern``, ``frontmatter``, ``type``.
+
+        For custom types that have a ``frontmatter_schema`` defined, additional
+        errors from ``jsonschema.validate()`` are included with the
+        ``frontmatter`` field and a descriptive ``hint``.
 
     Raises:
-        ValueError: If entity_type is not recognized
+        ValueError: If entity_type is not recognized by either the DB cache or
+                    the hardcoded fallback map.
     """
-    validators = {
-        "project_config": validate_project_config,
-        "spec_file": validate_spec_file,
-        "rule_file": validate_rule_file,
-        "context_file": validate_context_file,
-        "progress_template": validate_progress_template,
-    }
+    # ------------------------------------------------------------------
+    # DB-backed path (always attempted first)
+    # ------------------------------------------------------------------
+    db_config = _get_entity_type_config(entity_type)
+    if db_config is not None:
+        return _validate_from_db_config(
+            db_config, content, path, allowed_prefixes=allowed_prefixes
+        )
+    # _get_entity_type_config returns None on DB failure (warning already logged)
+    # or when the type simply has no row in the DB.  Fall through to hardcoded.
 
-    validator = validators.get(entity_type)
+    # ------------------------------------------------------------------
+    # Hardcoded fallback path (built-in types only)
+    # ------------------------------------------------------------------
+    validator = _HARDCODED_VALIDATORS.get(entity_type)
     if validator is None:
         raise ValueError(
             f"Unknown entity type: {entity_type}. "
-            f"Must be one of: {', '.join(validators.keys())}"
+            f"Must be one of: {', '.join(_HARDCODED_VALIDATORS.keys())}"
         )
 
     return validator(content, path, allowed_prefixes=allowed_prefixes)

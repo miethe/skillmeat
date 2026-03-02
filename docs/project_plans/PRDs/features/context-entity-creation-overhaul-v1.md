@@ -1,8 +1,8 @@
 ---
-title: "PRD: Context Entity Creation Overhaul"
+title: 'PRD: Context Entity Creation Overhaul'
 schema_version: 2
 doc_type: prd
-status: draft
+status: inferred_complete
 created: 2026-02-28
 updated: 2026-02-28
 feature_slug: context-entity-creation-overhaul
@@ -10,60 +10,68 @@ feature_version: v1
 prd_ref: null
 plan_ref: null
 related_documents:
-  - docs/project_plans/PRDs/features/enhanced-platform-profiles-v1.md
-  - docs/project_plans/PRDs/features/agent-context-entities-v1.md
+- docs/project_plans/PRDs/features/enhanced-platform-profiles-v1.md
+- docs/project_plans/PRDs/features/agent-context-entities-v1.md
 owner: null
 contributors: []
 priority: high
 risk_level: medium-high
 category: product-planning
-tags: [prd, context-entities, settings, platform-aware, creation-flow]
+tags:
+- prd
+- context-entities
+- settings
+- platform-aware
+- creation-flow
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/core/validators/context_entity.py
-  - skillmeat/core/platform_defaults.py
-  - skillmeat/api/routers/context_entities.py
-  - skillmeat/api/schemas/context_entity.py
-  - skillmeat/cache/models.py
-  - skillmeat/web/app/settings/page.tsx
-  - skillmeat/web/components/context/context-entity-editor.tsx
-  - skillmeat/web/types/context-entity.ts
-  - skillmeat/web/lib/api/context-entities.ts
-problem_statement: >
-  The current context entity creation flow has hardcoded entity types, opaque
-  validation requirements, no multi-platform awareness, a flat category string
-  field, and no content templates—making the form difficult to use correctly and
-  impossible to extend without code changes.
-personas: ["developer", "power-user"]
-goals:
-  - "Make entity type requirements discoverable and configurable at runtime"
-  - "Introduce platform-aware path patterns for multi-platform deployment"
-  - "Support multi-select categories and on-the-fly category creation"
-  - "Auto-populate content templates per entity type and platform"
-  - "Enable user-defined custom entity types without code changes"
-non_goals:
-  - "Real-time collaborative editing of context entities"
-  - "Version history / git-backed diffing for entity content"
-  - "Teams / compliance module implementation (future)"
-  - "Marketplace publishing of custom entity types"
-success_metrics:
-  - "Entity type configuration persisted to DB (not Python source)"
-  - "Creation form shows validation hints before submit"
-  - "Path pattern auto-populates from entity type + platform selection"
-  - "Content template auto-inserts required frontmatter"
-  - "Custom entity types roundtrip: create in Settings → available in creation form"
-dependencies:
-  - "SQLAlchemy/Alembic migration for entity_type_config table"
-  - "Existing deployment profiles system (DeploymentProfile model)"
-  - "Existing platform_defaults.py for seeding initial configurations"
-risks:
-  - "Alembic migration touching Artifact-adjacent tables risks breaking existing context entity records"
-  - "Validator logic split between Python (backend) and TypeScript (frontend) may drift"
-  - "Custom entity types require safe YAML/frontmatter template storage"
----
+- skillmeat/core/validators/context_entity.py
+- skillmeat/core/platform_defaults.py
+- skillmeat/api/routers/context_entities.py
+- skillmeat/api/schemas/context_entity.py
+- skillmeat/cache/models.py
+- skillmeat/web/app/settings/page.tsx
+- skillmeat/web/components/context/context-entity-editor.tsx
+- skillmeat/web/types/context-entity.ts
+- skillmeat/web/lib/api/context-entities.ts
+problem_statement: 'The current context entity creation flow has hardcoded entity
+  types, opaque validation requirements, no multi-platform awareness, a flat category
+  string field, and no content templates—making the form difficult to use correctly
+  and impossible to extend without code changes.
 
+  '
+personas:
+- developer
+- power-user
+goals:
+- Make entity type requirements discoverable and configurable at runtime
+- Introduce platform-aware path patterns for multi-platform deployment
+- Support multi-select categories and on-the-fly category creation
+- Auto-populate content templates per entity type and platform
+- Enable user-defined custom entity types without code changes
+non_goals:
+- Real-time collaborative editing of context entities
+- Version history / git-backed diffing for entity content
+- Teams / compliance module implementation (future)
+- Marketplace publishing of custom entity types
+success_metrics:
+- Entity type configuration persisted to DB (not Python source)
+- Creation form shows validation hints before submit
+- Path pattern auto-populates from entity type + platform selection
+- Content template auto-inserts required frontmatter
+- 'Custom entity types roundtrip: create in Settings → available in creation form'
+dependencies:
+- SQLAlchemy/Alembic migration for entity_type_config table
+- Existing deployment profiles system (DeploymentProfile model)
+- Existing platform_defaults.py for seeding initial configurations
+risks:
+- Alembic migration touching Artifact-adjacent tables risks breaking existing context
+  entity records
+- Validator logic split between Python (backend) and TypeScript (frontend) may drift
+- Custom entity types require safe YAML/frontmatter template storage
+---
 # Feature Brief & Metadata
 
 **Feature Name:**

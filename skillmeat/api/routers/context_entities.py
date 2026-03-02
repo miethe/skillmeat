@@ -25,11 +25,12 @@ import hashlib
 import logging
 import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 
+from skillmeat.api.config import APISettings, get_settings
 from skillmeat.api.schemas.context_entity import (
     ContextEntityCreateRequest,
     ContextEntityDeployRequest,
@@ -40,6 +41,7 @@ from skillmeat.api.schemas.context_entity import (
     ContextEntityUpdateRequest,
 )
 from skillmeat.api.schemas.common import PageInfo
+from skillmeat.core.content_assembly import assemble_content
 from skillmeat.core.path_resolver import default_project_config_filenames
 from skillmeat.core.validators.context_entity import validate_context_entity
 from skillmeat.core.validators.context_path_validator import (
@@ -49,8 +51,11 @@ from skillmeat.core.validators.context_path_validator import (
     validate_context_path,
 )
 
-from skillmeat.cache.models import Artifact, Project, get_session
+from skillmeat.cache.models import Artifact, ArtifactCategoryAssociation, Project, get_session
 from skillmeat.cache.repositories import DeploymentProfileRepository
+
+# Type alias for injected settings dependency
+SettingsDep = Annotated[APISettings, Depends(get_settings)]
 
 logger = logging.getLogger(__name__)
 
@@ -99,9 +104,59 @@ def _as_target_platforms(raw: Optional[List[str]]) -> Optional[List[str]]:
     return [str(item) for item in raw]
 
 
+def _sync_category_associations(
+    session,
+    artifact_uuid: str,
+    category_ids: List[int],
+) -> None:
+    """Replace all category associations for an artifact.
+
+    Deletes existing ``ArtifactCategoryAssociation`` rows for *artifact_uuid*,
+    then inserts new rows for each ID in *category_ids*.  Silently ignores
+    category IDs that do not exist in the ``entity_categories`` table.
+
+    Args:
+        session: Active SQLAlchemy session.
+        artifact_uuid: The ``Artifact.uuid`` field (hex UUID).
+        category_ids: Ordered list of ``ContextEntityCategory.id`` values to
+                      associate with the artifact.  An empty list removes all
+                      existing associations.
+    """
+    # Remove existing associations
+    session.query(ArtifactCategoryAssociation).filter(
+        ArtifactCategoryAssociation.artifact_uuid == artifact_uuid
+    ).delete(synchronize_session=False)
+
+    # Insert new associations
+    for cat_id in category_ids:
+        assoc = ArtifactCategoryAssociation(
+            artifact_uuid=artifact_uuid,
+            category_id=cat_id,
+        )
+        session.add(assoc)
+
+
 def _empty_deployed_to() -> dict:
     # Phase 3 adds response shape; deployment aggregation wiring is added separately.
     return {}
+
+
+def _get_category_ids(session, artifact_uuid: str) -> List[int]:
+    """Return the ordered list of category IDs associated with an artifact.
+
+    Args:
+        session: Active SQLAlchemy session.
+        artifact_uuid: The ``Artifact.uuid`` hex field.
+
+    Returns:
+        Sorted list of ``ContextEntityCategory.id`` values.
+    """
+    rows = (
+        session.query(ArtifactCategoryAssociation)
+        .filter(ArtifactCategoryAssociation.artifact_uuid == artifact_uuid)
+        .all()
+    )
+    return sorted(row.category_id for row in rows)
 
 
 def _profile_platform(profile: object) -> str:
@@ -314,6 +369,7 @@ async def list_context_entities(
                 target_platforms=_as_target_platforms(artifact.target_platforms),
                 deployed_to=_empty_deployed_to(),
                 content_hash=artifact.content_hash,
+                category_ids=_get_category_ids(session, artifact.uuid),
                 created_at=artifact.created_at,
                 updated_at=artifact.updated_at,
             )
@@ -374,6 +430,7 @@ async def list_context_entities(
 )
 async def create_context_entity(
     request: ContextEntityCreateRequest,
+    settings: SettingsDep,
 ) -> ContextEntityResponse:
     """Create a new context entity.
 
@@ -399,7 +456,7 @@ async def create_context_entity(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
+            detail=[{"field": "path_pattern", "hint": str(exc)}],
         ) from exc
 
     # Validate content using validators from TASK-1.3
@@ -413,11 +470,39 @@ async def create_context_entity(
     if validation_errors:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Content validation failed: {'; '.join(validation_errors)}",
+            detail=validation_errors,
         )
 
-    # Compute content hash
-    content_hash = compute_content_hash(request.content)
+    # Determine stored content values.
+    # When modular_content_architecture is enabled we split the incoming
+    # content into core_content (platform-agnostic) and content (assembled
+    # for the default/first target platform).  The assembled value is used
+    # for backward-compatible reads; the deploy endpoint re-assembles at
+    # deploy time.
+    stored_core_content: Optional[str] = None
+    assembled_content: str = request.content
+
+    if settings.modular_content_architecture:
+        stored_core_content = request.content
+        # Determine the default platform for initial assembly
+        entity_type_config = {"slug": request.entity_type.value}
+        default_platform: str = "claude-code"
+        if request.target_platforms:
+            default_platform = request.target_platforms[0].value
+        assembled_content = assemble_content(
+            core_content=stored_core_content,
+            entity_type_config=entity_type_config,
+            platform=default_platform,
+        )
+        logger.debug(
+            "modular_content_architecture: assembled content for platform=%r "
+            "(entity_type=%r)",
+            default_platform,
+            request.entity_type.value,
+        )
+
+    # Compute content hash from assembled content (used for change detection)
+    content_hash = compute_content_hash(assembled_content)
 
     session = get_session()
     try:
@@ -430,7 +515,8 @@ async def create_context_entity(
             project_id=CONTEXT_ENTITIES_PROJECT_ID,
             name=request.name,
             type=request.entity_type.value,
-            content=request.content,
+            content=assembled_content,
+            core_content=stored_core_content,
             path_pattern=request.path_pattern,
             description=request.description,
             category=request.category,
@@ -445,6 +531,12 @@ async def create_context_entity(
         )
 
         session.add(artifact)
+        session.flush()  # Flush so artifact.uuid is populated before associations
+
+        # Write category associations when category_ids provided
+        if request.category_ids is not None:
+            _sync_category_associations(session, artifact.uuid, request.category_ids)
+
         session.commit()
         session.refresh(artifact)
 
@@ -465,6 +557,7 @@ async def create_context_entity(
             target_platforms=_as_target_platforms(artifact.target_platforms),
             deployed_to=_empty_deployed_to(),
             content_hash=artifact.content_hash,
+            category_ids=_get_category_ids(session, artifact.uuid),
             created_at=artifact.created_at,
             updated_at=artifact.updated_at,
         )
@@ -554,6 +647,7 @@ async def get_context_entity(entity_id: str) -> ContextEntityResponse:
             target_platforms=_as_target_platforms(artifact.target_platforms),
             deployed_to=_empty_deployed_to(),
             content_hash=artifact.content_hash,
+            category_ids=_get_category_ids(session, artifact.uuid),
             created_at=artifact.created_at,
             updated_at=artifact.updated_at,
         )
@@ -590,7 +684,9 @@ async def get_context_entity(entity_id: str) -> ContextEntityResponse:
     },
 )
 async def update_context_entity(
-    entity_id: str, request: ContextEntityUpdateRequest
+    entity_id: str,
+    request: ContextEntityUpdateRequest,
+    settings: SettingsDep,
 ) -> ContextEntityResponse:
     """Update a context entity's metadata and/or content.
 
@@ -632,7 +728,27 @@ async def update_context_entity(
         if request.entity_type is not None:
             artifact.type = request.entity_type.value
         if request.content is not None:
-            artifact.content = request.content
+            if settings.modular_content_architecture:
+                # Store the raw author-supplied content as core_content and
+                # assemble the default platform-specific version into content.
+                artifact.core_content = request.content
+                entity_type_config = {"slug": artifact.type}
+                platforms = _as_target_platforms(artifact.target_platforms)
+                default_platform = platforms[0] if platforms else "claude-code"
+                artifact.content = assemble_content(
+                    core_content=request.content,
+                    entity_type_config=entity_type_config,
+                    platform=default_platform,
+                )
+                logger.debug(
+                    "modular_content_architecture: re-assembled content for "
+                    "platform=%r (entity_type=%r, entity_id=%r)",
+                    default_platform,
+                    artifact.type,
+                    entity_id,
+                )
+            else:
+                artifact.content = request.content
             content_changed = True
         if request.path_pattern is not None:
             try:
@@ -643,7 +759,7 @@ async def update_context_entity(
             except ValueError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=str(exc),
+                    detail=[{"field": "path_pattern", "hint": str(exc)}],
                 ) from exc
             artifact.path_pattern = request.path_pattern
         if request.description is not None:
@@ -658,6 +774,8 @@ async def update_context_entity(
             artifact.target_platforms = [
                 platform.value for platform in request.target_platforms
             ]
+        if request.category_ids is not None:
+            _sync_category_associations(session, artifact.uuid, request.category_ids)
 
         # Validate content if changed or type changed
         if content_changed or request.entity_type is not None:
@@ -671,7 +789,7 @@ async def update_context_entity(
                 session.rollback()
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Content validation failed: {'; '.join(validation_errors)}",
+                    detail=validation_errors,
                 )
 
         # Recompute content hash if content changed
@@ -695,6 +813,7 @@ async def update_context_entity(
             target_platforms=_as_target_platforms(artifact.target_platforms),
             deployed_to=_empty_deployed_to(),
             content_hash=artifact.content_hash,
+            category_ids=_get_category_ids(session, artifact.uuid),
             created_at=artifact.created_at,
             updated_at=artifact.updated_at,
         )
@@ -799,7 +918,9 @@ async def delete_context_entity(entity_id: str) -> None:
     },
 )
 async def deploy_context_entity(
-    entity_id: str, request: ContextEntityDeployRequest
+    entity_id: str,
+    request: ContextEntityDeployRequest,
+    settings: SettingsDep,
 ) -> ContextEntityDeployResponse:
     if request.all_profiles and request.deployment_profile_id:
         raise HTTPException(
@@ -841,8 +962,10 @@ async def deploy_context_entity(
         )
 
         target_platforms = _as_target_platforms(artifact.target_platforms)
-        content = artifact.content or ""
-        deployment_targets: List[tuple[str, Path]] = []
+        # Base content used when no per-profile assembly is needed.
+        # The per-profile assembly (below) may override this for each profile.
+        _base_content = artifact.content or ""
+        deployment_targets: List[tuple[str, str, Path]] = []
 
         # Validate all targets before writing files to avoid partial multi-profile deploys.
         for profile in profiles:
@@ -888,11 +1011,31 @@ async def deploy_context_entity(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to resolve deployment target path",
                 )
-            deployment_targets.append((profile_id, validated.resolved_path))
+            deployment_targets.append((profile_id, profile_platform, validated.resolved_path))
 
         deployed_paths: List[str] = []
         deployed_profiles: List[str] = []
-        for profile_id, target_path in deployment_targets:
+        for profile_id, profile_platform, target_path in deployment_targets:
+            # Assemble platform-specific content when the flag is enabled and
+            # core_content is available; fall back to the pre-assembled content
+            # stored in artifact.content for backward compatibility.
+            if settings.modular_content_architecture and artifact.core_content is not None:
+                entity_type_config = {"slug": artifact.type}
+                content = assemble_content(
+                    core_content=artifact.core_content,
+                    entity_type_config=entity_type_config,
+                    platform=profile_platform,
+                )
+                logger.debug(
+                    "modular_content_architecture: assembled deploy content for "
+                    "platform=%r (entity_type=%r, entity_id=%r)",
+                    profile_platform,
+                    artifact.type,
+                    entity_id,
+                )
+            else:
+                content = _base_content
+
             should_write = True
             if target_path.exists():
                 existing_content = target_path.read_text(encoding="utf-8")

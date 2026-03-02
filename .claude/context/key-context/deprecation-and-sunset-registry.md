@@ -8,6 +8,7 @@ Track active deprecations and planned removals used by agents.
 |---|---|---|---|---|---|
 | Web types | `Entity` alias usage in frontend | `Artifact` type | Active migration | 2026-09-30 | Keep compatibility until migration completes |
 | Context guidance | rule-heavy path-specific docs in `.claude/rules/` | key-context + local `CLAUDE.md` | In progress | 2026-03-31 | Keep only minimal universal rule pointers |
+| Database schema | `Artifact.category` (scalar string column) | `entity_category_associations` join table + `ContextEntityCategory` model | Deprecated | TBD (post-Phase 6) | Column retained for backward compatibility; existing values backfilled to join table in Phase 3 migration; new code should use `category_ids` array via associations |
 
 ## Process
 
