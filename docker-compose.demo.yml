@@ -17,10 +17,12 @@
 #   API + DB only:
 #     podman-compose -f docker-compose.demo.yml --profile api-only up
 #
-#   Backstage stub against already-running local API:
-#     podman-compose -f docker-compose.demo.yml --profile backstage-only up
+#   Backstage against already-running local API (requires pre-built app):
+#     BACKSTAGE_APP_DIR=/path/to/backstage-app \
+#       podman-compose -f docker-compose.demo.yml --profile backstage-only up
 #
-#   Backstage stub against a remote API:
+#   Backstage against a remote API:
+#     BACKSTAGE_APP_DIR=/path/to/backstage-app \
 #     SKILLMEAT_API_URL=http://1.2.3.4:8080 \
 #       podman-compose -f docker-compose.demo.yml --profile backstage-only up
 #
@@ -164,87 +166,55 @@ services:
       - demo
 
   # ===================================================================
-  # BACKSTAGE -- Local Backstage IDP Instance (ILLUSTRATIVE)
+  # BACKSTAGE -- Backstage IDP Instance
   #
-  # A full Backstage setup requires:
-  #   1. An initialized Backstage app (npx @backstage/create-app)
-  #   2. The @skillmeat/backstage-plugin-scaffolder-backend package
-  #      installed and wired into the backend.
-  #   3. An app-config.yaml pointing at SkillMeat API and your catalog.
+  # Built from demo/dockerfile (Backstage production image spec).
+  # Requires a pre-built Backstage app directory set via BACKSTAGE_APP_DIR.
   #
-  # This service uses a minimal Node container with a startup script that
-  # prints setup instructions and keeps the container alive so you can
-  # exec into it and run Backstage manually during a demo.
+  # PREREQUISITES — run once in your Backstage app directory:
+  #   1. npx @backstage/create-app@latest   (if no app yet)
+  #   2. yarn workspace backend add @skillmeat/backstage-plugin-scaffolder-backend
+  #   3. Wire plugin in packages/backend/src/index.ts:
+  #        backend.add(import('@skillmeat/backstage-plugin-scaffolder-backend'))
+  #   4. cp <skillmeat-repo>/demo/backstage-app-config.yaml app-config.local.yaml
+  #   5. cp <skillmeat-repo>/demo/dockerfile Dockerfile
+  #   6. yarn build:backend
   #
-  # TODO (real Backstage setup):
-  #   - Replace image with a pre-built Backstage Docker image from your CI
-  #   - Mount your Backstage app directory instead of /backstage-stub
-  #   - Pass BACKSTAGE_BASE_URL, GITHUB_TOKEN, catalog entity URLs
-  #   - See: https://backstage.io/docs/deployment/docker
+  # Then set BACKSTAGE_APP_DIR and start:
+  #   BACKSTAGE_APP_DIR=/path/to/your/backstage-app \
+  #     podman-compose -f docker-compose.demo.yml --profile backstage-only up
+  #
+  # NOTE: --mount=type=cache in the Dockerfile requires BuildKit.
+  # With podman: BUILDAH_FORMAT=docker podman-compose build backstage
   # ===================================================================
   backstage:
-    image: node:20-slim
+    build:
+      # Build context is your pre-built Backstage app directory.
+      # The Dockerfile (demo/dockerfile) must be copied there as 'Dockerfile'.
+      context: ${BACKSTAGE_APP_DIR:?Set BACKSTAGE_APP_DIR to your pre-built Backstage app directory}
+      dockerfile: Dockerfile
     profiles:
       - full
-      # backstage-only: start only this stub, pointing at an already-running
-      # SkillMeat API (e.g. `skillmeat web dev` on the host).
-      # Override SKILLMEAT_API_URL to match where your API is listening.
+      # backstage-only: start only Backstage, pointing at an already-running
+      # SkillMeat API (e.g. `skillmeat web dev`) on the host.
       - backstage-only
-    working_dir: /backstage-stub
-    # Startup script: prints setup instructions, then tails /dev/null so
-    # the container stays alive for interactive use during demos.
-    command: >
-      bash -c "
-        echo '========================================================' &&
-        echo '  SkillMeat Backstage Demo Stub' &&
-        echo '========================================================' &&
-        echo '' &&
-        echo '  This container is a PLACEHOLDER for a real Backstage' &&
-        echo '  instance.  To run Backstage for the demo:' &&
-        echo '' &&
-        echo '  1. Create a Backstage app (once):' &&
-        echo '     npx @backstage/create-app@latest' &&
-        echo '' &&
-        echo '  2. Add the SkillMeat scaffolder plugin:' &&
-        echo '     yarn workspace backend add @skillmeat/backstage-plugin-scaffolder-backend' &&
-        echo '' &&
-        echo '  3. Wire in the plugin (packages/backend/src/index.ts):' &&
-        echo '     backend.add(import(\"@skillmeat/backstage-plugin-scaffolder-backend\"))' &&
-        echo '' &&
-        echo '  4. Copy demo/backstage-app-config.yaml to app-config.local.yaml' &&
-        echo '     and start: yarn dev' &&
-        echo '' &&
-        echo '  SKILLMEAT_API_URL is set to: '\"$$SKILLMEAT_API_URL\"'' &&
-        echo '' &&
-        echo '  Container is idle.  exec in with:' &&
-        echo '    podman-compose -f docker-compose.demo.yml exec backstage bash' &&
-        echo '========================================================' &&
-        tail -f /dev/null
-      "
     ports:
       - "7007:7007"
     environment:
-      # SkillMeat API endpoint -- consumed by the scaffolder plugin.
+      # SkillMeat API endpoint consumed by the scaffolder plugin actions.
       #
-      # full profile:          points at the in-compose skillmeat-api service
-      # backstage-only profile: points at the host via host.containers.internal
-      #                         (podman) or host.docker.internal (Docker).
+      # full profile:          http://skillmeat-api:8080  (in-compose service)
+      # backstage-only profile: host.containers.internal:8080 (host, podman)
+      #                          host.docker.internal:8080     (host, Docker)
       #
       # Override at runtime:
       #   SKILLMEAT_API_URL=http://1.2.3.4:8080 podman-compose ... up
       - SKILLMEAT_API_URL=${SKILLMEAT_API_URL:-http://host.containers.internal:8080}
-      # TODO: add GITHUB_TOKEN for Backstage catalog GitHub integrations
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      # TODO: add BACKSTAGE_BASE_URL when deploying behind a reverse proxy
-    volumes:
-      # Mount the scaffolder plugin sources so they are available inside
-      # the container when you run `yarn add --no-install` or link manually.
-      - ./plugins/backstage-plugin-scaffolder-backend:/backstage-stub/skillmeat-plugin:ro
-      # Mount the demo Backstage app-config
-      - ./demo/backstage-app-config.yaml:/backstage-stub/app-config.local.yaml:ro
+      - APP_CONFIG_app_backend_baseUrl=http://localhost:7007
+      - APP_CONFIG_app_baseUrl=http://localhost:3000
     # depends_on is intentionally absent: in backstage-only mode there is no
-    # in-compose API service to wait for.  In full mode the API starts first
-    # simply because it is listed earlier in the file.
+    # in-compose API service to wait for.
     networks:
       - demo
 
