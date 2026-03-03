@@ -1,0 +1,283 @@
+# Docker Compose configuration for SkillMeat Backstage/IDP Integration Demo
+# Brings up a complete demo stack: SkillMeat API, Web UI, Backstage, and a
+# PostgreSQL database seeded with sample financial-services data.
+#
+# PROFILES
+#   full      -- All services (API, Web, Backstage, DB)
+#   api-only  -- API server + DB only (default when no profile given)
+#
+# QUICK START
+#   Full stack:
+#     docker compose -f docker-compose.demo.yml --profile full up
+#
+#   API + DB only:
+#     docker compose -f docker-compose.demo.yml --profile api-only up
+#
+#   Tear down (preserve data volume):
+#     docker compose -f docker-compose.demo.yml down
+#
+#   Tear down + wipe DB:
+#     docker compose -f docker-compose.demo.yml down -v
+
+version: '3.8'
+
+services:
+  # ===================================================================
+  # DEMO-DB -- PostgreSQL seeded with sample fin-serv data
+  # Used by SkillMeat API and Backstage for the IDP catalog demo.
+  # ===================================================================
+  demo-db:
+    image: postgres:16-alpine
+    container_name: skillmeat-demo-db
+    profiles:
+      - full
+      - api-only
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=demo
+      - POSTGRES_PASSWORD=demo_password
+      - POSTGRES_DB=demo_finserv
+    volumes:
+      # Persistent named volume -- survives container restarts
+      - demo-db-data:/var/lib/postgresql/data
+      # Init script runs once on first startup (when data volume is empty)
+      - ./demo/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d demo_finserv"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - demo
+
+  # ===================================================================
+  # SKILLMEAT-API -- SkillMeat API Server
+  # Runs uvicorn directly using the official Python image so no
+  # Dockerfile is required for the demo.  Swap image + command for a
+  # pre-built image once CI publishes one.
+  # ===================================================================
+  skillmeat-api:
+    image: python:3.12-slim
+    container_name: skillmeat-demo-api
+    profiles:
+      - full
+      - api-only
+    working_dir: /app
+    # Mount the repo into the container and install in editable mode so the
+    # demo always runs the local checkout without a build step.
+    command: >
+      bash -c "
+        pip install -q -e '.[dev]' &&
+        uvicorn skillmeat.api.main:app
+          --host 0.0.0.0
+          --port 8080
+          --log-level info
+      "
+    ports:
+      - "8080:8080"
+    environment:
+      - SKILLMEAT_ENV=demo
+      - SKILLMEAT_HOST=0.0.0.0
+      - SKILLMEAT_PORT=8080
+      - SKILLMEAT_LOG_LEVEL=INFO
+      - SKILLMEAT_LOG_FORMAT=text
+
+      # Feature flags -- keep demo lightweight
+      - SKILLMEAT_MEMORY_CONTEXT_ENABLED=true
+      - SKILLMEAT_MEMORY_AUTO_EXTRACT=false
+      - SKILLMEAT_ENABLE_AUTO_DISCOVERY=true
+      - SKILLMEAT_ENABLE_AUTO_POPULATION=true
+
+      # Security -- relaxed for demo (no API key required)
+      - SKILLMEAT_API_KEY_ENABLED=false
+      - SKILLMEAT_AUTH_ENABLED=false
+      - SKILLMEAT_RATE_LIMIT_ENABLED=false
+
+      # CORS -- allow all origins in demo mode
+      - SKILLMEAT_CORS_ORIGINS=["*"]
+
+      # DB connection for demo data (used by IDP scaffold actions)
+      - DEMO_DB_URL=postgresql://demo:demo_password@demo-db:5432/demo_finserv
+
+      # Optional: inject a GitHub token for live artifact fetching
+      - SKILLMEAT_GITHUB_TOKEN=${SKILLMEAT_GITHUB_TOKEN:-}
+    volumes:
+      # Mount the full repo for editable install
+      - .:/app:ro
+      # Mount user's local collection so demo can show real artifacts.
+      # Falls back to empty dir if ~/.skillmeat doesn't exist yet.
+      - ${SKILLMEAT_COLLECTION_PATH:-~/.skillmeat}:/root/.skillmeat
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    depends_on:
+      demo-db:
+        condition: service_healthy
+    networks:
+      - demo
+
+  # ===================================================================
+  # SKILLMEAT-WEB -- Next.js Web UI
+  # Runs `pnpm dev` from the web directory for hot-reload during demos.
+  # For a faster startup swap `pnpm dev` -> `pnpm build && pnpm start`.
+  # ===================================================================
+  skillmeat-web:
+    image: node:20-slim
+    container_name: skillmeat-demo-web
+    profiles:
+      - full
+    working_dir: /app/skillmeat/web
+    command: >
+      bash -c "
+        corepack enable &&
+        pnpm install --frozen-lockfile &&
+        pnpm dev
+      "
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      # Point at the API container (inter-service DNS on the demo network)
+      - NEXT_PUBLIC_API_URL=http://skillmeat-api:8080/api/v1
+      - NEXT_TELEMETRY_DISABLED=1
+    volumes:
+      # Mount repo so the dev server picks up local changes
+      - .:/app:ro
+      # Isolate node_modules inside the container to avoid host conflicts
+      - skillmeat-web-node-modules:/app/skillmeat/web/node_modules
+      - skillmeat-web-next-cache:/app/skillmeat/web/.next
+    depends_on:
+      skillmeat-api:
+        condition: service_healthy
+    networks:
+      - demo
+
+  # ===================================================================
+  # BACKSTAGE -- Local Backstage IDP Instance (ILLUSTRATIVE)
+  #
+  # A full Backstage setup requires:
+  #   1. An initialized Backstage app (npx @backstage/create-app)
+  #   2. The @skillmeat/backstage-plugin-scaffolder-backend package
+  #      installed and wired into the backend.
+  #   3. An app-config.yaml pointing at SkillMeat API and your catalog.
+  #
+  # This service uses a minimal Node container with a startup script that
+  # prints setup instructions and keeps the container alive so you can
+  # exec into it and run Backstage manually during a demo.
+  #
+  # TODO (real Backstage setup):
+  #   - Replace image with a pre-built Backstage Docker image from your CI
+  #   - Mount your Backstage app directory instead of /backstage-stub
+  #   - Pass BACKSTAGE_BASE_URL, GITHUB_TOKEN, catalog entity URLs
+  #   - See: https://backstage.io/docs/deployment/docker
+  # ===================================================================
+  backstage:
+    image: node:20-slim
+    container_name: skillmeat-demo-backstage
+    profiles:
+      - full
+    working_dir: /backstage-stub
+    # Startup script: prints setup instructions, then tails /dev/null so
+    # the container stays alive for interactive use during demos.
+    command: >
+      bash -c "
+        echo '========================================================' &&
+        echo '  SkillMeat Backstage Demo Stub' &&
+        echo '========================================================' &&
+        echo '' &&
+        echo '  This container is a PLACEHOLDER for a real Backstage' &&
+        echo '  instance.  To run Backstage for the demo:' &&
+        echo '' &&
+        echo '  1. Create a Backstage app (once):' &&
+        echo '     npx @backstage/create-app@latest' &&
+        echo '' &&
+        echo '  2. Add the SkillMeat scaffolder plugin:' &&
+        echo '     yarn workspace backend add @skillmeat/backstage-plugin-scaffolder-backend' &&
+        echo '' &&
+        echo '  3. Wire in the plugin (packages/backend/src/index.ts):' &&
+        echo '     backend.add(import(\"@skillmeat/backstage-plugin-scaffolder-backend\"))' &&
+        echo '' &&
+        echo '  4. Copy demo/backstage-app-config.yaml to app-config.local.yaml' &&
+        echo '     and start: yarn dev' &&
+        echo '' &&
+        echo '  SKILLMEAT_API_URL is set to: http://skillmeat-api:8080' &&
+        echo '' &&
+        echo '  Container is idle.  exec in with:' &&
+        echo '    docker compose -f docker-compose.demo.yml exec backstage bash' &&
+        echo '========================================================' &&
+        tail -f /dev/null
+      "
+    ports:
+      - "7007:7007"
+    environment:
+      # SkillMeat API endpoint -- consumed by the scaffolder plugin
+      - SKILLMEAT_API_URL=http://skillmeat-api:8080
+      # TODO: add GITHUB_TOKEN for Backstage catalog GitHub integrations
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      # TODO: add BACKSTAGE_BASE_URL when deploying behind a reverse proxy
+    volumes:
+      # Mount the scaffolder plugin sources so they are available inside
+      # the container when you run `yarn add --no-install` or link manually.
+      - ./plugins/backstage-plugin-scaffolder-backend:/backstage-stub/skillmeat-plugin:ro
+      # Mount the demo Backstage app-config
+      - ./demo/backstage-app-config.yaml:/backstage-stub/app-config.local.yaml:ro
+    depends_on:
+      skillmeat-api:
+        condition: service_healthy
+    networks:
+      - demo
+
+# ===================================================================
+# VOLUMES (Persistent Storage)
+# ===================================================================
+volumes:
+  # PostgreSQL data -- persists across `docker compose down` restarts
+  demo-db-data:
+    driver: local
+
+  # Next.js development caches -- speeds up rebuilds inside the container
+  skillmeat-web-node-modules:
+    driver: local
+  skillmeat-web-next-cache:
+    driver: local
+
+# ===================================================================
+# NETWORKS
+# ===================================================================
+networks:
+  demo:
+    driver: bridge
+    # Subnet chosen to avoid conflicts with common local dev ranges
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
+# ===================================================================
+# USAGE REFERENCE
+# ===================================================================
+# Full stack (API + Web + Backstage stub + DB):
+#   docker compose -f docker-compose.demo.yml --profile full up
+#
+# API + DB only (faster for backend demos):
+#   docker compose -f docker-compose.demo.yml --profile api-only up
+#
+# View logs for a single service:
+#   docker compose -f docker-compose.demo.yml logs -f skillmeat-api
+#
+# Exec into Backstage stub to run Backstage manually:
+#   docker compose -f docker-compose.demo.yml exec backstage bash
+#
+# Stop all services (data volume preserved):
+#   docker compose -f docker-compose.demo.yml down
+#
+# Stop and wipe DB data:
+#   docker compose -f docker-compose.demo.yml down -v
+#
+# Override collection path (default: ~/.skillmeat):
+#   SKILLMEAT_COLLECTION_PATH=/path/to/collection \
+#     docker compose -f docker-compose.demo.yml --profile full up

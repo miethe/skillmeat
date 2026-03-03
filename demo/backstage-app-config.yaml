@@ -1,0 +1,140 @@
+# =============================================================================
+# Backstage app-config.yaml -- SkillMeat IDP Integration Demo
+# =============================================================================
+# Copy this file to your Backstage app root as `app-config.local.yaml`.
+# It overrides the default app-config.yaml for the SkillMeat demo.
+#
+# When running inside Docker Compose, service hostnames resolve via the
+# `demo` network (e.g., `skillmeat-api`, `demo-db`).
+# When running Backstage on your host machine, replace service hostnames
+# with `localhost` and the mapped port numbers.
+# =============================================================================
+
+app:
+  title: SkillMeat IDP Demo
+  baseUrl: http://localhost:7007
+
+organization:
+  name: SkillMeat Demo Corp
+
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+    host: 0.0.0.0
+
+  # Database -- uses the demo PostgreSQL instance
+  database:
+    client: pg
+    connection:
+      host: ${POSTGRES_HOST:-demo-db}      # `demo-db` inside Docker, `localhost` on host
+      port: ${POSTGRES_PORT:-5432}
+      user: ${POSTGRES_USER:-demo}
+      password: ${POSTGRES_PASSWORD:-demo_password}
+      database: ${POSTGRES_DB:-demo_finserv}
+
+  # CORS -- allow the Backstage frontend origin
+  cors:
+    origin: http://localhost:7007
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+
+# =============================================================================
+# INTEGRATIONS
+# =============================================================================
+integrations:
+  github:
+    - host: github.com
+      # TODO: replace with your personal or org GitHub token
+      token: ${GITHUB_TOKEN}
+
+# =============================================================================
+# SKILLMEAT API INTEGRATION
+# =============================================================================
+# These values are consumed by the @skillmeat/backstage-plugin-scaffolder-backend
+# scaffolder actions (skillmeat:inject-claude-artifact, skillmeat:register-deployment).
+skillmeat:
+  apiUrl: ${SKILLMEAT_API_URL:-http://skillmeat-api:8080}
+  # apiKey: ${SKILLMEAT_API_KEY:-}   # uncomment if auth is enabled
+
+# =============================================================================
+# CATALOG
+# =============================================================================
+catalog:
+  import:
+    entityFilename: catalog-info.yaml
+    pullRequestBranchName: backstage-integration
+  rules:
+    - allow: [Component, System, API, Resource, Location, Template]
+
+  locations:
+    # SkillMeat demo catalog entities
+    # TODO: replace with your actual catalog URL or local paths
+    - type: url
+      target: https://github.com/your-org/your-backstage-catalog/blob/main/all.yaml
+
+    # Example: local catalog file (useful during development)
+    # - type: file
+    #   target: ../../catalog-entities/all.yaml
+
+# =============================================================================
+# SCAFFOLDER
+# =============================================================================
+scaffolder:
+  # The SkillMeat scaffolder actions are registered automatically when
+  # @skillmeat/backstage-plugin-scaffolder-backend is loaded.
+  # No additional config is required beyond the `skillmeat.apiUrl` above.
+
+  # TODO: add any additional scaffolder action config here
+
+# =============================================================================
+# AUTH (disabled for demo -- enable for real deployments)
+# =============================================================================
+auth:
+  # Using guest auth provider for demo simplicity.
+  # TODO: replace with GitHub OAuth or your IdP for real use.
+  providers:
+    guest: {}
+  environment: development
+
+# =============================================================================
+# PROXY ROUTES
+# =============================================================================
+# Expose the SkillMeat API through Backstage's backend proxy so the
+# frontend plugin can make authenticated calls without CORS issues.
+proxy:
+  endpoints:
+    '/skillmeat':
+      target: ${SKILLMEAT_API_URL:-http://skillmeat-api:8080}
+      changeOrigin: true
+      pathRewrite:
+        '^/api/proxy/skillmeat': ''
+      # headers:
+      #   Authorization: Bearer ${SKILLMEAT_API_KEY}   # uncomment if auth enabled
+
+# =============================================================================
+# TECH RADAR (optional -- remove if not using)
+# =============================================================================
+# techRadar:
+#   url: https://raw.githubusercontent.com/your-org/tech-radar/main/radar.json
+
+# =============================================================================
+# NOTES FOR REAL BACKSTAGE SETUP
+# =============================================================================
+# 1. Install the Backstage CLI and create a new app:
+#      npx @backstage/create-app@latest
+#
+# 2. Add the SkillMeat plugin to the backend package:
+#      cd packages/backend
+#      yarn add @skillmeat/backstage-plugin-scaffolder-backend
+#
+# 3. Register the plugin in packages/backend/src/index.ts:
+#      backend.add(import('@skillmeat/backstage-plugin-scaffolder-backend'));
+#
+# 4. Copy this file to <backstage-app>/app-config.local.yaml and fill in:
+#      - GITHUB_TOKEN
+#      - SKILLMEAT_API_URL (http://localhost:8080 when running on host)
+#      - Real catalog entity URLs
+#
+# 5. Start Backstage:
+#      yarn dev

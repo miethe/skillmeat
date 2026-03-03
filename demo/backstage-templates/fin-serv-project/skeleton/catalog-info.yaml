@@ -1,0 +1,27 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.projectName }}
+  title: ${{ values.projectName | title }}
+  description: ${{ values.description }}
+  annotations:
+    github.com/project-slug: ${{ values.repoUrl | parseRepoUrl | pick('owner') }}/${{ values.repoUrl | parseRepoUrl | pick('repo') }}
+    backstage.io/techdocs-ref: dir:.
+    # SkillMeat annotation — tracks which composite artifact seeded this project.
+    # Used by the SkillMeat Backstage plugin to surface context pack version info
+    # and drift detection results directly in the catalog entity page.
+    skillmeat.io/source-artifact: "composite:fin-serv-compliance"
+    skillmeat.io/team: ${{ values.team }}
+  tags:
+    - financial-services
+    - skillmeat
+    - ${{ values.team }}
+  links:
+    - url: https://skillmeat.internal/artifacts/composite:fin-serv-compliance
+      title: Source Context Pack
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: experimental
+  owner: ${{ values.owner }}
+  system: financial-services-platform
