@@ -8,7 +8,7 @@ prd_ref: docs/project_plans/PRDs/integrations/backstage-integration-demo.md
 plan_ref: null
 phase: 2
 title: Backstage Plugin
-status: in_progress
+status: completed
 started: null
 completed: null
 commit_refs: []
@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 4
-completed_tasks: 0
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -27,7 +27,7 @@ tasks:
 - id: TASK-2.1
   description: Scaffold @skillmeat/backstage-plugin-scaffolder-backend via @backstage/cli
     create-plugin --backend
-  status: pending
+  status: completed
   assigned_to:
   - platform-engineer
   dependencies: []
@@ -37,7 +37,7 @@ tasks:
   description: "Implement createSkillMeatInjectAction \u2014 calls POST /idp/scaffold,\
     \ writes returned files into Backstage scaffolder workspace using @backstage/integration\
     \ file APIs"
-  status: pending
+  status: completed
   assigned_to:
   - platform-engineer
   dependencies:
@@ -48,7 +48,7 @@ tasks:
 - id: TASK-2.3
   description: "Implement createSkillMeatRegisterAction \u2014 calls POST /idp/register-deployment\
     \ after publish:github completes, passing resolved repoUrl"
-  status: pending
+  status: completed
   assigned_to:
   - platform-engineer
   dependencies:
@@ -59,7 +59,7 @@ tasks:
 - id: TASK-2.4
   description: Export actions for Backstage host registration; write plugin README
     with installation, configuration, and action schema documentation
-  status: pending
+  status: completed
   assigned_to:
   - platform-engineer
   dependencies:
@@ -103,6 +103,7 @@ success_criteria:
   status: pending
 files_modified: []
 updated: '2026-03-03'
+progress: 100
 ---
 
 # backstage-integration-demo - Phase 2: Backstage Plugin
