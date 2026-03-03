@@ -8,30 +8,34 @@ Docker Compose stack for the SkillMeat / Backstage IDP integration demo.
 |---|---|---|
 | SkillMeat API | http://localhost:8080 | `full`, `api-only` |
 | SkillMeat Web UI | http://localhost:3000 | `full` |
-| Backstage (stub) | http://localhost:7007 | `full` |
+| Backstage | http://localhost:7007 | `full`, `backstage-only` |
 | PostgreSQL | localhost:5432 | `full`, `api-only` |
 
 ## Quick Start
 
 ```bash
-# Full stack (API + Web + Backstage stub + DB)
-docker compose -f docker-compose.demo.yml --profile full up
+# With podman-compose (recommended on RHEL/Fedora):
+podman-compose -f docker-compose.demo.yml --profile full up
 
 # API + DB only (faster, good for backend/API demos)
-docker compose -f docker-compose.demo.yml --profile api-only up
+podman-compose -f docker-compose.demo.yml --profile api-only up
+
+# Backstage only (uses already-running skillmeat web dev on host)
+podman-compose -f docker-compose.demo.yml --profile backstage-only up
 
 # Stop (data volume preserved)
-docker compose -f docker-compose.demo.yml down
+podman-compose -f docker-compose.demo.yml down
 
 # Stop + wipe database
-docker compose -f docker-compose.demo.yml down -v
+podman-compose -f docker-compose.demo.yml down -v
 ```
 
 ## Prerequisites
 
-- Docker and Docker Compose v2.x
-- (Optional) `~/.skillmeat/collection` directory with local artifacts for the API to serve
-- (Optional) `SKILLMEAT_GITHUB_TOKEN` env var for live GitHub artifact fetching
+- Docker / Podman with Compose support
+- (Optional) `~/.skillmeat/collection` directory with local artifacts
+- (Optional) `SKILLMEAT_GITHUB_TOKEN` for live GitHub artifact fetching
+- Backstage app set up in `demo/backstage-app/` — see **Backstage Setup** below
 
 ## Environment Variables
 
@@ -40,13 +44,14 @@ docker compose -f docker-compose.demo.yml down -v
 | `SKILLMEAT_GITHUB_TOKEN` | _(empty)_ | GitHub token for live artifact fetching |
 | `GITHUB_TOKEN` | _(empty)_ | GitHub token for Backstage catalog integrations |
 | `SKILLMEAT_COLLECTION_PATH` | `~/.skillmeat` | Path to local SkillMeat collection |
+| `SKILLMEAT_API_URL` | `http://host.containers.internal:8080` | API URL used by Backstage (backstage-only profile) |
 
 Example:
 
 ```bash
 SKILLMEAT_GITHUB_TOKEN=ghp_xxx \
 SKILLMEAT_COLLECTION_PATH=/path/to/collection \
-docker compose -f docker-compose.demo.yml --profile full up
+podman-compose -f docker-compose.demo.yml --profile full up
 ```
 
 ## Database
@@ -63,14 +68,78 @@ Connection details: `postgresql://demo:demo_password@localhost:5432/demo_finserv
 
 ## Backstage Setup
 
-The `backstage` service is a placeholder container that prints setup instructions
-on startup. To run a real Backstage instance:
+The Backstage app lives at `demo/backstage-app/` inside this repo.
+Run these steps once from the repo root before starting any profile that includes Backstage.
 
-1. Exec into the container and follow the printed instructions, or
-2. Set up Backstage on your host and point it at `http://localhost:8080`
+### 1. Create the Backstage app
 
-Copy `demo/backstage-app-config.yaml` to your Backstage app root as
-`app-config.local.yaml` and fill in the required tokens.
+```bash
+cd demo
+npx @backstage/create-app@latest
+# When prompted for a name enter: backstage-app
+cd backstage-app
+```
 
-See `plugins/backstage-plugin-scaffolder-backend/README.md` for plugin
-installation and wiring instructions.
+### 2. Install the SkillMeat scaffolder plugin
+
+```bash
+yarn workspace backend add @skillmeat/backstage-plugin-scaffolder-backend
+```
+
+Wire the plugin into `packages/backend/src/index.ts` (add one line):
+
+```ts
+backend.add(import('@skillmeat/backstage-plugin-scaffolder-backend'));
+```
+
+### 3. Apply the demo app-config
+
+```bash
+cp ../backstage-app-config.yaml app-config.local.yaml
+```
+
+Edit `app-config.local.yaml` and set your `GITHUB_TOKEN` if you want live catalog integrations.
+
+### 4. Symlink the Dockerfile
+
+The compose build context is `demo/backstage-app/`, so the Dockerfile must be reachable there.
+A symlink keeps `demo/dockerfile` as the canonical source:
+
+```bash
+ln -s ../dockerfile Dockerfile
+```
+
+### 5. Build the Backstage backend
+
+```bash
+yarn build:backend
+```
+
+### 6. Build the container image
+
+From the repo root:
+
+```bash
+# podman needs BUILDAH_FORMAT=docker for --mount=type=cache in the Dockerfile
+BUILDAH_FORMAT=docker podman-compose -f docker-compose.demo.yml build backstage
+```
+
+### 7. Start Backstage
+
+```bash
+# Against the in-compose API (full profile):
+podman-compose -f docker-compose.demo.yml --profile full up
+
+# Against an already-running skillmeat web dev on the host:
+podman-compose -f docker-compose.demo.yml --profile backstage-only up
+```
+
+### Rebuilding after plugin changes
+
+```bash
+cd demo/backstage-app && yarn build:backend && cd ../..
+BUILDAH_FORMAT=docker podman-compose -f docker-compose.demo.yml build backstage
+podman-compose -f docker-compose.demo.yml --profile backstage-only up --force-recreate backstage
+```
+
+See `plugins/backstage-plugin-scaffolder-backend/README.md` for full plugin documentation.

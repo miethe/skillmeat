@@ -17,12 +17,10 @@
 #   API + DB only:
 #     podman-compose -f docker-compose.demo.yml --profile api-only up
 #
-#   Backstage against already-running local API (requires pre-built app):
-#     BACKSTAGE_APP_DIR=/path/to/backstage-app \
-#       podman-compose -f docker-compose.demo.yml --profile backstage-only up
+#   Backstage only (demo/backstage-app must be set up first — see demo/README.md):
+#     podman-compose -f docker-compose.demo.yml --profile backstage-only up
 #
-#   Backstage against a remote API:
-#     BACKSTAGE_APP_DIR=/path/to/backstage-app \
+#   Backstage only against a remote API:
 #     SKILLMEAT_API_URL=http://1.2.3.4:8080 \
 #       podman-compose -f docker-compose.demo.yml --profile backstage-only up
 #
@@ -169,30 +167,35 @@ services:
   # BACKSTAGE -- Backstage IDP Instance
   #
   # Built from demo/dockerfile (Backstage production image spec).
-  # Requires a pre-built Backstage app directory set via BACKSTAGE_APP_DIR.
+  # The Backstage app lives at demo/backstage-app/ inside this repo.
   #
-  # PREREQUISITES — run once in your Backstage app directory:
-  #   1. npx @backstage/create-app@latest   (if no app yet)
-  #   2. yarn workspace backend add @skillmeat/backstage-plugin-scaffolder-backend
-  #   3. Wire plugin in packages/backend/src/index.ts:
-  #        backend.add(import('@skillmeat/backstage-plugin-scaffolder-backend'))
-  #   4. cp <skillmeat-repo>/demo/backstage-app-config.yaml app-config.local.yaml
-  #   5. cp <skillmeat-repo>/demo/dockerfile Dockerfile
-  #   6. yarn build:backend
+  # ONE-TIME SETUP (run from repo root):
+  #   cd demo
+  #   npx @backstage/create-app@latest
+  #   # when prompted for name, use: backstage-app
+  #   cd backstage-app
+  #   yarn workspace backend add @skillmeat/backstage-plugin-scaffolder-backend
+  #   # wire plugin into packages/backend/src/index.ts — see demo/README.md
+  #   cp ../backstage-app-config.yaml app-config.local.yaml
+  #   ln -s ../dockerfile Dockerfile   # symlink so compose can find it
+  #   yarn build:backend
   #
-  # Then set BACKSTAGE_APP_DIR and start:
-  #   BACKSTAGE_APP_DIR=/path/to/your/backstage-app \
-  #     podman-compose -f docker-compose.demo.yml --profile backstage-only up
+  # Start (from repo root):
+  #   podman-compose -f docker-compose.demo.yml --profile backstage-only up
   #
-  # NOTE: --mount=type=cache in the Dockerfile requires BuildKit.
-  # With podman: BUILDAH_FORMAT=docker podman-compose build backstage
+  # Rebuild after plugin changes:
+  #   cd demo/backstage-app && yarn build:backend
+  #   podman-compose -f docker-compose.demo.yml build backstage
+  #
+  # NOTE: --mount=type=cache requires BuildKit.
+  #   With podman: BUILDAH_FORMAT=docker podman-compose build backstage
   # ===================================================================
   backstage:
     build:
-      # Build context is your pre-built Backstage app directory.
-      # The Dockerfile (demo/dockerfile) must be copied there as 'Dockerfile'.
-      context: ${BACKSTAGE_APP_DIR:?Set BACKSTAGE_APP_DIR to your pre-built Backstage app directory}
-      dockerfile: Dockerfile
+      # Defaults to demo/backstage-app/ inside this repo — no env var needed
+      # for the standard setup.  Override only if your app lives elsewhere.
+      context: ${BACKSTAGE_APP_DIR:-./demo/backstage-app}
+      dockerfile: Dockerfile   # symlink → ../dockerfile (demo/dockerfile)
     profiles:
       - full
       # backstage-only: start only Backstage, pointing at an already-running
