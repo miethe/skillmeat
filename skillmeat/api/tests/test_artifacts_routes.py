@@ -228,17 +228,25 @@ class TestUpdateArtifact:
 
                 mock_coll_mgr.list_collections.return_value = ["default"]
                 mock_coll_mgr.load_collection.return_value = mock_coll
+                mock_coll_mgr.config.get_collection_path.return_value = Path(
+                    "/tmp/collection"
+                )
                 mock_art_mgr.show.return_value = sample_artifact
 
                 request_data = {
                     "tags": ["new", "updated"],
                 }
 
-                response = client.put(
-                    "/api/v1/artifacts/skill:test-skill", json=request_data
-                )
+                with patch(
+                    "skillmeat.utils.filesystem.compute_content_hash"
+                ) as mock_hash:
+                    mock_hash.return_value = "newhash123"
 
-                assert response.status_code == 200
+                    response = client.put(
+                        "/api/v1/artifacts/skill:test-skill", json=request_data
+                    )
+
+                    assert response.status_code == 200
 
     def test_update_artifact_metadata(self, client, sample_artifact):
         """Test updating artifact metadata."""
