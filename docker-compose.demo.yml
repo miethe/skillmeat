@@ -28,7 +28,6 @@ services:
   # ===================================================================
   demo-db:
     image: postgres:16-alpine
-    container_name: skillmeat-demo-db
     profiles:
       - full
       - api-only
@@ -60,7 +59,6 @@ services:
   # ===================================================================
   skillmeat-api:
     image: python:3.12-slim
-    container_name: skillmeat-demo-api
     profiles:
       - full
       - api-only
@@ -128,7 +126,6 @@ services:
   # ===================================================================
   skillmeat-web:
     image: node:20-slim
-    container_name: skillmeat-demo-web
     profiles:
       - full
     working_dir: /app/skillmeat/web
@@ -178,7 +175,6 @@ services:
   # ===================================================================
   backstage:
     image: node:20-slim
-    container_name: skillmeat-demo-backstage
     profiles:
       - full
     working_dir: /backstage-stub
