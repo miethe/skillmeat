@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 3
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -55,7 +55,7 @@ tasks:
 - id: TASK-1.4
   description: Create skillmeat/api/routers/idp_integration.py with POST /scaffold
     and POST /register-deployment endpoints; register in server.py
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -113,7 +113,7 @@ files_modified:
 - skillmeat/api/schemas/idp_integration.py
 - skillmeat/api/server.py
 updated: '2026-03-03'
-progress: 60
+progress: 80
 ---
 
 # backstage-integration-demo - Phase 1: SAM Backend API
