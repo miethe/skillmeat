@@ -3,15 +3,26 @@
 # PostgreSQL database seeded with sample financial-services data.
 #
 # PROFILES
-#   full      -- All services (API, Web, Backstage, DB)
-#   api-only  -- API server + DB only (default when no profile given)
+#   full             -- All services (API, Web, Backstage stub, DB)
+#   api-only         -- API server + DB only
+#   backstage-only   -- Backstage stub only; uses an already-running API on
+#                       the host (e.g. `skillmeat web dev`).  Set
+#                       SKILLMEAT_API_URL to override the default of
+#                       http://host.containers.internal:8080
 #
 # QUICK START
 #   Full stack:
-#     docker compose -f docker-compose.demo.yml --profile full up
+#     podman-compose -f docker-compose.demo.yml --profile full up
 #
 #   API + DB only:
-#     docker compose -f docker-compose.demo.yml --profile api-only up
+#     podman-compose -f docker-compose.demo.yml --profile api-only up
+#
+#   Backstage stub against already-running local API:
+#     podman-compose -f docker-compose.demo.yml --profile backstage-only up
+#
+#   Backstage stub against a remote API:
+#     SKILLMEAT_API_URL=http://1.2.3.4:8080 \
+#       podman-compose -f docker-compose.demo.yml --profile backstage-only up
 #
 #   Tear down (preserve data volume):
 #     docker compose -f docker-compose.demo.yml down
@@ -175,6 +186,10 @@ services:
     image: node:20-slim
     profiles:
       - full
+      # backstage-only: start only this stub, pointing at an already-running
+      # SkillMeat API (e.g. `skillmeat web dev` on the host).
+      # Override SKILLMEAT_API_URL to match where your API is listening.
+      - backstage-only
     working_dir: /backstage-stub
     # Startup script: prints setup instructions, then tails /dev/null so
     # the container stays alive for interactive use during demos.
@@ -199,18 +214,25 @@ services:
         echo '  4. Copy demo/backstage-app-config.yaml to app-config.local.yaml' &&
         echo '     and start: yarn dev' &&
         echo '' &&
-        echo '  SKILLMEAT_API_URL is set to: http://skillmeat-api:8080' &&
+        echo '  SKILLMEAT_API_URL is set to: '\"$$SKILLMEAT_API_URL\"'' &&
         echo '' &&
         echo '  Container is idle.  exec in with:' &&
-        echo '    docker compose -f docker-compose.demo.yml exec backstage bash' &&
+        echo '    podman-compose -f docker-compose.demo.yml exec backstage bash' &&
         echo '========================================================' &&
         tail -f /dev/null
       "
     ports:
       - "7007:7007"
     environment:
-      # SkillMeat API endpoint -- consumed by the scaffolder plugin
-      - SKILLMEAT_API_URL=http://skillmeat-api:8080
+      # SkillMeat API endpoint -- consumed by the scaffolder plugin.
+      #
+      # full profile:          points at the in-compose skillmeat-api service
+      # backstage-only profile: points at the host via host.containers.internal
+      #                         (podman) or host.docker.internal (Docker).
+      #
+      # Override at runtime:
+      #   SKILLMEAT_API_URL=http://1.2.3.4:8080 podman-compose ... up
+      - SKILLMEAT_API_URL=${SKILLMEAT_API_URL:-http://host.containers.internal:8080}
       # TODO: add GITHUB_TOKEN for Backstage catalog GitHub integrations
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       # TODO: add BACKSTAGE_BASE_URL when deploying behind a reverse proxy
@@ -220,8 +242,9 @@ services:
       - ./plugins/backstage-plugin-scaffolder-backend:/backstage-stub/skillmeat-plugin:ro
       # Mount the demo Backstage app-config
       - ./demo/backstage-app-config.yaml:/backstage-stub/app-config.local.yaml:ro
-    depends_on:
-      - skillmeat-api
+    # depends_on is intentionally absent: in backstage-only mode there is no
+    # in-compose API service to wait for.  In full mode the API starts first
+    # simply because it is listed earlier in the file.
     networks:
       - demo
 
