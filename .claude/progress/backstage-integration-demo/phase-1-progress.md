@@ -26,8 +26,8 @@ contributors:
 - code-reviewer
 tasks:
 - id: TASK-1.1
-  description: Add render_in_memory(target_id, variables) method to TemplateService
-    — returns list[RenderedFile] without writing to disk
+  description: "Add render_in_memory(target_id, variables) method to TemplateService\
+    \ \u2014 returns list[RenderedFile] without writing to disk"
   status: completed
   assigned_to:
   - python-backend-engineer

@@ -1,12 +1,12 @@
 ---
-title: "PRD: Backstage/RHDH Integration & Agentic SDLC Demo"
+title: 'PRD: Backstage/RHDH Integration & Agentic SDLC Demo'
 schema_version: 2
 doc_type: prd
-status: draft
-created: "2026-03-02"
-updated: "2026-03-03"
-feature_slug: "backstage-integration-demo"
-feature_version: "v1"
+status: inferred_complete
+created: '2026-03-02'
+updated: '2026-03-03'
+feature_slug: backstage-integration-demo
+feature_version: v1
 prd_ref: null
 plan_ref: null
 related_documents: []
@@ -14,22 +14,48 @@ owner: null
 contributors: []
 priority: high
 risk_level: medium
-category: "integration"
-tags: [prd, backstage, rhdh, idp, orchestration, demo, integration]
+category: integration
+tags:
+- prd
+- backstage
+- rhdh
+- idp
+- orchestration
+- demo
+- integration
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected: []
-problem_statement: "AI agents in newly scaffolded projects start with zero context, requiring manual CLAUDE.md setup before productive work."
-personas: ["platform-engineer", "backend-developer", "devsecops-consultant"]
-goals: ["Automate Golden Context Pack injection during Backstage scaffolding", "Enable drift detection for IDP-deployed packs", "Demonstrate Agentic SDLC value prop for enterprise GTM"]
-non_goals: ["Full marketplace integration with Backstage catalog", "Multi-IDP support (Backstage only for v1)"]
-requirements: ["Headless scaffold API endpoint", "Deployment registration endpoint", "Backstage scaffolder plugin", "Demo composite artifact"]
-success_metrics: ["End-to-end scaffold creates .claude/ dir in new repo", "Agent uses injected context without manual setup"]
-dependencies: ["Composite artifact system", "Template variable substitution", "Deployment tracking"]
-risks: ["Backstage API stability", "Demo environment complexity"]
+problem_statement: AI agents in newly scaffolded projects start with zero context,
+  requiring manual CLAUDE.md setup before productive work.
+personas:
+- platform-engineer
+- backend-developer
+- devsecops-consultant
+goals:
+- Automate Golden Context Pack injection during Backstage scaffolding
+- Enable drift detection for IDP-deployed packs
+- Demonstrate Agentic SDLC value prop for enterprise GTM
+non_goals:
+- Full marketplace integration with Backstage catalog
+- Multi-IDP support (Backstage only for v1)
+requirements:
+- Headless scaffold API endpoint
+- Deployment registration endpoint
+- Backstage scaffolder plugin
+- Demo composite artifact
+success_metrics:
+- End-to-end scaffold creates .claude/ dir in new repo
+- Agent uses injected context without manual setup
+dependencies:
+- Composite artifact system
+- Template variable substitution
+- Deployment tracking
+risks:
+- Backstage API stability
+- Demo environment complexity
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**
