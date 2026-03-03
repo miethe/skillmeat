@@ -23,14 +23,14 @@ in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
 
-owners: ["fullstack-engineer"]
+owners: ["platform-engineer"]
 contributors: []
 
 tasks:
   - id: "TASK-2.1"
     description: "Scaffold @skillmeat/backstage-plugin-scaffolder-backend via @backstage/cli create-plugin --backend"
     status: "pending"
-    assigned_to: ["fullstack-engineer"]
+    assigned_to: ["platform-engineer"]
     dependencies: []
     estimated_effort: "1h"
     priority: "high"
@@ -38,7 +38,7 @@ tasks:
   - id: "TASK-2.2"
     description: "Implement createSkillMeatInjectAction — calls POST /idp/scaffold, writes returned files into Backstage scaffolder workspace using @backstage/integration file APIs"
     status: "pending"
-    assigned_to: ["fullstack-engineer"]
+    assigned_to: ["platform-engineer"]
     dependencies: ["TASK-2.1", "TASK-1.4"]
     estimated_effort: "4h"
     priority: "high"
@@ -46,7 +46,7 @@ tasks:
   - id: "TASK-2.3"
     description: "Implement createSkillMeatRegisterAction — calls POST /idp/register-deployment after publish:github completes, passing resolved repoUrl"
     status: "pending"
-    assigned_to: ["fullstack-engineer"]
+    assigned_to: ["platform-engineer"]
     dependencies: ["TASK-2.1", "TASK-1.4"]
     estimated_effort: "2h"
     priority: "high"
@@ -54,7 +54,7 @@ tasks:
   - id: "TASK-2.4"
     description: "Export actions for Backstage host registration; write plugin README with installation, configuration, and action schema documentation"
     status: "pending"
-    assigned_to: ["fullstack-engineer"]
+    assigned_to: ["platform-engineer"]
     dependencies: ["TASK-2.2", "TASK-2.3"]
     estimated_effort: "2h"
     priority: "medium"

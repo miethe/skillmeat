@@ -440,7 +440,7 @@ class IDPRegisterDeploymentResponse(BaseModel):
   - [ ] 1.4: Add Pydantic schemas to `skillmeat/api/schemas/idp_integration.py`.
   - [ ] 1.5: Unit and integration tests for both endpoints.
 
-**Phase 2: Backstage Plugin** (assigned: Node.js/fullstack engineer, external)
+**Phase 2: Backstage Plugin** (assigned: platform-engineer)
 
 - Duration: 2-3 days
 - Tasks:
@@ -449,7 +449,7 @@ class IDPRegisterDeploymentResponse(BaseModel):
   - [ ] 2.3: Implement `createSkillMeatRegisterAction` — calls `/idp/register-deployment` post-publish.
   - [ ] 2.4: Export actions; write plugin README with configuration and action schema docs.
 
-**Phase 3: Demo Environment & Data** (assigned: `python-backend-engineer` + DevSecOps)
+**Phase 3: Demo Environment & Data** (assigned: `python-backend-engineer` + `platform-engineer`)
 
 - Duration: 2 days
 - Tasks:

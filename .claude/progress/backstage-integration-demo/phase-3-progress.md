@@ -24,7 +24,7 @@ blocked_tasks: 0
 at_risk_tasks: 0
 
 owners: ["python-backend-engineer"]
-contributors: ["documentation-writer"]
+contributors: ["documentation-writer", "platform-engineer"]
 
 tasks:
   - id: "TASK-3.1"
@@ -38,7 +38,7 @@ tasks:
   - id: "TASK-3.2"
     description: "Author docker-compose.demo.yml — SAM API/UI, local Backstage with plugin mounted, mock PostgreSQL for MCP target"
     status: "pending"
-    assigned_to: ["python-backend-engineer"]
+    assigned_to: ["python-backend-engineer", "platform-engineer"]
     dependencies: ["TASK-1.5", "TASK-2.4"]
     estimated_effort: "4h"
     priority: "high"
@@ -46,7 +46,7 @@ tasks:
   - id: "TASK-3.3"
     description: "Author Backstage template.yaml example with fetch:template, skillmeat:context:inject, publish:github, and skillmeat:deployment:register steps"
     status: "pending"
-    assigned_to: ["python-backend-engineer"]
+    assigned_to: ["python-backend-engineer", "platform-engineer"]
     dependencies: ["TASK-2.4"]
     estimated_effort: "2h"
     priority: "high"

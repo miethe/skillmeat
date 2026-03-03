@@ -194,6 +194,7 @@ External models are available as **opt-in** supplements to Claude. Claude Opus r
 | spike-writer | opus | planning | default | - |
 | ultrathink-debugger | opus | - | acceptEdits | project |
 | documentation-planner | opus | - | plan | - |
+| platform-engineer | opus | - | acceptEdits | - |
 
 ### Documentation
 
