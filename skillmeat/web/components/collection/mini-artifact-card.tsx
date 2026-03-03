@@ -68,6 +68,8 @@ export interface MiniArtifactCardProps {
   similarityScore?: number;
   /** Optional score breakdown for tooltip display */
   scoreBreakdown?: SimilarityBreakdown;
+  /** Delete handler — called when the user confirms deletion of this artifact */
+  onDelete?: () => void;
 }
 
 export interface DraggableMiniArtifactCardProps {
@@ -79,6 +81,8 @@ export interface DraggableMiniArtifactCardProps {
   groupId: string;
   /** Additional CSS classes */
   className?: string;
+  /** Delete handler — called when the user confirms deletion of this artifact */
+  onDelete?: () => void;
 }
 
 // ============================================================================
@@ -383,6 +387,7 @@ export function DraggableMiniArtifactCard({
   groupId,
   onClick,
   className,
+  onDelete,
 }: DraggableMiniArtifactCardProps) {
   const {
     attributes,
@@ -419,6 +424,7 @@ export function DraggableMiniArtifactCard({
       artifact={artifact}
       onClick={onClick}
       groupId={groupId}
+      onDelete={onDelete}
       className={cn(
         isDragging && 'border-dashed cursor-grabbing',
         className

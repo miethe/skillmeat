@@ -133,6 +133,7 @@ export function GroupedArtifactView({
   collectionId,
   artifacts,
   onArtifactClick,
+  onDelete,
 }: GroupedArtifactViewProps) {
   // ── State ──────────────────────────────────────────────────────────────
   const [selectedPane, setSelectedPane] = useState<PaneSelection>('all');
@@ -506,6 +507,7 @@ export function GroupedArtifactView({
                       artifact={artifact}
                       groupId={isSpecificGroup ? selectedPane : 'all'}
                       onClick={() => onArtifactClick?.(artifact)}
+                      onDelete={onDelete ? () => onDelete(artifact) : undefined}
                     />
                   ))}
                 </div>

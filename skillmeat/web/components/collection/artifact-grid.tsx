@@ -75,8 +75,6 @@ export function ArtifactGrid({
   const [deleteArtifact, setDeleteArtifact] = useState<Artifact | null>(null);
   const [deployArtifact, setDeployArtifact] = useState<Artifact | null>(null);
 
-  // Note: handleDelete is kept for the delete confirmation dialog flow
-  // even though ArtifactBrowseCard doesn't currently expose a delete action
   void _onMoveToCollection; // Preserved for API stability
   void _onEdit; // Preserved for API stability
 
@@ -128,6 +126,7 @@ export function ArtifactGrid({
             onTagClick={onTagClick}
             onGroupClick={onGroupClick}
             onManage={onManage}
+            onDelete={onDelete ? () => onDelete(artifact) : undefined}
             isSelected={selectedArtifactIds?.has(artifact.id) ?? false}
             onToggleSelect={onToggleArtifactSelect}
           />
