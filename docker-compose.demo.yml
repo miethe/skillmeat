@@ -114,8 +114,7 @@ services:
       retries: 5
       start_period: 45s
     depends_on:
-      demo-db:
-        condition: service_healthy
+      - demo-db
     networks:
       - demo
 
@@ -149,8 +148,7 @@ services:
       - skillmeat-web-node-modules:/app/skillmeat/web/node_modules
       - skillmeat-web-next-cache:/app/skillmeat/web/.next
     depends_on:
-      skillmeat-api:
-        condition: service_healthy
+      - skillmeat-api
     networks:
       - demo
 
@@ -223,8 +221,7 @@ services:
       # Mount the demo Backstage app-config
       - ./demo/backstage-app-config.yaml:/backstage-stub/app-config.local.yaml:ro
     depends_on:
-      skillmeat-api:
-        condition: service_healthy
+      - skillmeat-api
     networks:
       - demo
 
