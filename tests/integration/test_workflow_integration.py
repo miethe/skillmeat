@@ -220,6 +220,8 @@ def client(
     are replaced so all HTTP calls exercise the real service layer against the
     per-test SQLite file.
     """
+    import skillmeat.cache.models as _models
+
     with (
         patch(
             "skillmeat.api.routers.workflows._get_service",
@@ -231,6 +233,11 @@ def client(
         ),
     ):
         with TestClient(app) as tc:
+            # The app lifespan calls init_session_factory() with the default DB
+            # path, which caches SessionLocal pointing to the wrong database.
+            # Reset it here so that exec_service.start_execution() will
+            # re-initialise it with the per-test DB path on first use.
+            _models.SessionLocal = None
             yield tc
 
 

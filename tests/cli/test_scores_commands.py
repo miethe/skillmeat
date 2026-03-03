@@ -98,8 +98,8 @@ class TestScoresImportCommand:
         assert "No collections found" in result.output
 
     @patch("skillmeat.core.scoring.github_stars_importer.GitHubStarsImporter")
-    @patch("skillmeat.core.artifact.ArtifactManager")
-    @patch("skillmeat.core.collection.CollectionManager")
+    @patch("skillmeat.cli.ArtifactManager")
+    @patch("skillmeat.cli.CollectionManager")
     def test_import_all_artifacts(
         self, mock_coll_mgr_class, mock_art_mgr_class, mock_importer_class, isolated_cli_runner
     ):

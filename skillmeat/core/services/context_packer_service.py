@@ -90,6 +90,7 @@ class ContextPackerService:
         """
         self.memory_service = MemoryService(db_path=db_path)
         self.module_service = ContextModuleService(db_path=db_path)
+        self._db_path = db_path
         logger.info("ContextPackerService initialized (db_path=%s)", db_path)
 
     # =========================================================================
@@ -443,7 +444,7 @@ class ContextPackerService:
     def _get_context_entity_candidates(self, selectors: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Return context entities formatted as pack candidates."""
         try:
-            session = get_session()
+            session = get_session(self._db_path)
             try:
                 entities = (
                     session.query(Artifact)
@@ -576,11 +577,17 @@ def _sort_key_confidence_desc_created_desc(item: Dict[str, Any]) -> tuple:
         created_at DESC ordering.
     """
     confidence = item.get("confidence") or 0.0
-    created_at = item.get("created_at") or ""
+    created_at_raw = item.get("created_at") or ""
+
+    # Normalize to ISO string if a datetime object is returned from the service
+    if hasattr(created_at_raw, "isoformat"):
+        created_at_str = created_at_raw.isoformat()
+    else:
+        created_at_str = str(created_at_raw) if created_at_raw else ""
 
     # Invert character ordinals so ascending sort yields descending order
     inverted_created = (
-        "".join(chr(0xFFFF - ord(c)) for c in created_at) if created_at else ""
+        "".join(chr(0xFFFF - ord(c)) for c in created_at_str) if created_at_str else ""
     )
 
     return (-confidence, inverted_created)

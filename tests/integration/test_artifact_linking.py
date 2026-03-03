@@ -198,13 +198,25 @@ def api_client(temp_collection, test_settings):
     """FastAPI TestClient with initialized app and test collection."""
     app = create_app(test_settings)
 
-    # Mock collection manager dependency to use test collection
-    from skillmeat.api.dependencies import get_collection_manager
+    # Mock collection manager and artifact manager dependencies to use test collection
+    from skillmeat.api.dependencies import get_collection_manager, get_artifact_manager
+    from skillmeat.core.artifact import ArtifactManager
 
     def mock_get_collection_manager():
-        return temp_collection["manager"]
+        mgr = temp_collection["manager"]
+        # Ensure active collection resolves to our test collection, not the user's real config
+        mgr.get_active_collection_name = lambda: temp_collection["name"]
+        # Ensure list_collections includes our test collection for resolve_collection_name
+        mgr.list_collections = lambda: [temp_collection["name"]]
+        return mgr
 
     app.dependency_overrides[get_collection_manager] = mock_get_collection_manager
+
+    def mock_get_artifact_manager():
+        mgr = mock_get_collection_manager()
+        return ArtifactManager(collection_mgr=mgr)
+
+    app.dependency_overrides[get_artifact_manager] = mock_get_artifact_manager
 
     # Mock token verification (disable auth for tests)
     from skillmeat.api.dependencies import verify_api_key
@@ -411,6 +423,7 @@ class TestCreateLinkAPI:
 
         assert updated_agent.metadata.linked_artifacts is not None
         assert len(updated_agent.metadata.linked_artifacts) == 1
+        updated_agent.metadata.resolve_linked_artifacts()
         assert updated_agent.metadata.linked_artifacts[0].artifact_name == skill.name
 
     def test_create_link_all_types(self, api_client, collection_with_artifacts):
@@ -463,6 +476,7 @@ class TestDeleteLinkAPI:
         updated_agent = updated_collection.find_artifact(agent.name, ArtifactType.AGENT)
 
         assert len(updated_agent.metadata.linked_artifacts) == 2
+        updated_agent.metadata.resolve_linked_artifacts()
         remaining_names = {
             link.artifact_name for link in updated_agent.metadata.linked_artifacts
         }
@@ -685,7 +699,13 @@ class TestUnlinkedReferenceClearing:
         app = create_app(
             APISettings(env=Environment.TESTING, api_key_enabled=False)
         )
-        app.dependency_overrides[get_collection_manager] = lambda: collection_mgr
+        def _mock_mgr():
+            collection_mgr.get_active_collection_name = (
+                lambda: collection_with_artifacts["name"]
+            )
+            return collection_mgr
+
+        app.dependency_overrides[get_collection_manager] = _mock_mgr
         app.dependency_overrides[verify_api_key] = lambda: True
 
         with TestClient(app) as client:
@@ -735,17 +755,17 @@ class TestQueryFilters:
 
         collection_mgr.save_collection(collection)
 
-        # Query with has_unlinked=true
+        # Query with has_unlinked=true, scoped to our test collection
         response = api_client.get(
             "/api/v1/artifacts",
-            params={"has_unlinked": "true"},
+            params={"has_unlinked": "true", "collection": collection_with_artifacts["name"]},
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
         # Filter artifacts to only agents
-        agent_artifacts = [a for a in data["artifacts"] if a["type"] == "agent"]
+        agent_artifacts = [a for a in data["items"] if a["type"] == "agent"]
         assert len(agent_artifacts) >= 1
 
         # Verify artifact1 is included
@@ -891,13 +911,14 @@ class TestEdgeCases:
         collection = collection_with_artifacts["collection"]
         collection_mgr = collection_with_artifacts["manager"]
 
-        # Create artifact with no metadata
+        # Create artifact with empty/minimal metadata (metadata=None is not
+        # serializable; use empty ArtifactMetadata to represent "no metadata" state)
         agent_no_meta = Artifact(
             name="no-meta-agent",
             type=ArtifactType.AGENT,
             path="agents/no-meta-agent.md",
             origin="local",
-            metadata=None,  # No metadata
+            metadata=ArtifactMetadata(),
             added=datetime.now(timezone.utc),
         )
         collection.artifacts.append(agent_no_meta)

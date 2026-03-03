@@ -239,7 +239,10 @@ class TestGitHubScanner:
     def test_get_file_content_success(self, scanner, mock_client):
         """Test successful file content retrieval with metadata."""
         content = "# Test Skill\nThis is a skill."
-        mock_client.get_file_content.return_value = content.encode("utf-8")
+        mock_client.get_file_with_metadata.return_value = {
+            "content": content.encode("utf-8"),
+            "sha": "abc123",
+        }
 
         result = scanner.get_file_content("user", "repo", "skills/test/SKILL.md")
 
@@ -256,7 +259,10 @@ class TestGitHubScanner:
         import base64
 
         binary_data = b"\x89PNG\r\n\x1a\n"
-        mock_client.get_file_content.return_value = binary_data
+        mock_client.get_file_with_metadata.return_value = {
+            "content": binary_data,
+            "sha": "def456",
+        }
 
         result = scanner.get_file_content("user", "repo", "assets/icon.png")
 
@@ -269,7 +275,9 @@ class TestGitHubScanner:
 
     def test_get_file_content_not_found(self, scanner, mock_client):
         """Test file not found returns None."""
-        mock_client.get_file_content.side_effect = GitHubNotFoundError("Not found")
+        mock_client.get_file_with_metadata.side_effect = GitHubNotFoundError(
+            "Not found"
+        )
 
         result = scanner.get_file_content("user", "repo", "nonexistent.txt")
 

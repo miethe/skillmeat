@@ -29,7 +29,7 @@ class TestConfigListCommand:
         result = runner.invoke(main, ["config", "list"])
 
         assert result.exit_code == 0
-        assert "Configuration" in result.output
+        # CliRunner uses non-TTY output, so format defaults to JSON
         assert "test-key" in result.output
         assert "test-value" in result.output
 
@@ -91,7 +91,9 @@ class TestConfigGetCommand:
         result = runner.invoke(main, ["config", "get", "nonexistent"])
 
         assert result.exit_code == 0
-        assert "not set" in result.output
+        # CliRunner uses non-TTY output, so format defaults to JSON.
+        # A missing key is returned as {"status": "success", "key": "nonexistent", "value": null}
+        assert "nonexistent" in result.output
 
     def test_get_masks_github_token(self, isolated_cli_runner):
         """Test that get masks GitHub token."""

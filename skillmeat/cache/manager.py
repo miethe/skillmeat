@@ -172,6 +172,11 @@ class CacheManager:
                 db_path = Path(self.db_path)
                 db_path.parent.mkdir(parents=True, exist_ok=True)
 
+                # If the DB has tables (created via Base.metadata.create_all without
+                # running Alembic) but no alembic_version entry, stamp it at head so
+                # Alembic does not try to re-run the initial schema migration.
+                self._stamp_untracked_db_if_needed()
+
                 # Run Alembic migrations first (creates/updates schema)
                 from skillmeat.cache.migrations import run_migrations
                 run_migrations(self.db_path)
@@ -184,6 +189,40 @@ class CacheManager:
         except Exception as e:
             logger.error(f"Failed to initialize cache: {e}", exc_info=True)
             return False
+
+    def _stamp_untracked_db_if_needed(self) -> None:
+        """Stamp database at Alembic head if tables exist but alembic_version does not.
+
+        When CacheRepository or other code calls Base.metadata.create_all() directly
+        (without running Alembic), the database has all ORM tables but no
+        alembic_version tracking entry.  If we then call run_migrations(), Alembic
+        sees an empty revision history and tries to replay every migration from
+        scratch, hitting "table X already exists" errors.
+
+        This method detects that state and stamps the database at the current head
+        so Alembic skips all historical migrations.
+        """
+        try:
+            from sqlalchemy import create_engine, inspect as sa_inspect, text
+            engine = create_engine(f"sqlite:///{self.db_path}")
+            with engine.connect() as conn:
+                inspector = sa_inspect(engine)
+                existing_tables = set(inspector.get_table_names())
+
+                # Only act when actual schema tables exist but the Alembic tracking
+                # table is absent — the typical "create_all without Alembic" state.
+                if "projects" in existing_tables and "alembic_version" not in existing_tables:
+                    logger.debug(
+                        "Database has schema tables but no alembic_version; "
+                        "stamping at head to avoid re-running migrations."
+                    )
+                    from skillmeat.cache.migrations import get_alembic_config
+                    from alembic import command
+                    alembic_cfg = get_alembic_config(self.db_path)
+                    command.stamp(alembic_cfg, "head")
+        except Exception as e:
+            # Non-fatal: if stamping fails, let the normal migration path handle it
+            logger.debug(f"_stamp_untracked_db_if_needed skipped: {e}")
 
     # =========================================================================
     # Read Operations (Projects)

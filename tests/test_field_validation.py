@@ -28,27 +28,27 @@ class TestValidateFields:
 
     def test_validate_subset_of_fields(self):
         """Test validation with subset of valid fields."""
-        fields = ["description", "tags"]
+        fields = ["description", "author"]
         validated, invalid = validate_fields(fields, strict=True)
 
-        assert set(validated) == {"description", "tags"}
+        assert set(validated) == {"description", "author"}
         assert invalid == []
 
     def test_validate_case_insensitive(self):
         """Test case-insensitive field name matching."""
-        fields = ["DESCRIPTION", "Tags", "AuThOr"]
+        fields = ["DESCRIPTION", "License", "AuThOr"]
         validated, invalid = validate_fields(fields, strict=True)
 
         # Should normalize to lowercase canonical names
-        assert set(validated) == {"description", "tags", "author"}
+        assert set(validated) == {"description", "license", "author"}
         assert invalid == []
 
     def test_validate_with_whitespace(self):
         """Test field names with leading/trailing whitespace."""
-        fields = ["  description  ", " tags "]
+        fields = ["  description  ", " author "]
         validated, invalid = validate_fields(fields, strict=True)
 
-        assert set(validated) == {"description", "tags"}
+        assert set(validated) == {"description", "author"}
         assert invalid == []
 
     def test_validate_none_returns_all_fields(self):
@@ -60,7 +60,7 @@ class TestValidateFields:
 
     def test_validate_invalid_field_strict(self):
         """Test validation raises ValueError for invalid fields in strict mode."""
-        fields = ["description", "invalid_field", "tags"]
+        fields = ["description", "invalid_field", "author"]
 
         with pytest.raises(ValueError) as exc_info:
             validate_fields(fields, strict=True)
@@ -70,7 +70,7 @@ class TestValidateFields:
         assert "Invalid field name" in error_msg
         # Should list valid fields
         assert "description" in error_msg
-        assert "tags" in error_msg
+        assert "author" in error_msg
 
     def test_validate_invalid_field_non_strict(self):
         """Test validation returns invalid fields in non-strict mode."""
@@ -102,11 +102,11 @@ class TestValidateFields:
 
     def test_validate_duplicate_fields(self):
         """Test validation with duplicate field names."""
-        fields = ["description", "tags", "description"]
+        fields = ["description", "author", "description"]
         validated, invalid = validate_fields(fields, strict=True)
 
         # Should preserve duplicates (caller can deduplicate if needed)
-        assert validated == ["description", "tags", "description"]
+        assert validated == ["description", "author", "description"]
         assert invalid == []
 
 
@@ -116,7 +116,6 @@ class TestFindClosestField:
     def test_exact_prefix_match(self):
         """Test exact prefix matching has highest priority."""
         assert _find_closest_field("desc") == "description"
-        assert _find_closest_field("tag") == "tags"
         assert _find_closest_field("auth") == "author"
         assert _find_closest_field("lic") == "license"
 
@@ -129,8 +128,8 @@ class TestFindClosestField:
         """Test suggestions for common typos."""
         # Missing letter
         assert _find_closest_field("descriptio") == "description"
-        # Wrong letter
-        assert _find_closest_field("togs") == "tags"
+        # Wrong letter (close to "author")
+        assert _find_closest_field("autho") == "author"
 
     def test_no_match_returns_none(self):
         """Test that completely unrelated input returns None."""
@@ -141,7 +140,7 @@ class TestFindClosestField:
     def test_case_insensitive_matching(self):
         """Test case-insensitive fuzzy matching."""
         assert _find_closest_field("DESC") == "description"
-        assert _find_closest_field("TAGS") == "tags"
+        assert _find_closest_field("AUTH") == "author"
 
 
 class TestValidationErrorMessages:
@@ -184,7 +183,7 @@ class TestRefreshableFieldsConstant:
 
     def test_contains_expected_fields(self):
         """Test that REFRESHABLE_FIELDS contains all expected fields."""
-        expected = {"description", "tags", "author", "license", "origin_source"}
+        expected = {"description", "author", "license"}
         assert REFRESHABLE_FIELDS == expected
 
     def test_is_frozen(self):

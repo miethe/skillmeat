@@ -409,13 +409,20 @@ class TestSyncArtifact:
 
     def test_sync_artifact_skip_strategy(self, tmp_path):
         """Test _sync_artifact with skip in prompt mode."""
+        collection_path = tmp_path / "collection"
+        collection_path.mkdir(parents=True)
+        (collection_path / "skills").mkdir(parents=True)
+
         collection_mgr = Mock()
-        collection_mgr.get_collection.return_value = Mock(path=tmp_path / "collection")
+        mock_collection = Mock()
+        mock_collection.path = collection_path
+        collection_mgr.load_collection.return_value = mock_collection
+        collection_mgr.config = Mock()
+        collection_mgr.config.get_collection_path.return_value = collection_path
         sync_mgr = SyncManager(collection_manager=collection_mgr)
 
         project_path = tmp_path / "project"
         (project_path / ".claude" / "skills" / "test").mkdir(parents=True)
-        (tmp_path / "collection" / "skills").mkdir(parents=True)
 
         drift = DriftDetectionResult(
             artifact_name="test",
@@ -429,7 +436,7 @@ class TestSyncArtifact:
             "_get_project_artifact_path",
             return_value=project_path / ".claude" / "skills" / "test",
         ):
-            with patch.object(sync_mgr, "_load_deployment_metadata", return_value=None):
+            with patch.object(sync_mgr, "_load_deployment_metadata", return_value=[]):
                 with patch("rich.console.Console"):
                     with patch("rich.prompt.Prompt") as MockPrompt:
                         MockPrompt.ask.return_value = "4"  # Skip
@@ -491,11 +498,18 @@ class TestIntegration:
 
     def test_complete_sync_flow_overwrite(self, tmp_path):
         """Test complete sync flow with overwrite strategy."""
+        collection_path = tmp_path / "collection"
+        collection_path.mkdir(parents=True)
+        (collection_path / "skills" / "test-skill").mkdir(parents=True)
+        (collection_path / "skills" / "test-skill" / "old.txt").write_text("old content")
+
         # Create mock collection manager
         collection_mgr = Mock()
         mock_collection = Mock()
-        mock_collection.path = tmp_path / "collection"
-        collection_mgr.get_collection.return_value = mock_collection
+        mock_collection.path = collection_path
+        collection_mgr.load_collection.return_value = mock_collection
+        collection_mgr.config = Mock()
+        collection_mgr.config.get_collection_path.return_value = collection_path
 
         # Create sync manager
         sync_mgr = SyncManager(collection_manager=collection_mgr)
@@ -505,12 +519,6 @@ class TestIntegration:
         (project_path / ".claude" / "skills" / "test-skill").mkdir(parents=True)
         (project_path / ".claude" / "skills" / "test-skill" / "file.txt").write_text(
             "project content"
-        )
-
-        # Create collection structure
-        (tmp_path / "collection" / "skills" / "test-skill").mkdir(parents=True)
-        (tmp_path / "collection" / "skills" / "test-skill" / "old.txt").write_text(
-            "old content"
         )
 
         # Mock methods
@@ -532,7 +540,7 @@ class TestIntegration:
                     sync_mgr, "_compute_artifact_hash", return_value="xyz789"
                 ):
                     with patch.object(
-                        sync_mgr, "_load_deployment_metadata", return_value=None
+                        sync_mgr, "_load_deployment_metadata", return_value=[]
                     ):
                         result = sync_mgr.sync_from_project(
                             project_path,

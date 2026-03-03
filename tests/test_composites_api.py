@@ -68,6 +68,16 @@ def _utcnow() -> datetime:
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def reset_session_local():
+    """Reset the module-level SessionLocal between tests to prevent DB leakage."""
+    import skillmeat.cache.models as _models
+
+    _models.SessionLocal = None
+    yield
+    _models.SessionLocal = None
+
+
 @pytest.fixture()
 def temp_db() -> Generator[str, None, None]:
     """Temporary SQLite database file for each test."""
@@ -1204,7 +1214,7 @@ class TestRemoveCompositeMemberHTTPHandler:
             return_value=mock_repo,
         ):
             # Call the async handler directly
-            result = asyncio.get_event_loop().run_until_complete(
+            result = asyncio.run(
                 remove_composite_member(
                     composite_id=seeded_db["composite_id"],
                     member_uuid=seeded_db["canvas_uuid"],
@@ -1231,7 +1241,7 @@ class TestRemoveCompositeMemberHTTPHandler:
             return_value=mock_repo,
         ):
             with pytest.raises(HTTPException) as exc_info:
-                asyncio.get_event_loop().run_until_complete(
+                asyncio.run(
                     remove_composite_member(
                         composite_id=seeded_db["composite_id"],
                         member_uuid="nonexistent-uuid",

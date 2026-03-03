@@ -13,6 +13,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -553,10 +554,19 @@ class TestDiscoveryPhase1Integration:
 # =============================================================================
 
 
-def test_end_to_end_discovery_flow(populated_project_dir):
+def test_end_to_end_discovery_flow(populated_project_dir, tmp_path):
     """Test complete discovery flow using shared detection module."""
+    # Isolate from real user collection so all discovered artifacts are importable
+    empty_collection = tmp_path / "empty_collection"
+    mock_config = MagicMock()
+    mock_config.get_active_collection.return_value = "default"
+    mock_config.get_collection_path.return_value = empty_collection
+
     service = ArtifactDiscoveryService(populated_project_dir, scan_mode="project")
-    result = service.discover_artifacts()
+    with patch(
+        "skillmeat.config.ConfigManager", return_value=mock_config
+    ):
+        result = service.discover_artifacts()
 
     # Verify all artifacts were discovered
     assert result.discovered_count == 3

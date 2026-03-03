@@ -279,10 +279,11 @@ class TestToolsInAPIResponses:
         """Test that CollectionArtifact model correctly parses tools_json."""
         from skillmeat.cache.models import CollectionArtifact
 
-        # Create mock CollectionArtifact with tools_json
+        # artifact_id is a read-only property derived from the artifact relationship;
+        # construct via the actual FK column artifact_uuid instead.
         artifact = CollectionArtifact(
             collection_id="default",
-            artifact_id="skill:test-skill",
+            artifact_uuid="00000000-0000-0000-0000-000000000001",
             tools_json=json.dumps(["Bash", "Read", "Write"]),
         )
 
@@ -294,10 +295,11 @@ class TestToolsInAPIResponses:
         """Test that CollectionArtifact handles null tools_json."""
         from skillmeat.cache.models import CollectionArtifact
 
-        # Create mock CollectionArtifact without tools_json
+        # artifact_id is a read-only property derived from the artifact relationship;
+        # construct via the actual FK column artifact_uuid instead.
         artifact = CollectionArtifact(
             collection_id="default",
-            artifact_id="skill:simple-skill",
+            artifact_uuid="00000000-0000-0000-0000-000000000002",
             tools_json=None,
         )
 

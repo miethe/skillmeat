@@ -290,6 +290,37 @@ class DeploymentTracker:
         return None
 
     @staticmethod
+    def find_deployment_by_name(
+        project_path: Path,
+        artifact_name: str,
+        profile_id: Optional[str] = None,
+    ) -> Optional[Deployment]:
+        """Find a deployment record by name alone (without requiring artifact type).
+
+        Useful when the artifact type is not known at undeploy time. Returns the
+        first matching deployment found across all artifact types.
+
+        Args:
+            project_path: Project root directory
+            artifact_name: Artifact name
+            profile_id: Optional profile filter
+
+        Returns:
+            Deployment object or None if not found
+        """
+        deployments = DeploymentTracker.read_deployments(project_path, profile_root_dir=None)
+        normalized_search = _normalize_artifact_name(artifact_name)
+
+        for dep in deployments:
+            if _normalize_artifact_name(dep.artifact_name) == normalized_search and (
+                profile_id is None
+                or (dep.deployment_profile_id or "claude_code") == profile_id
+            ):
+                return dep
+
+        return None
+
+    @staticmethod
     def remove_deployment(
         project_path: Path,
         artifact_name: str,

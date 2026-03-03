@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from skillmeat.cache.models import Base, Artifact, ArtifactVersion
+from skillmeat.cache.models import Base, Artifact, ArtifactVersion, Project
 from skillmeat.core.version_lineage import (
     build_version_lineage,
     find_common_ancestor,
@@ -39,6 +39,14 @@ def session():
 @pytest.fixture
 def sample_artifact(session):
     """Create sample artifact for testing."""
+    project = Project(
+        id="project_test123",
+        name="Test Project",
+        path="/tmp/test_project",
+    )
+    session.add(project)
+    session.flush()
+
     artifact = Artifact(
         id="artifact_test123",
         project_id="project_test123",

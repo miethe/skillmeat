@@ -53,7 +53,6 @@ class TestThreeWayMergeWithBaseline:
         )
 
         # Create deployment with baseline
-        tracker = DeploymentTracker(temp_project)
         deployment = Deployment(
             artifact_name="test-skill",
             artifact_type="skill",
@@ -62,10 +61,10 @@ class TestThreeWayMergeWithBaseline:
             artifact_path=Path("skills/test-skill"),
             content_hash=base_hash,  # Baseline for merge
         )
-        tracker.track_deployment(deployment)
+        DeploymentTracker.write_deployments(temp_project, [deployment])
 
         # Verify deployment has baseline
-        retrieved = tracker.get_deployment("test-skill", ArtifactType.SKILL)
+        retrieved = DeploymentTracker.get_deployment(temp_project, "test-skill", "skill")
         assert retrieved.content_hash == base_hash
 
         # Three-way merge should use this baseline
@@ -107,7 +106,7 @@ class TestThreeWayMergeWithBaseline:
         # Should detect conflict
         assert result.success is False
         assert len(result.conflicts) > 0
-        assert "file.txt" in result.conflicts
+        assert any(c.file_path == "file.txt" for c in result.conflicts)
 
     def test_merge_auto_merges_when_only_one_side_changed(self, tmp_path):
         """Test auto-merge when only collection or project changed.
@@ -197,7 +196,6 @@ class TestThreeWayMergeFallback:
         - Warning includes helpful context
         """
         # Create deployment without baseline (old deployment)
-        tracker = DeploymentTracker(temp_project)
         old_deployment = Deployment(
             artifact_name="old-skill",
             artifact_type="skill",
@@ -256,10 +254,8 @@ class TestThreeWayMergeFallback:
         - Missing snapshot handled gracefully
         - Returns None or uses fallback
         """
-        tracker = DeploymentTracker(temp_project)
-
         # Try to get nonexistent deployment
-        deployment = tracker.get_deployment("nonexistent", ArtifactType.SKILL)
+        deployment = DeploymentTracker.get_deployment(temp_project, "nonexistent", "skill")
 
         # Should return None, not raise
         assert deployment is None
@@ -490,7 +486,7 @@ class TestMergeWithMultiFileArtifacts:
 
         # Should conflict
         assert result.success is False
-        assert "SKILL.md" in result.conflicts
+        assert any(c.file_path == "SKILL.md" for c in result.conflicts)
 
 
 class TestBaselineHashIntegration:
@@ -511,7 +507,6 @@ class TestBaselineHashIntegration:
 
         baseline_hash = compute_content_hash(skill_dir)
 
-        tracker = DeploymentTracker(temp_project)
         deployment = Deployment(
             artifact_name="e2e-test",
             artifact_type="skill",
@@ -520,10 +515,10 @@ class TestBaselineHashIntegration:
             artifact_path=Path("skills/e2e-test"),
             content_hash=baseline_hash,
         )
-        tracker.track_deployment(deployment)
+        DeploymentTracker.write_deployments(temp_project, [deployment])
 
         # Step 2: Verify baseline stored
-        retrieved = tracker.get_deployment("e2e-test", ArtifactType.SKILL)
+        retrieved = DeploymentTracker.get_deployment(temp_project, "e2e-test", "skill")
         assert retrieved.content_hash == baseline_hash
 
         # Step 3: Simulate local modification
@@ -561,7 +556,6 @@ class TestBaselineHashIntegration:
         - Graceful fallback
         """
         # Create deployment with invalid baseline hash
-        tracker = DeploymentTracker(temp_project)
         deployment = Deployment(
             artifact_name="mismatch-test",
             artifact_type="skill",
@@ -571,10 +565,10 @@ class TestBaselineHashIntegration:
             content_hash="nonexistent_hash_" + ("x" * 47),
         )
 
-        tracker.track_deployment(deployment)
+        DeploymentTracker.write_deployments(temp_project, [deployment])
 
         # Retrieve deployment
-        retrieved = tracker.get_deployment("mismatch-test", ArtifactType.SKILL)
+        retrieved = DeploymentTracker.get_deployment(temp_project, "mismatch-test", "skill")
 
         # Baseline hash is present but wouldn't match any snapshot
         assert retrieved.content_hash == "nonexistent_hash_" + ("x" * 47)

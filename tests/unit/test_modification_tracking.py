@@ -76,26 +76,18 @@ class TestModificationTimestampTracking:
         with patch.object(
             sync_manager, "_load_deployment_metadata"
         ) as mock_load_metadata:
-            # Create deployment metadata with our test deployment
-            from skillmeat.models import DeploymentMetadata, DeploymentRecord
-
-            deployment_record = DeploymentRecord(
-                name="test-skill",
+            # Create deployment list with our test deployment (new API: List[Deployment])
+            deployment = Deployment(
+                artifact_name="test-skill",
                 artifact_type="skill",
-                source="local:test",
-                version="1.0.0",
-                sha="abc123def456" + "0" * 52,  # Original hash
-                deployed_at=datetime.now().isoformat() + "Z",
-                deployed_from=str(tmp_path / "collection"),
+                from_collection="default",
+                deployed_at=datetime.now() - timedelta(days=1),
+                artifact_path=Path("skills/test-skill"),
+                content_hash="abc123def456" + "0" * 52,  # Original hash
+                local_modifications=False,
+                modification_detected_at=None,
             )
-
-            mock_metadata = DeploymentMetadata(
-                collection="default",
-                deployed_at=datetime.now().isoformat() + "Z",
-                skillmeat_version="0.3.0",
-                artifacts=[deployment_record],
-            )
-            mock_load_metadata.return_value = mock_metadata
+            mock_load_metadata.return_value = [deployment]
 
             # Mock collection artifacts
             with patch.object(
@@ -111,7 +103,7 @@ class TestModificationTimestampTracking:
                 ]
 
                 # Mock hash computation to show drift
-                with patch.object(sync_manager, "_compute_artifact_hash") as mock_hash:
+                with patch.object(sync_manager, "_compute_content_hash") as mock_hash:
                     # Collection hash matches deployment (no upstream changes)
                     # Project hash differs (local modifications)
                     mock_hash.side_effect = [
@@ -154,25 +146,18 @@ class TestModificationTimestampTracking:
         with patch.object(
             sync_manager, "_load_deployment_metadata"
         ) as mock_load_metadata:
-            from skillmeat.models import DeploymentMetadata, DeploymentRecord
-
-            deployment_record = DeploymentRecord(
-                name="test-skill",
+            # Return List[Deployment] (new API)
+            deployment = Deployment(
+                artifact_name="test-skill",
                 artifact_type="skill",
-                source="local:test",
-                version="1.0.0",
-                sha="abc123def456" + "0" * 52,
-                deployed_at=datetime.now().isoformat() + "Z",
-                deployed_from=str(tmp_path / "collection"),
+                from_collection="default",
+                deployed_at=datetime.now() - timedelta(days=1),
+                artifact_path=Path("skills/test-skill"),
+                content_hash="abc123def456" + "0" * 52,
+                local_modifications=True,
+                modification_detected_at=original_timestamp,
             )
-
-            mock_metadata = DeploymentMetadata(
-                collection="default",
-                deployed_at=datetime.now().isoformat() + "Z",
-                skillmeat_version="0.3.0",
-                artifacts=[deployment_record],
-            )
-            mock_load_metadata.return_value = mock_metadata
+            mock_load_metadata.return_value = [deployment]
 
             # Mock collection artifacts
             with patch.object(
@@ -188,7 +173,7 @@ class TestModificationTimestampTracking:
                 ]
 
                 # Mock hash computation
-                with patch.object(sync_manager, "_compute_artifact_hash") as mock_hash:
+                with patch.object(sync_manager, "_compute_content_hash") as mock_hash:
                     mock_hash.side_effect = [
                         "abc123def456" + "0" * 52,  # Collection SHA
                         "def789ghi012" + "0" * 52,  # Project SHA (modified)
@@ -212,21 +197,25 @@ class TestModificationTimestampTracking:
         claude_dir = project_path / ".claude"
         claude_dir.mkdir()
 
-        # Mock deployment metadata with no artifacts
+        # Mock deployment metadata — need at least one deployment so check_drift
+        # doesn't return early; use a placeholder that has no match in the collection
         with patch.object(
             sync_manager, "_load_deployment_metadata"
         ) as mock_load_metadata:
-            from skillmeat.models import DeploymentMetadata
-
-            mock_metadata = DeploymentMetadata(
-                collection="default",
-                deployed_at=datetime.now().isoformat() + "Z",
-                skillmeat_version="0.3.0",
-                artifacts=[],  # No deployed artifacts
+            # Return a deployment for a different artifact (not "new-skill")
+            # so check_drift proceeds past the early-exit and detects "new-skill" as added
+            placeholder_deployment = Deployment(
+                artifact_name="old-skill",
+                artifact_type="skill",
+                from_collection="default",
+                deployed_at=datetime.now() - timedelta(days=1),
+                artifact_path=Path("skills/old-skill"),
+                content_hash="abc123def456" + "0" * 52,
+                local_modifications=False,
             )
-            mock_load_metadata.return_value = mock_metadata
+            mock_load_metadata.return_value = [placeholder_deployment]
 
-            # Mock collection with new artifact
+            # Mock collection with only the new artifact (old-skill not in collection)
             with patch.object(
                 sync_manager, "_get_collection_artifacts"
             ) as mock_get_artifacts:
@@ -240,15 +229,17 @@ class TestModificationTimestampTracking:
                 ]
 
                 # Mock hash computation
-                with patch.object(sync_manager, "_compute_artifact_hash") as mock_hash:
+                with patch.object(sync_manager, "_compute_content_hash") as mock_hash:
                     mock_hash.return_value = "abc123def456" + "0" * 52
 
                     # Execute drift detection
                     drift_results = sync_manager.check_drift(project_path)
 
-                    # Verify "added" drift was detected
-                    assert len(drift_results) == 1
-                    drift = drift_results[0]
+                    # Verify "added" drift was detected (new-skill not deployed)
+                    # Also "removed" drift for old-skill (not in collection)
+                    added = [d for d in drift_results if d.drift_type == "added"]
+                    assert len(added) == 1
+                    drift = added[0]
 
                     assert drift.drift_type == "added"
                     assert drift.artifact_name == "new-skill"
@@ -269,25 +260,17 @@ class TestModificationTimestampTracking:
         with patch.object(
             sync_manager, "_load_deployment_metadata"
         ) as mock_load_metadata:
-            from skillmeat.models import DeploymentMetadata, DeploymentRecord
-
-            deployment_record = DeploymentRecord(
-                name="removed-skill",
+            # Return List[Deployment] (new API)
+            deployment = Deployment(
+                artifact_name="removed-skill",
                 artifact_type="skill",
-                source="local:test",
-                version="1.0.0",
-                sha="abc123def456" + "0" * 52,
-                deployed_at=datetime.now().isoformat() + "Z",
-                deployed_from=str(tmp_path / "collection"),
+                from_collection="default",
+                deployed_at=datetime.now() - timedelta(days=1),
+                artifact_path=Path("skills/removed-skill"),
+                content_hash="abc123def456" + "0" * 52,
+                local_modifications=False,
             )
-
-            mock_metadata = DeploymentMetadata(
-                collection="default",
-                deployed_at=datetime.now().isoformat() + "Z",
-                skillmeat_version="0.3.0",
-                artifacts=[deployment_record],
-            )
-            mock_load_metadata.return_value = mock_metadata
+            mock_load_metadata.return_value = [deployment]
 
             # Mock empty collection (artifact was removed)
             with patch.object(
@@ -325,25 +308,17 @@ class TestModificationTimestampTracking:
         with patch.object(
             sync_manager, "_load_deployment_metadata"
         ) as mock_load_metadata:
-            from skillmeat.models import DeploymentMetadata, DeploymentRecord
-
-            deployment_record = DeploymentRecord(
-                name="test-skill",
+            # Return List[Deployment] (new API)
+            deployment = Deployment(
+                artifact_name="test-skill",
                 artifact_type="skill",
-                source="local:test",
-                version="1.0.0",
-                sha="abc123def456" + "0" * 52,
-                deployed_at=datetime.now().isoformat() + "Z",
-                deployed_from=str(tmp_path / "collection"),
+                from_collection="default",
+                deployed_at=datetime.now() - timedelta(days=1),
+                artifact_path=Path("skills/test-skill"),
+                content_hash="abc123def456" + "0" * 52,
+                local_modifications=False,
             )
-
-            mock_metadata = DeploymentMetadata(
-                collection="default",
-                deployed_at=datetime.now().isoformat() + "Z",
-                skillmeat_version="0.3.0",
-                artifacts=[deployment_record],
-            )
-            mock_load_metadata.return_value = mock_metadata
+            mock_load_metadata.return_value = [deployment]
 
             # Mock collection with updated artifact
             with patch.object(
@@ -359,7 +334,7 @@ class TestModificationTimestampTracking:
                 ]
 
                 # Mock hash computation
-                with patch.object(sync_manager, "_compute_artifact_hash") as mock_hash:
+                with patch.object(sync_manager, "_compute_content_hash") as mock_hash:
                     # Collection changed (upstream update)
                     # Project unchanged (matches deployment)
                     mock_hash.side_effect = [

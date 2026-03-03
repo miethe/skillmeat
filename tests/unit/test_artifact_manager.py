@@ -62,7 +62,7 @@ def mock_github_fetch_result(test_skill_dir):
     return FetchResult(
         artifact_path=test_skill_dir,
         metadata=ArtifactMetadata(
-            title="Test Skill", description="A test skill", tags=["test"]
+            title="Test Skill", description="A test skill"
         ),
         resolved_sha="abc123def456",
         resolved_version="v1.0.0",

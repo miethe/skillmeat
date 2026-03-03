@@ -237,7 +237,7 @@ class TestRemoveCommand:
         assert add_result.exit_code == 0
 
         # Remove artifact
-        result = runner.invoke(main, ["remove", "test-skill"])
+        result = runner.invoke(main, ["remove", "--force", "test-skill"])
 
         assert result.exit_code == 0
 
@@ -255,7 +255,7 @@ class TestRemoveCommand:
         runner.invoke(main, ["init"])
 
         # Try to remove non-existent artifact
-        result = runner.invoke(main, ["remove", "nonexistent"])
+        result = runner.invoke(main, ["remove", "--force", "nonexistent"])
 
         assert result.exit_code == 1
 
@@ -272,7 +272,7 @@ class TestRemoveCommand:
         )
 
         # Remove with --keep-files
-        result = runner.invoke(main, ["remove", "test-skill", "--keep-files"])
+        result = runner.invoke(main, ["remove", "--force", "test-skill", "--keep-files"])
 
         assert result.exit_code == 0
 
@@ -296,7 +296,7 @@ class TestRemoveCommand:
         )
 
         # Remove with type
-        result = runner.invoke(main, ["remove", "test-skill", "--type", "skill"])
+        result = runner.invoke(main, ["remove", "--force", "test-skill", "--type", "skill"])
 
         assert result.exit_code == 0
 
@@ -325,13 +325,13 @@ class TestRemoveCommand:
         )
 
         # Try to remove without type (should fail or prompt)
-        result = runner.invoke(main, ["remove", "shared-name"])
+        result = runner.invoke(main, ["remove", "--force", "shared-name"])
 
         # Should require type specification or fail
         assert result.exit_code == 1 or "ambiguous" in result.output.lower()
 
         # Remove with type should work
-        result2 = runner.invoke(main, ["remove", "shared-name", "--type", "skill"])
+        result2 = runner.invoke(main, ["remove", "--force", "shared-name", "--type", "skill"])
         assert result2.exit_code == 0
 
     def test_remove_and_verify_files_deleted(
@@ -354,7 +354,7 @@ class TestRemoveCommand:
         assert artifact_path.exists()
 
         # Remove artifact
-        result = runner.invoke(main, ["remove", "test-skill"])
+        result = runner.invoke(main, ["remove", "--force", "test-skill"])
         assert result.exit_code == 0
 
         # Files should be deleted

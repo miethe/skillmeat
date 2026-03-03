@@ -68,7 +68,7 @@ class TestWebDev:
         mock_manager_class.assert_called_once_with(
             api_only=False,
             web_only=False,
-            api_port=8000,
+            api_port=8080,
             web_port=3000,
             api_host="127.0.0.1",
         )

@@ -2,7 +2,7 @@
 
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -46,10 +46,29 @@ def mock_storage():
     return MockStorage()
 
 
+def _jwt_decode_no_iat(*args, **kwargs):
+    """jwt.decode wrapper that disables iat validation.
+
+    On this system datetime.utcnow().timestamp() returns a value 5 hours ahead
+    of time.time() due to a local-timezone/UTC mismatch. PyJWT validates iat
+    using time.time() (via datetime.now(tz=UTC).timestamp()), so tokens whose
+    iat was set via datetime.utcnow().timestamp() appear to be 'not yet valid'.
+    Disabling iat verification in tests isolates this environment issue.
+    """
+    options = kwargs.pop("options", {})
+    options.setdefault("verify_iat", False)
+    return jwt.decode(*args, options=options, **kwargs)
+
+
 @pytest.fixture
 def token_manager(mock_storage):
     """Create token manager with mock storage."""
-    return TokenManager(storage=mock_storage, secret_key="test-secret-key")
+    with patch("skillmeat.core.auth.token_manager.jwt") as mock_jwt:
+        mock_jwt.decode.side_effect = _jwt_decode_no_iat
+        mock_jwt.encode = jwt.encode
+        mock_jwt.ExpiredSignatureError = jwt.ExpiredSignatureError
+        mock_jwt.InvalidTokenError = jwt.InvalidTokenError
+        yield TokenManager(storage=mock_storage, secret_key="test-secret-key")
 
 
 def test_generate_token_basic(token_manager):

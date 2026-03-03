@@ -243,6 +243,74 @@ async def list_tags(
 
 
 @router.get(
+    "/search",
+    response_model=List[TagResponse],
+    summary="Search tags by name",
+    description="""
+    Search for tags by name (case-insensitive substring match).
+
+    Results are limited to 50 tags and ordered by name.
+    """,
+    responses={
+        200: {"description": "Search completed successfully"},
+        400: {"description": "Invalid search query"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def search_tags(
+    q: str = Query(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Search query (case-insensitive)",
+    ),
+    limit: int = Query(
+        default=50,
+        ge=1,
+        le=100,
+        description="Maximum number of results",
+    ),
+) -> List[TagResponse]:
+    """Search tags by name.
+
+    Args:
+        q: Search query (case-insensitive substring)
+        limit: Maximum number of results (1-100)
+
+    Returns:
+        List of matching tags with counts
+
+    Raises:
+        HTTPException 400: If query is invalid
+        HTTPException 500: If search fails
+    """
+    from skillmeat.core.services import TagService
+
+    service = TagService()
+
+    try:
+        logger.info(f"Searching tags: query='{q}', limit={limit}")
+
+        results = service.search_tags(query=q, limit=limit)
+
+        logger.info(f"Found {len(results)} matching tags")
+        return results
+
+    except ValueError as e:
+        logger.warning(f"Tag search validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Failed to search tags: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to search tags: {str(e)}",
+        )
+
+
+@router.get(
     "/{tag_id}",
     response_model=TagResponse,
     summary="Get tag by ID",
@@ -554,80 +622,6 @@ async def delete_tag(tag_id: str, collection_mgr: CollectionManagerDep) -> None:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete tag: {str(e)}",
         )
-
-
-# =============================================================================
-# Tag Search
-# =============================================================================
-
-
-@router.get(
-    "/search",
-    response_model=List[TagResponse],
-    summary="Search tags by name",
-    description="""
-    Search for tags by name (case-insensitive substring match).
-
-    Results are limited to 50 tags and ordered by name.
-    """,
-    responses={
-        200: {"description": "Search completed successfully"},
-        400: {"description": "Invalid search query"},
-        500: {"description": "Internal server error"},
-    },
-)
-async def search_tags(
-    q: str = Query(
-        ...,
-        min_length=1,
-        max_length=100,
-        description="Search query (case-insensitive)",
-    ),
-    limit: int = Query(
-        default=50,
-        ge=1,
-        le=100,
-        description="Maximum number of results",
-    ),
-) -> List[TagResponse]:
-    """Search tags by name.
-
-    Args:
-        q: Search query (case-insensitive substring)
-        limit: Maximum number of results (1-100)
-
-    Returns:
-        List of matching tags with counts
-
-    Raises:
-        HTTPException 400: If query is invalid
-        HTTPException 500: If search fails
-    """
-    from skillmeat.core.services import TagService
-
-    service = TagService()
-
-    try:
-        logger.info(f"Searching tags: query='{q}', limit={limit}")
-
-        results = service.search_tags(query=q, limit=limit)
-
-        logger.info(f"Found {len(results)} matching tags")
-        return results
-
-    except ValueError as e:
-        logger.warning(f"Tag search validation error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
-    except Exception as e:
-        logger.error(f"Failed to search tags: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to search tags: {str(e)}",
-        )
-
 
 # =============================================================================
 # Note: Artifact-Tag Association Endpoints

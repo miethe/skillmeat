@@ -104,12 +104,23 @@ description: A description
 
         assert result["title"] == "My Skill Name"
 
-    def test_skips_non_skill_artifacts(self):
-        """Test that non-skill artifacts are skipped."""
-        mock_scanner = Mock()
-        mock_source = Mock()
+    def test_handles_non_skill_artifacts(self):
+        """Test that non-skill artifacts are processed using type-appropriate manifests.
 
-        # Create command artifact
+        The extractor now supports all artifact types via _get_manifest_candidates().
+        For commands, it looks for the command file or README.md.
+        When no manifest is found, it returns empty results.
+        """
+        mock_scanner = Mock()
+        # Return None to simulate no manifest found for this artifact
+        mock_scanner.get_file_content = Mock(return_value=None)
+
+        mock_source = Mock()
+        mock_source.owner = "test"
+        mock_source.repo_name = "test"
+        mock_source.ref = "main"
+
+        # Create command artifact with a directory path (not a .md file)
         artifact = DetectedArtifact(
             artifact_type="command",
             name="test-command",
@@ -120,10 +131,10 @@ description: A description
 
         result = _extract_frontmatter_for_artifact(mock_scanner, mock_source, artifact)
 
-        # Verify scanner was NOT called
-        mock_scanner.get_file_content.assert_not_called()
+        # Scanner IS called (to attempt manifest lookup)
+        mock_scanner.get_file_content.assert_called()
 
-        # Verify empty results
+        # No manifest found → empty results
         assert result["title"] is None
         assert result["description"] is None
         assert result["search_tags"] is None

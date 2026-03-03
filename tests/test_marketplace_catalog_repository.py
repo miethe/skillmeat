@@ -40,6 +40,23 @@ from skillmeat.cache.repositories import (
 # =============================================================================
 
 
+@pytest.fixture(autouse=True)
+def reset_session_local():
+    """Reset the module-level SessionLocal singleton before each test.
+
+    get_session() in models.py only calls init_session_factory() when
+    SessionLocal is None. Without this reset, the second+ test reuses the
+    first test's engine (pointing at its temp DB file), causing UNIQUE
+    constraint failures when tests try to INSERT the same source IDs into
+    what appears to be a fresh DB but is actually the old one.
+    """
+    import skillmeat.cache.models as _models
+
+    _models.SessionLocal = None
+    yield
+    _models.SessionLocal = None
+
+
 @pytest.fixture
 def temp_db():
     """Create temporary database file.

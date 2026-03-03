@@ -78,12 +78,13 @@ class TestArtifactType:
     def test_primary_types_method(self):
         """primary_types() should return list of deployable types."""
         primary = ArtifactType.primary_types()
-        assert len(primary) == 5
+        assert len(primary) == 6
         assert ArtifactType.SKILL in primary
         assert ArtifactType.COMMAND in primary
         assert ArtifactType.AGENT in primary
         assert ArtifactType.HOOK in primary
         assert ArtifactType.MCP in primary
+        assert ArtifactType.WORKFLOW in primary
         # Should not contain context types
         assert ArtifactType.PROJECT_CONFIG not in primary
 

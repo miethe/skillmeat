@@ -1995,8 +1995,25 @@ deployed_at = "2026-02-26T15:10:58.160381"
 artifact_path = "skills/better-auth"
 content_hash = "8fb3fa95f5ba8577a23f65b26f4d1fd1ac4260348d8885e476ef4590c48afb49"
 local_modifications = false
+version_lineage = [
+    "8fb3fa95f5ba8577a23f65b26f4d1fd1ac4260348d8885e476ef4590c48afb49",
+]
 merge_base_snapshot = "8fb3fa95f5ba8577a23f65b26f4d1fd1ac4260348d8885e476ef4590c48afb49"
 deployment_profile_id = "claude_code"
 platform = "claude_code"
 profile_root_dir = ".claude"
 collection_sha = "8fb3fa95f5ba8577a23f65b26f4d1fd1ac4260348d8885e476ef4590c48afb49"
+
+[[deployed]]
+artifact_name = "platform-engineer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-03-03T10:19:06.426627"
+artifact_path = "agents/dev-team/platform-engineer.md"
+content_hash = "17ea9f3d0a8f91fb5d787c9291f6f69cd20abef3bb950f9a4c3573c857e20859"
+local_modifications = false
+merge_base_snapshot = "17ea9f3d0a8f91fb5d787c9291f6f69cd20abef3bb950f9a4c3573c857e20859"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "17ea9f3d0a8f91fb5d787c9291f6f69cd20abef3bb950f9a4c3573c857e20859"

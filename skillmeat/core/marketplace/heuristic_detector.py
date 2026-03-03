@@ -396,8 +396,55 @@ class HeuristicDetector:
 
         return None
 
+    @staticmethod
+    def _build_entity_children_index(
+        dir_to_files: Dict[str, Set[str]],
+    ) -> Dict[str, Set[str]]:
+        """Precompute which entity-type names each directory has as direct children.
+
+        This runs in O(n) over all directories and eliminates the O(n^2) inner
+        loop inside ``_is_plugin_directory``.  Each directory entry in the result
+        maps to the set of direct-child entity-type directory names it contains
+        (e.g., ``{"commands", "agents"}``).
+
+        Args:
+            dir_to_files: Mapping of directory paths to their file sets.
+
+        Returns:
+            Dict mapping each directory path to the set of entity-type names that
+            appear as its *direct* children (depth-1 subdirectories).
+        """
+        entity_type_names = {"commands", "agents", "skills", "hooks", "rules", "mcp"}
+        # Map: parent_dir -> set of entity-type child names
+        entity_children: Dict[str, Set[str]] = {}
+
+        for path in dir_to_files.keys():
+            posix = PurePosixPath(path)
+            parts = posix.parts
+            # Walk every path component: for each component that is an entity-type
+            # name, record it against its parent.  This handles the case where the
+            # entity-type directory itself has no direct files (e.g.
+            # ``bundle/skills/helper`` → "skills" is at index 1, parent is "bundle").
+            for i, part in enumerate(parts):
+                if part.lower() not in entity_type_names:
+                    continue
+                # Reconstruct the parent path (ancestor of this entity-type dir)
+                parent = str(PurePosixPath(*parts[:i])) if i > 0 else "."
+                if parent not in entity_children:
+                    entity_children[parent] = set()
+                entity_children[parent].add(part.lower())
+                # Only record the shallowest occurrence for each path — once we
+                # find an entity-type component, no deeper component of the same
+                # path should count as a separate entry for a different ancestor.
+                break
+
+        return entity_children
+
     def _is_plugin_directory(
-        self, dir_path: str, dir_to_files: Dict[str, Set[str]]
+        self,
+        dir_path: str,
+        dir_to_files: Dict[str, Set[str]],
+        entity_children: Optional[Dict[str, Set[str]]] = None,
     ) -> bool:
         """Detect if a directory is a plugin (contains multiple entity-type subdirectories).
 
@@ -416,10 +463,18 @@ class HeuristicDetector:
         Args:
             dir_path: Path to check (e.g., "my-plugin")
             dir_to_files: Map of all directories to their files
+            entity_children: Optional precomputed index from
+                ``_build_entity_children_index()`` for O(1) lookup. When provided
+                the method avoids the O(n) scan of ``dir_to_files``.
 
         Returns:
             True if directory contains 2+ entity-type subdirectories
         """
+        # Fast path: use precomputed index (O(1)) when available.
+        if entity_children is not None:
+            return len(entity_children.get(dir_path, set())) >= 2
+
+        # Fallback: O(n) scan (kept for callers that don't supply the index).
         entity_type_names = {"commands", "agents", "skills", "hooks", "rules", "mcp"}
 
         child_dirs: set[str] = set()
@@ -542,6 +597,10 @@ class HeuristicDetector:
                 confidence,
             )
 
+        # Precompute entity-children index once in O(n) so that _is_plugin_directory
+        # (Signal 3) can do O(1) lookups instead of scanning all paths each time.
+        entity_children_index = self._build_entity_children_index(dir_to_files)
+
         for dir_path, files in dir_to_files.items():
             # Skip root
             if dir_path == ".":
@@ -576,8 +635,10 @@ class HeuristicDetector:
                 lower_files & {"composite.md", "plugin.md", "composite.json"}
             )
 
-            # Signal 3: Multiple entity-type subdirectories
-            is_heuristic_plugin = self._is_plugin_directory(dir_path, dir_to_files)
+            # Signal 3: Multiple entity-type subdirectories — uses precomputed O(1) index
+            is_heuristic_plugin = self._is_plugin_directory(
+                dir_path, dir_to_files, entity_children=entity_children_index
+            )
 
             if not (has_plugin_json or has_composite_manifest or is_heuristic_plugin):
                 continue
@@ -872,12 +933,16 @@ class HeuristicDetector:
             # promoted as a top-level command artifact (which causes 404 on resolution).
             # P1-T4: instead of silently skipping, identify the parent skill dir and
             # record embedded child matches for attachment to the parent artifact.
+            #
+            # O(depth) ancestor walk using set membership — avoids O(n * |all_skill_dirs|)
+            # inner loop that caused O(n^2) behaviour with large path sets.
             parent_skill_dir: Optional[str] = None
-            for sd in all_skill_dirs:
-                if dir_path.startswith(sd + "/"):
-                    # Pick the longest (most specific) matching skill dir
-                    if parent_skill_dir is None or len(sd) > len(parent_skill_dir):
-                        parent_skill_dir = sd
+            _parts = dir_path.split("/")
+            for _i in range(len(_parts) - 1, 0, -1):
+                _ancestor = "/".join(_parts[:_i])
+                if _ancestor in all_skill_dirs:
+                    parent_skill_dir = _ancestor
+                    break  # Longest (most specific) match is the deepest ancestor found
 
             if parent_skill_dir is not None:
                 # Determine the container type for this sub-directory so we can
@@ -949,15 +1014,18 @@ class HeuristicDetector:
 
             # Bug Fix 1: Skip if this directory is INSIDE an artifact directory
             # (unless it's a nested container like skills/my-skill/commands/)
+            # O(depth) ancestor walk instead of O(|artifact_dirs|) linear scan.
             is_inside_artifact = False
-            for artifact_dir in artifact_dirs:
-                if dir_path.startswith(artifact_dir + "/"):
+            _parts2 = dir_path.split("/")
+            for _i2 in range(len(_parts2) - 1, 0, -1):
+                _ancestor2 = "/".join(_parts2[:_i2])
+                if _ancestor2 in artifact_dirs:
                     # Check if there's a container directory between artifact and this path
-                    relative = dir_path[len(artifact_dir) + 1 :]
-                    first_segment = relative.split("/")[0].lower()
-                    if first_segment not in CONTAINER_TYPE_MAPPING:
+                    _relative2 = dir_path[len(_ancestor2) + 1 :]
+                    _first_segment2 = _relative2.split("/")[0].lower()
+                    if _first_segment2 not in CONTAINER_TYPE_MAPPING:
                         is_inside_artifact = True
-                        break
+                    break  # Stop at the deepest ancestor that is an artifact dir
 
             if is_inside_artifact:
                 continue  # Skip - this is a file inside an artifact, not a standalone

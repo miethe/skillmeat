@@ -151,7 +151,10 @@ class TestMemoryServiceCRUD:
         )
 
         assert result["provenance"]["source_type"] == "manual"
-        assert result["anchors"] == anchors
+        # Anchors are normalized to structured dicts by the service
+        assert result["anchors"] == [
+            {"path": "skillmeat/api/routers/memory_items.py", "type": "code"}
+        ]
         assert result["ttl_policy"]["max_age_days"] == 60
 
     def test_create_duplicate_returns_flag(self, memory_service):

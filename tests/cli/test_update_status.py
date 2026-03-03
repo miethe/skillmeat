@@ -139,15 +139,10 @@ class TestStatusCommand:
         """Test status when deployments have local modifications."""
         runner = isolated_cli_runner
 
-        # Mock modified deployments
+        # Mock modified deployments - return value is Dict[str, str] mapping
+        # artifact key to status string ("modified", "synced", "outdated")
         mock_check_status.return_value = {
-            "modified": [
-                {
-                    "name": "test-skill",
-                    "type": "skill",
-                }
-            ],
-            "synced": [],
+            "test-skill": "modified",
         }
 
         runner.invoke(main, ["init"])

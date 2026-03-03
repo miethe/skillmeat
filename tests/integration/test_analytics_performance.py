@@ -11,8 +11,6 @@ Performance Targets:
 """
 
 import time
-from datetime import datetime, timedelta
-
 import pytest
 
 from skillmeat.core.analytics import EventTracker
@@ -91,7 +89,7 @@ class TestAnalyticsQueryPerformance:
 
         # Benchmark get_cleanup_suggestions
         start_time = time.time()
-        suggestions = report_mgr.get_cleanup_suggestions(inactivity_days=30)
+        suggestions = report_mgr.get_cleanup_suggestions()
         query_time = time.time() - start_time
 
         assert suggestions is not None
@@ -127,6 +125,7 @@ class TestAnalyticsWritePerformance:
         """Test: Event tracker buffering handles rapid events efficiently."""
         workspace = analytics_workspace
         tracker = workspace["tracker"]
+        db = workspace["db"]
 
         # Record 500 events rapidly (should buffer)
         start_time = time.time()
@@ -158,10 +157,8 @@ class TestAnalyticsCleanupPerformance:
         db = workspace["db"]
 
         # Delete events older than 30 days
-        cutoff_date = datetime.now() - timedelta(days=30)
-
         start_time = time.time()
-        deleted_count = db.delete_events_before(cutoff_date)
+        deleted_count = db.cleanup_old_events(days=30)
         delete_time = time.time() - start_time
 
         assert delete_time < 2.0, f"Delete took {delete_time:.3f}s, expected < 2.0s"
@@ -174,13 +171,11 @@ class TestAnalyticsCleanupPerformance:
         db = workspace["db"]
 
         # Delete some events first
-        cutoff_date = datetime.now() - timedelta(days=60)
-        db.delete_events_before(cutoff_date)
+        db.cleanup_old_events(days=60)
 
         # Benchmark vacuum
         start_time = time.time()
-        db.connection.execute("VACUUM")
-        db.connection.commit()
+        db.vacuum()
         vacuum_time = time.time() - start_time
 
         # Vacuum should complete in < 3s even for large DB
@@ -216,7 +211,7 @@ class TestAnalyticsReportGenerationPerformance:
 
         # Benchmark trends calculation
         start_time = time.time()
-        trends = report_mgr.get_usage_trends(period_days=30)
+        trends = report_mgr.get_usage_trends(time_period="30d")
         trends_time = time.time() - start_time
 
         assert trends is not None

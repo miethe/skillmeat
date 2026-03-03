@@ -55,6 +55,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import inspect as sa_inspect
 
 
 # revision identifiers, used by Alembic.
@@ -68,7 +69,17 @@ def upgrade() -> None:
     """Create entity_type_configs table with indexes.
 
     Purely additive — no existing tables or columns are modified.
+
+    Idempotent: skips creation if table already exists (e.g., via
+    Base.metadata.create_all() before Alembic migrations ran).
     """
+    bind = op.get_bind()
+    inspector = sa_inspect(bind)
+    existing_tables = inspector.get_table_names()
+
+    if "entity_type_configs" in existing_tables:
+        return
+
     op.create_table(
         "entity_type_configs",
         # Primary key — auto-incrementing integer
@@ -159,13 +170,9 @@ def upgrade() -> None:
             nullable=False,
             comment="Row last-modified timestamp (UTC)",
         ),
-    )
-
-    # Unique constraint on slug — enforced at DB level in addition to ORM
-    op.create_unique_constraint(
-        "uq_entity_type_configs_slug",
-        "entity_type_configs",
-        ["slug"],
+        # Unique constraint on slug — declared inside create_table for SQLite
+        # compatibility (SQLite does not support ALTER TABLE ADD CONSTRAINT).
+        sa.UniqueConstraint("slug", name="uq_entity_type_configs_slug"),
     )
 
     # Index: fast lookup by slug (also serves the unique constraint)
@@ -196,11 +203,21 @@ def downgrade() -> None:
 
     All seeded rows (including the five built-in entity type definitions) will
     be permanently lost. No other tables are affected.
+
+    Handles the case where the table was pre-created by Base.metadata.create_all()
+    and therefore may not have the Alembic-managed named indexes.
     """
-    op.drop_index("idx_entity_type_configs_is_builtin", "entity_type_configs")
-    op.drop_index("idx_entity_type_configs_sort_order", "entity_type_configs")
-    op.drop_index("idx_entity_type_configs_slug", "entity_type_configs")
-    op.drop_constraint(
-        "uq_entity_type_configs_slug", "entity_type_configs", type_="unique"
-    )
+    from sqlalchemy import text as sa_text
+
+    bind = op.get_bind()
+    inspector = sa_inspect(bind)
+    existing_tables = inspector.get_table_names()
+
+    if "entity_type_configs" not in existing_tables:
+        return
+
+    bind.execute(sa_text("DROP INDEX IF EXISTS idx_entity_type_configs_is_builtin"))
+    bind.execute(sa_text("DROP INDEX IF EXISTS idx_entity_type_configs_sort_order"))
+    bind.execute(sa_text("DROP INDEX IF EXISTS idx_entity_type_configs_slug"))
+    bind.execute(sa_text("DROP INDEX IF EXISTS uq_entity_type_configs_slug"))
     op.drop_table("entity_type_configs")

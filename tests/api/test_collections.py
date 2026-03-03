@@ -169,16 +169,20 @@ class TestListCollections:
         # Should have previous page
         assert data["page_info"]["has_previous_page"] is True
 
-    def test_list_collections_empty(self, client):
+    def test_list_collections_empty(self, client, mock_collection_manager):
         """Test listing collections when none exist."""
-        mock_mgr = MagicMock()
-        mock_mgr.list_collections.return_value = []
+        # Reconfigure the already-injected mock to return an empty list.
+        # The client fixture wires get_collection_manager to mock_collection_manager
+        # via FastAPI dependency_overrides, so patching CollectionManagerDep here
+        # would have no effect. Mutate the mock directly instead.
+        original_return = mock_collection_manager.list_collections.return_value
+        mock_collection_manager.list_collections.return_value = []
 
-        with patch(
-            "skillmeat.api.routers.collections.CollectionManagerDep",
-            return_value=mock_mgr,
-        ):
+        try:
             response = client.get("/api/v1/collections")
+        finally:
+            # Restore original value so other tests are not affected
+            mock_collection_manager.list_collections.return_value = original_return
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()

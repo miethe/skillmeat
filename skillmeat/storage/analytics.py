@@ -6,6 +6,7 @@ other analytics events. Provides retention policy management and data aggregatio
 
 import json
 import sqlite3
+import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -27,9 +28,12 @@ class AnalyticsDB:
     - Usage summary table for aggregated statistics
 
     Thread Safety:
-        The connection is created with check_same_thread=False to allow
-        multi-threaded access. For production use with heavy concurrency,
-        consider using connection pooling.
+        A threading.Lock serialises all connection access so that concurrent
+        callers cannot interleave operations on the same sqlite3.Connection
+        object.  check_same_thread=False is still required to allow the
+        connection to be used from threads other than the one that created it,
+        but the lock is what actually prevents concurrent use that would cause
+        a segfault.
 
     Example:
         >>> db = AnalyticsDB()
@@ -67,6 +71,7 @@ class AnalyticsDB:
 
         self.db_path = db_path
         self.connection: Optional[sqlite3.Connection] = None
+        self._lock = threading.Lock()
 
         # Initialize database
         self._init_database()
@@ -90,12 +95,13 @@ class AnalyticsDB:
         # Use Row factory for dict-like access
         self.connection.row_factory = sqlite3.Row
 
-        # Enable WAL mode for better concurrency
-        # WAL allows multiple readers and one writer simultaneously
-        self.connection.execute("PRAGMA journal_mode=WAL")
+        with self._lock:
+            # Enable WAL mode for better concurrency
+            # WAL allows multiple readers and one writer simultaneously
+            self.connection.execute("PRAGMA journal_mode=WAL")
 
-        # Enable foreign keys
-        self.connection.execute("PRAGMA foreign_keys=ON")
+            # Enable foreign keys
+            self.connection.execute("PRAGMA foreign_keys=ON")
 
         # Apply migrations
         self._apply_migrations()
@@ -109,34 +115,35 @@ class AnalyticsDB:
         Raises:
             sqlite3.Error: If migration fails
         """
-        # Create migrations table
-        self.connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS migrations (
-                version INTEGER PRIMARY KEY,
-                applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """
-        )
-
-        # Get current version
-        cursor = self.connection.execute("SELECT MAX(version) FROM migrations")
-        result = cursor.fetchone()
-        current_version = result[0] if result[0] is not None else 0
-
-        # Apply migrations in order
-        migrations = self._get_migrations()
-        for version, migration_sql in sorted(migrations.items()):
-            if version > current_version:
-                # Execute migration
-                self.connection.executescript(migration_sql)
-
-                # Record migration
-                self.connection.execute(
-                    "INSERT INTO migrations (version) VALUES (?)", (version,)
+        with self._lock:
+            # Create migrations table
+            self.connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS migrations (
+                    version INTEGER PRIMARY KEY,
+                    applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
+            """
+            )
 
-                self.connection.commit()
+            # Get current version
+            cursor = self.connection.execute("SELECT MAX(version) FROM migrations")
+            result = cursor.fetchone()
+            current_version = result[0] if result[0] is not None else 0
+
+            # Apply migrations in order
+            migrations = self._get_migrations()
+            for version, migration_sql in sorted(migrations.items()):
+                if version > current_version:
+                    # Execute migration
+                    self.connection.executescript(migration_sql)
+
+                    # Record migration
+                    self.connection.execute(
+                        "INSERT INTO migrations (version) VALUES (?)", (version,)
+                    )
+
+                    self.connection.commit()
 
     def _get_migrations(self) -> Dict[int, str]:
         """Return all migrations indexed by version.
@@ -282,7 +289,8 @@ class AnalyticsDB:
         # Update usage summary
         self._update_usage_summary(event_type, artifact_name, artifact_type)
 
-        self.connection.commit()
+        with self._lock:
+            self.connection.commit()
 
         return cursor.lastrowid
 
@@ -310,7 +318,8 @@ class AnalyticsDB:
 
         for attempt in range(max_retries):
             try:
-                return self.connection.execute(sql, parameters)
+                with self._lock:
+                    return self.connection.execute(sql, parameters)
             except sqlite3.OperationalError as e:
                 if "database is locked" in str(e):
                     last_error = e
@@ -412,8 +421,9 @@ class AnalyticsDB:
         query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
-        cursor = self.connection.execute(query, params)
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.connection.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_usage_summary(
         self, artifact_name: Optional[str] = None, artifact_type: Optional[str] = None
@@ -445,8 +455,9 @@ class AnalyticsDB:
 
         query += " ORDER BY total_events DESC"
 
-        cursor = self.connection.execute(query, params)
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.connection.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_top_artifacts(
         self, artifact_type: Optional[str] = None, limit: int = 10
@@ -473,8 +484,9 @@ class AnalyticsDB:
         query += " ORDER BY total_events DESC LIMIT ?"
         params.append(limit)
 
-        cursor = self.connection.execute(query, params)
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.connection.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
 
     def cleanup_old_events(self, days: int = DEFAULT_RETENTION_DAYS) -> int:
         """Remove events older than specified days (retention policy).
@@ -513,7 +525,8 @@ class AnalyticsDB:
         )
 
         deleted = cursor.rowcount
-        self.connection.commit()
+        with self._lock:
+            self.connection.commit()
 
         return deleted
 
@@ -531,8 +544,9 @@ class AnalyticsDB:
             sqlite3.Error: If vacuum operation fails
         """
         # Close and reopen connection as VACUUM cannot run in a transaction
-        self.connection.commit()
-        self.connection.execute("VACUUM")
+        with self._lock:
+            self.connection.commit()
+            self.connection.execute("VACUUM")
 
     def get_stats(self) -> Dict[str, Any]:
         """Get database statistics.
@@ -553,46 +567,49 @@ class AnalyticsDB:
         """
         stats = {}
 
-        # Total events
-        cursor = self.connection.execute("SELECT COUNT(*) FROM events")
-        stats["total_events"] = cursor.fetchone()[0]
+        with self._lock:
+            # Total events
+            cursor = self.connection.execute("SELECT COUNT(*) FROM events")
+            stats["total_events"] = cursor.fetchone()[0]
 
-        # Total unique artifacts
-        cursor = self.connection.execute("SELECT COUNT(*) FROM usage_summary")
-        stats["total_artifacts"] = cursor.fetchone()[0]
+            # Total unique artifacts
+            cursor = self.connection.execute("SELECT COUNT(*) FROM usage_summary")
+            stats["total_artifacts"] = cursor.fetchone()[0]
 
-        # Event type counts
-        cursor = self.connection.execute(
+            # Event type counts
+            cursor = self.connection.execute(
+                """
+                SELECT event_type, COUNT(*) as count
+                FROM events
+                GROUP BY event_type
             """
-            SELECT event_type, COUNT(*) as count
-            FROM events
-            GROUP BY event_type
-        """
-        )
-        stats["event_type_counts"] = {row[0]: row[1] for row in cursor.fetchall()}
+            )
+            stats["event_type_counts"] = {row[0]: row[1] for row in cursor.fetchall()}
 
-        # Artifact type counts
-        cursor = self.connection.execute(
+            # Artifact type counts
+            cursor = self.connection.execute(
+                """
+                SELECT artifact_type, COUNT(DISTINCT artifact_name) as count
+                FROM usage_summary
+                GROUP BY artifact_type
             """
-            SELECT artifact_type, COUNT(DISTINCT artifact_name) as count
-            FROM usage_summary
-            GROUP BY artifact_type
-        """
-        )
-        stats["artifact_type_counts"] = {row[0]: row[1] for row in cursor.fetchall()}
+            )
+            stats["artifact_type_counts"] = {
+                row[0]: row[1] for row in cursor.fetchall()
+            }
 
-        # Oldest and newest events
-        cursor = self.connection.execute(
+            # Oldest and newest events
+            cursor = self.connection.execute(
+                """
+                SELECT MIN(timestamp), MAX(timestamp)
+                FROM events
             """
-            SELECT MIN(timestamp), MAX(timestamp)
-            FROM events
-        """
-        )
-        oldest, newest = cursor.fetchone()
-        stats["oldest_event"] = oldest
-        stats["newest_event"] = newest
+            )
+            oldest, newest = cursor.fetchone()
+            stats["oldest_event"] = oldest
+            stats["newest_event"] = newest
 
-        # Database file size
+        # Database file size (filesystem stat — no connection involved)
         if self.db_path.exists():
             stats["db_size_bytes"] = self.db_path.stat().st_size
         else:
@@ -606,10 +623,11 @@ class AnalyticsDB:
         Should be called when done with the database to ensure all changes
         are committed and resources are released.
         """
-        if self.connection:
-            self.connection.commit()
-            self.connection.close()
-            self.connection = None
+        with self._lock:
+            if self.connection:
+                self.connection.commit()
+                self.connection.close()
+                self.connection = None
 
     def __enter__(self):
         """Context manager entry."""

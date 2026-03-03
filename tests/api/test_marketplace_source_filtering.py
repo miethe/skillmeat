@@ -1002,11 +1002,11 @@ class TestUpdateSourceTags:
         data = response.json()
         assert data.get("id") == "src_update"
 
-    def test_update_source_tags_only_returns_400(self, client, mock_source_repo):
-        """Test that updating with only tags returns 400.
+    def test_update_source_tags_only_succeeds(self, client, mock_source_repo):
+        """Test that updating with only tags now succeeds (returns 200).
 
-        The current implementation requires at least one of the core update
-        fields to be provided. Tags alone are not sufficient.
+        Tags are now included in the list of valid standalone update parameters,
+        so a tags-only PATCH is accepted by the endpoint.
         """
         mock_source = MarketplaceSource(
             id="src_update",
@@ -1022,22 +1022,25 @@ class TestUpdateSourceTags:
             updated_at=datetime(2025, 12, 6, 10, 30, 0),
             enable_frontmatter_detection=False,
         )
+        mock_source.tags = json.dumps(["new-tag1", "new-tag2"])
+        mock_source.counts_by_type = json.dumps({"skill": 5})
 
         mock_source_repo.get_by_id.return_value = mock_source
+        mock_source_repo.update.return_value = mock_source
 
         with patch(
             "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
             return_value=mock_source_repo,
         ):
-            # Only tags - should return 400
             response = client.patch(
                 "/api/v1/marketplace/sources/src_update",
                 json={"tags": ["new-tag1", "new-tag2"]},
             )
 
-        # Current implementation returns 400 because tags alone is not enough
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "parameter" in response.json()["detail"].lower()
+        # Tags alone is now a valid update — endpoint returns 200
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data.get("id") == "src_update"
 
 
 class TestGetSourceDetails:

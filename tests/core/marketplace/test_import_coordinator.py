@@ -201,12 +201,16 @@ class TestImportCoordinator:
 
     def test_init_default_path(self, monkeypatch, tmp_path):
         """Test initialization with default collection path."""
-        home_dir = tmp_path / "home"
-        home_dir.mkdir()
-        monkeypatch.setenv("HOME", str(home_dir))
+        config_dir = tmp_path / ".skillmeat"
+        config_dir.mkdir()
+
+        from skillmeat.config import ConfigManager
+
+        monkeypatch.setattr(ConfigManager, "DEFAULT_CONFIG_DIR", config_dir)
 
         coordinator = ImportCoordinator()
-        expected_path = home_dir / ".skillmeat" / "collection"
+        # Default collection name is "default"; path is config_dir/collections/default
+        expected_path = config_dir / "collections" / "default"
         assert coordinator.collection_path == expected_path
 
     def test_init_custom_path(self, tmp_path):

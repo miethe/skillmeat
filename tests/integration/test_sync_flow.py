@@ -20,10 +20,9 @@ from unittest.mock import patch, MagicMock
 from skillmeat.config import ConfigManager
 from skillmeat.core.artifact import ArtifactManager, ArtifactType, ArtifactMetadata
 from skillmeat.core.collection import CollectionManager
+from skillmeat.core.deployment import Deployment
 from skillmeat.core.sync import SyncManager
 from skillmeat.models import (
-    DeploymentMetadata,
-    DeploymentRecord,
     DriftDetectionResult,
     SyncResult,
 )
@@ -130,22 +129,17 @@ def deployed_project(temp_workspace, sample_artifact, collection_mgr):
     project_artifact_path = claude_dir / "skills" / "sample-skill"
     shutil.copytree(artifact_path, project_artifact_path)
 
-    # Create deployment metadata
+    # Create deployment metadata in the current TOML format used by DeploymentTracker
     deployment_file = claude_dir / ".skillmeat-deployed.toml"
     deployment_content = """
-[deployment]
-collection = "test-collection"
-deployed-at = "2024-01-15T10:00:00"
-skillmeat-version = "0.1.0"
-
-[[artifacts]]
-name = "sample-skill"
-type = "skill"
-source = "github:user/repo/sample-skill"
-version = "v1.0.0"
-sha = "abc123"
-deployed-at = "2024-01-15T10:00:00"
-deployed-from = "test-collection"
+[[deployed]]
+artifact_name = "sample-skill"
+artifact_type = "skill"
+from_collection = "test-collection"
+deployed_at = "2024-01-15T10:00:00"
+artifact_path = "skills/sample-skill"
+content_hash = "abc123"
+local_modifications = false
 """
     deployment_file.write_text(deployment_content)
 
@@ -166,53 +160,44 @@ class TestDeploymentMetadata:
     """Test deployment metadata loading and saving."""
 
     def test_load_deployment_metadata(self, sync_mgr, deployed_project):
-        """Verify deployment metadata can be loaded."""
+        """Verify deployment metadata can be loaded as a list of Deployment objects."""
         project_dir = deployed_project["project_dir"]
 
-        metadata = sync_mgr._load_deployment_metadata(project_dir)
+        deployments = sync_mgr._load_deployment_metadata(project_dir)
 
-        assert metadata is not None
-        assert metadata.collection == "test-collection"
-        assert len(metadata.artifacts) == 1
-        assert metadata.artifacts[0].name == "sample-skill"
-        assert metadata.artifacts[0].sha == "abc123"
+        assert deployments is not None
+        assert isinstance(deployments, list)
+        assert len(deployments) == 1
+        assert deployments[0].artifact_name == "sample-skill"
+        assert deployments[0].content_hash == "abc123"
 
     def test_save_deployment_metadata(self, sync_mgr, tmp_path):
-        """Verify deployment metadata can be saved."""
+        """Verify deployment metadata can be saved and reloaded."""
         project_dir = tmp_path / "project"
         project_dir.mkdir()
         (project_dir / ".claude").mkdir()
 
-        metadata_file = project_dir / ".claude" / ".skillmeat-deployed.toml"
+        # Create Deployment objects (current API)
+        deployments = [
+            Deployment(
+                artifact_name="test-skill",
+                artifact_type="skill",
+                from_collection="test-collection",
+                deployed_at=datetime(2024, 1, 15, 10, 0, 0),
+                artifact_path=Path("skills/test-skill"),
+                content_hash="abc123",
+            )
+        ]
 
-        # Create metadata
-        metadata = DeploymentMetadata(
-            collection="test-collection",
-            deployed_at="2024-01-15T10:00:00Z",
-            skillmeat_version="0.2.0",
-            artifacts=[
-                DeploymentRecord(
-                    name="test-skill",
-                    artifact_type="skill",
-                    source="github:user/repo",
-                    version="v1.0.0",
-                    sha="abc123",
-                    deployed_at="2024-01-15T10:00:00Z",
-                    deployed_from="/path/to/collection",
-                )
-            ],
-        )
-
-        # Save
-        sync_mgr._save_deployment_metadata(metadata_file, metadata)
-
-        assert metadata_file.exists()
+        # Save using current signature: (project_path, List[Deployment])
+        sync_mgr._save_deployment_metadata(project_dir, deployments)
 
         # Reload and verify
         loaded = sync_mgr._load_deployment_metadata(project_dir)
-        assert loaded.collection == "test-collection"
-        assert len(loaded.artifacts) == 1
-        assert loaded.artifacts[0].name == "test-skill"
+        assert isinstance(loaded, list)
+        assert len(loaded) == 1
+        assert loaded[0].artifact_name == "test-skill"
+        assert loaded[0].content_hash == "abc123"
 
     def test_update_deployment_metadata(
         self, sync_mgr, deployed_project, collection_mgr
@@ -230,10 +215,12 @@ class TestDeploymentMetadata:
             collection_name="test-collection",
         )
 
-        # Verify metadata updated
-        metadata = sync_mgr._load_deployment_metadata(project_dir)
-        assert len(metadata.artifacts) == 1
-        assert metadata.artifacts[0].name == "sample-skill"
+        # Verify metadata updated — returns List[Deployment]
+        deployments = sync_mgr._load_deployment_metadata(project_dir)
+        assert isinstance(deployments, list)
+        assert len(deployments) >= 1
+        names = [d.artifact_name for d in deployments]
+        assert "sample-skill" in names
 
 
 # =============================================================================
@@ -554,28 +541,22 @@ class TestSyncPerformance:
         project_dir.mkdir()
         (project_dir / ".claude").mkdir()
 
-        metadata = DeploymentMetadata(
-            collection="test",
-            deployed_at="2024-01-15T10:00:00Z",
-            skillmeat_version="0.2.0",
-            artifacts=[
-                DeploymentRecord(
-                    name=f"artifact-{i}",
-                    artifact_type="skill",
-                    source="local",
-                    version="1.0.0",
-                    sha=f"sha{i}",
-                    deployed_at="2024-01-15T10:00:00Z",
-                    deployed_from="/collection",
-                )
-                for i in range(50)
-            ],
-        )
-
-        metadata_file = project_dir / ".claude" / ".skillmeat-deployed.toml"
+        # Use current Deployment objects (not the old DeploymentMetadata)
+        deployments = [
+            Deployment(
+                artifact_name=f"artifact-{i}",
+                artifact_type="skill",
+                from_collection="test",
+                deployed_at=datetime(2024, 1, 15, 10, 0, 0),
+                artifact_path=Path(f"skills/artifact-{i}"),
+                content_hash=f"sha{i}",
+            )
+            for i in range(50)
+        ]
 
         start = time.time()
-        sync_mgr._save_deployment_metadata(metadata_file, metadata)
+        # Current signature: (project_path, List[Deployment])
+        sync_mgr._save_deployment_metadata(project_dir, deployments)
         elapsed_save = time.time() - start
 
         start = time.time()
@@ -584,4 +565,4 @@ class TestSyncPerformance:
 
         assert elapsed_save < 0.5
         assert elapsed_load < 0.5
-        assert len(loaded.artifacts) == 50
+        assert len(loaded) == 50

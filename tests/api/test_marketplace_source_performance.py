@@ -427,7 +427,8 @@ class TestDetailFetchPerformance:
         which may involve external API calls.
         """
         source_with_details = many_sources[0]
-        source_with_details.repo_description = "A test repository with detailed description " * 50
+        # Keep repo_description within the 2000-char SourceResponse schema limit
+        source_with_details.repo_description = "A test repository with detailed description " * 44
         source_with_details.repo_readme = "# README\n\n" + ("Content line\n" * 1000)
 
         mock_source_repo_large.get_by_id.return_value = source_with_details

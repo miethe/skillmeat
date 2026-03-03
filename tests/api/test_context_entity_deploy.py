@@ -138,6 +138,16 @@ def test_deploy_context_entity_all_profiles(client, project_path, temp_db):
     """all_profiles should deploy once for each configured profile."""
     entity_id = _create_context_entity(client)
 
+    # The app lifespan calls init_session_factory() with no arguments, which
+    # initialises the module-level SessionLocal to the default ~/.skillmeat DB.
+    # BaseRepository._get_session() calls get_session(self.db_path) but skips
+    # re-initialisation if SessionLocal is already set, so it ends up using the
+    # wrong DB (missing the Project row we seeded in temp_db).
+    # Reset the global SessionLocal so get_session() re-initialises with temp_db.
+    import skillmeat.cache.models as _models
+
+    _models.SessionLocal = None
+
     repo = DeploymentProfileRepository(db_path=temp_db)
     repo.create(
         project_id="proj-ctx-deploy",

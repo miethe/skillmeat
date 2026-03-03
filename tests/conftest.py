@@ -54,6 +54,12 @@ def temp_home(tmp_path, monkeypatch):
     home_dir = tmp_path / "home"
     home_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HOME", str(home_dir))
+
+    # Also patch ConfigManager's class-level DEFAULT_CONFIG_DIR which is
+    # evaluated at import time and caches the real HOME before monkeypatching.
+    from skillmeat.config import ConfigManager
+    monkeypatch.setattr(ConfigManager, "DEFAULT_CONFIG_DIR", home_dir / ".skillmeat")
+
     return home_dir
 
 
@@ -333,11 +339,22 @@ def isolated_cli_runner(tmp_path, monkeypatch):
         CliRunner: Click test runner with isolated filesystem
     """
     from click.testing import CliRunner
+    from rich.console import Console
 
     # Set up isolated environment
     home_dir = tmp_path / "home"
     home_dir.mkdir()
     monkeypatch.setenv("HOME", str(home_dir))
+
+    # Also patch ConfigManager's class-level DEFAULT_CONFIG_DIR which is
+    # evaluated at import time and caches the real HOME before monkeypatching.
+    from skillmeat.config import ConfigManager
+    monkeypatch.setattr(ConfigManager, "DEFAULT_CONFIG_DIR", home_dir / ".skillmeat")
+
+    # Replace the CLI's module-level Rich console with a no-color version so
+    # that output string assertions work without needing to strip ANSI codes.
+    import skillmeat.cli as cli_module
+    monkeypatch.setattr(cli_module, "console", Console(no_color=True, highlight=False))
 
     return CliRunner()
 

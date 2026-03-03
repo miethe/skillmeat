@@ -91,23 +91,21 @@ class TestSecurityScanner:
 
     def test_check_size_limits_too_large(self, scanner, sample_bundle, tmp_path):
         """Test size limit check with too-large bundle."""
+        from unittest.mock import MagicMock, patch
+
         # Create large bundle file (simulate)
         bundle_path = tmp_path / "test.skillmeat-pack"
         # We can't actually create a 100MB+ file in tests, so we'll mock the stat
         with open(bundle_path, "wb") as f:
             f.write(b"x" * 1000)
 
-        # Mock the file size
-        original_stat = bundle_path.stat
+        # Mock Path.stat at the class level to return a fake large file size
+        mock_stat_result = MagicMock()
+        mock_stat_result.st_size = 101 * 1024 * 1024
 
-        def mock_stat():
-            s = original_stat()
-            return type("MockStat", (), {"st_size": 101 * 1024 * 1024})()
-
-        bundle_path.stat = mock_stat
-
-        result = ScanResult(passed=True)
-        scanner._check_size_limits(sample_bundle, bundle_path, result)
+        with patch("pathlib.Path.stat", return_value=mock_stat_result):
+            result = ScanResult(passed=True)
+            scanner._check_size_limits(sample_bundle, bundle_path, result)
 
         assert len(result.violations) > 0
         assert any("size" in v.lower() for v in result.violations)
@@ -191,7 +189,7 @@ class TestSecurityScanner:
         """Test secret detection for GitHub tokens."""
         bundle_path = create_test_bundle_file(
             {
-                "artifacts/skill/config.py": "GITHUB_TOKEN = 'ghp_abcdefghijklmnopqrstuvwxyz123456'",
+                "artifacts/skill/config.py": "GITHUB_TOKEN = 'ghp_abcdefghijklmnopqrstuvwxyz1234567890ab'",
             }
         )
 

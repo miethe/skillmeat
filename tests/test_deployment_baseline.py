@@ -47,7 +47,6 @@ Test content for baseline tracking.
         expected_hash = compute_content_hash(skill_dir)
 
         # Deploy artifact
-        tracker = DeploymentTracker(temp_project)
         deployment = Deployment(
             artifact_name="test-skill",
             artifact_type="skill",
@@ -78,7 +77,6 @@ Test content for baseline tracking.
         (skill_dir / "helpers.js").write_text("// Helper code")
 
         # Deploy
-        tracker = DeploymentTracker(temp_project)
         deployed_path = temp_project / ".claude" / "skills" / "canvas"
         deployed_path.mkdir(parents=True)
 
@@ -148,7 +146,6 @@ class TestDeploymentBaselineRetrieval:
         - Retrieved hash matches stored hash
         """
         # Create deployment with baseline
-        tracker = DeploymentTracker(temp_project)
         baseline_hash = "abc123" * 10 + "abcd"  # 64 chars
 
         deployment = Deployment(
@@ -161,10 +158,12 @@ class TestDeploymentBaselineRetrieval:
         )
 
         # Store deployment
-        tracker.track_deployment(deployment)
+        DeploymentTracker.write_deployments(temp_project, [deployment])
 
         # Retrieve deployment
-        retrieved = tracker.get_deployment("test-artifact", ArtifactType.SKILL)
+        retrieved = DeploymentTracker.get_deployment(
+            temp_project, "test-artifact", ArtifactType.SKILL.value
+        )
 
         assert retrieved is not None
         assert retrieved.content_hash == baseline_hash
@@ -177,9 +176,6 @@ class TestDeploymentBaselineRetrieval:
         - Graceful degradation (no errors)
         - Backward compatibility maintained
         """
-        # Create old-style deployment (before v1.5)
-        tracker = DeploymentTracker(temp_project)
-
         # Simulate old deployment without content_hash
         old_deployment_data = {
             "artifact_name": "old-skill",
@@ -206,10 +202,10 @@ class TestDeploymentBaselineRetrieval:
         - Returns None instead of raising error
         - Appropriate warning logged
         """
-        tracker = DeploymentTracker(temp_project)
-
         # Try to get deployment that doesn't exist
-        result = tracker.get_deployment("nonexistent", ArtifactType.SKILL)
+        result = DeploymentTracker.get_deployment(
+            temp_project, "nonexistent", ArtifactType.SKILL.value
+        )
 
         # Should return None, not raise
         assert result is None
@@ -325,7 +321,6 @@ class TestFallbackLogic:
         # If three_way_merge() is not yet implemented, this will be a placeholder
 
         # Create deployment without baseline
-        tracker = DeploymentTracker(temp_project)
         old_deployment = Deployment(
             artifact_name="fallback-test",
             artifact_type="skill",
@@ -496,8 +491,6 @@ class TestIntegrationWithDeploymentTracker:
 
     def test_tracker_persists_baseline_to_toml(self, temp_project, temp_collection):
         """Test that DeploymentTracker persists baseline to .skillmeat-deployed.toml."""
-        tracker = DeploymentTracker(temp_project)
-
         # Create and track deployment
         deployment = Deployment(
             artifact_name="persist-test",
@@ -508,43 +501,53 @@ class TestIntegrationWithDeploymentTracker:
             content_hash="persistent_hash_" + ("y" * 48),
         )
 
-        tracker.track_deployment(deployment)
+        DeploymentTracker.write_deployments(temp_project, [deployment])
 
         # Read back from file
-        import tomli
+        import sys
+        if sys.version_info >= (3, 11):
+            import tomllib
+        else:
+            import tomli as tomllib
 
-        toml_file = temp_project / ".skillmeat-deployed.toml"
+        toml_file = temp_project / ".claude" / ".skillmeat-deployed.toml"
         assert toml_file.exists()
 
         with open(toml_file, "rb") as f:
-            data = tomli.load(f)
+            data = tomllib.load(f)
 
-        # Verify baseline is in TOML
-        assert "deployments" in data
-        assert "persist-test" in data["deployments"]
+        # Verify deployment is in the "deployed" array
+        assert "deployed" in data
+        assert len(data["deployed"]) == 1
 
-        dep_data = data["deployments"]["persist-test"]
+        dep_data = data["deployed"][0]
+        assert dep_data["artifact_name"] == "persist-test"
         # Should have content_hash (and collection_sha for backward compat)
         assert "content_hash" in dep_data or "collection_sha" in dep_data
 
     def test_tracker_loads_baseline_from_toml(self, temp_project):
         """Test that DeploymentTracker loads baseline from existing TOML."""
-        # Create TOML file manually
-        toml_file = temp_project / ".skillmeat-deployed.toml"
-        toml_content = f"""
-[deployments.loaded-test]
+        # Create TOML file manually in the expected location
+        toml_dir = temp_project / ".claude"
+        toml_dir.mkdir(parents=True, exist_ok=True)
+        toml_file = toml_dir / ".skillmeat-deployed.toml"
+        content_hash_value = "loaded_baseline_hash_" + "z" * 41
+        toml_content = f"""[[deployed]]
 artifact_name = "loaded-test"
 artifact_type = "skill"
 from_collection = "/collection"
 deployed_at = "{datetime.now().isoformat()}"
 artifact_path = "skills/loaded-test"
-content_hash = "loaded_baseline_hash_{'z' * 41}"
+content_hash = "{content_hash_value}"
+collection_sha = "{content_hash_value}"
+local_modifications = false
 """
         toml_file.write_text(toml_content)
 
-        # Load via tracker
-        tracker = DeploymentTracker(temp_project)
-        deployment = tracker.get_deployment("loaded-test", ArtifactType.SKILL)
+        # Load via static tracker API
+        deployment = DeploymentTracker.get_deployment(
+            temp_project, "loaded-test", ArtifactType.SKILL.value
+        )
 
         assert deployment is not None
-        assert deployment.content_hash == "loaded_baseline_hash_" + ("z" * 41)
+        assert deployment.content_hash == content_hash_value

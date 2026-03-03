@@ -327,27 +327,23 @@ class TestCustomEntityTypeLifecycle:
         yield SessionLocal
         engine.dispose()
 
-    def test_create_entity_type_via_api_returns_500_due_to_schema_model_mismatch(
+    def test_create_entity_type_via_api_returns_201(
         self, client: TestClient
     ) -> None:
-        """Documents a known pre-existing bug: POST /settings/entity-type-configs
-        returns 500 because the router passes 'example_path' and
-        'applicable_platforms' to the EntityTypeConfig ORM constructor but these
-        columns are absent from the current model.
+        """POST /settings/entity-type-configs now returns 201.
 
-        This test will need to be updated to assert 201 once the migration that
-        adds 'example_path' to the model is applied.
+        The ORM model / router schema mismatch (missing 'example_path' column)
+        has been resolved. This test verifies that a minimal payload is accepted
+        and the new entity type config is created successfully.
         """
         payload = {
             "slug": "ceco6_bug_check",
             "label": "Bug Check",
-            "description": "Documents schema/model mismatch bug",
+            "description": "Documents schema/model mismatch — now fixed",
         }
         response = client.post("/api/v1/settings/entity-type-configs", json=payload)
-        # Until the ORM model gains the 'example_path' column, this returns 500.
-        # Change the assertion to HTTP_201_CREATED once the migration is in place.
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR, (
-            f"Bug may be fixed — update test to assert 201. Got: {response.status_code}"
+        assert response.status_code == status.HTTP_201_CREATED, (
+            f"Expected 201, got {response.status_code}: {response.text}"
         )
 
     def test_custom_type_appears_in_list(
