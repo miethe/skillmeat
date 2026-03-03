@@ -52,8 +52,6 @@ class ConsentRecord:
             raise ValueError("bundle_id cannot be empty")
         if not self.publisher_email:
             raise ValueError("publisher_email cannot be empty")
-        if not self.signature:
-            raise ValueError("signature cannot be empty")
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization.

@@ -246,7 +246,7 @@ class TestAnalyticsPerformance:
 
         Target: <1 second
         """
-        report_mgr = UsageReportManager(db_path=tmp_path)  # noqa: F841 — instantiated to verify constructor works
+        report_mgr = UsageReportManager(db_path=tmp_path / "analytics.db")  # noqa: F841 — instantiated to verify constructor works
 
         # Generate sample data
         events = []

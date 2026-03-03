@@ -53,18 +53,18 @@ This is valid markdown with frontmatter.
         """Test empty content fails validation."""
         errors = validate_project_config("", "CLAUDE.md")
         assert len(errors) == 1
-        assert "cannot be empty" in errors[0].lower()
+        assert "cannot be empty" in errors[0]["hint"].lower()
 
     def test_whitespace_only_fails(self):
         """Test whitespace-only content fails validation."""
         errors = validate_project_config("   \n  \n  ", "CLAUDE.md")
         assert len(errors) == 1
-        assert "cannot be empty" in errors[0].lower()
+        assert "cannot be empty" in errors[0]["hint"].lower()
 
     def test_content_too_short_fails(self):
         """Test very short content fails validation."""
         errors = validate_project_config("# Hi", "CLAUDE.md")
-        assert any("too short" in err.lower() for err in errors)
+        assert any("too short" in err["hint"].lower() for err in errors)
 
     def test_invalid_yaml_frontmatter_ignored(self):
         """Test invalid YAML frontmatter is gracefully ignored."""
@@ -105,7 +105,7 @@ This is the spec content.
 This has no frontmatter.
 """
         errors = validate_spec_file(content, ".claude/specs/spec.md")
-        assert any("frontmatter is required" in err.lower() for err in errors)
+        assert any("frontmatter is required" in err["hint"].lower() for err in errors)
 
     def test_missing_title_field_fails(self):
         """Test spec file without title field fails."""
@@ -116,7 +116,7 @@ version: 1.0.0
 # Content
 """
         errors = validate_spec_file(content, ".claude/specs/spec.md")
-        assert any("title" in err.lower() for err in errors)
+        assert any("title" in err["hint"].lower() for err in errors)
 
     def test_invalid_path_fails(self):
         """Test spec file not in .claude/specs/ fails."""
@@ -127,7 +127,7 @@ title: Spec
 Content
 """
         errors = validate_spec_file(content, "specs/wrong-location.md")
-        assert any(".claude/specs/" in err for err in errors)
+        assert any(".claude/specs/" in err["hint"] for err in errors)
 
     def test_empty_content_after_frontmatter_fails(self):
         """Test spec with frontmatter but no body content fails."""
@@ -137,7 +137,7 @@ title: Empty Spec
 
 """
         errors = validate_spec_file(content, ".claude/specs/spec.md")
-        assert any("after frontmatter cannot be empty" in err.lower() for err in errors)
+        assert any("after frontmatter cannot be empty" in err["hint"].lower() for err in errors)
 
     def test_valid_with_multiple_frontmatter_fields(self):
         """Test spec with multiple frontmatter fields passes."""
@@ -189,12 +189,12 @@ These are general rules without path scope.
 Content
 """
         errors = validate_rule_file(content, "rules/wrong.md")
-        assert any(".claude/rules/" in err for err in errors)
+        assert any(".claude/rules/" in err["hint"] for err in errors)
 
     def test_empty_content_fails(self):
         """Test empty rule file fails."""
         errors = validate_rule_file("", ".claude/rules/empty.md")
-        assert any("cannot be empty" in err.lower() for err in errors)
+        assert any("cannot be empty" in err["hint"].lower() for err in errors)
 
     def test_nested_rule_path_valid(self):
         """Test nested rule file path is valid."""
@@ -235,7 +235,7 @@ Backend patterns and conventions.
 No frontmatter here.
 """
         errors = validate_context_file(content, ".claude/context/test.md")
-        assert any("frontmatter is required" in err.lower() for err in errors)
+        assert any("frontmatter is required" in err["hint"].lower() for err in errors)
 
     def test_missing_references_field_fails(self):
         """Test context file without references field fails."""
@@ -246,7 +246,7 @@ title: Context
 # Content
 """
         errors = validate_context_file(content, ".claude/context/test.md")
-        assert any("references" in err.lower() for err in errors)
+        assert any("references" in err["hint"].lower() for err in errors)
 
     def test_references_not_list_fails(self):
         """Test context file with non-list references fails."""
@@ -258,7 +258,7 @@ references: "not a list"
 # Content
 """
         errors = validate_context_file(content, ".claude/context/test.md")
-        assert any("must be a list" in err.lower() for err in errors)
+        assert any("must be a list" in err["hint"].lower() for err in errors)
 
     def test_invalid_path_fails(self):
         """Test context file not in .claude/context/ fails."""
@@ -270,7 +270,7 @@ references:
 # Content
 """
         errors = validate_context_file(content, "context/wrong.md")
-        assert any(".claude/context/" in err for err in errors)
+        assert any(".claude/context/" in err["hint"] for err in errors)
 
     def test_empty_references_list_passes(self):
         """Test context file with empty references list passes."""
@@ -337,7 +337,7 @@ tasks:
 No frontmatter.
 """
         errors = validate_progress_template(content, ".claude/progress/test.md")
-        assert any("frontmatter is required" in err.lower() for err in errors)
+        assert any("frontmatter is required" in err["hint"].lower() for err in errors)
 
     def test_missing_type_field_fails(self):
         """Test progress template without type field fails."""
@@ -348,7 +348,7 @@ phase: 1
 # Progress
 """
         errors = validate_progress_template(content, ".claude/progress/test.md")
-        assert any("type" in err.lower() for err in errors)
+        assert any("type" in err["hint"].lower() for err in errors)
 
     def test_wrong_type_value_fails(self):
         """Test progress template with wrong type value fails."""
@@ -359,7 +359,7 @@ type: not-progress
 # Progress
 """
         errors = validate_progress_template(content, ".claude/progress/test.md")
-        assert any("must be 'progress'" in err.lower() for err in errors)
+        assert any("must be 'progress'" in err["hint"].lower() for err in errors)
 
     def test_invalid_path_fails(self):
         """Test progress template not in .claude/progress/ fails."""
@@ -370,7 +370,7 @@ type: progress
 # Progress
 """
         errors = validate_progress_template(content, "progress/wrong.md")
-        assert any(".claude/progress/" in err for err in errors)
+        assert any(".claude/progress/" in err["hint"] for err in errors)
 
     def test_nested_progress_path_valid(self):
         """Test nested progress template path is valid."""
@@ -396,7 +396,7 @@ type: progress
 
 """
         errors = validate_progress_template(content, ".claude/progress/test.md")
-        assert any("after frontmatter cannot be empty" in err.lower() for err in errors)
+        assert any("after frontmatter cannot be empty" in err["hint"].lower() for err in errors)
 
 
 class TestPathTraversalSecurity:
@@ -427,7 +427,7 @@ type: progress
 """
         malicious_path = valid_path.replace(".claude", ".claude/..")
         errors = validate_context_entity(entity_type, content, malicious_path)
-        assert any(".." in err or "security" in err.lower() for err in errors)
+        assert any(".." in err["hint"] or "security" in err["hint"].lower() for err in errors)
 
     def test_project_config_parent_ref_fails(self):
         """Test project_config paths with .. are rejected."""
@@ -436,7 +436,7 @@ type: progress
 Content here.
 """
         errors = validate_project_config(content, "../CLAUDE.md")
-        assert any(".." in err or "security" in err.lower() for err in errors)
+        assert any(".." in err["hint"] or "security" in err["hint"].lower() for err in errors)
 
     @pytest.mark.parametrize(
         "entity_type,malicious_path",
@@ -459,7 +459,7 @@ type: progress
 """
         errors = validate_context_entity(entity_type, content, malicious_path)
         assert any(
-            ".." in err or "security" in err.lower() or "escape" in err.lower()
+            ".." in err["hint"] or "security" in err["hint"].lower() or "escape" in err["hint"].lower()
             for err in errors
         )
 
@@ -483,7 +483,7 @@ type: progress
 # Content
 """
         errors = validate_context_entity(entity_type, content, absolute_path)
-        assert any("absolute" in err.lower() for err in errors)
+        assert any("absolute" in err["hint"].lower() for err in errors)
 
     @pytest.mark.parametrize(
         "entity_type,windows_path",
@@ -504,7 +504,7 @@ type: progress
 # Content
 """
         errors = validate_context_entity(entity_type, content, windows_path)
-        assert any("absolute" in err.lower() for err in errors)
+        assert any("absolute" in err["hint"].lower() for err in errors)
 
     def test_nested_parent_refs_fail(self):
         """Test deeply nested parent directory references fail."""
@@ -516,7 +516,7 @@ references: []
 """
         malicious_path = ".claude/context/../../../../../../etc/passwd"
         errors = validate_context_file(content, malicious_path)
-        assert any(".." in err or "security" in err.lower() for err in errors)
+        assert any(".." in err["hint"] or "security" in err["hint"].lower() for err in errors)
 
     def test_hidden_parent_ref_fails(self):
         """Test hidden parent reference in middle of path fails."""
@@ -528,7 +528,7 @@ references: []
 """
         malicious_path = ".claude/context/../specs/test.md"
         errors = validate_context_file(content, malicious_path)
-        assert any(".." in err or "security" in err.lower() for err in errors)
+        assert any(".." in err["hint"] or "security" in err["hint"].lower() for err in errors)
 
     def test_literal_dotdot_in_filename_fails(self):
         """Test literal .. in filename fails."""
@@ -542,7 +542,7 @@ references: []
         malicious_path = ".claude/context/../secret.md"
         errors = validate_context_file(content, malicious_path)
         # Should fail due to parent directory reference
-        assert any(".." in err or "security" in err.lower() for err in errors)
+        assert any(".." in err["hint"] or "security" in err["hint"].lower() for err in errors)
 
 
 class TestValidateContextEntity:
@@ -682,7 +682,7 @@ references: null
         # For context files (references must be list)
         errors = validate_context_file(content, ".claude/context/test.md")
         # null is not a list, should fail
-        assert any("references" in err.lower() for err in errors)
+        assert any("references" in err["hint"].lower() for err in errors)
 
     def test_very_long_content_passes(self):
         """Test very long content passes validation."""

@@ -321,7 +321,11 @@ class ConflictResolver:
             if lic_pair in self.CONFLICT_MATRIX:
                 conflict_type, description, resolution = self.CONFLICT_MATRIX[lic_pair]
 
-                # Only return conflicts/warnings, not info
+                # "info" means explicitly compatible in the matrix — return None (no conflict)
+                if conflict_type == "info":
+                    return None
+
+                # Return conflicts and warnings
                 if conflict_type in {"incompatible", "warning"}:
                     return LicenseConflict(
                         license1=license1,

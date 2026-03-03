@@ -276,8 +276,11 @@ class SecurityScanner:
                     if file_info.is_dir():
                         continue
 
-                    # Get file extension
+                    # Get file extension — handle dotfiles (e.g. ".env") where
+                    # Path.suffix returns "" but the name itself is the "extension"
                     ext = file_path.suffix.lower()
+                    if not ext and file_path.name.startswith("."):
+                        ext = file_path.name.lower()
 
                     # Check if blocked
                     if ext in self.BLOCKED_EXTENSIONS:

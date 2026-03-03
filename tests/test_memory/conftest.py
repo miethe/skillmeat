@@ -22,7 +22,21 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+import skillmeat.cache.models as _cache_models
 from skillmeat.cache.models import Base
+
+
+@pytest.fixture(autouse=True)
+def reset_session_local():
+    """Reset the module-level SessionLocal before each test.
+
+    get_session() only calls init_session_factory() when SessionLocal is None.
+    Between tests using different tmp_path db files, SessionLocal retains the
+    first test's engine — causing FK violations and stale data on subsequent tests.
+    """
+    _cache_models.SessionLocal = None
+    yield
+    _cache_models.SessionLocal = None
 
 
 # =============================================================================

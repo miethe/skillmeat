@@ -73,6 +73,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import inspect as sa_inspect
 
 
 # revision identifiers, used by Alembic.
@@ -87,7 +88,17 @@ def upgrade() -> None:
 
     Purely additive — no existing tables or columns are modified.
     The existing artifacts.category TEXT column is preserved as-is.
+
+    Idempotent: skips creation if tables already exist (e.g., via
+    Base.metadata.create_all() before Alembic migrations ran).
     """
+    bind = op.get_bind()
+    inspector = sa_inspect(bind)
+    existing_tables = inspector.get_table_names()
+
+    if "entity_categories" in existing_tables:
+        return
+
     # ------------------------------------------------------------------
     # 1. entity_categories — master category table
     # ------------------------------------------------------------------
@@ -168,13 +179,9 @@ def upgrade() -> None:
             nullable=False,
             comment="Row last-modified timestamp (UTC)",
         ),
-    )
-
-    # Unique constraint on slug — enforced at DB level in addition to ORM
-    op.create_unique_constraint(
-        "uq_entity_categories_slug",
-        "entity_categories",
-        ["slug"],
+        # Unique constraint on slug — declared inside create_table for SQLite
+        # compatibility (SQLite does not support ALTER TABLE ADD CONSTRAINT).
+        sa.UniqueConstraint("slug", name="uq_entity_categories_slug"),
     )
 
     # Index: fast lookup by slug (also serves the unique constraint)
@@ -255,20 +262,27 @@ def downgrade() -> None:
 
     The join table must be dropped before the category table due to FK
     constraints.  The existing artifacts.category TEXT column is untouched.
-    """
-    # Drop join table first (FK dependency on entity_categories.id)
-    op.drop_index(
-        "idx_artifact_category_assoc_category_id", "entity_category_associations"
-    )
-    op.drop_index(
-        "idx_artifact_category_assoc_artifact_uuid", "entity_category_associations"
-    )
-    op.drop_table("entity_category_associations")
 
-    # Drop master category table
-    op.drop_index("idx_entity_categories_is_builtin", "entity_categories")
-    op.drop_index("idx_entity_categories_sort_order", "entity_categories")
-    op.drop_index("idx_entity_categories_entity_type_platform", "entity_categories")
-    op.drop_index("idx_entity_categories_slug", "entity_categories")
-    op.drop_constraint("uq_entity_categories_slug", "entity_categories", type_="unique")
-    op.drop_table("entity_categories")
+    Handles the case where tables were pre-created by Base.metadata.create_all()
+    and therefore may not have the Alembic-managed named indexes.
+    """
+    from sqlalchemy import text as sa_text
+
+    bind = op.get_bind()
+    inspector = sa_inspect(bind)
+    existing_tables = inspector.get_table_names()
+
+    if "entity_category_associations" in existing_tables:
+        # Use raw DROP INDEX IF EXISTS to handle both Alembic-created and
+        # ORM-created tables (the latter may not have named indexes).
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_artifact_category_assoc_category_id"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_artifact_category_assoc_artifact_uuid"))
+        op.drop_table("entity_category_associations")
+
+    if "entity_categories" in existing_tables:
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_entity_categories_is_builtin"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_entity_categories_sort_order"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_entity_categories_entity_type_platform"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_entity_categories_slug"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS uq_entity_categories_slug"))
+        op.drop_table("entity_categories")

@@ -647,7 +647,7 @@ class TestAnalyticsClearCommand:
 
             mock_manager = MagicMock()
             mock_manager.db.get_stats.return_value = {"total_events": 1000}
-            mock_manager.db.delete_events_before.return_value = 456
+            mock_manager.db.cleanup_old_events.return_value = 456
             mock_manager_class.return_value = mock_manager
 
             result = cli_runner.invoke(
@@ -689,7 +689,7 @@ class TestAnalyticsClearCommand:
 
             mock_manager = MagicMock()
             mock_manager.db.get_stats.return_value = {"total_events": 100}
-            mock_manager.db.delete_events_before.return_value = 0
+            mock_manager.db.cleanup_old_events.return_value = 0
             mock_manager_class.return_value = mock_manager
 
             result = cli_runner.invoke(

@@ -9,8 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
+from skillmeat.core.deployment import Deployment
 from skillmeat.core.sync import SyncManager
-from skillmeat.models import DriftDetectionResult, DeploymentMetadata, DeploymentRecord
+from skillmeat.models import DriftDetectionResult
 
 
 class TestDetermineChangeOrigin:
@@ -115,23 +116,15 @@ class TestDriftAttributionFields:
 
         # Mock deployment metadata
         with patch.object(sync_manager, "_load_deployment_metadata") as mock_load:
-            deployment_record = DeploymentRecord(
-                name="test-skill",
+            deployment = Deployment(
+                artifact_name="test-skill",
                 artifact_type="skill",
-                source="local:test",
-                version="1.0.0",
-                sha="abc123def456" + "0" * 52,  # Original deployed hash
-                deployed_at=datetime.now().isoformat() + "Z",
-                deployed_from=str(tmp_path / "collection"),
+                from_collection=str(tmp_path / "collection"),
+                deployed_at=datetime.now(),
+                artifact_path=Path(".claude/skills/test-skill"),
+                content_hash="abc123def456" + "0" * 52,  # Original deployed hash
             )
-
-            mock_metadata = DeploymentMetadata(
-                collection="default",
-                deployed_at=datetime.now().isoformat() + "Z",
-                skillmeat_version="0.3.0",
-                artifacts=[deployment_record],
-            )
-            mock_load.return_value = mock_metadata
+            mock_load.return_value = [deployment]
 
             # Mock collection artifacts
             with patch.object(sync_manager, "_get_collection_artifacts") as mock_get:
@@ -145,7 +138,7 @@ class TestDriftAttributionFields:
                 ]
 
                 # Mock hash computation
-                with patch.object(sync_manager, "_compute_artifact_hash") as mock_hash:
+                with patch.object(sync_manager, "_compute_content_hash") as mock_hash:
                     # Collection unchanged, project modified
                     mock_hash.side_effect = [
                         "abc123def456" + "0" * 52,  # Collection SHA (same as deployed)
@@ -179,23 +172,15 @@ class TestDriftAttributionFields:
 
         # Mock deployment metadata
         with patch.object(sync_manager, "_load_deployment_metadata") as mock_load:
-            deployment_record = DeploymentRecord(
-                name="test-skill",
+            deployment = Deployment(
+                artifact_name="test-skill",
                 artifact_type="skill",
-                source="local:test",
-                version="1.0.0",
-                sha="abc123def456" + "0" * 52,
-                deployed_at=datetime.now().isoformat() + "Z",
-                deployed_from=str(tmp_path / "collection"),
+                from_collection=str(tmp_path / "collection"),
+                deployed_at=datetime.now(),
+                artifact_path=Path(".claude/skills/test-skill"),
+                content_hash="abc123def456" + "0" * 52,
             )
-
-            mock_metadata = DeploymentMetadata(
-                collection="default",
-                deployed_at=datetime.now().isoformat() + "Z",
-                skillmeat_version="0.3.0",
-                artifacts=[deployment_record],
-            )
-            mock_load.return_value = mock_metadata
+            mock_load.return_value = [deployment]
 
             # Mock collection artifacts
             with patch.object(sync_manager, "_get_collection_artifacts") as mock_get:
@@ -209,7 +194,7 @@ class TestDriftAttributionFields:
                 ]
 
                 # Mock hash computation
-                with patch.object(sync_manager, "_compute_artifact_hash") as mock_hash:
+                with patch.object(sync_manager, "_compute_content_hash") as mock_hash:
                     # Collection updated, project unchanged
                     mock_hash.side_effect = [
                         "updated12345" + "0" * 52,  # Collection SHA (different)
@@ -243,23 +228,15 @@ class TestDriftAttributionFields:
 
         # Mock deployment metadata
         with patch.object(sync_manager, "_load_deployment_metadata") as mock_load:
-            deployment_record = DeploymentRecord(
-                name="test-skill",
+            deployment = Deployment(
+                artifact_name="test-skill",
                 artifact_type="skill",
-                source="local:test",
-                version="1.0.0",
-                sha="abc123def456" + "0" * 52,
-                deployed_at=datetime.now().isoformat() + "Z",
-                deployed_from=str(tmp_path / "collection"),
+                from_collection=str(tmp_path / "collection"),
+                deployed_at=datetime.now(),
+                artifact_path=Path(".claude/skills/test-skill"),
+                content_hash="abc123def456" + "0" * 52,
             )
-
-            mock_metadata = DeploymentMetadata(
-                collection="default",
-                deployed_at=datetime.now().isoformat() + "Z",
-                skillmeat_version="0.3.0",
-                artifacts=[deployment_record],
-            )
-            mock_load.return_value = mock_metadata
+            mock_load.return_value = [deployment]
 
             # Mock collection artifacts
             with patch.object(sync_manager, "_get_collection_artifacts") as mock_get:
@@ -273,7 +250,7 @@ class TestDriftAttributionFields:
                 ]
 
                 # Mock hash computation
-                with patch.object(sync_manager, "_compute_artifact_hash") as mock_hash:
+                with patch.object(sync_manager, "_compute_content_hash") as mock_hash:
                     # Both collection and project modified (conflict)
                     mock_hash.side_effect = [
                         "updated12345" + "0" * 52,  # Collection SHA (different)
@@ -309,23 +286,15 @@ class TestDriftAttributionFields:
 
         # Mock deployment metadata
         with patch.object(sync_manager, "_load_deployment_metadata") as mock_load:
-            deployment_record = DeploymentRecord(
-                name="test-skill",
+            deployment = Deployment(
+                artifact_name="test-skill",
                 artifact_type="skill",
-                source="local:test",
-                version="1.0.0",
-                sha=deployed_sha,
-                deployed_at=datetime.now().isoformat() + "Z",
-                deployed_from=str(tmp_path / "collection"),
+                from_collection=str(tmp_path / "collection"),
+                deployed_at=datetime.now(),
+                artifact_path=Path(".claude/skills/test-skill"),
+                content_hash=deployed_sha,
             )
-
-            mock_metadata = DeploymentMetadata(
-                collection="default",
-                deployed_at=datetime.now().isoformat() + "Z",
-                skillmeat_version="0.3.0",
-                artifacts=[deployment_record],
-            )
-            mock_load.return_value = mock_metadata
+            mock_load.return_value = [deployment]
 
             # Mock collection artifacts
             with patch.object(sync_manager, "_get_collection_artifacts") as mock_get:
@@ -339,7 +308,7 @@ class TestDriftAttributionFields:
                 ]
 
                 # Mock hash computation
-                with patch.object(sync_manager, "_compute_artifact_hash") as mock_hash:
+                with patch.object(sync_manager, "_compute_content_hash") as mock_hash:
                     mock_hash.side_effect = [
                         "abc123def456" + "0" * 52,  # Collection SHA
                         "modified1234" + "0" * 52,  # Project SHA
@@ -373,23 +342,15 @@ class TestDriftAttributionFields:
 
         # Mock deployment metadata
         with patch.object(sync_manager, "_load_deployment_metadata") as mock_load:
-            deployment_record = DeploymentRecord(
-                name="test-skill",
+            deployment = Deployment(
+                artifact_name="test-skill",
                 artifact_type="skill",
-                source="local:test",
-                version="1.0.0",
-                sha="abc123def456" + "0" * 52,
-                deployed_at=datetime.now().isoformat() + "Z",
-                deployed_from=str(tmp_path / "collection"),
+                from_collection=str(tmp_path / "collection"),
+                deployed_at=datetime.now(),
+                artifact_path=Path(".claude/skills/test-skill"),
+                content_hash="abc123def456" + "0" * 52,
             )
-
-            mock_metadata = DeploymentMetadata(
-                collection="default",
-                deployed_at=datetime.now().isoformat() + "Z",
-                skillmeat_version="0.3.0",
-                artifacts=[deployment_record],
-            )
-            mock_load.return_value = mock_metadata
+            mock_load.return_value = [deployment]
 
             # Mock collection artifacts
             with patch.object(sync_manager, "_get_collection_artifacts") as mock_get:
@@ -403,7 +364,7 @@ class TestDriftAttributionFields:
                 ]
 
                 # Mock hash computation
-                with patch.object(sync_manager, "_compute_artifact_hash") as mock_hash:
+                with patch.object(sync_manager, "_compute_content_hash") as mock_hash:
                     mock_hash.side_effect = [
                         "abc123def456" + "0" * 52,  # Collection SHA
                         current_project_sha,  # Project SHA

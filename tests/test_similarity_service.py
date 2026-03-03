@@ -199,7 +199,7 @@ def test_match_type_classification(score: float, expected_type: MatchType):
 def test_composite_score_weights():
     """Composite score uses documented weights when semantic is available.
 
-    Weights: keyword=0.30, content=0.25, structure=0.20, metadata=0.15, semantic=0.10
+    Weights: metadata=0.30, keyword=0.25, content=0.20, structure=0.15, semantic=0.10
     """
     svc = _make_service(session=MagicMock())
     bd = _make_breakdown(
@@ -210,7 +210,7 @@ def test_composite_score_weights():
         semantic=0.0,
     )
     score = svc._compute_composite_score(bd)
-    assert pytest.approx(score, abs=1e-6) == 0.30
+    assert pytest.approx(score, abs=1e-6) == 0.25
 
     bd2 = _make_breakdown(
         keyword=0.0,
@@ -219,7 +219,7 @@ def test_composite_score_weights():
         metadata=0.0,
         semantic=0.0,
     )
-    assert pytest.approx(svc._compute_composite_score(bd2), abs=1e-6) == 0.25
+    assert pytest.approx(svc._compute_composite_score(bd2), abs=1e-6) == 0.20
 
     bd_all = _make_breakdown(
         keyword=1.0,
@@ -234,9 +234,9 @@ def test_composite_score_weights():
 def test_composite_score_no_semantic():
     """Composite score redistributes the 0.10 semantic weight when semantic=None.
 
-    Original weights without semantic: keyword=0.30, content=0.25, structure=0.20, metadata=0.15.
+    Original weights without semantic: metadata=0.30, keyword=0.25, content=0.20, structure=0.15.
     Sum = 0.90.  Each is scaled up by 1/0.90 so they sum to 1.0.
-    Redistributed: keyword≈0.3333, content≈0.2778, structure≈0.2222, metadata≈0.1667.
+    Redistributed: metadata≈0.3333, keyword≈0.2778, content≈0.2222, structure≈0.1667.
     """
     svc = _make_service(session=MagicMock())
     bd = _make_breakdown(
@@ -247,8 +247,8 @@ def test_composite_score_no_semantic():
         semantic=None,  # semantic unavailable
     )
     score = svc._compute_composite_score(bd)
-    # keyword alone should be 0.30 / 0.90 ≈ 0.3333
-    assert pytest.approx(score, abs=1e-4) == 0.30 / 0.90
+    # keyword alone should be 0.25 / 0.90 ≈ 0.2778
+    assert pytest.approx(score, abs=1e-4) == 0.25 / 0.90
 
     bd_all_no_sem = _make_breakdown(
         keyword=1.0,

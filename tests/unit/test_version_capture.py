@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 from skillmeat.core.deployment import DeploymentManager
 from skillmeat.core.sync import SyncManager
-from skillmeat.core.artifact import Artifact, ArtifactType
+from skillmeat.core.artifact import Artifact, ArtifactMetadata, ArtifactType
 from skillmeat.models import SyncResult
 from skillmeat.storage.snapshot import Snapshot
 
@@ -119,6 +119,10 @@ deployed-at = "2024-01-01T00:00:00Z"
 skillmeat-version = "0.3.0"
 """)
 
+        # Mock deployment record with from_collection attribute
+        mock_deployment = Mock()
+        mock_deployment.from_collection = "default"
+
         # Mock successful sync with artifacts
         with patch.object(sync_mgr, 'check_drift') as mock_drift, \
              patch.object(sync_mgr, '_sync_artifact') as mock_sync_artifact, \
@@ -126,8 +130,8 @@ skillmeat-version = "0.3.0"
              patch.object(sync_mgr, '_show_sync_preview'), \
              patch.object(sync_mgr, '_confirm_sync', return_value=True):
 
-            # Setup mocks
-            mock_load.return_value = Mock(collection="default")
+            # Setup mocks - return a list of deployment records (not a single Mock)
+            mock_load.return_value = [mock_deployment]
 
             # Mock drift detection with modified artifacts
             from skillmeat.models import DriftDetectionResult, ArtifactSyncResult
@@ -249,12 +253,6 @@ class TestDeployVersionCapture:
 
     def test_deploy_creates_snapshot_on_success(self, mock_collection_mgr, mock_version_mgr, tmp_path):
         """Test that successful deployment creates an automatic snapshot."""
-        # Setup
-        deploy_mgr = DeploymentManager(
-            collection_mgr=mock_collection_mgr,
-            version_mgr=mock_version_mgr,
-        )
-
         # Create collection with artifact
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
@@ -270,7 +268,7 @@ class TestDeployVersionCapture:
             type=ArtifactType.SKILL,
             path="skills/test-skill",
             origin="local",
-            metadata=Mock(version="1.0.0"),
+            metadata=ArtifactMetadata(version="1.0.0"),
             added=datetime.now(),
         )
         collection_mock = Mock()
@@ -283,45 +281,51 @@ class TestDeployVersionCapture:
         project_path = tmp_path / "project"
         project_path.mkdir()
 
-        # Mock filesystem operations
-        with patch('skillmeat.core.deployment.FilesystemManager') as mock_fs_mgr, \
+        # Mock filesystem operations — instantiate DeploymentManager inside the patch
+        # context so that FilesystemManager() is intercepted
+        with patch('skillmeat.core.deployment.FilesystemManager') as mock_fs_cls, \
              patch('skillmeat.core.deployment.compute_content_hash') as mock_hash, \
              patch('skillmeat.storage.deployment.DeploymentTracker'), \
              patch('skillmeat.core.deployment.Confirm.ask', return_value=True):
 
             mock_hash.return_value = "abc123"
-            mock_fs_mgr_instance = Mock()
-            mock_fs_mgr.return_value = mock_fs_mgr_instance
+            mock_fs_instance = Mock()
+            mock_fs_cls.return_value = mock_fs_instance
 
-            # Execute deployment
-            deployments = deploy_mgr.deploy_artifacts(
-                artifact_names=["test-skill"],
-                collection_name="default",
-                project_path=project_path,
+            # Setup: instantiate inside patch context so filesystem_mgr is mocked
+            deploy_mgr = DeploymentManager(
+                collection_mgr=mock_collection_mgr,
+                version_mgr=mock_version_mgr,
             )
+            # Also patch _lookup_artifact_uuid to avoid DB access
+            with patch.object(deploy_mgr, '_lookup_artifact_uuid', return_value=None), \
+                 patch.object(deploy_mgr, '_record_deploy_event'), \
+                 patch.object(deploy_mgr, '_record_deployment_version'):
 
-            # Verify deployment succeeded
-            assert len(deployments) == 1
-            assert deployments[0].artifact_name == "test-skill"
+                # Execute deployment
+                deployments = deploy_mgr.deploy_artifacts(
+                    artifact_names=["test-skill"],
+                    collection_name="default",
+                    project_path=project_path,
+                )
 
-            # Verify snapshot was created
-            mock_version_mgr.auto_snapshot.assert_called_once()
-            call_args = mock_version_mgr.auto_snapshot.call_args
+                # Verify deployment succeeded
+                assert len(deployments) == 1
+                assert deployments[0].artifact_name == "test-skill"
 
-            # Check message includes artifact name and project path
-            assert "test-skill" in call_args.kwargs["message"]
-            assert "Auto-deploy" in call_args.kwargs["message"]
-            assert str(project_path) in call_args.kwargs["message"]
+                # Verify snapshot was created
+                mock_version_mgr.auto_snapshot.assert_called_once()
+                call_args = mock_version_mgr.auto_snapshot.call_args
+
+                # Check message includes artifact name and project path
+                assert "test-skill" in call_args.kwargs["message"]
+                assert "Auto-deploy" in call_args.kwargs["message"]
+                assert str(project_path) in call_args.kwargs["message"]
 
     def test_deploy_handles_snapshot_failure_gracefully(self, mock_collection_mgr, mock_version_mgr, tmp_path):
         """Test that deployment continues even if snapshot creation fails."""
         # Setup - version manager raises error
         mock_version_mgr.auto_snapshot.side_effect = RuntimeError("Snapshot failed")
-
-        deploy_mgr = DeploymentManager(
-            collection_mgr=mock_collection_mgr,
-            version_mgr=mock_version_mgr,
-        )
 
         # Create collection with artifact
         collection_path = tmp_path / "collection"
@@ -337,7 +341,7 @@ class TestDeployVersionCapture:
             type=ArtifactType.SKILL,
             path="skills/test-skill",
             origin="local",
-            metadata=Mock(version="1.0.0"),
+            metadata=ArtifactMetadata(version="1.0.0"),
             added=datetime.now(),
         )
         collection_mock = Mock()
@@ -349,35 +353,38 @@ class TestDeployVersionCapture:
         project_path = tmp_path / "project"
         project_path.mkdir()
 
-        # Mock filesystem operations
-        with patch('skillmeat.core.deployment.FilesystemManager') as mock_fs_mgr, \
+        # Mock filesystem operations — instantiate DeploymentManager inside the patch
+        # context so that FilesystemManager() is intercepted
+        with patch('skillmeat.core.deployment.FilesystemManager') as mock_fs_cls, \
              patch('skillmeat.core.deployment.compute_content_hash') as mock_hash, \
              patch('skillmeat.storage.deployment.DeploymentTracker'), \
              patch('skillmeat.core.deployment.Confirm.ask', return_value=True):
 
             mock_hash.return_value = "abc123"
-            mock_fs_mgr_instance = Mock()
-            mock_fs_mgr.return_value = mock_fs_mgr_instance
+            mock_fs_instance = Mock()
+            mock_fs_cls.return_value = mock_fs_instance
 
-            # Execute - should not raise exception
-            deployments = deploy_mgr.deploy_artifacts(
-                artifact_names=["test-skill"],
-                collection_name="default",
-                project_path=project_path,
+            deploy_mgr = DeploymentManager(
+                collection_mgr=mock_collection_mgr,
+                version_mgr=mock_version_mgr,
             )
+            with patch.object(deploy_mgr, '_lookup_artifact_uuid', return_value=None), \
+                 patch.object(deploy_mgr, '_record_deploy_event'), \
+                 patch.object(deploy_mgr, '_record_deployment_version'):
 
-            # Verify deployment still succeeded
-            assert len(deployments) == 1
-            assert deployments[0].artifact_name == "test-skill"
+                # Execute - should not raise exception
+                deployments = deploy_mgr.deploy_artifacts(
+                    artifact_names=["test-skill"],
+                    collection_name="default",
+                    project_path=project_path,
+                )
+
+                # Verify deployment still succeeded
+                assert len(deployments) == 1
+                assert deployments[0].artifact_name == "test-skill"
 
     def test_deploy_all_creates_single_snapshot(self, mock_collection_mgr, mock_version_mgr, tmp_path):
         """Test that deploy_all creates a single snapshot for all artifacts."""
-        # Setup
-        deploy_mgr = DeploymentManager(
-            collection_mgr=mock_collection_mgr,
-            version_mgr=mock_version_mgr,
-        )
-
         # Create collection with multiple artifacts
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
@@ -397,7 +404,7 @@ class TestDeployVersionCapture:
                 type=ArtifactType.SKILL,
                 path="skills/skill1",
                 origin="local",
-                metadata=Mock(version="1.0.0"),
+                metadata=ArtifactMetadata(version="1.0.0"),
                 added=datetime.now(),
             ),
             Artifact(
@@ -405,7 +412,7 @@ class TestDeployVersionCapture:
                 type=ArtifactType.SKILL,
                 path="skills/skill2",
                 origin="local",
-                metadata=Mock(version="1.0.0"),
+                metadata=ArtifactMetadata(version="1.0.0"),
                 added=datetime.now(),
             ),
         ]
@@ -422,30 +429,39 @@ class TestDeployVersionCapture:
         project_path = tmp_path / "project"
         project_path.mkdir()
 
-        # Mock filesystem operations
-        with patch('skillmeat.core.deployment.FilesystemManager') as mock_fs_mgr, \
+        # Mock filesystem operations — instantiate DeploymentManager inside the patch
+        # context so that FilesystemManager() is intercepted
+        with patch('skillmeat.core.deployment.FilesystemManager') as mock_fs_cls, \
              patch('skillmeat.core.deployment.compute_content_hash') as mock_hash, \
              patch('skillmeat.storage.deployment.DeploymentTracker'), \
              patch('skillmeat.core.deployment.Confirm.ask', return_value=True):
 
             mock_hash.return_value = "abc123"
-            mock_fs_mgr_instance = Mock()
-            mock_fs_mgr.return_value = mock_fs_mgr_instance
+            mock_fs_instance = Mock()
+            mock_fs_cls.return_value = mock_fs_instance
 
-            # Execute deploy_all
-            deployments = deploy_mgr.deploy_all(
-                collection_name="default",
-                project_path=project_path,
+            deploy_mgr = DeploymentManager(
+                collection_mgr=mock_collection_mgr,
+                version_mgr=mock_version_mgr,
             )
+            with patch.object(deploy_mgr, '_lookup_artifact_uuid', return_value=None), \
+                 patch.object(deploy_mgr, '_record_deploy_event'), \
+                 patch.object(deploy_mgr, '_record_deployment_version'):
 
-            # Verify both artifacts deployed
-            assert len(deployments) == 2
+                # Execute deploy_all
+                deployments = deploy_mgr.deploy_all(
+                    collection_name="default",
+                    project_path=project_path,
+                )
 
-            # Verify only one snapshot was created (deploy_all calls deploy_artifacts)
-            mock_version_mgr.auto_snapshot.assert_called_once()
-            call_args = mock_version_mgr.auto_snapshot.call_args
+                # Verify both artifacts deployed
+                assert len(deployments) == 2
 
-            # Message should include both artifact names (or indicate multiple)
-            message = call_args.kwargs["message"]
-            assert "Auto-deploy" in message
-            assert ("skill1" in message and "skill2" in message) or "2" in message
+                # Verify only one snapshot was created (deploy_all calls deploy_artifacts)
+                mock_version_mgr.auto_snapshot.assert_called_once()
+                call_args = mock_version_mgr.auto_snapshot.call_args
+
+                # Message should include both artifact names (or indicate multiple)
+                message = call_args.kwargs["message"]
+                assert "Auto-deploy" in message
+                assert ("skill1" in message and "skill2" in message) or "2" in message

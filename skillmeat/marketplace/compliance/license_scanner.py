@@ -241,6 +241,11 @@ class LicenseScanner:
                 result = self._scan_source_file(zf, file_info)
                 if result:
                     detected_licenses.append(result)
+                else:
+                    # File was scanned but has no license or copyright — track as missing
+                    detected_licenses.append(
+                        LicenseDetectionResult(file_path=file_info.filename)
+                    )
 
         # Use declared license or try to infer from detected
         if not declared_license and detected_licenses:

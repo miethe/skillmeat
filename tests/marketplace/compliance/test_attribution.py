@@ -319,7 +319,7 @@ def test_generate_credits_no_modifications(tracker):
 
     credits = tracker.generate_credits(attributions)
 
-    assert "Modifications: None" in credits
+    assert "**Modifications**: None" in credits
 
 
 def test_validate_attributions_valid(tracker, tmp_path):
@@ -351,4 +351,4 @@ def test_validate_attributions_invalid_bundle(tracker, tmp_path):
     errors = tracker.validate_attributions(invalid_path, [])
 
     assert len(errors) > 0
-    assert any("not a valid ZIP" in error for error in errors)
+    assert any("not a valid zip" in error.lower() for error in errors)

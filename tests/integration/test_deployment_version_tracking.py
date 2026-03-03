@@ -110,7 +110,26 @@ def populated_cache(test_db, project_dir):
         session.add(artifact)
         session.commit()
 
-        return project, artifact
+        # Capture attribute values before closing session to avoid
+        # DetachedInstanceError when attributes are accessed later.
+        project_id = project.id
+        artifact_id = artifact.id
+        artifact_name = artifact.name
+        artifact_type = artifact.type
+
+        return (
+            type("ProjectProxy", (), {"id": project_id})(),
+            type(
+                "ArtifactProxy",
+                (),
+                {
+                    "id": artifact_id,
+                    "name": artifact_name,
+                    "type": artifact_type,
+                    "project_id": project_id,
+                },
+            )(),
+        )
 
     finally:
         session.close()
@@ -203,8 +222,27 @@ class TestDeploymentVersionTracking:
         monkeypatch.setenv("SKILLMEAT_CONFIG_DIR", str(config_dir))
 
         # Create collection
-        coll_mgr = CollectionManager()
-        coll_mgr.config.create_collection("test-collection", str(collection_dir))
+        from skillmeat.config import ConfigManager
+        from skillmeat.core.artifact import Artifact as CoreArtifact, ArtifactMetadata, ArtifactType as CoreArtifactType
+        from datetime import datetime as dt
+        config = ConfigManager(config_dir=config_dir)
+        coll_mgr = CollectionManager(config=config)
+        collection = coll_mgr.init("test-collection")
+        import shutil
+        collection_path = config.get_collection_path("test-collection")
+        shutil.copytree(collection_dir, collection_path, dirs_exist_ok=True)
+
+        # Register artifact in the collection manifest so deploy_artifacts finds it
+        test_artifact = CoreArtifact(
+            name="test-skill",
+            type=CoreArtifactType.SKILL,
+            path="artifacts/skills/test-skill",
+            origin="local",
+            metadata=ArtifactMetadata(title="Test Skill", version="1.0.0"),
+            added=dt.now(),
+        )
+        collection.add_artifact(test_artifact)
+        coll_mgr.save_collection(collection)
 
         # Deploy artifact twice
         deploy_mgr = DeploymentManager(collection_mgr=coll_mgr)
@@ -215,11 +253,12 @@ class TestDeploymentVersionTracking:
             project_path=project_dir,
         )
 
-        # Deploy again (overwrite)
+        # Deploy again (overwrite) — pass overwrite=True to skip interactive prompt
         deploy_mgr.deploy_artifacts(
             artifact_names=["test-skill"],
             collection_name="test-collection",
             project_path=project_dir,
+            overwrite=True,
         )
 
         # Check that only one version record exists
@@ -247,8 +286,27 @@ class TestDeploymentVersionTracking:
         monkeypatch.setenv("SKILLMEAT_CONFIG_DIR", str(config_dir))
 
         # Create collection
-        coll_mgr = CollectionManager()
-        coll_mgr.config.create_collection("test-collection", str(collection_dir))
+        from skillmeat.config import ConfigManager
+        from skillmeat.core.artifact import Artifact as CoreArtifact, ArtifactMetadata, ArtifactType as CoreArtifactType
+        from datetime import datetime as dt
+        import shutil
+        config = ConfigManager(config_dir=config_dir)
+        coll_mgr = CollectionManager(config=config)
+        collection = coll_mgr.init("test-collection")
+        collection_path = config.get_collection_path("test-collection")
+        shutil.copytree(collection_dir, collection_path, dirs_exist_ok=True)
+
+        # Register artifact in the collection manifest so deploy_artifacts finds it
+        test_artifact = CoreArtifact(
+            name="test-skill",
+            type=CoreArtifactType.SKILL,
+            path="artifacts/skills/test-skill",
+            origin="local",
+            metadata=ArtifactMetadata(title="Test Skill", version="1.0.0"),
+            added=dt.now(),
+        )
+        collection.add_artifact(test_artifact)
+        coll_mgr.save_collection(collection)
 
         # Deploy artifact WITHOUT creating cache entry first
         deploy_mgr = DeploymentManager(collection_mgr=coll_mgr)

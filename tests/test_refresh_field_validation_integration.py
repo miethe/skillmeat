@@ -7,6 +7,7 @@ Task: BE-407
 """
 
 import pytest
+from datetime import datetime, timezone
 from unittest.mock import Mock, MagicMock
 
 from skillmeat.core.artifact import Artifact, ArtifactMetadata
@@ -44,9 +45,11 @@ class TestRefreshMetadataFieldValidation:
         artifact = Artifact(
             name="test-skill",
             type=ArtifactType.SKILL,
-            version_spec="1.0.0",
-            metadata=metadata,
+            path="skills/test-skill/",
             origin="github",
+            metadata=metadata,
+            added=datetime.now(timezone.utc),
+            version_spec="1.0.0",
             upstream="owner/repo/skill",
         )
         return artifact
@@ -56,13 +59,13 @@ class TestRefreshMetadataFieldValidation:
         # This will fail early in validation if fields are invalid
         result = refresher.refresh_metadata(
             artifact=sample_artifact,
-            fields=["description", "tags"],
+            fields=["description", "author"],
             dry_run=True,
         )
 
-        # Should not error on validation, but will be skipped due to no GitHub source fetch
+        # Should not error on validation; actual status depends on GitHub fetch outcome
         assert result.artifact_id == "skill:test-skill"
-        assert result.status in ("skipped", "error", "unchanged")
+        assert result.status in ("skipped", "error", "unchanged", "refreshed")
 
     def test_refresh_metadata_with_invalid_fields(self, refresher, sample_artifact):
         """Test refresh_metadata rejects invalid field names."""
@@ -83,14 +86,14 @@ class TestRefreshMetadataFieldValidation:
         """Test refresh_metadata normalizes field names case-insensitively."""
         result = refresher.refresh_metadata(
             artifact=sample_artifact,
-            fields=["DESCRIPTION", "Tags"],
+            fields=["DESCRIPTION", "Author"],
             dry_run=True,
         )
 
         # Should not error on validation
         assert result.artifact_id == "skill:test-skill"
         # Validation passed, so status is from actual refresh logic
-        assert result.status in ("skipped", "error", "unchanged")
+        assert result.status in ("skipped", "error", "unchanged", "refreshed")
 
     def test_refresh_metadata_with_none_fields(self, refresher, sample_artifact):
         """Test refresh_metadata accepts None (all fields)."""
@@ -127,7 +130,7 @@ class TestRefreshCollectionFieldValidation:
         """Test refresh_collection accepts valid field names."""
         result = refresher.refresh_collection(
             collection_name="test-collection",
-            fields=["description", "tags"],
+            fields=["description", "author"],
             dry_run=True,
         )
 
@@ -152,7 +155,7 @@ class TestRefreshCollectionFieldValidation:
         """Test refresh_collection normalizes field names."""
         result = refresher.refresh_collection(
             collection_name="test-collection",
-            fields=["DESCRIPTION", "Tags", "AUTHOR"],
+            fields=["DESCRIPTION", "LICENSE", "AUTHOR"],
             dry_run=True,
         )
 

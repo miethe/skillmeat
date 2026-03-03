@@ -70,13 +70,13 @@ class BrokerRegistry:
             "priority": 1,
         },
         "skillmeat": {
-            "enabled": False,
+            "enabled": True,
             "endpoint": "https://marketplace.skillmeat.dev/api",
             "description": "Official SkillMeat marketplace",
             "priority": 2,
         },
         "claudehub": {
-            "enabled": False,
+            "enabled": True,
             "endpoint": "https://claude.ai/marketplace/api",
             "description": "Claude Hub public catalogs (read-only)",
             "priority": 3,

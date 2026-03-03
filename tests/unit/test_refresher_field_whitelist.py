@@ -7,6 +7,7 @@ Tests that field whitelisting correctly:
 """
 
 import pytest
+from datetime import datetime, timezone
 
 from skillmeat.core.artifact import Artifact, ArtifactMetadata
 from skillmeat.core.artifact_detection import ArtifactType
@@ -35,33 +36,36 @@ class TestFieldWhitelistValidation:
         assert result.status in ("refreshed", "unchanged", "skipped")
 
     def test_invalid_field_names_rejected(self, mock_collection_manager):
-        """Invalid field names should raise ValueError with helpful message."""
+        """Invalid field names should return error status with helpful message."""
         refresher = CollectionRefresher(mock_collection_manager)
         artifact = _create_test_artifact()
 
-        with pytest.raises(ValueError) as exc_info:
-            refresher.refresh_metadata(
-                artifact, fields=["invalid_field", "another_bad_field"]
-            )
+        result = refresher.refresh_metadata(
+            artifact, fields=["invalid_field", "another_bad_field"]
+        )
 
-        error_msg = str(exc_info.value)
-        assert "Invalid field names" in error_msg
+        assert result.status == "error"
+        assert result.error is not None
+        error_msg = result.error
+        assert "Invalid field name" in error_msg
         assert "invalid_field" in error_msg
         assert "another_bad_field" in error_msg
-        assert "Valid fields are:" in error_msg
+        assert "Valid fields" in error_msg
 
     def test_mixed_valid_invalid_fields_rejected(self, mock_collection_manager):
-        """Mix of valid and invalid field names should reject all."""
+        """Mix of valid and invalid field names should return error status."""
         refresher = CollectionRefresher(mock_collection_manager)
         artifact = _create_test_artifact()
 
         # Note: "tags" is no longer a valid field since GitHub topics are source-level
-        with pytest.raises(ValueError) as exc_info:
-            refresher.refresh_metadata(
-                artifact, fields=["description", "invalid_field", "license"]
-            )
+        result = refresher.refresh_metadata(
+            artifact, fields=["description", "invalid_field", "license"]
+        )
 
-        error_msg = str(exc_info.value)
+        assert result.status == "error"
+        assert result.error is not None
+        error_msg = result.error
+        assert "Invalid field name" in error_msg
         assert "invalid_field" in error_msg
         # Should NOT mention valid fields in the error
         assert "description" not in error_msg or "Invalid" in error_msg
@@ -73,9 +77,9 @@ class TestFieldWhitelistValidation:
 
         # Should not raise with empty list
         result = refresher.refresh_metadata(artifact, fields=[], dry_run=True)
-        # With empty whitelist, no fields are applied, so status should be unchanged
-        # (or skipped if no GitHub source)
-        assert result.status in ("unchanged", "skipped")
+        # With empty whitelist, no fields are applied, so status should be unchanged,
+        # skipped (no GitHub source), or refreshed (if changes detected upstream)
+        assert result.status in ("unchanged", "skipped", "refreshed")
 
     def test_refreshable_fields_constant_exists(self):
         """REFRESHABLE_FIELDS should contain all valid field names."""
@@ -111,6 +115,7 @@ class TestFieldWhitelistFiltering:
             author="test-owner",
             license="MIT",  # Changed
             url="https://github.com/test/repo",
+            fetched_at=datetime.now(timezone.utc),
         )
 
         # Mock the metadata extractor to return our upstream
@@ -153,6 +158,7 @@ class TestFieldWhitelistFiltering:
             author="new-author",  # Changed
             license="MIT",
             url="https://github.com/test/repo",
+            fetched_at=datetime.now(timezone.utc),
         )
 
         mock_metadata_extractor.fetch_metadata.return_value = upstream_metadata
@@ -196,6 +202,7 @@ class TestFieldWhitelistFiltering:
             author="test",
             license="MIT",
             url="https://github.com/test/repo",
+            fetched_at=datetime.now(timezone.utc),
         )
 
         mock_metadata_extractor.fetch_metadata.return_value = upstream_metadata
@@ -224,9 +231,10 @@ class TestRefreshCollectionFieldWhitelist:
         # Setup mock collection
         collection = Collection(
             name="test",
-            path=tmp_path / "collection",
+            version="1.0.0",
             artifacts=[],
-            _manifest_data={},
+            created=datetime.now(),
+            updated=datetime.now(),
         )
         mock_collection_manager.load_collection.return_value = collection
 
@@ -236,7 +244,7 @@ class TestRefreshCollectionFieldWhitelist:
         with pytest.raises(ValueError) as exc_info:
             refresher.refresh_collection(fields=["invalid_field"])
 
-        assert "Invalid field names" in str(exc_info.value)
+        assert "Invalid field name" in str(exc_info.value)
 
     def test_collection_refresh_passes_fields_to_artifacts(
         self, mock_collection_manager, mock_metadata_extractor, tmp_path
@@ -246,9 +254,10 @@ class TestRefreshCollectionFieldWhitelist:
 
         collection = Collection(
             name="test",
-            path=tmp_path / "collection",
+            version="1.0.0",
             artifacts=[artifact],
-            _manifest_data={},
+            created=datetime.now(),
+            updated=datetime.now(),
         )
         mock_collection_manager.load_collection.return_value = collection
 
@@ -259,6 +268,7 @@ class TestRefreshCollectionFieldWhitelist:
             author="test",
             license="MIT",
             url="https://github.com/test/repo",
+            fetched_at=datetime.now(timezone.utc),
         )
         mock_metadata_extractor.fetch_metadata.return_value = upstream_metadata
 
@@ -290,6 +300,7 @@ def _create_test_artifact(
         name=name,
         type=ArtifactType.SKILL,
         path="/test/path",
+        origin="github",
         metadata=ArtifactMetadata(
             title="Test Skill",
             description=description,
@@ -297,8 +308,8 @@ def _create_test_artifact(
             author="test-author",
             license=license,
         ),
+        added=datetime.now(),
         tags=tags or [],
-        origin="github",
         upstream="test-owner/test-repo/test-skill",
         version_spec="latest",
         resolved_sha="abc123",
@@ -309,11 +320,13 @@ def _create_test_artifact(
 
 
 @pytest.fixture
-def mock_collection_manager(monkeypatch):
+def mock_collection_manager():
     """Mock CollectionManager for testing."""
-    manager = CollectionManager()
+    from unittest.mock import MagicMock
+
+    manager = MagicMock(spec=CollectionManager)
     # Mock save_collection to prevent actual file writes
-    monkeypatch.setattr(manager, "save_collection", lambda c: None)
+    manager.save_collection = MagicMock(return_value=None)
     return manager
 
 

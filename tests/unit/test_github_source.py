@@ -158,7 +158,7 @@ class TestGitHubSource:
 
     @patch("skillmeat.sources.github.GitHubClient.resolve_version")
     @patch("skillmeat.sources.github.GitHubClient.clone_repo")
-    @patch("skillmeat.sources.github.ArtifactValidator.validate")
+    @patch("skillmeat.utils.validator.ArtifactValidator.validate")
     @patch("skillmeat.sources.github.extract_artifact_metadata")
     def test_fetch_skill(
         self, mock_extract, mock_validate, mock_clone, mock_resolve, tmp_path
@@ -190,7 +190,7 @@ class TestGitHubSource:
 
     @patch("skillmeat.sources.github.GitHubClient.resolve_version")
     @patch("skillmeat.sources.github.GitHubClient.clone_repo")
-    @patch("skillmeat.sources.github.ArtifactValidator.validate")
+    @patch("skillmeat.utils.validator.ArtifactValidator.validate")
     def test_fetch_invalid_artifact(
         self, mock_validate, mock_clone, mock_resolve, tmp_path
     ):
@@ -298,7 +298,7 @@ class TestGitHubSource:
 
         assert update_info is None
 
-    @patch("skillmeat.sources.github.ArtifactValidator.validate")
+    @patch("skillmeat.utils.validator.ArtifactValidator.validate")
     def test_validate(self, mock_validator, tmp_path):
         """Test validation."""
         mock_validator.return_value = Mock(is_valid=True)

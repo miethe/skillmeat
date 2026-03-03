@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List
 
 from skillmeat.utils.metadata import extract_artifact_metadata, find_metadata_file
+from skillmeat.core.artifact_detection import ArtifactType
 
 
 class TestSearchPerformanceSimple:
@@ -19,21 +20,28 @@ class TestSearchPerformanceSimple:
         """Benchmark metadata extraction from all artifacts.
 
         Target: <3 seconds
+
+        Note: extract_artifact_metadata(path, artifact_type) requires both arguments.
+        The artifact type is determined from the metadata filename convention.
         """
-        # Get all metadata files
-        metadata_files = (
-            list(large_collection_500.rglob("*/SKILL.md")) +
-            list(large_collection_500.rglob("*/COMMAND.md")) +
-            list(large_collection_500.rglob("*/AGENT.md"))
-        )
+        # Get all metadata files paired with their artifact types
+        # extract_artifact_metadata(path, artifact_type) — both args required
+        metadata_file_pairs = []
+        for pattern, artifact_type in [
+            ("*/SKILL.md", ArtifactType.SKILL),
+            ("*/COMMAND.md", ArtifactType.COMMAND),
+            ("*/AGENT.md", ArtifactType.AGENT),
+        ]:
+            for f in large_collection_500.rglob(pattern):
+                metadata_file_pairs.append((f, artifact_type))
 
         # Run benchmark
         def extract_all_metadata():
             """Extract metadata from all artifacts."""
             metadata_list = []
-            for file in metadata_files:
+            for file, artifact_type in metadata_file_pairs:
                 try:
-                    metadata = extract_artifact_metadata(file)
+                    metadata = extract_artifact_metadata(file, artifact_type)
                     if metadata:
                         metadata_list.append(metadata)
                 except Exception:

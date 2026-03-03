@@ -288,6 +288,20 @@ class BaseRepository(Generic[T]):
         # Create engine
         self.engine = create_db_engine(self.db_path)
 
+        # Create a session factory bound to this repository's engine.  Using a
+        # per-instance factory avoids coupling to the module-level SessionLocal
+        # singleton, which is only initialised once at application startup and
+        # therefore points to the *default* database path regardless of the
+        # db_path passed here.  This is especially important for tests that spin
+        # up isolated temporary databases.
+        from sqlalchemy.orm import sessionmaker as _sessionmaker
+
+        self._session_factory = _sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=self.engine,
+        )
+
         # Create any missing base tables (backward compatibility)
         # Note: Alembic migrations run once at app startup via CacheManager
         create_tables(self.db_path)
@@ -300,7 +314,7 @@ class BaseRepository(Generic[T]):
         )
 
     def _get_session(self) -> Session:
-        """Create a new database session using the shared session factory.
+        """Create a new database session bound to this repository's engine.
 
         Returns:
             SQLAlchemy Session instance
@@ -309,9 +323,7 @@ class BaseRepository(Generic[T]):
             Sessions should be closed after use. Prefer using the
             transaction() context manager for automatic cleanup.
         """
-        from skillmeat.cache.models import get_session
-
-        return get_session(self.db_path)
+        return self._session_factory()
 
     @contextmanager
     def transaction(self) -> Generator[Session, None, None]:

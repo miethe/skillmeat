@@ -156,8 +156,8 @@ class TestSearchCommand:
                 )
                 mock_instance.search_collection.return_value = mock_result
 
-                # Execute with JSON flag
-                result = runner.invoke(main, ['search', 'test', '--json'])
+                # Execute with JSON format
+                result = runner.invoke(main, ['search', 'test', '--format', 'json'])
 
                 # Verify
                 assert result.exit_code == 0
@@ -402,11 +402,11 @@ class TestSearchProjectsCommand:
                 )
                 mock_instance.search_projects.return_value = mock_result
 
-                # Execute with JSON flag
+                # Execute with JSON format
                 result = runner.invoke(main, [
                     'search', 'test',
                     '--projects', str(project1),
-                    '--json'
+                    '--format', 'json'
                 ])
 
                 # Verify

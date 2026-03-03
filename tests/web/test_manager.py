@@ -59,7 +59,7 @@ class TestWebManager:
 
         assert manager.api_only is False
         assert manager.web_only is False
-        assert manager.api_port == 8000
+        assert manager.api_port == 8080
         assert manager.web_port == 3000
         assert manager.api_host == "127.0.0.1"
         assert isinstance(manager.processes, dict)
@@ -296,7 +296,7 @@ class TestWebManager:
         assert exit_code == 0
         mock_run.assert_called_once()
         call_args = mock_run.call_args
-        assert call_args[0][0] == ["pnpm", "build"]
+        assert call_args[0][0] == ["pnpm", "build:fresh"]
         assert call_args[1]["cwd"] == manager.web_dir
 
     def test_build_web_failure(self):

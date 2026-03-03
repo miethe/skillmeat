@@ -11,14 +11,37 @@ Tests the rollback support added in P3-004:
 import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock, call
+from datetime import datetime
 from skillmeat.core.sync import SyncManager
+from skillmeat.core.deployment import Deployment
 from skillmeat.models import (
     SyncResult,
     DriftDetectionResult,
-    DeploymentMetadata,
-    DeploymentRecord,
 )
 from skillmeat.storage.snapshot import Snapshot
+
+
+def _make_deployment(collection_name="test-collection"):
+    """Create a minimal Deployment object for tests."""
+    return Deployment(
+        artifact_name="skill1",
+        artifact_type="skill",
+        from_collection=collection_name,
+        deployed_at=datetime.now(),
+        artifact_path=Path("skills/skill1"),
+        content_hash="abc123",
+    )
+
+
+def _setup_collection_mgr(collection_path):
+    """Create a collection_mgr mock with load_collection and config.get_collection_path."""
+    collection_mgr = Mock()
+    collection = Mock()
+    collection.path = collection_path
+    collection_mgr.load_collection.return_value = collection
+    collection_mgr.config = Mock()
+    collection_mgr.config.get_collection_path.return_value = collection_path
+    return collection_mgr
 
 
 class TestSyncFromProjectWithRollback:
@@ -160,22 +183,12 @@ class TestSyncFromProjectWithRollback:
         project_path = tmp_path / "project"
         project_path.mkdir()
         (project_path / ".claude").mkdir()
-        metadata_path = project_path / ".claude" / ".skillmeat-deployed.toml"
-        metadata_path.write_text(
-            "[deployment]\n"
-            'collection = "test-collection"\n'
-            'deployed-at = "2024-01-01T00:00:00"\n'
-            'skillmeat-version = "0.1.0"\n'
-        )
 
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
 
         snapshot_mgr = Mock()
-        collection_mgr = Mock()
-        collection = Mock()
-        collection.path = collection_path
-        collection_mgr.get_collection.return_value = collection
+        collection_mgr = _setup_collection_mgr(collection_path)
 
         snapshot = Mock()
         snapshot.id = "snap123"
@@ -187,48 +200,40 @@ class TestSyncFromProjectWithRollback:
             snapshot_manager=snapshot_mgr,
         )
 
-        with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
-            mock_sync.return_value = SyncResult(
-                status="success",
-                message="Synced 1 artifact",
-                artifacts_synced=["skill1"],
-            )
+        deployment = _make_deployment("test-collection")
+        with patch.object(sync_mgr, '_load_deployment_metadata', return_value=[deployment]):
+            with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
+                mock_sync.return_value = SyncResult(
+                    status="success",
+                    message="Synced 1 artifact",
+                    artifacts_synced=["skill1"],
+                )
 
-            result = sync_mgr.sync_from_project_with_rollback(
-                project_path=project_path,
-                strategy="overwrite",
-            )
+                result = sync_mgr.sync_from_project_with_rollback(
+                    project_path=project_path,
+                    strategy="overwrite",
+                )
 
-            # Should create snapshot before sync
-            snapshot_mgr.create_snapshot.assert_called_once_with(
-                collection_path=collection_path,
-                collection_name="test-collection",
-                message="Pre-sync snapshot (automatic)",
-            )
-            assert mock_sync.called
-            assert result.status == "success"
+                # Should create snapshot before sync
+                snapshot_mgr.create_snapshot.assert_called_once_with(
+                    collection_path=collection_path,
+                    collection_name="test-collection",
+                    message="Pre-sync snapshot (automatic)",
+                )
+                assert mock_sync.called
+                assert result.status == "success"
 
     def test_rollback_snapshot_creation_failure_interactive(self, tmp_path):
         """Test rollback handles snapshot creation failure in interactive mode."""
         project_path = tmp_path / "project"
         project_path.mkdir()
         (project_path / ".claude").mkdir()
-        metadata_path = project_path / ".claude" / ".skillmeat-deployed.toml"
-        metadata_path.write_text(
-            "[deployment]\n"
-            'collection = "test-collection"\n'
-            'deployed-at = "2024-01-01T00:00:00"\n'
-            'skillmeat-version = "0.1.0"\n'
-        )
 
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
 
         snapshot_mgr = Mock()
-        collection_mgr = Mock()
-        collection = Mock()
-        collection.path = collection_path
-        collection_mgr.get_collection.return_value = collection
+        collection_mgr = _setup_collection_mgr(collection_path)
 
         # Snapshot creation fails
         snapshot_mgr.create_snapshot.side_effect = Exception("Disk full")
@@ -238,46 +243,38 @@ class TestSyncFromProjectWithRollback:
             snapshot_manager=snapshot_mgr,
         )
 
-        with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
-            mock_sync.return_value = SyncResult(
-                status="success",
-                message="Synced 1 artifact",
-                artifacts_synced=["skill1"],
-            )
-
-            # User confirms to proceed without snapshot
-            with patch('rich.prompt.Confirm.ask', return_value=True):
-                result = sync_mgr.sync_from_project_with_rollback(
-                    project_path=project_path,
-                    strategy="overwrite",
-                    interactive=True,
+        deployment = _make_deployment("test-collection")
+        with patch.object(sync_mgr, '_load_deployment_metadata', return_value=[deployment]):
+            with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
+                mock_sync.return_value = SyncResult(
+                    status="success",
+                    message="Synced 1 artifact",
+                    artifacts_synced=["skill1"],
                 )
 
-                # Should proceed with sync despite snapshot failure
-                assert mock_sync.called
-                assert result.status == "success"
+                # User confirms to proceed without snapshot
+                with patch('rich.prompt.Confirm.ask', return_value=True):
+                    result = sync_mgr.sync_from_project_with_rollback(
+                        project_path=project_path,
+                        strategy="overwrite",
+                        interactive=True,
+                    )
+
+                    # Should proceed with sync despite snapshot failure
+                    assert mock_sync.called
+                    assert result.status == "success"
 
     def test_rollback_snapshot_creation_failure_user_cancels(self, tmp_path):
         """Test rollback cancels when user declines to proceed without snapshot."""
         project_path = tmp_path / "project"
         project_path.mkdir()
         (project_path / ".claude").mkdir()
-        metadata_path = project_path / ".claude" / ".skillmeat-deployed.toml"
-        metadata_path.write_text(
-            "[deployment]\n"
-            'collection = "test-collection"\n'
-            'deployed-at = "2024-01-01T00:00:00"\n'
-            'skillmeat-version = "0.1.0"\n'
-        )
 
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
 
         snapshot_mgr = Mock()
-        collection_mgr = Mock()
-        collection = Mock()
-        collection.path = collection_path
-        collection_mgr.get_collection.return_value = collection
+        collection_mgr = _setup_collection_mgr(collection_path)
 
         # Snapshot creation fails
         snapshot_mgr.create_snapshot.side_effect = Exception("Disk full")
@@ -287,41 +284,33 @@ class TestSyncFromProjectWithRollback:
             snapshot_manager=snapshot_mgr,
         )
 
-        with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
-            # User declines to proceed
-            with patch('rich.prompt.Confirm.ask', return_value=False):
-                result = sync_mgr.sync_from_project_with_rollback(
-                    project_path=project_path,
-                    strategy="overwrite",
-                    interactive=True,
-                )
+        deployment = _make_deployment("test-collection")
+        with patch.object(sync_mgr, '_load_deployment_metadata', return_value=[deployment]):
+            with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
+                # User declines to proceed
+                with patch('rich.prompt.Confirm.ask', return_value=False):
+                    result = sync_mgr.sync_from_project_with_rollback(
+                        project_path=project_path,
+                        strategy="overwrite",
+                        interactive=True,
+                    )
 
-                # Should cancel sync
-                assert not mock_sync.called
-                assert result.status == "cancelled"
-                assert "snapshot creation failed" in result.message.lower()
+                    # Should cancel sync
+                    assert not mock_sync.called
+                    assert result.status == "cancelled"
+                    assert "snapshot creation failed" in result.message.lower()
 
     def test_rollback_on_sync_failure(self, tmp_path):
         """Test automatic rollback when sync fails."""
         project_path = tmp_path / "project"
         project_path.mkdir()
         (project_path / ".claude").mkdir()
-        metadata_path = project_path / ".claude" / ".skillmeat-deployed.toml"
-        metadata_path.write_text(
-            "[deployment]\n"
-            'collection = "test-collection"\n'
-            'deployed-at = "2024-01-01T00:00:00"\n'
-            'skillmeat-version = "0.1.0"\n'
-        )
 
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
 
         snapshot_mgr = Mock()
-        collection_mgr = Mock()
-        collection = Mock()
-        collection.path = collection_path
-        collection_mgr.get_collection.return_value = collection
+        collection_mgr = _setup_collection_mgr(collection_path)
 
         snapshot = Mock()
         snapshot.id = "snap123"
@@ -333,42 +322,34 @@ class TestSyncFromProjectWithRollback:
             snapshot_manager=snapshot_mgr,
         )
 
-        with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
-            # Sync fails
-            mock_sync.side_effect = Exception("Permission denied")
+        deployment = _make_deployment("test-collection")
+        with patch.object(sync_mgr, '_load_deployment_metadata', return_value=[deployment]):
+            with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
+                # Sync fails
+                mock_sync.side_effect = Exception("Permission denied")
 
-            with pytest.raises(ValueError, match="Sync failed and was rolled back"):
-                sync_mgr.sync_from_project_with_rollback(
-                    project_path=project_path,
-                    strategy="overwrite",
+                with pytest.raises(ValueError, match="Sync failed and was rolled back"):
+                    sync_mgr.sync_from_project_with_rollback(
+                        project_path=project_path,
+                        strategy="overwrite",
+                    )
+
+                # Should automatically restore snapshot
+                snapshot_mgr.restore_snapshot.assert_called_once_with(
+                    snapshot, collection_path
                 )
-
-            # Should automatically restore snapshot
-            snapshot_mgr.restore_snapshot.assert_called_once_with(
-                snapshot, collection_path
-            )
 
     def test_rollback_on_partial_success_user_accepts(self, tmp_path):
         """Test user-initiated rollback on partial success."""
         project_path = tmp_path / "project"
         project_path.mkdir()
         (project_path / ".claude").mkdir()
-        metadata_path = project_path / ".claude" / ".skillmeat-deployed.toml"
-        metadata_path.write_text(
-            "[deployment]\n"
-            'collection = "test-collection"\n'
-            'deployed-at = "2024-01-01T00:00:00"\n'
-            'skillmeat-version = "0.1.0"\n'
-        )
 
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
 
         snapshot_mgr = Mock()
-        collection_mgr = Mock()
-        collection = Mock()
-        collection.path = collection_path
-        collection_mgr.get_collection.return_value = collection
+        collection_mgr = _setup_collection_mgr(collection_path)
 
         snapshot = Mock()
         snapshot.id = "snap123"
@@ -380,51 +361,43 @@ class TestSyncFromProjectWithRollback:
             snapshot_manager=snapshot_mgr,
         )
 
-        with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
-            # Partial success with conflicts
-            mock_sync.return_value = SyncResult(
-                status="partial",
-                message="Synced 1 of 2 artifacts",
-                artifacts_synced=["skill1"],
-                conflicts=["skill2"],
-            )
-
-            # User chooses to rollback
-            with patch('rich.prompt.Confirm.ask', return_value=True):
-                result = sync_mgr.sync_from_project_with_rollback(
-                    project_path=project_path,
-                    strategy="overwrite",
-                    interactive=True,
+        deployment = _make_deployment("test-collection")
+        with patch.object(sync_mgr, '_load_deployment_metadata', return_value=[deployment]):
+            with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
+                # Partial success with conflicts
+                mock_sync.return_value = SyncResult(
+                    status="partial",
+                    message="Synced 1 of 2 artifacts",
+                    artifacts_synced=["skill1"],
+                    conflicts=["skill2"],
                 )
 
-                # Should rollback
-                snapshot_mgr.restore_snapshot.assert_called_once_with(
-                    snapshot, collection_path
-                )
-                assert result.status == "cancelled"
-                assert "conflicts" in result.message.lower()
+                # User chooses to rollback
+                with patch('rich.prompt.Confirm.ask', return_value=True):
+                    result = sync_mgr.sync_from_project_with_rollback(
+                        project_path=project_path,
+                        strategy="overwrite",
+                        interactive=True,
+                    )
+
+                    # Should rollback
+                    snapshot_mgr.restore_snapshot.assert_called_once_with(
+                        snapshot, collection_path
+                    )
+                    assert result.status == "cancelled"
+                    assert "conflicts" in result.message.lower()
 
     def test_rollback_on_partial_success_user_declines(self, tmp_path):
         """Test user declines rollback on partial success."""
         project_path = tmp_path / "project"
         project_path.mkdir()
         (project_path / ".claude").mkdir()
-        metadata_path = project_path / ".claude" / ".skillmeat-deployed.toml"
-        metadata_path.write_text(
-            "[deployment]\n"
-            'collection = "test-collection"\n'
-            'deployed-at = "2024-01-01T00:00:00"\n'
-            'skillmeat-version = "0.1.0"\n'
-        )
 
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
 
         snapshot_mgr = Mock()
-        collection_mgr = Mock()
-        collection = Mock()
-        collection.path = collection_path
-        collection_mgr.get_collection.return_value = collection
+        collection_mgr = _setup_collection_mgr(collection_path)
 
         snapshot = Mock()
         snapshot.id = "snap123"
@@ -436,48 +409,40 @@ class TestSyncFromProjectWithRollback:
             snapshot_manager=snapshot_mgr,
         )
 
-        with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
-            # Partial success with conflicts
-            mock_sync.return_value = SyncResult(
-                status="partial",
-                message="Synced 1 of 2 artifacts",
-                artifacts_synced=["skill1"],
-                conflicts=["skill2"],
-            )
-
-            # User declines rollback
-            with patch('rich.prompt.Confirm.ask', return_value=False):
-                result = sync_mgr.sync_from_project_with_rollback(
-                    project_path=project_path,
-                    strategy="overwrite",
-                    interactive=True,
+        deployment = _make_deployment("test-collection")
+        with patch.object(sync_mgr, '_load_deployment_metadata', return_value=[deployment]):
+            with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
+                # Partial success with conflicts
+                mock_sync.return_value = SyncResult(
+                    status="partial",
+                    message="Synced 1 of 2 artifacts",
+                    artifacts_synced=["skill1"],
+                    conflicts=["skill2"],
                 )
 
-                # Should not rollback
-                assert not snapshot_mgr.restore_snapshot.called
-                assert result.status == "partial"
+                # User declines rollback
+                with patch('rich.prompt.Confirm.ask', return_value=False):
+                    result = sync_mgr.sync_from_project_with_rollback(
+                        project_path=project_path,
+                        strategy="overwrite",
+                        interactive=True,
+                    )
+
+                    # Should not rollback
+                    assert not snapshot_mgr.restore_snapshot.called
+                    assert result.status == "partial"
 
     def test_rollback_failure_raises_error(self, tmp_path):
         """Test rollback failure raises error with both sync and rollback errors."""
         project_path = tmp_path / "project"
         project_path.mkdir()
         (project_path / ".claude").mkdir()
-        metadata_path = project_path / ".claude" / ".skillmeat-deployed.toml"
-        metadata_path.write_text(
-            "[deployment]\n"
-            'collection = "test-collection"\n'
-            'deployed-at = "2024-01-01T00:00:00"\n'
-            'skillmeat-version = "0.1.0"\n'
-        )
 
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
 
         snapshot_mgr = Mock()
-        collection_mgr = Mock()
-        collection = Mock()
-        collection.path = collection_path
-        collection_mgr.get_collection.return_value = collection
+        collection_mgr = _setup_collection_mgr(collection_path)
 
         snapshot = Mock()
         snapshot.id = "snap123"
@@ -492,42 +457,34 @@ class TestSyncFromProjectWithRollback:
             snapshot_manager=snapshot_mgr,
         )
 
-        with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
-            # Sync fails
-            mock_sync.side_effect = Exception("Permission denied")
+        deployment = _make_deployment("test-collection")
+        with patch.object(sync_mgr, '_load_deployment_metadata', return_value=[deployment]):
+            with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
+                # Sync fails
+                mock_sync.side_effect = Exception("Permission denied")
 
-            with pytest.raises(ValueError) as exc_info:
-                sync_mgr.sync_from_project_with_rollback(
-                    project_path=project_path,
-                    strategy="overwrite",
-                )
+                with pytest.raises(ValueError) as exc_info:
+                    sync_mgr.sync_from_project_with_rollback(
+                        project_path=project_path,
+                        strategy="overwrite",
+                    )
 
-            # Should mention both errors
-            error_msg = str(exc_info.value)
-            assert "sync failed" in error_msg.lower()
-            assert "rollback" in error_msg.lower()
+                # Should mention both errors
+                error_msg = str(exc_info.value)
+                assert "sync failed" in error_msg.lower()
+                assert "rollback" in error_msg.lower()
 
     def test_rollback_non_interactive_mode(self, tmp_path):
         """Test rollback in non-interactive mode (no user prompts)."""
         project_path = tmp_path / "project"
         project_path.mkdir()
         (project_path / ".claude").mkdir()
-        metadata_path = project_path / ".claude" / ".skillmeat-deployed.toml"
-        metadata_path.write_text(
-            "[deployment]\n"
-            'collection = "test-collection"\n'
-            'deployed-at = "2024-01-01T00:00:00"\n'
-            'skillmeat-version = "0.1.0"\n'
-        )
 
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
 
         snapshot_mgr = Mock()
-        collection_mgr = Mock()
-        collection = Mock()
-        collection.path = collection_path
-        collection_mgr.get_collection.return_value = collection
+        collection_mgr = _setup_collection_mgr(collection_path)
 
         snapshot = Mock()
         snapshot.id = "snap123"
@@ -539,46 +496,38 @@ class TestSyncFromProjectWithRollback:
             snapshot_manager=snapshot_mgr,
         )
 
-        with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
-            # Partial success
-            mock_sync.return_value = SyncResult(
-                status="partial",
-                message="Synced 1 of 2 artifacts",
-                artifacts_synced=["skill1"],
-                conflicts=["skill2"],
-            )
+        deployment = _make_deployment("test-collection")
+        with patch.object(sync_mgr, '_load_deployment_metadata', return_value=[deployment]):
+            with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
+                # Partial success
+                mock_sync.return_value = SyncResult(
+                    status="partial",
+                    message="Synced 1 of 2 artifacts",
+                    artifacts_synced=["skill1"],
+                    conflicts=["skill2"],
+                )
 
-            result = sync_mgr.sync_from_project_with_rollback(
-                project_path=project_path,
-                strategy="overwrite",
-                interactive=False,  # Non-interactive
-            )
+                result = sync_mgr.sync_from_project_with_rollback(
+                    project_path=project_path,
+                    strategy="overwrite",
+                    interactive=False,  # Non-interactive
+                )
 
-            # Should not prompt for rollback, just return partial result
-            assert result.status == "partial"
-            assert not snapshot_mgr.restore_snapshot.called
+                # Should not prompt for rollback, just return partial result
+                assert result.status == "partial"
+                assert not snapshot_mgr.restore_snapshot.called
 
     def test_rollback_success_no_rollback_needed(self, tmp_path):
         """Test successful sync with no rollback needed."""
         project_path = tmp_path / "project"
         project_path.mkdir()
         (project_path / ".claude").mkdir()
-        metadata_path = project_path / ".claude" / ".skillmeat-deployed.toml"
-        metadata_path.write_text(
-            "[deployment]\n"
-            'collection = "test-collection"\n'
-            'deployed-at = "2024-01-01T00:00:00"\n'
-            'skillmeat-version = "0.1.0"\n'
-        )
 
         collection_path = tmp_path / "collection"
         collection_path.mkdir()
 
         snapshot_mgr = Mock()
-        collection_mgr = Mock()
-        collection = Mock()
-        collection.path = collection_path
-        collection_mgr.get_collection.return_value = collection
+        collection_mgr = _setup_collection_mgr(collection_path)
 
         snapshot = Mock()
         snapshot.id = "snap123"
@@ -590,18 +539,20 @@ class TestSyncFromProjectWithRollback:
             snapshot_manager=snapshot_mgr,
         )
 
-        with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
-            mock_sync.return_value = SyncResult(
-                status="success",
-                message="Synced 3 artifacts",
-                artifacts_synced=["skill1", "skill2", "skill3"],
-            )
+        deployment = _make_deployment("test-collection")
+        with patch.object(sync_mgr, '_load_deployment_metadata', return_value=[deployment]):
+            with patch.object(sync_mgr, 'sync_from_project') as mock_sync:
+                mock_sync.return_value = SyncResult(
+                    status="success",
+                    message="Synced 3 artifacts",
+                    artifacts_synced=["skill1", "skill2", "skill3"],
+                )
 
-            result = sync_mgr.sync_from_project_with_rollback(
-                project_path=project_path,
-                strategy="overwrite",
-            )
+                result = sync_mgr.sync_from_project_with_rollback(
+                    project_path=project_path,
+                    strategy="overwrite",
+                )
 
-            # Should not rollback on success
-            assert not snapshot_mgr.restore_snapshot.called
-            assert result.status == "success"
+                # Should not rollback on success
+                assert not snapshot_mgr.restore_snapshot.called
+                assert result.status == "success"

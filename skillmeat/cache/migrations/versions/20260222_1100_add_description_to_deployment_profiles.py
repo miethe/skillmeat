@@ -24,6 +24,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect as sa_inspect
 
 
 # revision identifiers, used by Alembic.
@@ -40,9 +41,16 @@ def upgrade() -> None:
 
     The column is nullable so that existing rows are unaffected and the
     migration can be applied without a data backfill step.
+
+    Idempotent: skips the ALTER TABLE if the column already exists (e.g.,
+    when Base.metadata.create_all() was called before Alembic migrations ran).
     """
-    with op.batch_alter_table("deployment_profiles") as batch_op:
-        batch_op.add_column(sa.Column("description", sa.Text(), nullable=True))
+    bind = op.get_bind()
+    inspector = sa_inspect(bind)
+    existing_columns = [col["name"] for col in inspector.get_columns("deployment_profiles")]
+    if "description" not in existing_columns:
+        with op.batch_alter_table("deployment_profiles") as batch_op:
+            batch_op.add_column(sa.Column("description", sa.Text(), nullable=True))
 
 
 def downgrade() -> None:

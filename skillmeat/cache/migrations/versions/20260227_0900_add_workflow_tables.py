@@ -120,6 +120,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect as sa_inspect
 
 
 # revision identifiers, used by Alembic.
@@ -136,7 +137,19 @@ def upgrade() -> None:
     deps), workflow_stages next (references workflows), workflow_executions
     third (references workflows), and execution_steps last (references
     workflow_executions).
+
+    Idempotent: skips table creation if tables already exist (e.g., created
+    via Base.metadata.create_all() before Alembic migrations ran).
     """
+    bind = op.get_bind()
+    inspector = sa_inspect(bind)
+    existing_tables = inspector.get_table_names()
+
+    if "workflows" in existing_tables:
+        # All four tables are created together — if the anchor table already
+        # exists then all of them do; skip the entire upgrade body.
+        return
+
     # -------------------------------------------------------------------------
     # 1. workflows
     # -------------------------------------------------------------------------
@@ -227,6 +240,10 @@ def upgrade() -> None:
             "status IN ('draft', 'published', 'archived')",
             name="check_workflow_status",
         ),
+        # Unique constraint: workflow names must be globally unique.
+        # Declared inside create_table (not via ALTER TABLE) for SQLite
+        # compatibility — SQLite does not support ADD CONSTRAINT after creation.
+        sa.UniqueConstraint("name", name="uq_workflow_name"),
     )
 
     # Indexes on workflows
@@ -655,45 +672,46 @@ def upgrade() -> None:
         ["execution_id", "stage_id_ref"],
     )
 
-    # -------------------------------------------------------------------------
-    # Unique constraint — workflow names must be globally unique
-    # -------------------------------------------------------------------------
-    op.create_unique_constraint("uq_workflow_name", "workflows", ["name"])
-
-
 def downgrade() -> None:
     """Drop execution_steps, workflow_executions, workflow_stages, workflows.
 
     Tables are dropped in strict reverse dependency order to satisfy FK
     constraints.  All workflow definitions, stage records, execution history,
     and step detail will be permanently lost.
+
+    Handles the case where tables were pre-created by Base.metadata.create_all()
+    and therefore may not have the Alembic-managed named indexes.
     """
-    # Drop additional composite indexes and unique constraint (reverse order)
-    op.drop_constraint("uq_workflow_name", "workflows", type_="unique")
-    op.drop_index("idx_execution_steps_stage_ref", "execution_steps")
-    op.drop_index("idx_execution_steps_execution_status", "execution_steps")
-    op.drop_index("idx_workflow_executions_status_updated", "workflow_executions")
-    op.drop_index("idx_workflow_executions_workflow_status", "workflow_executions")
-    op.drop_index("idx_workflow_stages_workflow_stage_ref", "workflow_stages")
+    from sqlalchemy import text as sa_text
 
-    # Drop leaf table first (FK references workflow_executions)
-    op.drop_index("idx_execution_steps_stage_id_ref", "execution_steps")
-    op.drop_index("idx_execution_steps_execution_id", "execution_steps")
-    op.drop_table("execution_steps")
+    bind = op.get_bind()
+    inspector = sa_inspect(bind)
+    existing_tables = inspector.get_table_names()
 
-    # Drop execution table (FK references workflows)
-    op.drop_index("idx_workflow_executions_trigger", "workflow_executions")
-    op.drop_index("idx_workflow_executions_status", "workflow_executions")
-    op.drop_index("idx_workflow_executions_workflow_id", "workflow_executions")
-    op.drop_table("workflow_executions")
+    if "execution_steps" in existing_tables:
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_execution_steps_stage_ref"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_execution_steps_execution_status"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflow_executions_status_updated"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflow_executions_workflow_status"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflow_stages_workflow_stage_ref"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_execution_steps_stage_id_ref"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_execution_steps_execution_id"))
+        op.drop_table("execution_steps")
 
-    # Drop stage table (FK references workflows)
-    op.drop_index("idx_workflow_stages_stage_id_ref", "workflow_stages")
-    op.drop_index("idx_workflow_stages_workflow_id", "workflow_stages")
-    op.drop_table("workflow_stages")
+    if "workflow_executions" in existing_tables:
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflow_executions_trigger"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflow_executions_status"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflow_executions_workflow_id"))
+        op.drop_table("workflow_executions")
 
-    # Drop root table last
-    op.drop_index("idx_workflows_definition_hash", "workflows")
-    op.drop_index("idx_workflows_status", "workflows")
-    op.drop_index("idx_workflows_name", "workflows")
-    op.drop_table("workflows")
+    if "workflow_stages" in existing_tables:
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflow_stages_stage_id_ref"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflow_stages_workflow_id"))
+        op.drop_table("workflow_stages")
+
+    if "workflows" in existing_tables:
+        bind.execute(sa_text("DROP INDEX IF EXISTS uq_workflow_name"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflows_definition_hash"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflows_status"))
+        bind.execute(sa_text("DROP INDEX IF EXISTS idx_workflows_name"))
+        op.drop_table("workflows")

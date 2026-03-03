@@ -198,59 +198,28 @@ It should still work and extract the description from the content.
 class TestGitHubSourceIntegration:
     """Integration tests for GitHubSource (with mocking)."""
 
-    @patch("skillmeat.sources.github.subprocess.run")
-    @patch("skillmeat.sources.github.requests.Session.get")
-    def test_fetch_workflow(self, mock_get, mock_subprocess, tmp_path):
-        """Test complete fetch workflow with mocked GitHub."""
-        # Mock API responses
-        repo_response = type(
-            "MockResponse",
-            (),
-            {
-                "json": lambda self: {"default_branch": "main"},
-                "raise_for_status": lambda self: None,
-            },
-        )()
+    def test_fetch_workflow(self, tmp_path):
+        """Test complete fetch workflow with mocked GitHub client."""
+        from skillmeat.sources.base import FetchResult
+        from skillmeat.core.artifact import ArtifactMetadata
 
-        commit_response = type(
-            "MockResponse",
-            (),
-            {
-                "json": lambda self: {"sha": "abc123def456"},
-                "raise_for_status": lambda self: None,
-            },
-        )()
+        # Create a fake artifact directory for the fetch result
+        artifact_dir = tmp_path / "python-skill"
+        artifact_dir.mkdir()
+        (artifact_dir / "SKILL.md").write_text("# Python Skill")
 
-        mock_get.side_effect = [repo_response, commit_response]
+        fake_result = FetchResult(
+            artifact_path=artifact_dir,
+            metadata=ArtifactMetadata(title="Python Skill"),
+            resolved_sha="abc123def456",
+            resolved_version=None,
+            upstream_url="https://github.com/anthropics/skills/tree/abc123def456/python-skill",
+        )
 
-        # Mock git commands
-        def subprocess_side_effect(*args, **kwargs):
-            cmd = args[0]
-            if cmd[0] == "git" and cmd[1] == "clone":
-                # Create fake repo with skill
-                dest = Path(cmd[-1])
-                dest.mkdir(parents=True, exist_ok=True)
-                skill_dir = dest / "python-skill"
-                skill_dir.mkdir()
-                (skill_dir / "SKILL.md").write_text("# Python Skill")
-                return type("Result", (), {"returncode": 0, "stderr": ""})()
-            elif cmd[0] == "git" and "rev-parse" in cmd:
-                return type(
-                    "Result",
-                    (),
-                    {"returncode": 0, "stdout": "abc123def456\n", "stderr": ""},
-                )()
-            elif cmd[0] == "git" and "checkout" in cmd:
-                return type("Result", (), {"returncode": 0, "stderr": ""})()
-            elif cmd[0] == "git" and "fetch" in cmd:
-                return type("Result", (), {"returncode": 0, "stderr": ""})()
-            return type("Result", (), {"returncode": 0, "stderr": ""})()
-
-        mock_subprocess.side_effect = subprocess_side_effect
-
-        # Test fetch
         source = GitHubSource()
-        result = source.fetch("anthropics/skills/python-skill", ArtifactType.SKILL)
+        # Mock the underlying client.fetch_artifact to avoid real network/git calls
+        with patch.object(source.client, "fetch_artifact", return_value=fake_result):
+            result = source.fetch("anthropics/skills/python-skill", ArtifactType.SKILL)
 
         assert result.resolved_sha == "abc123def456"
         assert result.upstream_url is not None

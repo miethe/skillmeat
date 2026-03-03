@@ -31,10 +31,14 @@ class TestMergeEngineErrorHandling:
         local = tmp_path / "local"
         remote = tmp_path / "remote"
 
-        # Create valid base, local, remote
-        for path in [base, local, remote]:
-            path.mkdir()
-            (path / "file.txt").write_text("content")
+        # Create valid base, local, remote with distinct content so the diff
+        # engine has files to process (identical content → zero diff items)
+        base.mkdir()
+        (base / "file.txt").write_text("base content")
+        local.mkdir()
+        (local / "file.txt").write_text("local modified content")
+        remote.mkdir()
+        (remote / "file.txt").write_text("base content")
 
         # Create read-only parent directory
         readonly_parent = tmp_path / "readonly"
