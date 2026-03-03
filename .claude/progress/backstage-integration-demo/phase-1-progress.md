@@ -8,7 +8,7 @@ prd_ref: docs/project_plans/PRDs/integrations/backstage-integration-demo.md
 plan_ref: null
 phase: 1
 title: SAM Backend API
-status: pending
+status: completed
 started: null
 completed: null
 commit_refs: []
@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 4
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -67,7 +67,7 @@ tasks:
 - id: TASK-1.5
   description: Unit and integration tests for both IDP endpoints (authenticated/unauthenticated,
     valid/invalid target_id, idempotent register)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -113,7 +113,7 @@ files_modified:
 - skillmeat/api/schemas/idp_integration.py
 - skillmeat/api/server.py
 updated: '2026-03-03'
-progress: 80
+progress: 100
 ---
 
 # backstage-integration-demo - Phase 1: SAM Backend API
