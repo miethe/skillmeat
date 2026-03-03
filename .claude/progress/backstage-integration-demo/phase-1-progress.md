@@ -2,95 +2,118 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "backstage-integration-demo"
-feature_slug: "backstage-integration-demo"
-prd_ref: "docs/project_plans/PRDs/integrations/backstage-integration-demo.md"
+prd: backstage-integration-demo
+feature_slug: backstage-integration-demo
+prd_ref: docs/project_plans/PRDs/integrations/backstage-integration-demo.md
 plan_ref: null
 phase: 1
-title: "SAM Backend API"
-status: "planning"
+title: SAM Backend API
+status: pending
 started: null
 completed: null
 commit_refs: []
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
-contributors: ["code-reviewer"]
-
+owners:
+- python-backend-engineer
+contributors:
+- code-reviewer
 tasks:
-  - id: "TASK-1.1"
-    description: "Add render_in_memory(target_id, variables) method to TemplateService — returns list[RenderedFile] without writing to disk"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "4h"
-    priority: "high"
-
-  - id: "TASK-1.2"
-    description: "Add remote_git platform type to DeploymentProfile; add remote_url field to DeploymentSet model"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-1.3"
-    description: "Create Pydantic schemas in skillmeat/api/schemas/idp_integration.py (IDPScaffoldRequest, IDPScaffoldResponse, IDPRegisterDeploymentRequest, IDPRegisterDeploymentResponse)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "high"
-
-  - id: "TASK-1.4"
-    description: "Create skillmeat/api/routers/idp_integration.py with POST /scaffold and POST /register-deployment endpoints; register in server.py"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1", "TASK-1.2", "TASK-1.3"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "TASK-1.5"
-    description: "Unit and integration tests for both IDP endpoints (authenticated/unauthenticated, valid/invalid target_id, idempotent register)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.4"]
-    estimated_effort: "3h"
-    priority: "high"
-
+- id: TASK-1.1
+  description: Add render_in_memory(target_id, variables) method to TemplateService
+    — returns list[RenderedFile] without writing to disk
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 4h
+  priority: high
+- id: TASK-1.2
+  description: Add remote_git platform type to DeploymentProfile; add remote_url field
+    to DeploymentSet model
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+- id: TASK-1.3
+  description: Create Pydantic schemas in skillmeat/api/schemas/idp_integration.py
+    (IDPScaffoldRequest, IDPScaffoldResponse, IDPRegisterDeploymentRequest, IDPRegisterDeploymentResponse)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1h
+  priority: high
+- id: TASK-1.4
+  description: Create skillmeat/api/routers/idp_integration.py with POST /scaffold
+    and POST /register-deployment endpoints; register in server.py
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  - TASK-1.2
+  - TASK-1.3
+  estimated_effort: 3h
+  priority: high
+- id: TASK-1.5
+  description: Unit and integration tests for both IDP endpoints (authenticated/unauthenticated,
+    valid/invalid target_id, idempotent register)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.4
+  estimated_effort: 3h
+  priority: high
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.2", "TASK-1.3"]
-  batch_2: ["TASK-1.4"]
-  batch_3: ["TASK-1.5"]
-  critical_path: ["TASK-1.1", "TASK-1.4", "TASK-1.5"]
-  estimated_total_time: "10h"
-
+  batch_1:
+  - TASK-1.1
+  - TASK-1.2
+  - TASK-1.3
+  batch_2:
+  - TASK-1.4
+  batch_3:
+  - TASK-1.5
+  critical_path:
+  - TASK-1.1
+  - TASK-1.4
+  - TASK-1.5
+  estimated_total_time: 10h
 blockers: []
-
 success_criteria:
-  - { id: "SC-1", description: "POST /idp/scaffold returns Base64-encoded file tree for valid composite", status: "pending" }
-  - { id: "SC-2", description: "POST /idp/register-deployment creates DeploymentSet record", status: "pending" }
-  - { id: "SC-3", description: "Idempotent register-deployment updates instead of duplicating", status: "pending" }
-  - { id: "SC-4", description: "401 returned without bearer token", status: "pending" }
-  - { id: "SC-5", description: "All existing deployment tests still pass", status: "pending" }
-
-files_modified: [
-  "skillmeat/core/services/template_service.py",
-  "skillmeat/core/deployment.py",
-  "skillmeat/cache/models.py",
-  "skillmeat/api/routers/idp_integration.py",
-  "skillmeat/api/schemas/idp_integration.py",
-  "skillmeat/api/server.py"
-]
+- id: SC-1
+  description: POST /idp/scaffold returns Base64-encoded file tree for valid composite
+  status: pending
+- id: SC-2
+  description: POST /idp/register-deployment creates DeploymentSet record
+  status: pending
+- id: SC-3
+  description: Idempotent register-deployment updates instead of duplicating
+  status: pending
+- id: SC-4
+  description: 401 returned without bearer token
+  status: pending
+- id: SC-5
+  description: All existing deployment tests still pass
+  status: pending
+files_modified:
+- skillmeat/core/services/template_service.py
+- skillmeat/core/deployment.py
+- skillmeat/cache/models.py
+- skillmeat/api/routers/idp_integration.py
+- skillmeat/api/schemas/idp_integration.py
+- skillmeat/api/server.py
+updated: '2026-03-03'
+progress: 60
 ---
 
 # backstage-integration-demo - Phase 1: SAM Backend API

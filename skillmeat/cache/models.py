@@ -473,7 +473,7 @@ class DeploymentProfile(Base):
             unique=True,
         ),
         CheckConstraint(
-            "platform IN ('claude_code', 'codex', 'gemini', 'cursor', 'other')",
+            "platform IN ('claude_code', 'codex', 'gemini', 'cursor', 'remote_git', 'other')",
             name="ck_deployment_profiles_platform",
         ),
     )
@@ -3301,6 +3301,12 @@ class DeploymentSet(Base):
         icon: Optional icon identifier string (e.g. ``"layers"``), max 64 chars
         tags_json: JSON-serialized list of tag strings, default ``"[]"``
         owner_id: Owning user / identity scope (required)
+        remote_url: Remote Git repository URL; populated when platform is
+            ``"remote_git"`` (e.g. Backstage / IDP deployments). ``None``
+            for all local deployment sets.
+        provisioned_by: Audit field identifying the provisioning agent or
+            system (e.g. ``"idp"``, ``"backstage"``). ``None`` for sets
+            created through standard local workflows.
         created_at: UTC timestamp when the set was created
         updated_at: UTC timestamp on last modification (auto-refreshed)
         members: Ordered list of ``DeploymentSetMember`` children
@@ -3332,6 +3338,20 @@ class DeploymentSet(Base):
 
     # Ownership
     owner_id: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Remote deployment fields (populated when platform="remote_git")
+    remote_url: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        default=None,
+        comment="Remote Git repository URL for remote_git platform deployments",
+    )
+    provisioned_by: Mapped[Optional[str]] = mapped_column(
+        String(128),
+        nullable=True,
+        default=None,
+        comment="Audit field: provisioning agent/system (e.g. 'idp', 'backstage')",
+    )
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -3384,6 +3404,8 @@ class DeploymentSet(Base):
             "description": self.description,
             "tags": self.get_tags(),
             "owner_id": self.owner_id,
+            "remote_url": self.remote_url,
+            "provisioned_by": self.provisioned_by,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "members": [m.to_dict() for m in self.members],

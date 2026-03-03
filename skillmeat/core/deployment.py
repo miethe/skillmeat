@@ -242,6 +242,7 @@ class DeploymentManager:
             "codex": Platform.CODEX,
             "gemini": Platform.GEMINI,
             "cursor": Platform.CURSOR,
+            "remote_git": Platform.REMOTE_GIT,
         }
         platform = platform_map.get(profile_id, Platform.OTHER)
         root_dir = (
@@ -250,6 +251,7 @@ class DeploymentManager:
                 "codex": ".codex",
                 "gemini": ".gemini",
                 "cursor": ".cursor",
+                # remote_git: no local root dir — use profile_id as sentinel
             }.get(profile_id)
             or f".{profile_id}"
         )

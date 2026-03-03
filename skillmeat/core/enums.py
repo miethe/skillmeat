@@ -36,6 +36,7 @@ class Platform(str, Enum):
         CODEX: OpenAI Codex CLI and integrations
         GEMINI: Google Gemini CLI and integrations
         CURSOR: Cursor AI editor
+        REMOTE_GIT: Remote Git repository (e.g. Backstage / IDP deployments)
         OTHER: Other platforms or unspecified
 
     Example:
@@ -45,12 +46,15 @@ class Platform(str, Enum):
         True
         >>> str(Platform.CURSOR)
         'cursor'
+        >>> Platform.REMOTE_GIT.value
+        'remote_git'
     """
 
     CLAUDE_CODE = "claude_code"
     CODEX = "codex"
     GEMINI = "gemini"
     CURSOR = "cursor"
+    REMOTE_GIT = "remote_git"
     OTHER = "other"
 
 
