@@ -4389,6 +4389,51 @@ async def import_artifacts(
             f"with full metadata"
         )
 
+        # Sync SKIPPED artifacts to the database cache.
+        #
+        # When conflict_strategy is "skip" (the default), ImportCoordinator marks
+        # entries as SKIPPED because the artifact already exists on the filesystem.
+        # However, those artifacts still need a CollectionArtifact DB row so that
+        # the frontend (which reads from the DB cache, not the filesystem) can see
+        # them.  We call populate_collection_artifact_from_import() for each
+        # skipped entry here — it is idempotent (create-or-update), so re-running
+        # for an already-present row is safe.
+        skipped_entries = [
+            e for e in import_result.entries if e.status.value == "skipped"
+        ]
+        if skipped_entries:
+            logger.info(
+                f"Syncing {len(skipped_entries)} skipped artifacts to database cache"
+            )
+            total_skipped_synced = 0
+            try:
+                with transaction_handler.import_transaction(source_id) as ctx:
+                    ensure_default_collection(ctx.session)
+                    for entry in skipped_entries:
+                        try:
+                            populate_collection_artifact_from_import(
+                                ctx.session,
+                                artifact_mgr,
+                                DEFAULT_COLLECTION_ID,
+                                entry,
+                            )
+                            total_skipped_synced += 1
+                        except Exception as cache_err:
+                            logger.warning(
+                                f"Cache population failed for skipped entry "
+                                f"{entry.artifact_type}:{entry.name}: {cache_err}"
+                            )
+                logger.debug(
+                    f"Synced {total_skipped_synced}/{len(skipped_entries)} "
+                    f"skipped artifacts to database cache"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to sync skipped artifacts to database cache for "
+                    f"source {source_id}: {e}"
+                )
+                # Non-fatal — filesystem import already succeeded.
+
         # Update catalog entry statuses atomically
         with transaction_handler.import_transaction(source_id) as ctx:
             # Get list of successfully imported entry IDs
