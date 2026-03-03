@@ -587,8 +587,17 @@ def populate_collection_artifact_from_import(
     # --- End composite branch -------------------------------------------
 
     # Read filesystem for fields not available in ImportEntry
-    # (author, license, tools, version, resolved_sha, resolved_version)
-    file_artifact = artifact_mgr.show(entry.name)
+    # (author, license, tools, version, resolved_sha, resolved_version).
+    # show() raises ValueError if the collection hasn't been reloaded after
+    # the import wrote to disk, so fall back to entry-only metadata.
+    try:
+        file_artifact = artifact_mgr.show(entry.name)
+    except (ValueError, Exception) as e:
+        logger.debug(
+            f"artifact_mgr.show({entry.name!r}) unavailable, "
+            f"using entry-only metadata: {e}"
+        )
+        file_artifact = None
 
     # Compute fingerprints from the artifact's filesystem files (SSO-2.4).
     artifact_fs_path = (
