@@ -2012,7 +2012,6 @@ async def list_artifacts(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     sync_mgr: SyncManagerDep,
-    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
     limit: int = Query(
         default=20,
@@ -2315,21 +2314,24 @@ async def list_artifacts(
             except Exception as e:
                 logger.warning(f"Failed to query collection memberships: {e}")
 
-        # Build uuid lookup from DB cache via repository
+        # Build uuid lookup from DB cache via batch query.
+        # CollectionArtifact uses artifact_uuid FK (ADR-007); query Artifact table
+        # directly so artifacts in any collection (not just "active") are found.
         uuid_lookup: dict = {}
         try:
-            # TODO: Replace individual get() calls with a batch lookup when
-            # IArtifactRepository exposes a list_by_ids() method.
-            for artifact in page_artifacts:
-                artifact_key = f"{artifact.type.value}:{artifact.name}"
-                try:
-                    dto = artifact_repo.get(artifact_key)
-                    if dto and dto.uuid:
-                        uuid_lookup[artifact_key] = dto.uuid
-                except Exception:
-                    pass
+            artifact_keys = [f"{a.type.value}:{a.name}" for a in page_artifacts]
+            db_session_uuid = get_session()
+            try:
+                rows = (
+                    db_session_uuid.query(Artifact.id, Artifact.uuid)
+                    .filter(Artifact.id.in_(artifact_keys))
+                    .all()
+                )
+                uuid_lookup = {row.id: row.uuid for row in rows if row.uuid}
+            finally:
+                db_session_uuid.close()
         except Exception as e:
-            logger.warning(f"Failed to query uuids from repository: {e}")
+            logger.warning(f"Failed to query uuids from DB cache: {e}")
 
         # Convert to response format
         items: List[ArtifactResponse] = []
