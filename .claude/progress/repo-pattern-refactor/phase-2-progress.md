@@ -20,14 +20,14 @@ contributors: []
 tasks:
 - id: TASK-2.1
   title: Implement ProjectPathResolver
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
   estimate: 2 pts
 - id: TASK-2.2
   title: Implement LocalArtifactRepository
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -35,7 +35,7 @@ tasks:
   estimate: 3 pts
 - id: TASK-2.3
   title: Implement LocalProjectRepository
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -43,7 +43,7 @@ tasks:
   estimate: 2 pts
 - id: TASK-2.4
   title: Implement LocalCollectionRepository
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -51,7 +51,7 @@ tasks:
   estimate: 2 pts
 - id: TASK-2.5
   title: Implement remaining local repos (Deployment, Tag, Settings)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -59,7 +59,7 @@ tasks:
   estimate: 2 pts
 - id: TASK-2.6
   title: Write-through integration tests
-  status: pending
+  status: in_progress
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -79,10 +79,10 @@ parallelization:
   batch_3:
   - TASK-2.6
 total_tasks: 6
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 1
 blocked_tasks: 0
-progress: 0
+progress: 83
 ---
 
 # Phase 2: Local Repository Implementations — Progress
