@@ -20,7 +20,7 @@ contributors: []
 tasks:
 - id: TASK-0.1
   title: 'Baseline tests: deployments.py'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -93,10 +93,10 @@ parallelization:
   batch_2:
   - TASK-0.8
 total_tasks: 8
-completed_tasks: 5
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 62
+progress: 75
 ---
 
 # Phase 0: Test Scaffolding & Prerequisites — Progress
