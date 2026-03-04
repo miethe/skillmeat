@@ -37,12 +37,18 @@ from typing import Any
 from skillmeat.core.interfaces.context import RequestContext
 from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
+    CatalogItemDTO,
     CategoryDTO,
     CollectionDTO,
     CollectionMembershipDTO,
+    ContextEntityDTO,
     DeploymentDTO,
     EntityTypeConfigDTO,
+    GroupArtifactDTO,
+    GroupDTO,
+    MarketplaceSourceDTO,
     ProjectDTO,
+    ProjectTemplateDTO,
     SettingsDTO,
     TagDTO,
 )
@@ -54,6 +60,10 @@ __all__ = [
     "IDeploymentRepository",
     "ITagRepository",
     "ISettingsRepository",
+    "IGroupRepository",
+    "IContextEntityRepository",
+    "IMarketplaceSourceRepository",
+    "IProjectTemplateRepository",
 ]
 
 
@@ -1556,5 +1566,895 @@ class ISettingsRepository(abc.ABC):
         Raises:
             ValueError: If a category with the same *name* and *entity_type*
                 combination already exists.
+        """
+        raise NotImplementedError
+
+
+# =============================================================================
+# IGroupRepository
+# =============================================================================
+
+
+class IGroupRepository(abc.ABC):
+    """Contract for group storage backends.
+
+    Groups let users organise artifacts within a collection into named,
+    position-ordered buckets.  Operations map to the ``/api/v1/groups``
+    router.
+    """
+
+    # ------------------------------------------------------------------
+    # Single-item lookup
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_with_artifacts(
+        self,
+        group_id: int,
+        ctx: RequestContext | None = None,
+    ) -> GroupDTO | None:
+        """Return a group by ID, including its artifact membership list.
+
+        Args:
+            group_id: Integer primary key of the group.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`~skillmeat.core.interfaces.dtos.GroupDTO` when the
+            group exists (with ``artifact_count`` populated), ``None``
+            otherwise.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Collection queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list(
+        self,
+        collection_id: str,
+        filters: dict[str, Any] | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[GroupDTO]:
+        """Return all groups belonging to a collection.
+
+        Args:
+            collection_id: Collection unique identifier.
+            filters: Optional additional filter map (e.g. ``{"name": "…"}``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.GroupDTO` objects
+            ordered by ``position`` ascending.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Mutations — groups
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def create(
+        self,
+        name: str,
+        collection_id: str,
+        description: str | None = None,
+        position: int | None = None,
+        ctx: RequestContext | None = None,
+    ) -> GroupDTO:
+        """Create a new group in the given collection.
+
+        Args:
+            name: Human-readable group name (must be unique within the
+                collection).
+            collection_id: Owning collection identifier.
+            description: Optional group description.
+            position: Explicit display position.  When ``None`` the
+                implementation appends the group at the end.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The created :class:`~skillmeat.core.interfaces.dtos.GroupDTO`.
+
+        Raises:
+            ValueError: If a group with the same *name* already exists in
+                *collection_id*.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update(
+        self,
+        group_id: int,
+        updates: dict[str, Any],
+        ctx: RequestContext | None = None,
+    ) -> GroupDTO:
+        """Apply a partial update to an existing group's metadata.
+
+        Args:
+            group_id: Integer primary key of the group.
+            updates: Map of field names to new values (e.g. ``{"name": "…",
+                "description": "…"}``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated :class:`~skillmeat.core.interfaces.dtos.GroupDTO`.
+
+        Raises:
+            KeyError: If no group with *group_id* exists.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete(
+        self,
+        group_id: int,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Delete a group and all its artifact membership records.
+
+        Args:
+            group_id: Integer primary key of the group.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no group with *group_id* exists.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def copy_to_collection(
+        self,
+        group_id: int,
+        target_collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> GroupDTO:
+        """Duplicate a group (and its artifact memberships) into another collection.
+
+        Artifact UUIDs are preserved; positions are reset to match the source
+        group.
+
+        Args:
+            group_id: Integer primary key of the source group.
+            target_collection_id: Identifier of the destination collection.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The newly created :class:`~skillmeat.core.interfaces.dtos.GroupDTO`
+            in the target collection.
+
+        Raises:
+            KeyError: If *group_id* or *target_collection_id* does not exist.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def reorder_groups(
+        self,
+        collection_id: str,
+        ordered_ids: list[int],
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Bulk-update the display positions of all groups in a collection.
+
+        The ``position`` of each group is set to its zero-based index in
+        *ordered_ids*.
+
+        Args:
+            collection_id: Collection unique identifier.
+            ordered_ids: Complete list of group primary keys in the desired
+                display order.  Must include all groups in the collection.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist.
+            ValueError: If *ordered_ids* does not contain every group in the
+                collection.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Mutations — artifact membership
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def add_artifacts(
+        self,
+        group_id: int,
+        artifact_uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Add one or more artifacts to a group.
+
+        Artifacts already present in the group are silently skipped.  Newly
+        added artifacts are appended after existing members.
+
+        Args:
+            group_id: Integer primary key of the target group.
+            artifact_uuids: List of stable artifact UUIDs to add.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *group_id* does not exist.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def remove_artifact(
+        self,
+        group_id: int,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Remove a single artifact from a group.
+
+        Args:
+            group_id: Integer primary key of the group.
+            artifact_uuid: Stable artifact UUID to remove.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *group_id* does not exist or *artifact_uuid* is not
+                a member of the group.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_artifact_position(
+        self,
+        group_id: int,
+        artifact_uuid: str,
+        position: int,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Update the display position of a single artifact within a group.
+
+        Args:
+            group_id: Integer primary key of the group.
+            artifact_uuid: Stable artifact UUID whose position to update.
+            position: New zero-based display position.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *group_id* does not exist or *artifact_uuid* is not
+                a member of the group.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def reorder_artifacts(
+        self,
+        group_id: int,
+        ordered_uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Bulk-update the display positions of all artifacts in a group.
+
+        The ``position`` of each membership record is set to the artifact's
+        zero-based index in *ordered_uuids*.
+
+        Args:
+            group_id: Integer primary key of the group.
+            ordered_uuids: Complete list of artifact UUIDs in the desired
+                display order.  Must include all current members.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *group_id* does not exist.
+            ValueError: If *ordered_uuids* does not cover all current members.
+        """
+        raise NotImplementedError
+
+
+# =============================================================================
+# IContextEntityRepository
+# =============================================================================
+
+
+class IContextEntityRepository(abc.ABC):
+    """Contract for context entity storage backends.
+
+    Context entities are special artifacts (CLAUDE.md, spec files, rule files,
+    context files, and progress templates) that define project structure and
+    context for Claude Code projects.  Operations map to the
+    ``/api/v1/context-entities`` router.
+    """
+
+    # ------------------------------------------------------------------
+    # Collection queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list(
+        self,
+        filters: dict[str, Any] | None = None,
+        limit: int = 20,
+        after: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[ContextEntityDTO]:
+        """Return a page of context entities matching optional filter criteria.
+
+        Filters may include ``entity_type``, ``category``, ``auto_load``, and
+        ``search`` (full-text across name, description, path_pattern).
+
+        Args:
+            filters: Optional key/value filter map.
+            limit: Maximum number of records to return (1-100).
+            after: Opaque cursor value for the next page (base64-encoded ID).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.core.interfaces.dtos.ContextEntityDTO` objects.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Single-item lookup
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get(
+        self,
+        entity_id: str,
+        ctx: RequestContext | None = None,
+    ) -> ContextEntityDTO | None:
+        """Return a context entity by its identifier.
+
+        Args:
+            entity_id: Artifact primary key (e.g. ``"ctx_abc123"``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`~skillmeat.core.interfaces.dtos.ContextEntityDTO` when
+            found, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Mutations
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def create(
+        self,
+        name: str,
+        entity_type: str,
+        content: str,
+        path_pattern: str,
+        description: str | None = None,
+        category: str | None = None,
+        auto_load: bool = False,
+        version: str | None = None,
+        target_platforms: list[str] | None = None,
+        category_ids: list[int] | None = None,
+        ctx: RequestContext | None = None,
+    ) -> ContextEntityDTO:
+        """Persist a new context entity and return the stored representation.
+
+        Args:
+            name: Human-readable entity name.
+            entity_type: Entity type key (``"project_config"``,
+                ``"spec_file"``, ``"rule_file"``, ``"context_file"``,
+                ``"progress_template"``).
+            content: Assembled markdown content.
+            path_pattern: Target deployment path (must start with
+                ``".claude/"`` or a supported prefix).
+            description: Optional description.
+            category: Optional category label (e.g. ``"api"``).
+            auto_load: Whether to auto-load the entity on platform startup.
+            version: Optional version string.
+            target_platforms: Optional list of platform identifiers to
+                target on deploy.
+            category_ids: Ordered list of category IDs to associate.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The persisted
+            :class:`~skillmeat.core.interfaces.dtos.ContextEntityDTO`.
+
+        Raises:
+            ValueError: If *path_pattern* is invalid or *entity_type* is
+                unrecognised.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update(
+        self,
+        entity_id: str,
+        updates: dict[str, Any],
+        ctx: RequestContext | None = None,
+    ) -> ContextEntityDTO:
+        """Apply a partial update to an existing context entity.
+
+        Args:
+            entity_id: Artifact primary key.
+            updates: Map of field names to new values.  Supported keys mirror
+                :class:`~skillmeat.core.interfaces.dtos.ContextEntityDTO`
+                fields (``name``, ``entity_type``, ``content``,
+                ``path_pattern``, ``description``, ``category``,
+                ``auto_load``, ``version``, ``target_platforms``,
+                ``category_ids``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated
+            :class:`~skillmeat.core.interfaces.dtos.ContextEntityDTO`.
+
+        Raises:
+            KeyError: If no entity with *entity_id* exists.
+            ValueError: If *updates* contains invalid field values.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete(
+        self,
+        entity_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Delete a context entity permanently.
+
+        Args:
+            entity_id: Artifact primary key.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no entity with *entity_id* exists.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Deployment
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def deploy(
+        self,
+        entity_id: str,
+        project_path: str,
+        options: dict[str, Any] | None = None,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Deploy a context entity's content to a filesystem project path.
+
+        Writes the assembled content to the location specified by the entity's
+        ``path_pattern``, resolved against *project_path*.
+
+        Args:
+            entity_id: Artifact primary key.
+            project_path: Absolute filesystem path to the target project
+                directory.
+            options: Optional deployment options such as ``overwrite``,
+                ``deployment_profile_id``, and ``all_profiles``.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *entity_id* does not exist.
+            FileExistsError: If the target file already exists and
+                ``options["overwrite"]`` is ``False``.
+            ValueError: If *project_path* does not exist or *entity_id* has
+                no ``path_pattern``.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Content access
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_content(
+        self,
+        entity_id: str,
+        ctx: RequestContext | None = None,
+    ) -> str | None:
+        """Return the raw markdown content of a context entity.
+
+        Args:
+            entity_id: Artifact primary key.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Raw content string when the entity exists, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+
+# =============================================================================
+# IMarketplaceSourceRepository
+# =============================================================================
+
+
+class IMarketplaceSourceRepository(abc.ABC):
+    """Contract for marketplace broker/source configuration backends.
+
+    A marketplace source is a configured endpoint (broker) that provides
+    artifact listings for installation.  This interface covers both source
+    configuration management and the catalog operations delegated to each
+    broker.  Operations map to ``/api/v1/marketplace-sources`` and the
+    primary ``/api/v1/marketplace`` router.
+    """
+
+    # ------------------------------------------------------------------
+    # Source CRUD
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list_sources(
+        self,
+        filters: dict[str, Any] | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[MarketplaceSourceDTO]:
+        """Return all configured marketplace sources.
+
+        Args:
+            filters: Optional filter map (e.g. ``{"enabled": True}``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of
+            :class:`~skillmeat.core.interfaces.dtos.MarketplaceSourceDTO`
+            objects.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_source(
+        self,
+        source_id: str,
+        ctx: RequestContext | None = None,
+    ) -> MarketplaceSourceDTO | None:
+        """Return a marketplace source by its identifier.
+
+        Args:
+            source_id: Source unique identifier (broker name).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`~skillmeat.core.interfaces.dtos.MarketplaceSourceDTO`
+            when found, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def create_source(
+        self,
+        name: str,
+        endpoint: str,
+        enabled: bool = True,
+        description: str | None = None,
+        supports_publish: bool = False,
+        ctx: RequestContext | None = None,
+    ) -> MarketplaceSourceDTO:
+        """Register a new marketplace source.
+
+        Args:
+            name: Human-readable source name (must be unique).
+            endpoint: Base URL for the broker API.
+            enabled: Whether to activate the source immediately.
+            description: Optional description of this source.
+            supports_publish: Whether the source allows publishing.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The created
+            :class:`~skillmeat.core.interfaces.dtos.MarketplaceSourceDTO`.
+
+        Raises:
+            ValueError: If a source with the same *name* already exists.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_source(
+        self,
+        source_id: str,
+        updates: dict[str, Any],
+        ctx: RequestContext | None = None,
+    ) -> MarketplaceSourceDTO:
+        """Apply a partial update to a marketplace source configuration.
+
+        Args:
+            source_id: Source unique identifier.
+            updates: Map of field names to new values (``enabled``,
+                ``endpoint``, ``description``, ``supports_publish``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated
+            :class:`~skillmeat.core.interfaces.dtos.MarketplaceSourceDTO`.
+
+        Raises:
+            KeyError: If no source with *source_id* exists.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete_source(
+        self,
+        source_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Remove a marketplace source configuration.
+
+        Args:
+            source_id: Source unique identifier.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no source with *source_id* exists.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Catalog operations
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list_catalog_items(
+        self,
+        source_id: str | None = None,
+        filters: dict[str, Any] | None = None,
+        page: int = 1,
+        limit: int = 50,
+        ctx: RequestContext | None = None,
+    ) -> list[CatalogItemDTO]:
+        """Return paginated catalog listings from one or all sources.
+
+        Filters may include ``query`` (search term), ``tags``
+        (``list[str]``), ``license``, and ``publisher``.
+
+        Args:
+            source_id: When provided, restrict results to this broker.
+                When ``None``, aggregate listings from all enabled sources.
+            filters: Optional key/value filter map.
+            page: One-based page number for pagination.
+            limit: Maximum number of items per page (1-100).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of
+            :class:`~skillmeat.core.interfaces.dtos.CatalogItemDTO` objects.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def import_item(
+        self,
+        listing_id: str,
+        source_id: str | None = None,
+        strategy: str = "keep",
+        ctx: RequestContext | None = None,
+    ) -> list[ArtifactDTO]:
+        """Download and import a marketplace listing into the local collection.
+
+        Args:
+            listing_id: Unique identifier of the listing within its broker.
+            source_id: Optional broker identifier.  When ``None`` the
+                implementation auto-detects the broker that owns this listing.
+            strategy: Conflict resolution strategy (``"keep"``, ``"replace"``,
+                or ``"fork"``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
+            objects representing all imported artifacts.
+
+        Raises:
+            KeyError: If *listing_id* is not found in any enabled source.
+            ValueError: If *strategy* is not a recognised value.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_composite_members(
+        self,
+        composite_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[ArtifactDTO]:
+        """Return the child artifacts that make up a composite listing.
+
+        Args:
+            composite_id: Artifact primary key of the composite artifact
+                (``"composite:<name>"``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
+            objects for each member artifact, ordered by ``position``.
+
+        Raises:
+            KeyError: If *composite_id* does not exist or is not a composite
+                artifact.
+        """
+        raise NotImplementedError
+
+
+# =============================================================================
+# IProjectTemplateRepository
+# =============================================================================
+
+
+class IProjectTemplateRepository(abc.ABC):
+    """Contract for project template storage backends.
+
+    Project templates are reusable collections of context entities that can
+    be deployed together to initialise Claude Code project structures.
+    Templates support variable substitution for customisation.  Operations
+    map to the ``/api/v1/project-templates`` router.
+    """
+
+    # ------------------------------------------------------------------
+    # Collection queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list(
+        self,
+        filters: dict[str, Any] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: RequestContext | None = None,
+    ) -> list[ProjectTemplateDTO]:
+        """Return a page of project templates.
+
+        Args:
+            filters: Optional key/value filter map (e.g.
+                ``{"collection_id": "default"}``).
+            limit: Maximum number of records to return (1-100).
+            offset: Zero-based record offset for pagination.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.core.interfaces.dtos.ProjectTemplateDTO`
+            objects ordered by ``created_at`` descending.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Single-item lookup
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get(
+        self,
+        template_id: str,
+        ctx: RequestContext | None = None,
+    ) -> ProjectTemplateDTO | None:
+        """Return a project template by its identifier, including full entity details.
+
+        Args:
+            template_id: Template hex-UUID identifier.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`~skillmeat.core.interfaces.dtos.ProjectTemplateDTO`
+            (with ``entities`` populated) when found, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Mutations
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def create(
+        self,
+        name: str,
+        entity_ids: list[str],
+        description: str | None = None,
+        collection_id: str | None = None,
+        default_project_config_id: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> ProjectTemplateDTO:
+        """Create a new project template from an ordered list of entity IDs.
+
+        Args:
+            name: Human-readable template name (must be unique).
+            entity_ids: Ordered list of artifact primary keys to include.
+                The deploy order is derived from the list order.
+            description: Optional template description.
+            collection_id: Optional owning collection identifier.
+            default_project_config_id: Optional artifact ID of the default
+                CLAUDE.md config to include.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The created
+            :class:`~skillmeat.core.interfaces.dtos.ProjectTemplateDTO`
+            with full entity details.
+
+        Raises:
+            ValueError: If any element of *entity_ids* does not correspond
+                to a known artifact.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update(
+        self,
+        template_id: str,
+        updates: dict[str, Any],
+        ctx: RequestContext | None = None,
+    ) -> ProjectTemplateDTO:
+        """Apply a partial update to an existing project template.
+
+        Supported update keys: ``name``, ``description``, ``entity_ids``
+        (full replacement of the entity list).
+
+        Args:
+            template_id: Template hex-UUID identifier.
+            updates: Map of field names to new values.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated
+            :class:`~skillmeat.core.interfaces.dtos.ProjectTemplateDTO`.
+
+        Raises:
+            KeyError: If no template with *template_id* exists.
+            ValueError: If ``entity_ids`` contains unknown artifact IDs.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete(
+        self,
+        template_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Delete a project template and all its entity associations.
+
+        Args:
+            template_id: Template hex-UUID identifier.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no template with *template_id* exists.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Deployment
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def deploy(
+        self,
+        template_id: str,
+        project_path: str,
+        options: dict[str, Any] | None = None,
+        ctx: RequestContext | None = None,
+    ) -> dict[str, Any]:
+        """Deploy all template entities to a target project directory.
+
+        Performs variable substitution (if ``options["variables"]`` is
+        provided) and writes each entity's content to the path resolved
+        from ``path_pattern`` relative to *project_path*.
+
+        Args:
+            template_id: Template hex-UUID identifier.
+            project_path: Absolute filesystem path to the target project
+                directory.
+            options: Optional deployment options, including:
+                - ``variables`` (``dict[str, str]``): substitution variables,
+                - ``selected_entity_ids`` (``list[str]``): subset of entities
+                  to deploy (default: all),
+                - ``overwrite`` (``bool``): overwrite existing files
+                  (default: ``False``),
+                - ``deployment_profile_id`` (``str``): profile to use.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Result mapping with at minimum ``success`` (bool),
+            ``deployed_files`` (list[str]), ``skipped_files`` (list[str]),
+            and ``message`` (str).
+
+        Raises:
+            KeyError: If *template_id* does not exist.
+            ValueError: If *project_path* does not exist or is invalid.
         """
         raise NotImplementedError

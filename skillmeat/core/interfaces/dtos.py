@@ -51,6 +51,17 @@ __all__ = [
     "CollectionMembershipDTO",
     "EntityTypeConfigDTO",
     "CategoryDTO",
+    # Groups
+    "GroupDTO",
+    "GroupArtifactDTO",
+    # Context entities
+    "ContextEntityDTO",
+    # Marketplace
+    "MarketplaceSourceDTO",
+    "CatalogItemDTO",
+    # Project templates
+    "ProjectTemplateDTO",
+    "TemplateEntityDTO",
 ]
 
 
@@ -591,6 +602,420 @@ class CategoryDTO:
             description=data.get("description"),
             color=data.get("color"),
             artifact_count=int(data.get("artifact_count") or 0),
+            created_at=_to_iso(data.get("created_at")),
+            updated_at=_to_iso(data.get("updated_at")),
+        )
+
+
+# =============================================================================
+# GroupDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class GroupDTO:
+    """Lightweight representation of an artifact group within a collection.
+
+    Groups let users organise collection artifacts into named, position-ordered
+    buckets.  Each group belongs to exactly one collection.
+
+    Attributes:
+        id: Integer primary key (stored as ``str`` for DTO uniformity).
+        name: Human-readable group name.
+        collection_id: Identifier of the owning collection.
+        description: Optional group description.
+        position: Zero-based display order within the collection.
+        artifact_count: Number of artifacts currently in this group.
+        created_at: ISO-8601 creation timestamp.
+        updated_at: ISO-8601 last-update timestamp.
+    """
+
+    id: str
+    name: str
+    collection_id: str
+    description: str | None = None
+    position: int = 0
+    artifact_count: int = 0
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a GroupDTO from a plain dictionary.
+
+        Args:
+            data: Mapping that contains at minimum ``id``, ``name``,
+                and ``collection_id``.
+
+        Returns:
+            A fully populated :class:`GroupDTO`.
+        """
+        return cls(
+            id=str(data["id"]),
+            name=data["name"],
+            collection_id=str(data["collection_id"]),
+            description=data.get("description"),
+            position=int(data.get("position") or 0),
+            artifact_count=int(data.get("artifact_count") or 0),
+            created_at=_to_iso(data.get("created_at")),
+            updated_at=_to_iso(data.get("updated_at")),
+        )
+
+
+# =============================================================================
+# GroupArtifactDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class GroupArtifactDTO:
+    """Records that an artifact is a member of a group.
+
+    Carries the position-based ordering of artifacts within a group.
+
+    Attributes:
+        group_id: Integer primary key of the owning group (as ``str``).
+        artifact_uuid: Stable ADR-007 UUID of the artifact.
+        position: Zero-based display order within the group.
+        added_at: ISO-8601 timestamp when the artifact was added to the group.
+    """
+
+    group_id: str
+    artifact_uuid: str
+    position: int = 0
+    added_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a GroupArtifactDTO from a plain dictionary.
+
+        Args:
+            data: Mapping that contains at minimum ``group_id`` and
+                ``artifact_uuid``.
+
+        Returns:
+            A fully populated :class:`GroupArtifactDTO`.
+        """
+        return cls(
+            group_id=str(data["group_id"]),
+            artifact_uuid=data["artifact_uuid"],
+            position=int(data.get("position") or 0),
+            added_at=_to_iso(data.get("added_at")),
+        )
+
+
+# =============================================================================
+# ContextEntityDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class ContextEntityDTO:
+    """Lightweight representation of a context entity artifact.
+
+    Context entities are special artifacts (CLAUDE.md, spec files, rule files,
+    context files, progress templates) that define project structure, rules, and
+    context for Claude Code projects.
+
+    Attributes:
+        id: Artifact primary key (e.g. ``"ctx_abc123"``).
+        name: Human-readable entity name.
+        entity_type: Entity type key (``"project_config"``, ``"spec_file"``,
+            ``"rule_file"``, ``"context_file"``, ``"progress_template"``).
+        content: Assembled markdown content.
+        path_pattern: Target path pattern for deployment (e.g. ``".claude/CLAUDE.md"``).
+        description: Optional description.
+        category: Optional category for progressive disclosure (e.g. ``"api"``).
+        auto_load: Whether the entity should be auto-loaded by the platform.
+        version: Optional version string.
+        target_platforms: Optional list of target platform identifiers.
+        content_hash: SHA-256 hex hash of the current content for change detection.
+        category_ids: Ordered list of category IDs associated with this entity.
+        core_content: Platform-agnostic source content (modular content architecture).
+        created_at: ISO-8601 creation timestamp.
+        updated_at: ISO-8601 last-update timestamp.
+    """
+
+    id: str
+    name: str
+    entity_type: str
+    content: str = ""
+    path_pattern: str = ""
+    description: str | None = None
+    category: str | None = None
+    auto_load: bool = False
+    version: str | None = None
+    target_platforms: List[str] = field(default_factory=list)
+    content_hash: str | None = None
+    category_ids: List[int] = field(default_factory=list)
+    core_content: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a ContextEntityDTO from a plain dictionary.
+
+        Args:
+            data: Mapping that contains at minimum ``id``, ``name``,
+                and ``entity_type`` (or ``type`` as an alias).
+
+        Returns:
+            A fully populated :class:`ContextEntityDTO`.
+        """
+        raw_platforms = data.get("target_platforms") or []
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            entity_type=data.get("entity_type") or data.get("type") or "",
+            content=data.get("content") or "",
+            path_pattern=data.get("path_pattern") or "",
+            description=data.get("description"),
+            category=data.get("category"),
+            auto_load=bool(data.get("auto_load", False)),
+            version=data.get("version") or data.get("deployed_version"),
+            target_platforms=list(raw_platforms),
+            content_hash=data.get("content_hash"),
+            category_ids=list(data.get("category_ids") or []),
+            core_content=data.get("core_content"),
+            created_at=_to_iso(data.get("created_at")),
+            updated_at=_to_iso(data.get("updated_at")),
+        )
+
+
+# =============================================================================
+# MarketplaceSourceDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class MarketplaceSourceDTO:
+    """Lightweight representation of a marketplace broker/source.
+
+    A marketplace source is a configured endpoint (broker) that provides
+    listings of artifacts available for installation.
+
+    Attributes:
+        id: Source unique identifier (usually the broker name).
+        name: Human-readable source name.
+        enabled: Whether this source is currently active.
+        endpoint: Base URL for the broker API.
+        description: Optional description of this source.
+        supports_publish: Whether this source allows publishing new listings.
+        created_at: ISO-8601 creation timestamp.
+        updated_at: ISO-8601 last-update timestamp.
+    """
+
+    id: str
+    name: str
+    enabled: bool = False
+    endpoint: str = ""
+    description: str | None = None
+    supports_publish: bool = False
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a MarketplaceSourceDTO from a plain dictionary.
+
+        Args:
+            data: Mapping that contains at minimum ``id`` and ``name``.
+
+        Returns:
+            A fully populated :class:`MarketplaceSourceDTO`.
+        """
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            enabled=bool(data.get("enabled", False)),
+            endpoint=data.get("endpoint") or "",
+            description=data.get("description"),
+            supports_publish=bool(data.get("supports_publish", False)),
+            created_at=_to_iso(data.get("created_at")),
+            updated_at=_to_iso(data.get("updated_at")),
+        )
+
+
+# =============================================================================
+# CatalogItemDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class CatalogItemDTO:
+    """Lightweight representation of a single marketplace catalog listing.
+
+    Each catalog item represents one publishable artifact bundle available
+    from a marketplace source/broker.
+
+    Attributes:
+        listing_id: Unique identifier for this listing within its source.
+        name: Human-readable listing name.
+        source_id: Identifier of the broker/source that provides this listing.
+        publisher: Publisher or author name.
+        description: Optional listing description.
+        license: SPDX license identifier (e.g. ``"MIT"``).
+        version: Version string.
+        artifact_count: Number of artifacts bundled in this listing.
+        tags: Tag strings categorising this listing.
+        source_url: URL to the upstream source repository or page.
+        bundle_url: URL to the downloadable bundle archive.
+        signature: Bundle signature for integrity verification.
+        downloads: Total download count.
+        rating: Average rating (0-5 scale).
+        price: Price string (``None`` or ``"0"`` for free listings).
+        created_at: ISO-8601 creation timestamp.
+    """
+
+    listing_id: str
+    name: str
+    source_id: str | None = None
+    publisher: str | None = None
+    description: str | None = None
+    license: str | None = None
+    version: str | None = None
+    artifact_count: int = 0
+    tags: List[str] = field(default_factory=list)
+    source_url: str | None = None
+    bundle_url: str | None = None
+    signature: str | None = None
+    downloads: int = 0
+    rating: float | None = None
+    price: str | None = None
+    created_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a CatalogItemDTO from a plain dictionary.
+
+        Args:
+            data: Mapping that contains at minimum ``listing_id`` and ``name``.
+
+        Returns:
+            A fully populated :class:`CatalogItemDTO`.
+        """
+        return cls(
+            listing_id=data["listing_id"],
+            name=data["name"],
+            source_id=data.get("source_id"),
+            publisher=data.get("publisher"),
+            description=data.get("description"),
+            license=data.get("license"),
+            version=data.get("version"),
+            artifact_count=int(data.get("artifact_count") or 0),
+            tags=list(data.get("tags") or []),
+            source_url=data.get("source_url"),
+            bundle_url=data.get("bundle_url"),
+            signature=data.get("signature"),
+            downloads=int(data.get("downloads") or 0),
+            rating=float(data["rating"]) if data.get("rating") is not None else None,
+            price=data.get("price"),
+            created_at=_to_iso(data.get("created_at")),
+        )
+
+
+# =============================================================================
+# ProjectTemplateDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class TemplateEntityDTO:
+    """A single entity entry within a project template.
+
+    Captures the relationship between a :class:`ProjectTemplateDTO` and one
+    of its constituent context-entity artifacts.
+
+    Attributes:
+        artifact_id: Artifact primary key (``"type:name"``).
+        name: Artifact display name.
+        artifact_type: Artifact type string (e.g. ``"spec_file"``).
+        deploy_order: Zero-based position controlling deployment sequence.
+        required: Whether this entity is mandatory for template deployment.
+        path_pattern: Target path pattern from the artifact.
+    """
+
+    artifact_id: str
+    name: str
+    artifact_type: str = ""
+    deploy_order: int = 0
+    required: bool = True
+    path_pattern: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a TemplateEntityDTO from a plain dictionary.
+
+        Args:
+            data: Mapping that contains at minimum ``artifact_id`` and ``name``.
+
+        Returns:
+            A fully populated :class:`TemplateEntityDTO`.
+        """
+        return cls(
+            artifact_id=data["artifact_id"],
+            name=data["name"],
+            artifact_type=data.get("artifact_type") or data.get("type") or "",
+            deploy_order=int(data.get("deploy_order") or 0),
+            required=bool(data.get("required", True)),
+            path_pattern=data.get("path_pattern"),
+        )
+
+
+@dataclass(frozen=True)
+class ProjectTemplateDTO:
+    """Lightweight representation of a project template.
+
+    Project templates are reusable collections of context entities that can
+    be deployed together to initialise Claude Code project structures.
+    Templates support variable substitution for customisation.
+
+    Attributes:
+        id: Template unique identifier (hex UUID).
+        name: Human-readable template name.
+        description: Optional template description.
+        collection_id: Identifier of the owning collection.
+        default_project_config_id: Artifact ID of the default CLAUDE.md to use.
+        entities: Ordered list of template entity records.
+        entity_count: Total number of entities in this template.
+        created_at: ISO-8601 creation timestamp.
+        updated_at: ISO-8601 last-update timestamp.
+    """
+
+    id: str
+    name: str
+    description: str | None = None
+    collection_id: str | None = None
+    default_project_config_id: str | None = None
+    entities: List[TemplateEntityDTO] = field(default_factory=list)
+    entity_count: int = 0
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a ProjectTemplateDTO from a plain dictionary.
+
+        Args:
+            data: Mapping that contains at minimum ``id`` and ``name``.
+
+        Returns:
+            A fully populated :class:`ProjectTemplateDTO`.
+        """
+        raw_entities = data.get("entities") or []
+        entities = [
+            TemplateEntityDTO.from_dict(e) if isinstance(e, dict) else e
+            for e in raw_entities
+        ]
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            description=data.get("description"),
+            collection_id=data.get("collection_id"),
+            default_project_config_id=data.get("default_project_config_id"),
+            entities=entities,
+            entity_count=int(data.get("entity_count") or len(entities)),
             created_at=_to_iso(data.get("created_at")),
             updated_at=_to_iso(data.get("updated_at")),
         )
