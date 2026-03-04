@@ -27,7 +27,7 @@ tasks:
   estimate: 1.5 pts
 - id: TASK-0.2
   title: 'Baseline tests: deployment_sets.py + deployment_profiles.py'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -93,10 +93,10 @@ parallelization:
   batch_2:
   - TASK-0.8
 total_tasks: 8
-completed_tasks: 4
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 50
+progress: 62
 ---
 
 # Phase 0: Test Scaffolding & Prerequisites — Progress
