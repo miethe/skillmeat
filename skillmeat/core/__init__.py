@@ -5,6 +5,7 @@ artifact handling, diff operations, search, and sync.
 """
 
 from .diff_engine import DiffEngine
+from .path_resolver import ProjectPathResolver
 from .search import SearchManager
 from .sync import SyncManager
 from .usage_reports import UsageReportManager
@@ -17,6 +18,7 @@ from .version_graph import (
 
 __all__ = [
     "DiffEngine",
+    "ProjectPathResolver",
     "SearchManager",
     "SyncManager",
     "UsageReportManager",
