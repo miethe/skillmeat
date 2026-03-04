@@ -36,6 +36,18 @@ from skillmeat.core.interfaces.dtos import ArtifactDTO, TagDTO
 from skillmeat.core.interfaces.repositories import IArtifactRepository
 from skillmeat.core.path_resolver import ProjectPathResolver
 
+# ---------------------------------------------------------------------------
+# Optional DB UUID lookup — graceful degradation when cache module is absent.
+# ---------------------------------------------------------------------------
+try:
+    from skillmeat.cache.models import get_session as _get_db_session
+    from skillmeat.cache.models import Artifact as _DBArtifact
+    _db_available = True
+except ImportError:  # pragma: no cover
+    _get_db_session = None  # type: ignore[assignment]
+    _DBArtifact = None  # type: ignore[assignment]
+    _db_available = False
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -75,12 +87,19 @@ def _parse_id(id: str) -> tuple[str, str]:
     return artifact_type_str, name
 
 
-def _artifact_to_dto(artifact: Any, collection_id: Optional[str] = None) -> ArtifactDTO:
+def _artifact_to_dto(
+    artifact: Any,
+    collection_id: Optional[str] = None,
+    db_uuid: Optional[str] = None,
+) -> ArtifactDTO:
     """Convert an :class:`~skillmeat.core.artifact.Artifact` to :class:`ArtifactDTO`.
 
     Args:
         artifact: A ``skillmeat.core.artifact.Artifact`` instance.
         collection_id: Optional collection identifier to set as ``project_id``.
+        db_uuid: Optional UUID sourced from the DB cache.  When provided this
+            takes precedence over any ``uuid`` attribute on the filesystem
+            artifact (per ADR-007, UUIDs live in the DB, not on the FS).
 
     Returns:
         An :class:`ArtifactDTO` populated from the artifact's fields.
@@ -107,11 +126,14 @@ def _artifact_to_dto(artifact: Any, collection_id: Optional[str] = None) -> Arti
         artifact, "version_spec", None
     )
 
+    # Prefer DB UUID (authoritative per ADR-007) over any FS-level attribute.
+    uuid = db_uuid or getattr(artifact, "uuid", None)
+
     return ArtifactDTO(
         id=artifact_id,
         name=artifact.name,
         artifact_type=artifact_type_str,
-        uuid=getattr(artifact, "uuid", None),
+        uuid=uuid,
         source=getattr(artifact, "upstream", None),
         version=version,
         scope=None,  # scope lives at the deployment level, not collection
@@ -202,6 +224,80 @@ class LocalArtifactRepository(IArtifactRepository):
                 exc_info=True,
             )
 
+    def _get_db_uuid(self, artifact_id: str) -> Optional[str]:
+        """Look up the stable UUID for an artifact from the DB cache.
+
+        Filesystem ``Artifact`` instances do not carry UUIDs (per ADR-007,
+        UUIDs live exclusively in the DB cache).  This method opens a
+        short-lived DB session, queries ``artifacts.uuid`` by the
+        ``type:name`` primary key, and returns the result.
+
+        Args:
+            artifact_id: Artifact primary key string (``"type:name"``).
+
+        Returns:
+            32-char hex UUID string when found in DB, ``None`` otherwise.
+        """
+        if not _db_available or _get_db_session is None or _DBArtifact is None:
+            return None
+        # Local refs for Pyright type narrowing
+        get_session = _get_db_session
+        DBArtifact = _DBArtifact
+        try:
+            session = get_session()
+            try:
+                row = session.query(DBArtifact.uuid).filter(
+                    DBArtifact.id == artifact_id
+                ).first()
+                return row[0] if row else None
+            finally:
+                session.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(
+                "DB UUID lookup failed for artifact '%s': %s",
+                artifact_id,
+                exc,
+            )
+            return None
+
+    def _get_db_uuid_batch(self, artifact_ids: List[str]) -> dict[str, str]:
+        """Batch look up stable UUIDs for multiple artifacts from the DB cache.
+
+        Opens a single session, queries all requested IDs in one round-trip,
+        and returns a mapping of ``artifact_id → uuid``.  Artifacts not found
+        in the DB are absent from the returned dict.
+
+        Args:
+            artifact_ids: List of ``"type:name"`` primary key strings.
+
+        Returns:
+            Dict mapping artifact ID to 32-char hex UUID.  Missing entries
+            indicate the artifact has not yet been indexed in the DB cache.
+        """
+        if not _db_available or not artifact_ids or _get_db_session is None or _DBArtifact is None:
+            return {}
+        # Local refs for Pyright type narrowing
+        get_session = _get_db_session
+        DBArtifact = _DBArtifact
+        try:
+            session = get_session()
+            try:
+                rows = (
+                    session.query(DBArtifact.id, DBArtifact.uuid)
+                    .filter(DBArtifact.id.in_(artifact_ids))
+                    .all()
+                )
+                return {row[0]: row[1] for row in rows if row[1] is not None}
+            finally:
+                session.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(
+                "DB UUID batch lookup failed (%d ids): %s",
+                len(artifact_ids),
+                exc,
+            )
+            return {}
+
     def _resolve_artifact_path(self, artifact: Any) -> Optional[str]:
         """Resolve the absolute filesystem path for an artifact's content.
 
@@ -211,6 +307,8 @@ class LocalArtifactRepository(IArtifactRepository):
         Returns:
             Absolute path string or ``None`` when the path cannot be resolved.
         """
+        if self._collection_name is None:
+            return None
         try:
             collection_path = self._mgr.collection_mgr.config.get_collection_path(
                 self._collection_name
@@ -262,7 +360,8 @@ class LocalArtifactRepository(IArtifactRepository):
             logger.warning("get() failed for artifact '%s': %s", id, exc)
             return None
 
-        return _artifact_to_dto(artifact)
+        db_uuid = self._get_db_uuid(id)
+        return _artifact_to_dto(artifact, db_uuid=db_uuid)
 
     def get_by_uuid(
         self,
@@ -282,6 +381,26 @@ class LocalArtifactRepository(IArtifactRepository):
         Returns:
             :class:`ArtifactDTO` when found, ``None`` otherwise.
         """
+        # First try DB — UUIDs are authoritative there (ADR-007).
+        if _db_available and _get_db_session is not None and _DBArtifact is not None:
+            # Local refs for Pyright type narrowing
+            get_session = _get_db_session
+            DBArtifact = _DBArtifact
+            try:
+                session = get_session()
+                try:
+                    row = session.query(DBArtifact.id, DBArtifact.uuid).filter(
+                        DBArtifact.uuid == uuid
+                    ).first()
+                finally:
+                    session.close()
+                if row:
+                    artifact_id = row[0]
+                    return self.get(artifact_id)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("get_by_uuid() DB lookup failed: %s", exc)
+
+        # Fallback: linear scan over filesystem artifacts.
         try:
             all_artifacts = self._mgr.list_artifacts(
                 collection_name=self._collection_name
@@ -292,7 +411,7 @@ class LocalArtifactRepository(IArtifactRepository):
 
         for artifact in all_artifacts:
             if getattr(artifact, "uuid", None) == uuid:
-                return _artifact_to_dto(artifact)
+                return _artifact_to_dto(artifact, db_uuid=uuid)
 
         return None
 
@@ -346,7 +465,23 @@ class LocalArtifactRepository(IArtifactRepository):
 
         # Apply pagination
         page = artifacts[offset : offset + limit]
-        return [_artifact_to_dto(a) for a in page]
+
+        # Batch-fetch UUIDs from DB cache in a single round-trip.
+        page_ids = [
+            f"{a.type.value if hasattr(a.type, 'value') else str(a.type)}:{a.name}"
+            for a in page
+        ]
+        uuid_map = self._get_db_uuid_batch(page_ids)
+
+        return [
+            _artifact_to_dto(
+                a,
+                db_uuid=uuid_map.get(
+                    f"{a.type.value if hasattr(a.type, 'value') else str(a.type)}:{a.name}"
+                ),
+            )
+            for a in page
+        ]
 
     def count(
         self,
@@ -424,7 +559,7 @@ class LocalArtifactRepository(IArtifactRepository):
             logger.warning("search() list failed: %s", exc)
             return []
 
-        results = []
+        matched = []
         for artifact in candidates:
             name_match = q in artifact.name.lower()
             desc = (
@@ -436,9 +571,24 @@ class LocalArtifactRepository(IArtifactRepository):
             tag_match = any(q in t.lower() for t in (artifact.tags or []))
 
             if name_match or desc_match or tag_match:
-                results.append(_artifact_to_dto(artifact))
+                matched.append(artifact)
 
-        return results
+        # Batch-fetch UUIDs from DB cache in a single round-trip.
+        matched_ids = [
+            f"{a.type.value if hasattr(a.type, 'value') else str(a.type)}:{a.name}"
+            for a in matched
+        ]
+        uuid_map = self._get_db_uuid_batch(matched_ids)
+
+        return [
+            _artifact_to_dto(
+                a,
+                db_uuid=uuid_map.get(
+                    f"{a.type.value if hasattr(a.type, 'value') else str(a.type)}:{a.name}"
+                ),
+            )
+            for a in matched
+        ]
 
     # ------------------------------------------------------------------
     # Mutations
