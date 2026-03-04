@@ -486,6 +486,9 @@ def add_member(
             detail=f"Deployment set '{set_id}' not found.",
         )
 
+    # TODO: migrate to repository — DeploymentSetService currently requires a
+    #   raw SQLAlchemy session; extract IDeploymentSetRepository to inject via
+    #   DI once the service layer is refactored to support the hexagonal pattern.
     session = get_session()
     try:
         svc = DeploymentSetService(session=session)
@@ -682,6 +685,8 @@ def resolve_deployment_set(
             detail=f"Deployment set '{set_id}' not found.",
         )
 
+    # TODO: migrate to repository — DeploymentSetService.resolve() requires a
+    #   raw SQLAlchemy session; inject via DI once the service is refactored.
     session = get_session()
     try:
         svc = DeploymentSetService(session=session)
@@ -786,6 +791,9 @@ def batch_deploy(
             detail=f"Project path '{request.project_path}' does not exist.",
         )
 
+    # TODO: migrate to repository — DeploymentSetService.resolve() and the
+    #   per-artifact deploy loop require a raw SQLAlchemy session; inject via
+    #   DI once the service is refactored to support the hexagonal pattern.
     session = get_session()
     try:
         svc = DeploymentSetService(session=session)

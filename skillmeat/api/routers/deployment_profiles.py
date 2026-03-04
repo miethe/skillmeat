@@ -53,6 +53,11 @@ def _resolve_project_db_id(project_id: str) -> str:
     Supports both:
     - direct cache project IDs
     - base64-encoded project paths used by `/projects` endpoints
+
+    TODO: migrate to repository — this helper creates a raw session to look up
+    and optionally create a Project row.  Once IProjectRepository exposes a
+    ``get_or_create_by_path()`` method, inject ProjectRepoDep at the endpoint
+    level and pass it in instead.
     """
     session = get_session()
     try:
