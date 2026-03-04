@@ -15,6 +15,15 @@ from skillmeat.config import ConfigManager
 from skillmeat.core.artifact import ArtifactManager
 from skillmeat.core.auth import TokenManager
 from skillmeat.core.collection import CollectionManager
+from skillmeat.core.interfaces.repositories import (
+    IArtifactRepository,
+    ICollectionRepository,
+    IDeploymentRepository,
+    IProjectRepository,
+    ISettingsRepository,
+    ITagRepository,
+)
+from skillmeat.core.path_resolver import ProjectPathResolver
 from skillmeat.core.services.context_sync import ContextSyncService
 from skillmeat.core.sync import SyncManager
 
@@ -46,6 +55,7 @@ class AppState:
         self.metadata_cache: Optional[Any] = None  # MetadataCache, lazily initialized
         self.cache_manager: Optional[Any] = None  # CacheManager, lazily initialized
         self.refresh_job: Optional[Any] = None  # RefreshJob, lazily initialized
+        self.path_resolver: Optional[ProjectPathResolver] = None
 
     def initialize(self, settings: APISettings) -> None:
         """Initialize all managers with settings.
@@ -65,6 +75,7 @@ class AppState:
             collection_manager=self.collection_manager,
             artifact_manager=self.artifact_manager,
         )
+        self.path_resolver = ProjectPathResolver()
 
         # Initialize cache manager if not already initialized (lazy init pattern)
         if self.cache_manager is None:
@@ -113,6 +124,7 @@ class AppState:
         self.metadata_cache = None
         self.cache_manager = None
         self.refresh_job = None
+        self.path_resolver = None
         logger.info("Application state shutdown complete")
 
 
@@ -308,6 +320,178 @@ def require_memory_context_enabled(
     """Legacy no-op dependency retained for backward compatibility."""
     _ = settings
     return
+
+
+# ---------------------------------------------------------------------------
+# Repository factory providers (hexagonal architecture)
+# ---------------------------------------------------------------------------
+
+
+def get_artifact_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IArtifactRepository:
+    """Get IArtifactRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IArtifactRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalArtifactRepository
+
+        return LocalArtifactRepository(
+            artifact_manager=state.artifact_manager,
+            path_resolver=state.path_resolver,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_project_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IProjectRepository:
+    """Get IProjectRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IProjectRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalProjectRepository
+
+        return LocalProjectRepository(
+            path_resolver=state.path_resolver,
+            cache_manager=state.cache_manager,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_collection_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ICollectionRepository:
+    """Get ICollectionRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        ICollectionRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalCollectionRepository
+
+        return LocalCollectionRepository(
+            collection_manager=state.collection_manager,
+            path_resolver=state.path_resolver,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_deployment_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IDeploymentRepository:
+    """Get IDeploymentRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IDeploymentRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.deployment import DeploymentManager
+        from skillmeat.core.repositories import LocalDeploymentRepository
+
+        deployment_manager = DeploymentManager(collection_mgr=state.collection_manager)
+        return LocalDeploymentRepository(
+            deployment_manager=deployment_manager,
+            path_resolver=state.path_resolver,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_tag_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ITagRepository:
+    """Get ITagRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        ITagRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalTagRepository
+
+        return LocalTagRepository()
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_settings_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ISettingsRepository:
+    """Get ISettingsRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        ISettingsRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalSettingsRepository
+
+        return LocalSettingsRepository(
+            path_resolver=state.path_resolver,
+            config_manager=state.config_manager,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
 
 
 # Type aliases for cleaner dependency injection
