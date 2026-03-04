@@ -41,7 +41,7 @@ tasks:
   estimate: 1 pt
 - id: TASK-0.4
   title: 'Baseline tests: mcp.py, icon_packs.py, versions.py, artifact_history.py'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -93,10 +93,10 @@ parallelization:
   batch_2:
   - TASK-0.8
 total_tasks: 8
-completed_tasks: 6
+completed_tasks: 7
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 75
+progress: 87
 ---
 
 # Phase 0: Test Scaffolding & Prerequisites — Progress
