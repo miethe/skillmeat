@@ -2,7 +2,7 @@
 schema_version: 2
 doc_type: implementation_plan
 title: 'Implementation Plan: Storage Abstraction & Repository Pattern Refactor'
-status: completed
+status: completed-with-gaps
 created: 2026-03-01
 updated: '2026-03-04'
 feature_slug: repo-pattern-refactor
