@@ -129,7 +129,7 @@ function formatScore(score: number | null): string {
 export const MiniArtifactCard = React.forwardRef<
   HTMLDivElement,
   MiniArtifactCardProps & Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick'>
->(({ artifact, onClick, groupId, className, style, showScore, similarityScore, scoreBreakdown, ...htmlProps }, ref) => {
+>(({ artifact, onClick, groupId, className, style, showScore, similarityScore, scoreBreakdown, onDelete, ...htmlProps }, ref) => {
   const config = getArtifactTypeConfig(artifact.type);
 
   // Fetch all tags to build a name->color map from DB
