@@ -1048,6 +1048,8 @@ async def deploy_context_entity(
                     should_write = False
 
             if should_write:
+                # TODO: migrate to repository — direct filesystem write; IContextEntityRepository
+                # would expose deploy(entity_id, target_path, content) to abstract this.
                 target_path.parent.mkdir(parents=True, exist_ok=True)
                 target_path.write_text(content, encoding="utf-8")
 
