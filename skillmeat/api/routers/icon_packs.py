@@ -36,6 +36,8 @@ router = APIRouter(
 
 # This file lives at: skillmeat/api/routers/icon_packs.py
 # Project root is three directories up:  routers/ → api/ → skillmeat/ → root/
+# TODO: migrate to repository — ISettingsRepository could expose get_icon_pack_config() /
+# update_icon_pack_config() to abstract this direct filesystem read/write.
 _ICON_PACKS_CONFIG_PATH: Path = (
     Path(__file__).resolve().parents[3] / "icon-packs.config.json"
 )

@@ -247,6 +247,9 @@ def _build_deployment_events(
 
     for project_path in sorted(project_paths):
         try:
+            # TODO: migrate to repository — IDeploymentRepository.list(filters={"project_id": ...})
+            # should replace DeploymentTracker.read_deployments() once DeploymentRepoDep
+            # supports per-project filtering on the history endpoint.
             deployments = DeploymentTracker.read_deployments(Path(project_path))
         except Exception:
             continue
