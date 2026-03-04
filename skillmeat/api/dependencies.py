@@ -10,6 +10,7 @@ from typing import Annotated, Any, Optional
 
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
+from sqlalchemy.orm import Session
 
 from skillmeat.config import ConfigManager
 from skillmeat.core.artifact import ArtifactManager
@@ -23,6 +24,7 @@ from skillmeat.core.interfaces.repositories import (
     ISettingsRepository,
     ITagRepository,
 )
+from skillmeat.cache.session import get_db_session
 from skillmeat.core.path_resolver import ProjectPathResolver
 from skillmeat.core.services.context_sync import ContextSyncService
 from skillmeat.core.sync import SyncManager
@@ -504,3 +506,14 @@ ContextSyncServiceDep = Annotated[ContextSyncService, Depends(get_context_sync_s
 SettingsDep = Annotated[APISettings, Depends(get_settings)]
 APIKeyDep = Annotated[None, Depends(verify_api_key)]
 MemoryContextEnabledDep = Annotated[None, Depends(require_memory_context_enabled)]
+
+# Repository DI aliases (hexagonal architecture)
+ArtifactRepoDep = Annotated[IArtifactRepository, Depends(get_artifact_repository)]
+ProjectRepoDep = Annotated[IProjectRepository, Depends(get_project_repository)]
+CollectionRepoDep = Annotated[ICollectionRepository, Depends(get_collection_repository)]
+DeploymentRepoDep = Annotated[IDeploymentRepository, Depends(get_deployment_repository)]
+TagRepoDep = Annotated[ITagRepository, Depends(get_tag_repository)]
+SettingsRepoDep = Annotated[ISettingsRepository, Depends(get_settings_repository)]
+
+# Per-request SQLAlchemy session (hexagonal architecture)
+DbSessionDep = Annotated[Session, Depends(get_db_session)]
