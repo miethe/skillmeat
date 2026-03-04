@@ -7474,13 +7474,11 @@ async def list_skip_preferences(
 )
 async def get_artifact_tags(
     artifact_id: str,
-    artifact_repo: ArtifactRepoDep,
 ) -> List[TagResponse]:
     """Get all tags assigned to a specific artifact.
 
     Args:
         artifact_id: Unique identifier of the artifact (type:name format)
-        artifact_repo: IArtifactRepository dependency (hexagonal DI)
 
     Returns:
         List of tags assigned to the artifact
@@ -7494,14 +7492,19 @@ async def get_artifact_tags(
     service = TagService()
 
     try:
-        # Resolve type:name artifact_id → UUID via repository (ADR-007 stable identity)
-        artifact_dto = artifact_repo.get(artifact_id)
-        if not artifact_dto or not artifact_dto.uuid:
-            raise HTTPException(
-                status_code=404, detail=f"Artifact '{artifact_id}' not found"
-            )
+        # Resolve type:name artifact_id → UUID via DB cache (ADR-007 stable identity)
+        db_session = get_session()
+        try:
+            db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
+            if not db_art:
+                raise HTTPException(
+                    status_code=404, detail=f"Artifact '{artifact_id}' not found"
+                )
+            artifact_uuid = db_art.uuid
+        finally:
+            db_session.close()
 
-        return service.get_artifact_tags(artifact_dto.uuid)
+        return service.get_artifact_tags(artifact_uuid)
     except HTTPException:
         raise
     except Exception as e:
@@ -7659,7 +7662,6 @@ async def add_tag_to_artifact(
     artifact_id: str,
     tag_id: str,
     collection_mgr: CollectionManagerDep,
-    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
 ) -> dict[str, str]:
     """Add a tag to an artifact.
@@ -7668,7 +7670,6 @@ async def add_tag_to_artifact(
         artifact_id: Unique identifier of the artifact
         tag_id: Unique identifier of the tag
         collection_mgr: Collection manager dependency
-        artifact_repo: IArtifactRepository dependency (hexagonal DI)
         token: API token for authentication
 
     Returns:
@@ -7682,14 +7683,17 @@ async def add_tag_to_artifact(
 
     service = TagService()
 
-    # Resolve type:name artifact_id → UUID via repository (ADR-007 stable identity)
-    artifact_dto = artifact_repo.get(artifact_id)
-    if not artifact_dto or not artifact_dto.uuid:
-        raise HTTPException(
-            status_code=404, detail=f"Artifact '{artifact_id}' not found"
-        )
-
-    artifact_uuid = artifact_dto.uuid
+    # Resolve type:name artifact_id → UUID via DB cache (ADR-007 stable identity)
+    db_session = get_session()
+    try:
+        db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
+        if not db_art:
+            raise HTTPException(
+                status_code=404, detail=f"Artifact '{artifact_id}' not found"
+            )
+        artifact_uuid = db_art.uuid
+    finally:
+        db_session.close()
 
     try:
         service.add_tag_to_artifact(artifact_uuid, tag_id)
@@ -7749,7 +7753,6 @@ async def remove_tag_from_artifact(
     artifact_id: str,
     tag_id: str,
     collection_mgr: CollectionManagerDep,
-    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
 ) -> None:
     """Remove a tag from an artifact.
@@ -7758,7 +7761,6 @@ async def remove_tag_from_artifact(
         artifact_id: Unique identifier of the artifact
         tag_id: Unique identifier of the tag
         collection_mgr: Collection manager dependency
-        artifact_repo: IArtifactRepository dependency (hexagonal DI)
         token: API token for authentication
 
     Returns:
@@ -7772,14 +7774,17 @@ async def remove_tag_from_artifact(
 
     service = TagService()
 
-    # Resolve type:name artifact_id → UUID via repository (ADR-007 stable identity)
-    artifact_dto = artifact_repo.get(artifact_id)
-    if not artifact_dto or not artifact_dto.uuid:
-        raise HTTPException(
-            status_code=404, detail=f"Artifact '{artifact_id}' not found"
-        )
-
-    artifact_uuid = artifact_dto.uuid
+    # Resolve type:name artifact_id → UUID via DB cache (ADR-007 stable identity)
+    db_session = get_session()
+    try:
+        db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
+        if not db_art:
+            raise HTTPException(
+                status_code=404, detail=f"Artifact '{artifact_id}' not found"
+            )
+        artifact_uuid = db_art.uuid
+    finally:
+        db_session.close()
 
     try:
         if not service.remove_tag_from_artifact(artifact_uuid, tag_id):
