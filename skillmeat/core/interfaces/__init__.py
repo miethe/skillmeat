@@ -25,8 +25,11 @@ Design principles:
 from skillmeat.core.interfaces.context import RequestContext
 from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
+    CategoryDTO,
     CollectionDTO,
+    CollectionMembershipDTO,
     DeploymentDTO,
+    EntityTypeConfigDTO,
     ProjectDTO,
     SettingsDTO,
     TagDTO,
@@ -45,8 +48,11 @@ __all__: list[str] = [
     "RequestContext",
     # DTOs
     "ArtifactDTO",
+    "CategoryDTO",
     "CollectionDTO",
+    "CollectionMembershipDTO",
     "DeploymentDTO",
+    "EntityTypeConfigDTO",
     "ProjectDTO",
     "SettingsDTO",
     "TagDTO",

@@ -37,8 +37,11 @@ from typing import Any
 from skillmeat.core.interfaces.context import RequestContext
 from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
+    CategoryDTO,
     CollectionDTO,
+    CollectionMembershipDTO,
     DeploymentDTO,
+    EntityTypeConfigDTO,
     ProjectDTO,
     SettingsDTO,
     TagDTO,
@@ -332,6 +335,218 @@ class IArtifactRepository(abc.ABC):
         """
         raise NotImplementedError
 
+    # ------------------------------------------------------------------
+    # UUID resolution
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def resolve_uuid_by_type_name(
+        self,
+        artifact_type: str,
+        name: str,
+        ctx: RequestContext | None = None,
+    ) -> str | None:
+        """Resolve the stable UUID for an artifact identified by type and name.
+
+        Args:
+            artifact_type: Artifact type string (e.g. ``"skill"``).
+            name: Artifact name string.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            32-char hex UUID string when found, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def batch_resolve_uuids(
+        self,
+        artifacts: list[tuple[str, str]],
+        ctx: RequestContext | None = None,
+    ) -> dict[tuple[str, str], str]:
+        """Batch-resolve UUIDs for multiple ``(artifact_type, name)`` pairs.
+
+        Executes a single round-trip (when possible) rather than N individual
+        lookups.  Pairs that cannot be resolved are absent from the returned
+        dict.
+
+        Args:
+            artifacts: List of ``(artifact_type, name)`` tuples.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Dict mapping each ``(artifact_type, name)`` tuple to its 32-char
+            hex UUID.  Unresolvable pairs are omitted.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Collection-context queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_with_collection_context(
+        self,
+        uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> ArtifactDTO | None:
+        """Return an artifact with enriched collection-membership context.
+
+        The returned DTO may carry additional collection-level metadata
+        (e.g. collection description, collection tags) compared to the
+        plain :meth:`get_by_uuid` result.
+
+        Args:
+            uuid: Stable artifact UUID (32-char hex).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            An :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO` when
+            found (with collection context populated where available),
+            ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_collection_memberships(
+        self,
+        uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionMembershipDTO]:
+        """Return all collections that contain the artifact identified by *uuid*.
+
+        Args:
+            uuid: Stable artifact UUID (32-char hex).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.CollectionMembershipDTO`
+            objects, one per collection membership.  Returns an empty list
+            when the artifact is not found or has no collection memberships.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_collection_description(
+        self,
+        uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> str | None:
+        """Return the collection-level description for an artifact.
+
+        The collection-level description may differ from the artifact's
+        intrinsic description (e.g. it may be set by the collection owner
+        rather than the artifact author).
+
+        Args:
+            uuid: Stable artifact UUID (32-char hex).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Collection-level description string, or ``None`` when not set
+            or the artifact does not exist.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Deduplication cluster queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_duplicate_cluster_members(
+        self,
+        cluster_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[ArtifactDTO]:
+        """Return all artifacts that belong to the given deduplication cluster.
+
+        Deduplication clusters group semantically equivalent artifacts
+        discovered during import or sync.
+
+        Args:
+            cluster_id: Opaque cluster identifier (implementation-defined).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
+            objects representing every cluster member.  Returns an empty
+            list when the cluster does not exist or has no members.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Existence and type queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def validate_exists(
+        self,
+        uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        """Check whether an artifact with the given UUID exists.
+
+        Lighter-weight alternative to :meth:`get_by_uuid` when only
+        existence is needed.
+
+        Args:
+            uuid: Stable artifact UUID (32-char hex).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            ``True`` when an artifact with *uuid* exists, ``False`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_by_type(
+        self,
+        artifact_type: str,
+        ctx: RequestContext | None = None,
+    ) -> list[ArtifactDTO]:
+        """Return all artifacts of the specified type.
+
+        Equivalent to calling :meth:`list` with ``filters={"artifact_type": artifact_type}``
+        and no pagination, but expressed as a first-class method for clarity.
+
+        Args:
+            artifact_type: Artifact type string (e.g. ``"skill"``, ``"command"``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
+            objects matching *artifact_type*.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Collection-level mutations
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def update_collection_tags(
+        self,
+        uuid: str,
+        tags: list[str],
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Replace the collection-level tags for an artifact.
+
+        Collection-level tags are distinct from intrinsic artifact tags:
+        they are set by the collection owner and stored alongside the
+        collection membership record rather than in the artifact manifest.
+
+        Args:
+            uuid: Stable artifact UUID (32-char hex).
+            tags: New complete list of tag name strings.  Replaces any
+                previously set collection-level tags.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no artifact with *uuid* exists.
+        """
+        raise NotImplementedError
+
 
 # =============================================================================
 # IProjectRepository
@@ -597,6 +812,215 @@ class ICollectionRepository(abc.ABC):
         Returns:
             List of :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
             objects.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Mutations
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def create(
+        self,
+        name: str,
+        description: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> CollectionDTO:
+        """Create a new collection.
+
+        Args:
+            name: Human-readable name for the new collection.  Must be
+                unique within the storage backend.
+            description: Optional description text.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The created :class:`~skillmeat.core.interfaces.dtos.CollectionDTO`.
+
+        Raises:
+            ValueError: If a collection with the same *name* already exists.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update(
+        self,
+        collection_id: str,
+        updates: dict[str, Any],
+        ctx: RequestContext | None = None,
+    ) -> CollectionDTO:
+        """Apply a partial update to an existing collection.
+
+        Args:
+            collection_id: Collection unique identifier.
+            updates: Map of field names to new values (e.g. ``{"name": "new-name"}``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated :class:`~skillmeat.core.interfaces.dtos.CollectionDTO`.
+
+        Raises:
+            KeyError: If no collection with *collection_id* exists.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Delete a collection and remove all its membership records.
+
+        Does not delete artifact files from disk — only removes the
+        collection registry entry and associated memberships.
+
+        Args:
+            collection_id: Collection unique identifier.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no collection with *collection_id* exists.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def add_artifacts(
+        self,
+        collection_id: str,
+        artifact_uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Add one or more artifacts to a collection by UUID.
+
+        Idempotent: artifacts already in the collection are silently skipped.
+
+        Args:
+            collection_id: Collection unique identifier.
+            artifact_uuids: List of stable artifact UUIDs (32-char hex
+                strings) to add to the collection.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist.
+            ValueError: If any UUID in *artifact_uuids* does not correspond
+                to a known artifact.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def remove_artifact(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Remove a single artifact from a collection.
+
+        Args:
+            collection_id: Collection unique identifier.
+            artifact_uuid: Stable artifact UUID (32-char hex) to remove.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist or *artifact_uuid* is
+                not a member of the collection.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Entity management within a collection
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list_entities(
+        self,
+        collection_id: str,
+        entity_type: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[Any]:
+        """Return entities belonging to a collection, optionally filtered by type.
+
+        Args:
+            collection_id: Collection unique identifier.
+            entity_type: Optional entity type string to filter by
+                (e.g. ``"workflow"``, ``"dataset"``).  When ``None``, all
+                entity types are returned.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of entity records.  The exact element type is
+            implementation-defined; callers should treat them as plain
+            dicts or typed DTOs depending on the backend.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def add_entity(
+        self,
+        collection_id: str,
+        entity_type: str,
+        entity_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Associate an entity with a collection.
+
+        Args:
+            collection_id: Collection unique identifier.
+            entity_type: Entity type string (e.g. ``"workflow"``).
+            entity_id: Unique identifier of the entity to associate.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist.
+            ValueError: If *entity_id* does not correspond to a known entity
+                of the given *entity_type*.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def remove_entity(
+        self,
+        collection_id: str,
+        entity_type: str,
+        entity_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Remove an entity association from a collection.
+
+        Args:
+            collection_id: Collection unique identifier.
+            entity_type: Entity type string (e.g. ``"workflow"``).
+            entity_id: Unique identifier of the entity to disassociate.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist or the entity is not
+                associated with the collection.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def migrate_to_default(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Migrate a collection's artifacts and entities to the default collection.
+
+        Intended for use when a non-default collection is being retired.
+        All member artifacts and entity associations are moved to the active
+        default collection; the source collection record is then removed.
+
+        Args:
+            collection_id: Collection unique identifier of the source collection
+                to migrate away from.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist.
+            ValueError: If *collection_id* refers to the current default
+                collection (cannot migrate to itself).
         """
         raise NotImplementedError
 
@@ -980,5 +1404,157 @@ class ISettingsRepository(abc.ABC):
         Returns:
             ``True`` if the token is valid and authenticated, ``False``
             otherwise.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Entity type configuration
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list_entity_type_configs(
+        self,
+        ctx: RequestContext | None = None,
+    ) -> list[EntityTypeConfigDTO]:
+        """Return all registered entity type configurations.
+
+        Args:
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.EntityTypeConfigDTO`
+            objects, including both system-defined and user-created entries.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def create_entity_type_config(
+        self,
+        entity_type: str,
+        display_name: str,
+        description: str | None = None,
+        icon: str | None = None,
+        color: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> EntityTypeConfigDTO:
+        """Create a new user-defined entity type configuration.
+
+        Args:
+            entity_type: Machine-readable entity type key
+                (e.g. ``"workflow"``).  Must be unique.
+            display_name: Human-readable display name.
+            description: Optional description of this entity type.
+            icon: Optional icon identifier or URL.
+            color: Optional hex color code (e.g. ``"#FF5733"``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The created :class:`~skillmeat.core.interfaces.dtos.EntityTypeConfigDTO`.
+
+        Raises:
+            ValueError: If an entity type config with the same *entity_type*
+                already exists.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_entity_type_config(
+        self,
+        config_id: str,
+        updates: dict[str, Any],
+        ctx: RequestContext | None = None,
+    ) -> EntityTypeConfigDTO:
+        """Apply a partial update to an existing entity type configuration.
+
+        Args:
+            config_id: Unique identifier of the entity type config record.
+            updates: Map of field names to new values.  Recognised keys
+                mirror :class:`~skillmeat.core.interfaces.dtos.EntityTypeConfigDTO`
+                fields: ``display_name``, ``description``, ``icon``,
+                ``color``.  The ``entity_type`` and ``is_system`` fields
+                are immutable after creation.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated :class:`~skillmeat.core.interfaces.dtos.EntityTypeConfigDTO`.
+
+        Raises:
+            KeyError: If no config with *config_id* exists.
+            ValueError: If the update attempts to mutate an immutable field.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete_entity_type_config(
+        self,
+        config_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Delete a user-defined entity type configuration.
+
+        System-defined entity type configs (``is_system=True``) cannot be
+        deleted.
+
+        Args:
+            config_id: Unique identifier of the entity type config record.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no config with *config_id* exists.
+            ValueError: If the config is system-defined.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Category management
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list_categories(
+        self,
+        entity_type: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[CategoryDTO]:
+        """Return all categories, optionally filtered by entity type.
+
+        Args:
+            entity_type: When provided, return only categories that apply
+                to this entity type (or cross-type categories where
+                ``entity_type`` is ``None`` on the record).  When omitted,
+                all categories are returned.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.CategoryDTO`
+            objects.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def create_category(
+        self,
+        name: str,
+        entity_type: str | None = None,
+        description: str | None = None,
+        color: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> CategoryDTO:
+        """Create a new category.
+
+        Args:
+            name: Human-readable category name.  Must be unique within the
+                same *entity_type* namespace.
+            entity_type: Optional entity type this category applies to.
+                Pass ``None`` for a cross-type (universal) category.
+            description: Optional description text.
+            color: Optional hex color code for UI display (e.g. ``"#00FF00"``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The created :class:`~skillmeat.core.interfaces.dtos.CategoryDTO`.
+
+        Raises:
+            ValueError: If a category with the same *name* and *entity_type*
+                combination already exists.
         """
         raise NotImplementedError

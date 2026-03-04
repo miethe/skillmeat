@@ -48,6 +48,9 @@ __all__ = [
     "DeploymentDTO",
     "TagDTO",
     "SettingsDTO",
+    "CollectionMembershipDTO",
+    "EntityTypeConfigDTO",
+    "CategoryDTO",
 ]
 
 
@@ -431,6 +434,165 @@ class SettingsDTO:
             edition=data.get("edition", "community"),
             indexing_mode=data.get("indexing_mode", "opt_in"),
             extra={k: v for k, v in data.items() if k not in known},
+        )
+
+
+# =============================================================================
+# CollectionMembershipDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class CollectionMembershipDTO:
+    """Records that an artifact belongs to a named collection.
+
+    Attributes:
+        collection_id: Unique identifier of the collection (collection name).
+        collection_name: Human-readable collection name.
+        artifact_uuid: Stable UUID of the artifact (per ADR-007).
+        artifact_id: Artifact primary key in ``"type:name"`` format.
+        added_at: ISO-8601 timestamp when the artifact was added to the
+            collection, or ``None`` when not tracked.
+    """
+
+    collection_id: str
+    collection_name: str
+    artifact_uuid: str | None = None
+    artifact_id: str | None = None
+    added_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a CollectionMembershipDTO from a plain dictionary.
+
+        Args:
+            data: Mapping that contains at minimum ``collection_id``
+                and ``collection_name``.
+
+        Returns:
+            A fully populated :class:`CollectionMembershipDTO`.
+        """
+        return cls(
+            collection_id=data["collection_id"],
+            collection_name=data["collection_name"],
+            artifact_uuid=data.get("artifact_uuid"),
+            artifact_id=data.get("artifact_id"),
+            added_at=_to_iso(data.get("added_at")),
+        )
+
+
+# =============================================================================
+# EntityTypeConfigDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class EntityTypeConfigDTO:
+    """Configuration record for a custom entity type.
+
+    Entity types extend the artifact model with user-defined groupings
+    (e.g. ``"workflow"``, ``"dataset"``).
+
+    Attributes:
+        id: Unique identifier for the entity type config record.
+        entity_type: Machine-readable entity type key (e.g. ``"workflow"``).
+        display_name: Human-readable display name.
+        description: Optional description of this entity type.
+        icon: Optional icon identifier or URL.
+        color: Optional hex color code for UI display (e.g. ``"#FF5733"``).
+        is_system: True when this config is built-in (not user-created).
+        created_at: ISO-8601 creation timestamp.
+        updated_at: ISO-8601 last-update timestamp.
+    """
+
+    id: str
+    entity_type: str
+    display_name: str
+    description: str | None = None
+    icon: str | None = None
+    color: str | None = None
+    is_system: bool = False
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct an EntityTypeConfigDTO from a plain dictionary.
+
+        Args:
+            data: Mapping that contains at minimum ``id``, ``entity_type``,
+                and ``display_name``.
+
+        Returns:
+            A fully populated :class:`EntityTypeConfigDTO`.
+        """
+        return cls(
+            id=data["id"],
+            entity_type=data["entity_type"],
+            display_name=data["display_name"],
+            description=data.get("description"),
+            icon=data.get("icon"),
+            color=data.get("color"),
+            is_system=bool(data.get("is_system", False)),
+            created_at=_to_iso(data.get("created_at")),
+            updated_at=_to_iso(data.get("updated_at")),
+        )
+
+
+# =============================================================================
+# CategoryDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class CategoryDTO:
+    """A user-defined category that can be applied to entities.
+
+    Categories provide a secondary classification axis beyond artifact type,
+    allowing users to group entities by purpose, domain, or any other
+    meaningful attribute.
+
+    Attributes:
+        id: Unique identifier for the category record.
+        name: Human-readable category name (must be unique within
+            ``entity_type``).
+        entity_type: The entity type this category applies to, or ``None``
+            for cross-type categories.
+        description: Optional description of what this category represents.
+        color: Optional hex color code for UI display (e.g. ``"#00FF00"``).
+        artifact_count: Number of artifacts assigned to this category.
+        created_at: ISO-8601 creation timestamp.
+        updated_at: ISO-8601 last-update timestamp.
+    """
+
+    id: str
+    name: str
+    entity_type: str | None = None
+    description: str | None = None
+    color: str | None = None
+    artifact_count: int = 0
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a CategoryDTO from a plain dictionary.
+
+        Args:
+            data: Mapping that contains at minimum ``id`` and ``name``.
+
+        Returns:
+            A fully populated :class:`CategoryDTO`.
+        """
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            entity_type=data.get("entity_type"),
+            description=data.get("description"),
+            color=data.get("color"),
+            artifact_count=int(data.get("artifact_count") or 0),
+            created_at=_to_iso(data.get("created_at")),
+            updated_at=_to_iso(data.get("updated_at")),
         )
 
 
