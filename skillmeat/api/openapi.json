@@ -18297,6 +18297,97 @@
         }
       }
     },
+    "/api/v1/integrations/idp/scaffold": {
+      "post": {
+        "tags": [
+          "integrations-idp",
+          "integrations-idp"
+        ],
+        "summary": "Generate scaffold files for an IDP target",
+        "description": "Renders a composite or skill artifact in-memory and returns the generated files as base64-encoded content.  Intended for use by Backstage software template actions and other IDP scaffolders.",
+        "operationId": "scaffold_api_v1_integrations_idp_scaffold_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IDPScaffoldRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Scaffold files rendered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IDPScaffoldResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid target_id or variable validation error"
+          },
+          "404": {
+            "description": "Target artifact not found"
+          },
+          "500": {
+            "description": "Internal rendering error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/integrations/idp/register-deployment": {
+      "post": {
+        "tags": [
+          "integrations-idp",
+          "integrations-idp"
+        ],
+        "summary": "Register or update an IDP deployment",
+        "description": "Records that a repository has deployed a given artifact target.  The operation is idempotent: re-submitting the same repo_url + target_id pair updates the existing DeploymentSet record instead of creating a duplicate.",
+        "operationId": "register_deployment_api_v1_integrations_idp_register_deployment_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IDPRegisterDeploymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Deployment registered or updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IDPRegisterDeploymentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request payload"
+          },
+          "500": {
+            "description": "Internal error persisting the deployment record"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
     "/api/v1/projects": {
       "get": {
         "tags": [
@@ -38068,6 +38159,164 @@
         "title": "HealthStatus",
         "description": "Health check response model."
       },
+      "IDPRegisterDeploymentRequest": {
+        "properties": {
+          "repo_url": {
+            "type": "string",
+            "title": "Repo Url",
+            "description": "HTTPS URL of the repository being registered (e.g. 'https://github.com/org/customer-api')",
+            "examples": [
+              "https://github.com/org/customer-api"
+            ]
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id",
+            "description": "Target artifact identifier in 'type:name' format (e.g. 'composite:fin-serv-compliance')",
+            "examples": [
+              "composite:fin-serv-compliance"
+            ]
+          },
+          "metadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Metadata",
+            "description": "Optional key/value metadata stored alongside the deployment record",
+            "examples": [
+              {
+                "environment": "production",
+                "team": "platform"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "repo_url",
+          "target_id"
+        ],
+        "title": "IDPRegisterDeploymentRequest",
+        "description": "Request to register an IDP deployment for an artifact target.\n\nRecords that a repository has deployed a given artifact target.  The\noperation is idempotent: re-submitting the same ``repo_url`` + ``target_id``\npair updates the existing deployment record rather than creating a duplicate.\n\nExamples:\n    >>> request = IDPRegisterDeploymentRequest(\n    ...     repo_url=\"https://github.com/org/customer-api\",\n    ...     target_id=\"composite:fin-serv-compliance\",\n    ...     metadata={\"team\": \"platform\"},\n    ... )",
+        "example": {
+          "metadata": {
+            "environment": "production",
+            "team": "platform"
+          },
+          "repo_url": "https://github.com/org/customer-api",
+          "target_id": "composite:fin-serv-compliance"
+        }
+      },
+      "IDPRegisterDeploymentResponse": {
+        "properties": {
+          "deployment_set_id": {
+            "type": "string",
+            "title": "Deployment Set Id",
+            "description": "UUID of the DeploymentSet record created or updated by this request",
+            "examples": [
+              "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            ]
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created",
+            "description": "True when a new DeploymentSet was created; False when an existing record was updated (idempotent re-registration)",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "deployment_set_id",
+          "created"
+        ],
+        "title": "IDPRegisterDeploymentResponse",
+        "description": "Response for a successful IDP deployment registration.\n\nReturns the UUID of the created or updated DeploymentSet together with an\nidempotency flag indicating whether the record was newly created.",
+        "example": {
+          "created": true,
+          "deployment_set_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        }
+      },
+      "IDPScaffoldRequest": {
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "title": "Target Id",
+            "description": "Target artifact identifier in 'type:name' format (e.g. 'composite:fin-serv-compliance', 'skill:canvas')",
+            "examples": [
+              "composite:fin-serv-compliance",
+              "skill:canvas"
+            ]
+          },
+          "variables": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Variables",
+            "description": "Optional key/value pairs substituted into rendered template files",
+            "examples": [
+              {
+                "AUTHOR": "Jane Doe",
+                "PROJECT_NAME": "customer-api"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_id"
+        ],
+        "title": "IDPScaffoldRequest",
+        "description": "Request to generate scaffold files for an IDP target.\n\nRenders a set of template files (e.g. CLAUDE.md, project config) for a\ngiven composite or skill target, with optional variable substitution.\n\nExamples:\n    >>> request = IDPScaffoldRequest(\n    ...     target_id=\"composite:fin-serv-compliance\",\n    ...     variables={\"PROJECT_NAME\": \"customer-api\"},\n    ... )",
+        "example": {
+          "target_id": "composite:fin-serv-compliance",
+          "variables": {
+            "AUTHOR": "Jane Doe",
+            "PROJECT_NAME": "customer-api"
+          }
+        }
+      },
+      "IDPScaffoldResponse": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/RenderedFile"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Rendered template files to be written to the target repository",
+            "examples": [
+              [
+                {
+                  "content_base64": "IyBDTEFVREUubWQ=",
+                  "path": ".claude/CLAUDE.md"
+                }
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "IDPScaffoldResponse",
+        "description": "Response containing rendered scaffold files for an IDP target.\n\nReturns a list of files that should be written to the repository by the\nIDP scaffolder (e.g. a Backstage software template action).",
+        "example": {
+          "files": [
+            {
+              "content_base64": "IyBDTEFVREUubWQ=",
+              "path": ".claude/CLAUDE.md"
+            },
+            {
+              "content_base64": "IyBDb21wbGlhbmNlIFJ1bGVz",
+              "path": ".claude/rules/compliance.md"
+            }
+          ]
+        }
+      },
       "IconPackResponse": {
         "properties": {
           "id": {
@@ -42212,10 +42461,11 @@
           "codex",
           "gemini",
           "cursor",
+          "remote_git",
           "other"
         ],
         "title": "Platform",
-        "description": "Supported platforms for artifact execution.\n\nRepresents the target execution environment where an artifact is designed\nto run. Used in frontmatter metadata to indicate platform compatibility.\n\nAttributes:\n    CLAUDE_CODE: Anthropic's Claude Code CLI tool\n    CODEX: OpenAI Codex CLI and integrations\n    GEMINI: Google Gemini CLI and integrations\n    CURSOR: Cursor AI editor\n    OTHER: Other platforms or unspecified\n\nExample:\n    >>> Platform.CLAUDE_CODE.value\n    'claude_code'\n    >>> Platform.CLAUDE_CODE == \"claude_code\"\n    True\n    >>> str(Platform.CURSOR)\n    'cursor'"
+        "description": "Supported platforms for artifact execution.\n\nRepresents the target execution environment where an artifact is designed\nto run. Used in frontmatter metadata to indicate platform compatibility.\n\nAttributes:\n    CLAUDE_CODE: Anthropic's Claude Code CLI tool\n    CODEX: OpenAI Codex CLI and integrations\n    GEMINI: Google Gemini CLI and integrations\n    CURSOR: Cursor AI editor\n    REMOTE_GIT: Remote Git repository (e.g. Backstage / IDP deployments)\n    OTHER: Other platforms or unspecified\n\nExample:\n    >>> Platform.CLAUDE_CODE.value\n    'claude_code'\n    >>> Platform.CLAUDE_CODE == \"claude_code\"\n    True\n    >>> str(Platform.CURSOR)\n    'cursor'\n    >>> Platform.REMOTE_GIT.value\n    'remote_git'"
       },
       "PlatformDefaultsEntry": {
         "properties": {
@@ -43823,6 +44073,34 @@
           "message": "Successfully re-imported artifact from upstream",
           "success": true
         }
+      },
+      "RenderedFile": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Relative path of the rendered file within the project (e.g. '.claude/CLAUDE.md')",
+            "examples": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/api-patterns.md"
+            ]
+          },
+          "content_base64": {
+            "type": "string",
+            "title": "Content Base64",
+            "description": "Base64-encoded UTF-8 file content",
+            "examples": [
+              "IyBDTEFVREUubWQKCk15IHByb2plY3QuCg=="
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "content_base64"
+        ],
+        "title": "RenderedFile",
+        "description": "A single rendered scaffold file.\n\nRepresents a file generated from a template during IDP scaffold rendering.\nContent is base64-encoded to safely transport arbitrary text (including\nCLAUDE.md files that may contain non-ASCII characters)."
       },
       "ReorderArtifactsRequest": {
         "properties": {
