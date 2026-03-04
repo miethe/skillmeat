@@ -177,7 +177,6 @@ services:
   #   yarn workspace backend add @skillmeat/backstage-plugin-scaffolder-backend
   #   # wire plugin into packages/backend/src/index.ts — see demo/README.md
   #   cp ../backstage-app-config.yaml app-config.local.yaml
-  #   ln -s ../dockerfile Dockerfile   # symlink so compose can find it
   #   yarn build:backend
   #
   # Start (from repo root):
@@ -195,7 +194,7 @@ services:
       # Defaults to demo/backstage-app/ inside this repo — no env var needed
       # for the standard setup.  Override only if your app lives elsewhere.
       context: ${BACKSTAGE_APP_DIR:-./demo/backstage-app}
-      dockerfile: Dockerfile   # symlink → ../dockerfile (demo/dockerfile)
+      dockerfile: ../dockerfile   # demo/dockerfile (relative to context)
     profiles:
       - full
       # backstage-only: start only Backstage, pointing at an already-running

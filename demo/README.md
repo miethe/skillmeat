@@ -80,17 +80,11 @@ npx @backstage/create-app@latest
 cd backstage-app
 ```
 
-### 2. Install the SkillMeat scaffolder plugin
+### 2. Set up the SkillMeat scaffolder plugin
 
-```bash
-yarn workspace backend add @skillmeat/backstage-plugin-scaffolder-backend
-```
-
-Wire the plugin into `packages/backend/src/index.ts` (add one line):
-
-```ts
-backend.add(import('@skillmeat/backstage-plugin-scaffolder-backend'));
-```
+The plugin ships with this repo at `plugins/backstage-plugin-scaffolder-backend/` and is
+already copied into `demo/backstage-app/plugins/` as a local workspace package — no npm
+install needed. It is also pre-wired into `packages/backend/src/index.ts`.
 
 ### 3. Apply the demo app-config
 
@@ -100,31 +94,26 @@ cp ../backstage-app-config.yaml app-config.local.yaml
 
 Edit `app-config.local.yaml` and set your `GITHUB_TOKEN` if you want live catalog integrations.
 
-### 4. Symlink the Dockerfile
-
-The compose build context is `demo/backstage-app/`, so the Dockerfile must be reachable there.
-A symlink keeps `demo/dockerfile` as the canonical source:
-
-```bash
-ln -s ../dockerfile Dockerfile
-```
-
-### 5. Build the Backstage backend
+### 4. Build the Backstage backend
 
 ```bash
 yarn build:backend
 ```
 
-### 6. Build the container image
+### 5. Build the container image
 
 From the repo root:
 
 ```bash
+# docker (recommended):
+docker compose -f docker-compose.demo.yml build backstage
+
 # podman needs BUILDAH_FORMAT=docker for --mount=type=cache in the Dockerfile
-BUILDAH_FORMAT=docker podman-compose -f docker-compose.demo.yml build backstage
+# and requires a profile to see the backstage service:
+BUILDAH_FORMAT=docker podman-compose -f docker-compose.demo.yml --profile backstage-only build backstage
 ```
 
-### 7. Start Backstage
+### 6. Start Backstage
 
 ```bash
 # Against the in-compose API (full profile):
@@ -138,8 +127,8 @@ podman-compose -f docker-compose.demo.yml --profile backstage-only up
 
 ```bash
 cd demo/backstage-app && yarn build:backend && cd ../..
-BUILDAH_FORMAT=docker podman-compose -f docker-compose.demo.yml build backstage
-podman-compose -f docker-compose.demo.yml --profile backstage-only up --force-recreate backstage
+docker compose -f docker-compose.demo.yml build backstage
+docker compose -f docker-compose.demo.yml --profile backstage-only up --force-recreate backstage
 ```
 
 See `plugins/backstage-plugin-scaffolder-backend/README.md` for full plugin documentation.

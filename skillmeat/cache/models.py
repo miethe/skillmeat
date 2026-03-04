@@ -378,7 +378,7 @@ class Artifact(Base):
     __table_args__ = (
         CheckConstraint(
             "type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook', "
-            "'composite', "
+            "'workflow', 'composite', "
             "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_artifact_type",
         ),
