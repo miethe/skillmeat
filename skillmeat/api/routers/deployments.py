@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from skillmeat.api.dependencies import (
     CollectionManagerDep,
+    DeploymentRepoDep,
     verify_api_key,
 )
 from skillmeat.api.middleware.auth import TokenDep
@@ -265,6 +266,9 @@ async def deploy_artifact(
             )
 
             # Update DB cache with deployment info (write-through pattern)
+            # TODO: migrate to repository — replace get_session() with
+            #   DeploymentRepoDep once IDeploymentRepository exposes a
+            #   cache-write / upsert method for add_deployment_to_cache.
             with PerfTimer(
                 "router.deploy_artifact.cache_write",
                 artifact_name=request.artifact_name,
@@ -398,6 +402,9 @@ async def undeploy_artifact(
                 )
 
             # Write through to DB cache after successful undeploy
+            # TODO: migrate to repository — replace get_session() with
+            #   DeploymentRepoDep once IDeploymentRepository exposes a
+            #   cache-write / delete method for remove_deployment_from_cache.
             with PerfTimer(
                 "router.undeploy_artifact.cache_write",
                 artifact_name=request.artifact_name,
@@ -470,6 +477,7 @@ async def undeploy_artifact(
     },
 )
 async def list_deployments(
+    deployment_repo: DeploymentRepoDep,
     deployment_mgr: DeploymentManager = Depends(get_deployment_manager),
     token: TokenDep = None,
     project_path: Optional[str] = Query(

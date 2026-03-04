@@ -14,7 +14,11 @@ from typing import Annotated, List, Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
 
-from skillmeat.api.dependencies import ArtifactManagerDep, CollectionManagerDep
+from skillmeat.api.dependencies import (
+    ArtifactManagerDep,
+    CollectionManagerDep,
+    DbSessionDep as _DbSessionDepBase,
+)
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.collections import (
     RefreshModeEnum,
@@ -54,7 +58,6 @@ from skillmeat.cache.models import (
     Group,
     GroupArtifact,
     Project,
-    get_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,24 +77,9 @@ router = APIRouter(
 # Database Session Dependency
 # =============================================================================
 
-
-def get_db_session():
-    """Get database session with proper cleanup.
-
-    Yields:
-        SQLAlchemy session instance
-
-    Note:
-        Session is automatically closed after request completes
-    """
-    session = get_session()
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-DbSessionDep = Annotated[Session, Depends(get_db_session)]
+# Use the canonical per-request session from the hexagonal DI layer instead of
+# a local duplicate so that session lifecycle is managed in one place.
+DbSessionDep = _DbSessionDepBase
 
 
 # =============================================================================
