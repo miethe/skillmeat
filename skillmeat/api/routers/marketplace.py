@@ -772,6 +772,8 @@ async def publish_bundle(
 
     try:
         # Validate bundle path exists
+        # TODO: migrate to repository — bundle file access could go through an IBundleRepository
+        # once bundle storage is abstracted beyond direct filesystem paths.
         bundle_path = Path(publish_req.bundle_path)
         if not bundle_path.exists():
             raise HTTPException(
