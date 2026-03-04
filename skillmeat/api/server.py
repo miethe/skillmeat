@@ -45,6 +45,7 @@ from .routers import (
     groups,
     health,
     icon_packs,
+    idp_integration,
     marketplace,
     marketplace_catalog,
     marketplace_sources,
@@ -428,6 +429,11 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(merge.router, prefix=settings.api_prefix, tags=["merge"])
     app.include_router(
         project_templates.router, prefix=settings.api_prefix, tags=["project-templates"]
+    )
+    app.include_router(
+        idp_integration.router,
+        prefix=settings.api_prefix,
+        tags=["integrations-idp"],
     )
     app.include_router(projects.router, prefix=settings.api_prefix, tags=["projects"])
     app.include_router(ratings.router, prefix=settings.api_prefix, tags=["ratings"])

@@ -1,0 +1,162 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: fin-serv-project
+  title: "Financial Services Project with AI Context"
+  description: "Scaffolds a new financial services project with SkillMeat compliance context pack pre-injected for AI-assisted development"
+  tags:
+    - financial-services
+    - skillmeat
+    - ai-context
+    - compliance
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: Project Details
+      required:
+        - projectName
+        - owner
+        - repoUrl
+      properties:
+        projectName:
+          title: Project Name
+          type: string
+          description: Name of the new financial services project
+          ui:autofocus: true
+          pattern: "^[a-z][a-z0-9-]*$"
+          ui:help: "Lowercase letters, numbers, and hyphens only. Must start with a letter."
+
+        description:
+          title: Description
+          type: string
+          description: Short description of the project's purpose
+          ui:widget: textarea
+          ui:options:
+            rows: 3
+
+        owner:
+          title: Owner
+          type: string
+          description: GitHub username or team that will own this repository
+          ui:field: OwnerPicker
+          ui:options:
+            allowedKinds:
+              - Group
+              - User
+
+        team:
+          title: Team
+          type: string
+          description: Team name used for deployment metadata and cost attribution
+          default: platform
+          enum:
+            - platform
+            - risk
+            - compliance
+            - treasury
+            - retail-banking
+          enumNames:
+            - Platform
+            - Risk & Analytics
+            - Compliance
+            - Treasury
+            - Retail Banking
+
+        repoUrl:
+          title: Repository Location
+          type: string
+          description: GitHub repository where the project will be published
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+
+  steps:
+    # Step 1: Scaffold the base project skeleton from the local template directory.
+    # The skeleton/ folder ships standard financial services project boilerplate
+    # including a catalog-info.yaml, .gitignore, and basic directory layout.
+    - id: fetch-template
+      name: Fetch Base Template
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          projectName: ${{ parameters.projectName }}
+          description: ${{ parameters.description | default("A financial services project") }}
+          owner: ${{ parameters.owner }}
+          team: ${{ parameters.team }}
+          repoUrl: ${{ parameters.repoUrl }}
+
+    # Step 2: Inject the SkillMeat Golden Context Pack for fin-serv compliance.
+    # This calls POST /api/v1/integrations/idp/scaffold on the SkillMeat API and
+    # writes the returned context files (CLAUDE.md, skill configs, compliance
+    # checklists, etc.) directly into the scaffolder workspace alongside the
+    # skeleton files fetched above.
+    #
+    # The action resolves the API URL and token from app-config.yaml by default
+    # (skillmeat.baseUrl and skillmeat.token). Both can be overridden per-step
+    # via the baseUrl and token inputs if needed for environment-specific routing.
+    - id: inject-context
+      name: Inject SkillMeat Compliance Context Pack
+      action: skillmeat:context:inject
+      input:
+        targetId: "composite:fin-serv-compliance"
+        variables:
+          PROJECT_NAME: ${{ parameters.projectName }}
+          AUTHOR: ${{ parameters.owner }}
+
+    # Step 3: Publish the combined workspace (skeleton + injected context) to GitHub.
+    # The remoteUrl output from this step is consumed by the register-deployment
+    # step so that SkillMeat can correlate the new repository with the source
+    # composite artifact.
+    - id: publish
+      name: Publish to GitHub
+      action: publish:github
+      input:
+        allowedHosts:
+          - github.com
+        description: ${{ parameters.description | default("Financial services project scaffolded with SkillMeat AI context") }}
+        repoUrl: ${{ parameters.repoUrl }}
+        defaultBranch: main
+        gitCommitMessage: "chore: initial project scaffold with SkillMeat fin-serv compliance context"
+        repoVisibility: private
+        topics:
+          - financial-services
+          - skillmeat
+          - ai-assisted
+
+    # Step 4: Register the deployment with SkillMeat so the platform can track
+    # which repositories were bootstrapped from each composite artifact. This
+    # enables drift detection, compliance auditing, and context pack version
+    # management across the organization's project fleet.
+    - id: register-deployment
+      name: Register SkillMeat Deployment
+      action: skillmeat:deployment:register
+      input:
+        repoUrl: ${{ steps.publish.output.remoteUrl }}
+        targetId: "composite:fin-serv-compliance"
+        metadata:
+          team: ${{ parameters.team }}
+          environment: development
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+        icon: github
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps.register-catalog-info.output.entityRef }}
+    text:
+      - title: SkillMeat Context
+        content: |
+          Injected **${{ steps.inject-context.output.filesWritten }}** context files
+          from the `composite:fin-serv-compliance` pack into your project workspace.
+      - title: Deployment Registration
+        content: |
+          Deployment set ID: `${{ steps.register-deployment.output.deploymentSetId }}`
+          Status: ${{ "Created" if steps.register-deployment.output.created else "Updated" }}

@@ -6,6 +6,7 @@ This module provides secure template deployment functionality with:
 - Atomic deployment with rollback
 - Support for selective entity deployment
 - Optimized for performance (async I/O, batch queries, cached patterns)
+- In-memory rendering for Backstage/IDP scaffold integrations
 
 Security:
     - Uses simple string replacement (no eval/exec)
@@ -31,6 +32,7 @@ Performance Optimizations:
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import tempfile
 import shutil
@@ -38,15 +40,20 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy.orm import Session, joinedload
 
-from skillmeat.cache.models import Artifact, ProjectTemplate, TemplateEntity
+from skillmeat.cache.models import Artifact, CompositeArtifact, ProjectTemplate, TemplateEntity
 from skillmeat.core.validators.context_path_validator import (
     resolve_project_profile,
     rewrite_path_for_profile,
 )
+
+logger = logging.getLogger(__name__)
+
+# Maximum number of composite member artifacts allowed for in-memory rendering.
+_MAX_COMPOSITE_MEMBERS = 20
 
 # Try importing aiofiles, fall back to sync I/O if not available
 try:
@@ -65,6 +72,21 @@ ALLOWED_VARIABLES = {
     "DATE",
     "ARCHITECTURE_DESCRIPTION",
 }
+
+
+@dataclass
+class RenderedFile:
+    """A single rendered file produced by in-memory template rendering.
+
+    Attributes:
+        path: Relative path within the project (e.g. ".claude/CLAUDE.md").
+              Leading "./" is stripped; the path is always relative (no leading "/").
+        content: Rendered file content as UTF-8 bytes with all template variables
+                 already substituted.
+    """
+
+    path: str
+    content: bytes
 
 
 @dataclass
@@ -189,6 +211,196 @@ def resolve_file_path(path_pattern: str, project_path: Path) -> Path:
         ) from e
 
     return target_path
+
+
+def render_in_memory(
+    session: Session,
+    target_id: str,
+    variables: dict[str, str],
+) -> List[RenderedFile]:
+    """Render a composite artifact in memory without writing any files to disk.
+
+    Resolves a composite artifact by ``target_id``, iterates over its member
+    artifacts in dependency order (ascending ``position``), performs variable
+    substitution on each member's stored content, and returns the full rendered
+    file tree as a list of :class:`RenderedFile` objects.
+
+    This method is intended for Backstage/IDP scaffold integrations where the
+    caller needs the rendered file contents as base64-encoded bytes without any
+    intermediate disk writes.
+
+    Supported ``target_id`` formats (v1 — composite only):
+        - ``"composite:<name>"``  e.g. ``"composite:my-plugin"``
+        - ``"template:<name>"`` is reserved but not yet implemented
+
+    Args:
+        session: SQLAlchemy database session used to resolve the composite and
+                 its member artifacts.
+        target_id: Identifier of the artifact to render.  Must be in
+                   ``"composite:<name>"`` format for v1.
+        variables: Template variable values.  Must include ``PROJECT_NAME``; all
+                   keys must be in the :data:`ALLOWED_VARIABLES` whitelist.
+
+    Returns:
+        List of :class:`RenderedFile` objects ordered by member ``position``.
+        Members whose ``child_artifact`` has no stored content are silently
+        skipped (a debug-level log entry is emitted for each skip).
+
+    Raises:
+        ValueError: If ``target_id`` format is invalid, the composite is not
+                    found in the database, the number of member artifacts exceeds
+                    :data:`_MAX_COMPOSITE_MEMBERS`, or ``variables`` fails
+                    validation.
+
+    Note:
+        The existing disk-write render pipeline (:func:`deploy_template_async` /
+        :func:`deploy_template`) is completely unchanged by this method.
+
+    Performance:
+        Member artifacts are loaded via the ``memberships → child_artifact``
+        relationship which uses ``lazy="selectin"`` / ``lazy="joined"``
+        respectively, so the full membership set is typically resolved in at
+        most two SQL round-trips.
+    """
+    # ------------------------------------------------------------------
+    # 1. Validate variables up-front (raises ValueError on bad input).
+    # ------------------------------------------------------------------
+    validate_variables(variables)
+
+    # Apply default DATE if not supplied.
+    if "DATE" not in variables:
+        variables = dict(variables)  # avoid mutating the caller's dict
+        variables["DATE"] = datetime.now().strftime("%Y-%m-%d")
+
+    # ------------------------------------------------------------------
+    # 2. Parse and validate target_id format.
+    # ------------------------------------------------------------------
+    if ":" not in target_id:
+        raise ValueError(
+            f"Invalid target_id format '{target_id}'. "
+            "Expected 'composite:<name>' or 'template:<name>'."
+        )
+
+    id_type, _, id_name = target_id.partition(":")
+
+    if id_type == "template":
+        raise ValueError(
+            "target_id type 'template' is not yet implemented. "
+            "Only 'composite:<name>' is supported in v1."
+        )
+
+    if id_type != "composite":
+        raise ValueError(
+            f"Unknown target_id type '{id_type}'. "
+            "Expected 'composite:<name>'."
+        )
+
+    if not id_name:
+        raise ValueError(
+            f"target_id '{target_id}' has an empty name component."
+        )
+
+    # ------------------------------------------------------------------
+    # 3. Resolve the composite artifact from the DB.
+    # ------------------------------------------------------------------
+    composite: Optional[CompositeArtifact] = (
+        session.query(CompositeArtifact)
+        .filter(CompositeArtifact.id == target_id)
+        .first()
+    )
+
+    if composite is None:
+        raise ValueError(
+            f"Composite artifact '{target_id}' not found in the database."
+        )
+
+    # ------------------------------------------------------------------
+    # 4. Enforce membership cap.
+    # ------------------------------------------------------------------
+    memberships = composite.memberships  # already selectin-loaded
+    if len(memberships) > _MAX_COMPOSITE_MEMBERS:
+        raise ValueError(
+            f"Composite '{target_id}' has {len(memberships)} member artifacts "
+            f"which exceeds the maximum of {_MAX_COMPOSITE_MEMBERS}."
+        )
+
+    # ------------------------------------------------------------------
+    # 5. Sort members in dependency order (ascending position, nulls last).
+    # ------------------------------------------------------------------
+    sorted_memberships = sorted(
+        memberships,
+        key=lambda m: (m.position is None, m.position if m.position is not None else 0),
+    )
+
+    # ------------------------------------------------------------------
+    # 6. Render each member artifact in order.
+    # ------------------------------------------------------------------
+    rendered_files: List[RenderedFile] = []
+
+    for membership in sorted_memberships:
+        child = membership.child_artifact  # joined-loaded
+
+        if child is None:
+            logger.debug(
+                "render_in_memory: skipping membership in composite '%s' — "
+                "child_artifact_uuid=%s not resolved (possibly deleted).",
+                target_id,
+                membership.child_artifact_uuid,
+            )
+            continue
+
+        # Prefer core_content (pre-assembly), fall back to assembled content.
+        raw_content: Optional[str] = child.core_content or child.content
+
+        if raw_content is None:
+            logger.debug(
+                "render_in_memory: skipping child artifact '%s' (uuid=%s) in "
+                "composite '%s' — no stored content.",
+                child.id,
+                child.uuid,
+                target_id,
+            )
+            continue
+
+        path_pattern = child.path_pattern
+        if not path_pattern:
+            logger.debug(
+                "render_in_memory: skipping child artifact '%s' (uuid=%s) in "
+                "composite '%s' — no path_pattern defined.",
+                child.id,
+                child.uuid,
+                target_id,
+            )
+            continue
+
+        # Security: reject path traversal in the stored pattern.
+        if ".." in path_pattern:
+            logger.warning(
+                "render_in_memory: skipping child artifact '%s' — "
+                "path_pattern '%s' contains '..' (path traversal rejected).",
+                child.id,
+                path_pattern,
+            )
+            continue
+
+        # Normalise to a clean relative path (strip leading "./" or "/").
+        clean_path = path_pattern
+        if clean_path.startswith("./"):
+            clean_path = clean_path[2:]
+        elif clean_path.startswith("/"):
+            clean_path = clean_path[1:]
+
+        # Perform variable substitution.
+        rendered_str = render_content(raw_content, variables)
+
+        rendered_files.append(
+            RenderedFile(
+                path=clean_path,
+                content=rendered_str.encode("utf-8"),
+            )
+        )
+
+    return rendered_files
 
 
 async def deploy_template_async(
