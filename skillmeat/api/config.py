@@ -45,6 +45,14 @@ class APISettings(BaseSettings):
         description="Application environment (development, production, testing)",
     )
 
+    # Edition — controls repository implementation selection (local vs enterprise)
+    edition: str = Field(
+        default="local",
+        description="Deployment edition: 'local' (default) or 'enterprise'. "
+        "Used by factory providers to choose between repository implementations. "
+        "Configurable via SKILLMEAT_EDITION env var.",
+    )
+
     # Server configuration
     host: str = Field(
         default="127.0.0.1",

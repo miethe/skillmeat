@@ -5,7 +5,7 @@ doc_type: context
 prd: "repo-pattern-refactor"
 feature_slug: "repo-pattern-refactor"
 created: 2026-03-01
-updated: 2026-03-01
+updated: 2026-03-04
 ---
 
 # Context: Storage Abstraction & Repository Pattern Refactor
@@ -64,7 +64,23 @@ _Active blockers will be tracked here._
 
 ## Performance Baseline
 
-_To be recorded during Phase 0 TASK-0.7_
+**Date**: 2026-03-04
+**Endpoint**: GET /api/v1/artifacts
+**Requests**: 50
+**Server**: Started fresh via `python -m skillmeat.api.server` (was not already running at time of measurement)
+
+| Metric | Value |
+|--------|-------|
+| P50 | 0.000901s |
+| P95 | 0.014845s |
+| P99 | 0.016221s |
+| Min | 0.000702s |
+| Max | 0.016221s |
+
+**Notes**: Baseline recorded before any architectural changes (branch: `refactor/repo-pattern-refactor`,
+no commits yet). All 50 requests returned HTTP 200. Latencies measured end-to-end via
+`curl --time_total` on localhost — values reflect server processing time with no network overhead.
+Server had no warm-up period; first request hit cold caches.
 
 ## Pre-existing Test Failures
 
