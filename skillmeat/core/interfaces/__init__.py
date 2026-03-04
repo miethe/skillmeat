@@ -31,13 +31,30 @@ from skillmeat.core.interfaces.dtos import (
     SettingsDTO,
     TagDTO,
 )
+from skillmeat.core.interfaces.repositories import (
+    IArtifactRepository,
+    ICollectionRepository,
+    IDeploymentRepository,
+    IProjectRepository,
+    ISettingsRepository,
+    ITagRepository,
+)
 
 __all__: list[str] = [
+    # Context
     "RequestContext",
+    # DTOs
     "ArtifactDTO",
     "CollectionDTO",
     "DeploymentDTO",
     "ProjectDTO",
     "SettingsDTO",
     "TagDTO",
+    # Repository interfaces
+    "IArtifactRepository",
+    "ICollectionRepository",
+    "IDeploymentRepository",
+    "IProjectRepository",
+    "ISettingsRepository",
+    "ITagRepository",
 ]
