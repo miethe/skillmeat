@@ -27,7 +27,7 @@ tasks:
   estimate: 0.5 pts
 - id: TASK-1.2
   title: Define RequestContext dataclass
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -35,7 +35,7 @@ tasks:
   estimate: 0.5 pts
 - id: TASK-1.3
   title: Define DTOs (Artifact, Project, Collection, Deployment, Tag, Settings)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -59,10 +59,10 @@ parallelization:
   batch_3:
   - TASK-1.4
 total_tasks: 4
-completed_tasks: 1
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 25
+progress: 75
 ---
 
 # Phase 1: Interface Design — Progress
