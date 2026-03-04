@@ -14,7 +14,12 @@ from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from skillmeat.api.dependencies import get_app_state, get_collection_manager, verify_api_key
+from skillmeat.api.dependencies import (
+    ProjectRepoDep,
+    get_app_state,
+    get_collection_manager,
+    verify_api_key,
+)
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.artifacts import (
     DeploymentModificationStatus,
@@ -42,6 +47,7 @@ from skillmeat.api.schemas.projects import (
 )
 from skillmeat.api.project_registry import ProjectRegistry, get_project_registry
 from skillmeat.cache.manager import CacheManager
+from skillmeat.core.interfaces.dtos import ProjectDTO
 from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.storage.project import ProjectMetadataStorage
@@ -616,6 +622,7 @@ async def list_projects(
 async def create_project(
     request: ProjectCreateRequest,
     token: TokenDep,
+    project_repo: ProjectRepoDep,
     cache_manager: CacheManagerDep,
 ) -> ProjectCreateResponse:
     """Create a new project.
@@ -624,11 +631,13 @@ async def create_project(
     1. Creating the project directory if it doesn't exist
     2. Creating the .claude subdirectory
     3. Storing project metadata
-    4. Adding project to persistent cache
+    4. Registering project via repository
+    5. Adding project to persistent cache
 
     Args:
         request: Project creation request with name, path, and optional description
         token: Authentication token
+        project_repo: IProjectRepository dependency
         cache_manager: CacheManager dependency for persistent cache updates
 
     Returns:
@@ -657,10 +666,19 @@ async def create_project(
     try:
         logger.info(f"Creating project: {request.name} at {request.path}")
 
-        # Convert path to Path object
+        # Resolve path
+        # TODO: IProjectRepository.create() should handle path resolution internally.
         project_path = Path(request.path).resolve()
+        project_id = encode_project_id(str(project_path))
 
-        # Check if project metadata already exists
+        # Check if project metadata already exists via repository lookup
+        existing = project_repo.get(project_id)
+        if existing is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Project already exists at path: {request.path}",
+            )
+        # Also check filesystem metadata in case the project exists but is unregistered
         if ProjectMetadataStorage.exists(project_path):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -668,6 +686,7 @@ async def create_project(
             )
 
         # Create project directory if it doesn't exist
+        # TODO: Directory creation should move into IProjectRepository.create() impl.
         try:
             project_path.mkdir(parents=True, exist_ok=True)
             logger.info(f"Created project directory: {project_path}")
@@ -678,6 +697,7 @@ async def create_project(
             )
 
         # Create .claude subdirectory
+        # TODO: .claude directory scaffolding should move into IProjectRepository.create() impl.
         claude_dir = project_path / ".claude"
         try:
             claude_dir.mkdir(parents=True, exist_ok=True)
@@ -688,7 +708,8 @@ async def create_project(
                 detail=f"Failed to create .claude directory: {str(e)}",
             )
 
-        # Create project metadata
+        # Create project metadata on filesystem
+        # TODO: ProjectMetadataStorage write should move into IProjectRepository.create() impl.
         metadata = ProjectMetadataStorage.create_metadata(
             project_path=project_path,
             name=request.name,
@@ -700,6 +721,23 @@ async def create_project(
 
         DeploymentTracker.write_deployments(project_path, [])
 
+        # Register project via repository
+        new_dto = ProjectDTO(
+            id=project_id,
+            name=request.name,
+            path=str(project_path),
+            description=request.description,
+            status="active",
+            artifact_count=0,
+            created_at=metadata.created_at.isoformat() if hasattr(metadata.created_at, "isoformat") else str(metadata.created_at) if metadata.created_at else None,
+        )
+        try:
+            project_repo.create(new_dto)
+            logger.info(f"Project registered via repository: {request.name}")
+        except Exception as e:
+            # Log but don't fail — filesystem state is the source of truth
+            logger.warning(f"Failed to register project in repository: {e}")
+
         logger.info(f"Project created successfully: {request.name}")
 
         # Invalidate in-memory cache so new project appears in list
@@ -710,7 +748,7 @@ async def create_project(
         if cache_manager is not None:
             try:
                 new_project_data: dict[str, object] = {
-                    "id": encode_project_id(str(project_path)),
+                    "id": project_id,
                     "name": request.name,
                     "path": str(project_path),
                     "description": request.description,
@@ -726,7 +764,7 @@ async def create_project(
                 )
 
         return ProjectCreateResponse(
-            id=encode_project_id(str(project_path)),
+            id=project_id,
             path=str(project_path),
             name=metadata.name,
             description=metadata.description,
@@ -758,6 +796,7 @@ async def create_project(
 async def get_project(
     project_id: str,
     token: TokenDep,
+    project_repo: ProjectRepoDep,
     cache_manager: CacheManagerDep,
     response: Response,
 ) -> ProjectDetail:
@@ -769,6 +808,7 @@ async def get_project(
     Args:
         project_id: Base64-encoded project path
         token: Authentication token
+        project_repo: IProjectRepository dependency
         cache_manager: CacheManager dependency
         response: FastAPI Response for headers
 
@@ -784,9 +824,20 @@ async def get_project(
     try:
         logger.info(f"Getting project: {project_id}")
 
-        # Decode project ID to path
-        project_path_str = decode_project_id(project_id)
-        project_path = Path(project_path_str)
+        # Resolve project via repository (replaces direct path.exists() check)
+        project_dto: Optional[ProjectDTO] = project_repo.get(project_id)
+        if project_dto is None:
+            # Fall back to decoding the ID and checking filesystem directly for
+            # projects not yet registered in the repository.
+            project_path_str = decode_project_id(project_id)
+            project_path = Path(project_path_str)
+            if not project_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project not found at path: {project_path_str}",
+                )
+        else:
+            project_path = Path(project_dto.path)
 
         # Try to get from cache first (if available)
         if cache_manager is not None:
@@ -805,14 +856,8 @@ async def get_project(
             except Exception as e:
                 logger.warning(f"Failed to check cache for project {project_id}: {e}")
 
-        # Check if project exists on filesystem
-        if not project_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path_str}",
-            )
-
-        # Check if deployment file exists
+        # Check if deployment file exists (filesystem check — no repository method for this)
+        # TODO: IProjectRepository.get_artifacts() could replace this when fully wired.
         deployment_file = DeploymentTracker.get_deployment_file_path(project_path)
         if not deployment_file.exists():
             raise HTTPException(
@@ -864,6 +909,7 @@ async def update_project(
     project_id: str,
     request: ProjectUpdateRequest,
     token: TokenDep,
+    project_repo: ProjectRepoDep,
 ) -> ProjectDetail:
     """Update project metadata.
 
@@ -874,6 +920,7 @@ async def update_project(
         project_id: Base64-encoded project path
         request: Project update request with optional name and description
         token: Authentication token
+        project_repo: IProjectRepository dependency
 
     Returns:
         Updated project details
@@ -893,23 +940,24 @@ async def update_project(
     try:
         logger.info(f"Updating project: {project_id}")
 
-        # Decode project ID to path
-        project_path_str = decode_project_id(project_id)
-        project_path = Path(project_path_str)
-
-        # Check if project exists
-        if not project_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path_str}",
-            )
-
-        # Check if metadata exists
-        if not ProjectMetadataStorage.exists(project_path):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project metadata not found for: {project_path.name}",
-            )
+        # Resolve project via repository (replaces direct path.exists() checks)
+        project_dto: Optional[ProjectDTO] = project_repo.get(project_id)
+        if project_dto is None:
+            # Fall back to decoding ID and checking filesystem for unregistered projects
+            project_path_str = decode_project_id(project_id)
+            project_path = Path(project_path_str)
+            if not project_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project not found at path: {project_path_str}",
+                )
+            if not ProjectMetadataStorage.exists(project_path):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project metadata not found for: {project_path.name}",
+                )
+        else:
+            project_path = Path(project_dto.path)
 
         # Validate that at least one field is being updated
         if request.name is None and request.description is None:
@@ -918,7 +966,9 @@ async def update_project(
                 detail="At least one field (name or description) must be provided",
             )
 
-        # Update metadata
+        # Update filesystem metadata
+        # TODO: ProjectMetadataStorage.update_metadata() should move into
+        #       IProjectRepository.update() implementation.
         updated_metadata = ProjectMetadataStorage.update_metadata(
             project_path=project_path,
             name=request.name,
@@ -930,6 +980,19 @@ async def update_project(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Failed to update project metadata",
             )
+
+        # Sync update back to repository
+        updates: dict = {}
+        if request.name is not None:
+            updates["name"] = request.name
+        if request.description is not None:
+            updates["description"] = request.description
+        if updates:
+            try:
+                project_repo.update(project_id, updates)
+            except Exception as e:
+                # Log but don't fail — filesystem is source of truth
+                logger.warning(f"Failed to update project in repository: {e}")
 
         logger.info(f"Project updated successfully: {updated_metadata.name}")
 
@@ -966,6 +1029,7 @@ async def update_project(
 async def delete_project(
     project_id: str,
     token: TokenDep,
+    project_repo: ProjectRepoDep,
     delete_files: bool = Query(
         default=False,
         description="If true, delete project files from disk (WARNING: destructive operation)",
@@ -980,6 +1044,7 @@ async def delete_project(
     Args:
         project_id: Base64-encoded project path
         token: Authentication token
+        project_repo: IProjectRepository dependency
         delete_files: Whether to delete project files from disk (default: False)
 
     Returns:
@@ -1001,26 +1066,37 @@ async def delete_project(
     try:
         logger.info(f"Deleting project: {project_id} (delete_files={delete_files})")
 
-        # Decode project ID to path
-        project_path_str = decode_project_id(project_id)
-        project_path = Path(project_path_str)
+        # Resolve project via repository (replaces direct path.exists() checks)
+        project_dto: Optional[ProjectDTO] = project_repo.get(project_id)
+        if project_dto is None:
+            # Fall back to decoding ID and checking filesystem for unregistered projects
+            project_path_str = decode_project_id(project_id)
+            project_path = Path(project_path_str)
+            if not project_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project not found at path: {project_path_str}",
+                )
+            if not ProjectMetadataStorage.exists(project_path):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project metadata not found for: {project_path.name}",
+                )
+        else:
+            project_path = Path(project_dto.path)
 
-        # Check if project exists
-        if not project_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path_str}",
-            )
-
-        # Check if metadata exists
-        if not ProjectMetadataStorage.exists(project_path):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project metadata not found for: {project_path.name}",
-            )
-
-        # Delete metadata file
+        # Delete filesystem metadata
+        # TODO: ProjectMetadataStorage.delete_metadata() should move into
+        #       IProjectRepository.delete() implementation.
         metadata_deleted = ProjectMetadataStorage.delete_metadata(project_path)
+
+        # Remove from repository registry
+        try:
+            project_repo.delete(project_id)
+            logger.info(f"Project removed from repository: {project_id}")
+        except Exception as e:
+            # Log but don't fail — filesystem state drives truth
+            logger.warning(f"Failed to remove project from repository: {e}")
 
         message = "Project removed from tracking successfully"
         files_deleted = False
@@ -1080,6 +1156,7 @@ async def remove_project_deployment(
     project_id: str,
     artifact_name: str,
     token: TokenDep,
+    project_repo: ProjectRepoDep,
     artifact_type: str = Query(
         description="Type of the artifact to remove",
         examples=["skill"],
@@ -1131,16 +1208,24 @@ async def remove_project_deployment(
             f"({artifact_type}) from project {project_id}"
         )
 
-        # Decode project ID to path
-        project_path_str = decode_project_id(project_id)
-        project_path = Path(project_path_str)
-
-        # Validate project exists
-        if not project_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path_str}",
-            )
+        # Resolve project via repository (replaces direct path.exists() check)
+        project_dto: Optional[ProjectDTO] = project_repo.get(project_id)
+        if project_dto is None:
+            project_path_str = decode_project_id(project_id)
+            project_path = Path(project_path_str)
+            if not project_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project not found at path: {project_path_str}",
+                )
+        else:
+            project_path = Path(project_dto.path)
+            project_path_str = str(project_path)
+            if not project_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project not found at path: {project_path_str}",
+                )
 
         # Validate artifact type
         try:
@@ -1264,6 +1349,7 @@ async def remove_project_deployment(
 async def check_project_modifications(
     project_id: str,
     token: TokenDep,
+    project_repo: ProjectRepoDep,
 ) -> ModificationCheckResponse:
     """Check for modifications in all deployed artifacts.
 
@@ -1276,6 +1362,7 @@ async def check_project_modifications(
     Args:
         project_id: Base64-encoded project path
         token: Authentication token
+        project_repo: IProjectRepository dependency
 
     Returns:
         Modification check results with status and change origin for each deployment
@@ -1307,18 +1394,21 @@ async def check_project_modifications(
     try:
         logger.info(f"Checking modifications for project: {project_id}")
 
-        # Decode project ID to path
-        project_path_str = decode_project_id(project_id)
-        project_path = Path(project_path_str)
+        # Resolve project via repository (replaces direct path.exists() check)
+        project_dto: Optional[ProjectDTO] = project_repo.get(project_id)
+        if project_dto is None:
+            project_path_str = decode_project_id(project_id)
+            project_path = Path(project_path_str)
+            if not project_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project not found at path: {project_path_str}",
+                )
+        else:
+            project_path = Path(project_dto.path)
 
-        # Validate project exists
-        if not project_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path_str}",
-            )
-
-        # Check if deployment file exists
+        # Check if deployment file exists (no repository method for this yet)
+        # TODO: Replace with project_repo.get_artifacts() when fully wired.
         deployment_file = DeploymentTracker.get_deployment_file_path(project_path)
         if not deployment_file.exists():
             raise HTTPException(
@@ -1326,7 +1416,8 @@ async def check_project_modifications(
                 detail=f"No deployments found for project: {project_path.name}",
             )
 
-        # Use sync manager to check drift - this provides proper change_origin detection
+        # Use sync manager from app state to check drift - provides proper change_origin detection
+        # TODO: SyncManager construction with hardcoded collection_path should use DI.
         from skillmeat.core.sync import SyncManager
 
         sync_mgr = SyncManager(
@@ -1420,6 +1511,7 @@ async def check_project_modifications(
 async def get_modified_artifacts(
     project_id: str,
     token: TokenDep,
+    project_repo: ProjectRepoDep,
 ) -> ModifiedArtifactsResponse:
     """Get list of all modified artifacts in a project.
 
@@ -1431,6 +1523,7 @@ async def get_modified_artifacts(
     Args:
         project_id: Base64-encoded project path
         token: Authentication token
+        project_repo: IProjectRepository dependency
 
     Returns:
         List of modified artifacts with change origin and hashes
@@ -1461,18 +1554,21 @@ async def get_modified_artifacts(
     try:
         logger.info(f"Getting modified artifacts for project: {project_id}")
 
-        # Decode project ID to path
-        project_path_str = decode_project_id(project_id)
-        project_path = Path(project_path_str)
+        # Resolve project via repository (replaces direct path.exists() check)
+        project_dto: Optional[ProjectDTO] = project_repo.get(project_id)
+        if project_dto is None:
+            project_path_str = decode_project_id(project_id)
+            project_path = Path(project_path_str)
+            if not project_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project not found at path: {project_path_str}",
+                )
+        else:
+            project_path = Path(project_dto.path)
 
-        # Validate project exists
-        if not project_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path_str}",
-            )
-
-        # Check if deployment file exists
+        # Check if deployment file exists (no repository method for this yet)
+        # TODO: Replace with project_repo.get_artifacts() when fully wired.
         deployment_file = DeploymentTracker.get_deployment_file_path(project_path)
         if not deployment_file.exists():
             raise HTTPException(
@@ -1481,6 +1577,7 @@ async def get_modified_artifacts(
             )
 
         # Use sync manager to check drift - provides proper change_origin
+        # TODO: SyncManager construction with hardcoded collection_path should use DI.
         from skillmeat.core.sync import SyncManager
 
         sync_mgr = SyncManager(
@@ -1571,6 +1668,7 @@ async def get_modified_artifacts(
 async def get_project_context_map(
     project_id: str,
     token: TokenDep,
+    project_repo: ProjectRepoDep,
 ) -> ContextMapResponse:
     """Discover context entities in a project's .claude/ directory.
 
@@ -1582,9 +1680,14 @@ async def get_project_context_map(
 
     Token estimates are calculated as: word_count * 1.3
 
+    File content is read directly from the filesystem here — this endpoint's
+    purpose is to expose file-level metadata and token estimates, so direct
+    filesystem access is intentional and appropriate.
+
     Args:
         project_id: Base64-encoded project path
         token: Authentication token
+        project_repo: IProjectRepository dependency
 
     Returns:
         Context map with categorized entities and token estimates
@@ -1621,16 +1724,18 @@ async def get_project_context_map(
     try:
         logger.info(f"Discovering context entities for project: {project_id}")
 
-        # Decode project ID to path
-        project_path_str = decode_project_id(project_id)
-        project_path = Path(project_path_str)
-
-        # Validate project exists
-        if not project_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path_str}",
-            )
+        # Resolve project via repository (replaces direct path.exists() check)
+        project_dto: Optional[ProjectDTO] = project_repo.get(project_id)
+        if project_dto is None:
+            project_path_str = decode_project_id(project_id)
+            project_path = Path(project_path_str)
+            if not project_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project not found at path: {project_path_str}",
+                )
+        else:
+            project_path = Path(project_dto.path)
 
         # Initialize response containers
         auto_loaded: List[ContextEntityInfo] = []
@@ -1891,6 +1996,7 @@ def calculate_drift_summary(
 async def get_project_drift_summary(
     project_id: str,
     token: TokenDep,
+    project_repo: ProjectRepoDep,
     collection_name: Optional[str] = Query(
         default=None,
         description="Collection name to compare against (defaults to deployed collection)",
@@ -1910,6 +2016,7 @@ async def get_project_drift_summary(
     Args:
         project_id: Base64-encoded project path
         token: Authentication token
+        project_repo: IProjectRepository dependency
         collection_name: Optional collection name override
 
     Returns:
@@ -1935,18 +2042,21 @@ async def get_project_drift_summary(
     try:
         logger.info(f"Getting drift summary for project: {project_id}")
 
-        # Decode project ID to path
-        project_path_str = decode_project_id(project_id)
-        project_path = Path(project_path_str)
+        # Resolve project via repository (replaces direct path.exists() check)
+        project_dto: Optional[ProjectDTO] = project_repo.get(project_id)
+        if project_dto is None:
+            project_path_str = decode_project_id(project_id)
+            project_path = Path(project_path_str)
+            if not project_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project not found at path: {project_path_str}",
+                )
+        else:
+            project_path = Path(project_dto.path)
 
-        # Validate project exists
-        if not project_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path_str}",
-            )
-
-        # Check if deployment file exists
+        # Check if deployment file exists (no repository method for this yet)
+        # TODO: Replace with project_repo.get_artifacts() when fully wired.
         deployment_file = DeploymentTracker.get_deployment_file_path(project_path)
         if not deployment_file.exists():
             raise HTTPException(
