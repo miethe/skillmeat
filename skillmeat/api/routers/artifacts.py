@@ -11,6 +11,10 @@ import logging
 import shutil
 import time
 from datetime import datetime, timezone
+# PathLib is retained for filesystem utility helpers (iter_artifact_files,
+# _decode_project_id_param, resolve_project_path, diff/deploy operations)
+# that are inherently path-level. Endpoint-level artifact lookups use
+# IArtifactRepository (ArtifactRepoDep) instead.
 from pathlib import Path as PathLib
 from typing import Annotated, Dict, Iterator, List, Optional
 
@@ -29,8 +33,10 @@ from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
+    ArtifactRepoDep,
     CollectionManagerDep,
     ConfigManagerDep,
+    DbSessionDep,
     SettingsDep,
     SyncManagerDep,
     get_app_state,
@@ -335,20 +341,7 @@ router = APIRouter(
 )
 
 
-def get_db_session():
-    """Dependency that provides a database session.
-
-    Yields:
-        Session: SQLAlchemy database session
-    """
-    session = get_session()
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-DbSessionDep = Annotated[Session, Depends(get_db_session)]
+# DbSessionDep is imported from skillmeat.api.dependencies (hexagonal DI).
 
 
 def resolve_collection_name(
@@ -2019,6 +2012,7 @@ async def list_artifacts(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     sync_mgr: SyncManagerDep,
+    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
     limit: int = Query(
         default=20,
@@ -2190,6 +2184,8 @@ async def list_artifacts(
         # so we query the DB to get artifact names/types from that import batch.
         if import_id:
             try:
+                # TODO: Replace with repository method when IArtifactRepository
+                # supports import_id filtering (MarketplaceCatalogEntry join).
                 db_session = get_session()
                 # Query catalog entries that were imported in this batch
                 entries = (
@@ -2285,6 +2281,9 @@ async def list_artifacts(
 
         if artifact_ids:
             try:
+                # TODO: Replace CollectionService and CollectionArtifact join with
+                # repository methods when ICollectionRepository exposes batch
+                # collection-membership lookup and deployment summary queries.
                 db_session = get_session()
                 collection_service = CollectionService(db_session)
                 collections_map = collection_service.get_collection_membership_batch(
@@ -2316,22 +2315,21 @@ async def list_artifacts(
             except Exception as e:
                 logger.warning(f"Failed to query collection memberships: {e}")
 
-        # Build uuid lookup from DB cache
+        # Build uuid lookup from DB cache via repository
         uuid_lookup: dict = {}
         try:
-            db_session = get_session()
-            db_artifacts = (
-                db_session.query(Artifact.type, Artifact.name, Artifact.uuid)
-                .filter(
-                    Artifact.type.in_([a.type.value for a in page_artifacts]),
-                )
-                .all()
-            )
-            for db_art in db_artifacts:
-                uuid_lookup[f"{db_art.type}:{db_art.name}"] = db_art.uuid
-            db_session.close()
+            # TODO: Replace individual get() calls with a batch lookup when
+            # IArtifactRepository exposes a list_by_ids() method.
+            for artifact in page_artifacts:
+                artifact_key = f"{artifact.type.value}:{artifact.name}"
+                try:
+                    dto = artifact_repo.get(artifact_key)
+                    if dto and dto.uuid:
+                        uuid_lookup[artifact_key] = dto.uuid
+                except Exception:
+                    pass
         except Exception as e:
-            logger.warning(f"Failed to query uuids from DB: {e}")
+            logger.warning(f"Failed to query uuids from repository: {e}")
 
         # Convert to response format
         items: List[ArtifactResponse] = []
@@ -2935,6 +2933,7 @@ async def update_artifact_parameters(
     request: ParameterUpdateRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
     collection: Optional[str] = Query(
         default=None,
@@ -2951,6 +2950,7 @@ async def update_artifact_parameters(
         request: Parameter update request
         artifact_mgr: Artifact manager dependency
         collection_mgr: Collection manager dependency
+        artifact_repo: IArtifactRepository dependency (hexagonal DI)
         token: Authentication token
         collection: Optional collection filter
 
@@ -3148,18 +3148,12 @@ async def update_artifact_parameters(
                 try:
                     from skillmeat.core.services import TagService
 
-                    session = get_session()
-                    try:
-                        row = (
-                            session.query(Artifact.uuid)
-                            .filter(Artifact.id == artifact_id)
-                            .first()
+                    # Resolve UUID via repository (ADR-007 stable identity)
+                    artifact_dto = artifact_repo.get(artifact_id)
+                    if artifact_dto and artifact_dto.uuid:
+                        TagService().sync_artifact_tags(
+                            artifact_dto.uuid, pending_tag_sync
                         )
-                    finally:
-                        session.close()
-
-                    if row:
-                        TagService().sync_artifact_tags(row[0], pending_tag_sync)
                     else:
                         logger.warning(
                             f"No artifact row found for {artifact_id}, skipping tag sync"
@@ -3572,7 +3566,11 @@ def _refresh_cache_safe(
     collection_name: str,
     deployment_profile_id: Optional[str] = None,
 ) -> None:
-    """Refresh DB cache after deploy, swallowing errors to avoid failing the deploy."""
+    """Refresh DB cache after deploy, swallowing errors to avoid failing the deploy.
+
+    TODO: When the service layer has a proper cache-sync abstraction, replace
+    the raw get_session() calls here with a CacheSyncService dependency.
+    """
     try:
         db_session = get_session()
         try:
@@ -7474,11 +7472,15 @@ async def list_skip_preferences(
     summary="Get artifact tags",
     description="Get all tags assigned to an artifact",
 )
-async def get_artifact_tags(artifact_id: str) -> List[TagResponse]:
+async def get_artifact_tags(
+    artifact_id: str,
+    artifact_repo: ArtifactRepoDep,
+) -> List[TagResponse]:
     """Get all tags assigned to a specific artifact.
 
     Args:
         artifact_id: Unique identifier of the artifact (type:name format)
+        artifact_repo: IArtifactRepository dependency (hexagonal DI)
 
     Returns:
         List of tags assigned to the artifact
@@ -7492,19 +7494,14 @@ async def get_artifact_tags(artifact_id: str) -> List[TagResponse]:
     service = TagService()
 
     try:
-        # Resolve type:name artifact_id → artifacts.uuid (ADR-007 stable identity)
-        db_session = get_session()
-        try:
-            db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
-        finally:
-            db_session.close()
-
-        if not db_art:
+        # Resolve type:name artifact_id → UUID via repository (ADR-007 stable identity)
+        artifact_dto = artifact_repo.get(artifact_id)
+        if not artifact_dto or not artifact_dto.uuid:
             raise HTTPException(
                 status_code=404, detail=f"Artifact '{artifact_id}' not found"
             )
 
-        return service.get_artifact_tags(db_art.uuid)
+        return service.get_artifact_tags(artifact_dto.uuid)
     except HTTPException:
         raise
     except Exception as e:
@@ -7610,7 +7607,9 @@ async def update_artifact_tags(
         # Save collection back to disk
         collection_mgr.save_collection(coll)
 
-        # Refresh CollectionArtifact cache to keep tags in sync
+        # Refresh CollectionArtifact cache to keep tags in sync.
+        # TODO: Replace with IArtifactRepository.set_tags() or a dedicated
+        # write-through helper when the repository interface exposes tag cache sync.
         try:
             db_session = get_session()
             # Resolve type:name artifact_id → artifacts.uuid for the FK lookup
@@ -7660,6 +7659,7 @@ async def add_tag_to_artifact(
     artifact_id: str,
     tag_id: str,
     collection_mgr: CollectionManagerDep,
+    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
 ) -> dict[str, str]:
     """Add a tag to an artifact.
@@ -7668,6 +7668,7 @@ async def add_tag_to_artifact(
         artifact_id: Unique identifier of the artifact
         tag_id: Unique identifier of the tag
         collection_mgr: Collection manager dependency
+        artifact_repo: IArtifactRepository dependency (hexagonal DI)
         token: API token for authentication
 
     Returns:
@@ -7681,19 +7682,14 @@ async def add_tag_to_artifact(
 
     service = TagService()
 
-    # Resolve type:name artifact_id → artifacts.uuid (ADR-007 stable identity)
-    db_session = get_session()
-    try:
-        db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
-    finally:
-        db_session.close()
-
-    if not db_art:
+    # Resolve type:name artifact_id → UUID via repository (ADR-007 stable identity)
+    artifact_dto = artifact_repo.get(artifact_id)
+    if not artifact_dto or not artifact_dto.uuid:
         raise HTTPException(
             status_code=404, detail=f"Artifact '{artifact_id}' not found"
         )
 
-    artifact_uuid = db_art.uuid
+    artifact_uuid = artifact_dto.uuid
 
     try:
         service.add_tag_to_artifact(artifact_uuid, tag_id)
@@ -7701,7 +7697,9 @@ async def add_tag_to_artifact(
         # Write-through: sync tags to CollectionArtifact.tags_json and filesystem
         updated_tags = [t.name for t in service.get_artifact_tags(artifact_uuid)]
 
-        # Update CollectionArtifact.tags_json in DB cache
+        # Update CollectionArtifact.tags_json in DB cache.
+        # TODO: Replace with IArtifactRepository.set_tags() write-through helper
+        # when the repository interface exposes tag cache sync.
         try:
             db_session = get_session()
             cas = (
@@ -7751,6 +7749,7 @@ async def remove_tag_from_artifact(
     artifact_id: str,
     tag_id: str,
     collection_mgr: CollectionManagerDep,
+    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
 ) -> None:
     """Remove a tag from an artifact.
@@ -7759,6 +7758,7 @@ async def remove_tag_from_artifact(
         artifact_id: Unique identifier of the artifact
         tag_id: Unique identifier of the tag
         collection_mgr: Collection manager dependency
+        artifact_repo: IArtifactRepository dependency (hexagonal DI)
         token: API token for authentication
 
     Returns:
@@ -7772,19 +7772,14 @@ async def remove_tag_from_artifact(
 
     service = TagService()
 
-    # Resolve type:name artifact_id → artifacts.uuid (ADR-007 stable identity)
-    db_session = get_session()
-    try:
-        db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
-    finally:
-        db_session.close()
-
-    if not db_art:
+    # Resolve type:name artifact_id → UUID via repository (ADR-007 stable identity)
+    artifact_dto = artifact_repo.get(artifact_id)
+    if not artifact_dto or not artifact_dto.uuid:
         raise HTTPException(
             status_code=404, detail=f"Artifact '{artifact_id}' not found"
         )
 
-    artifact_uuid = db_art.uuid
+    artifact_uuid = artifact_dto.uuid
 
     try:
         if not service.remove_tag_from_artifact(artifact_uuid, tag_id):
@@ -7793,7 +7788,9 @@ async def remove_tag_from_artifact(
         # Write-through: sync tags to CollectionArtifact.tags_json and filesystem
         updated_tags = [t.name for t in service.get_artifact_tags(artifact_uuid)]
 
-        # Update CollectionArtifact.tags_json in DB cache
+        # Update CollectionArtifact.tags_json in DB cache.
+        # TODO: Replace with IArtifactRepository.set_tags() write-through helper
+        # when the repository interface exposes tag cache sync.
         try:
             db_session = get_session()
             cas = (
