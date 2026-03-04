@@ -2933,7 +2933,6 @@ async def update_artifact_parameters(
     request: ParameterUpdateRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
-    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
     collection: Optional[str] = Query(
         default=None,
@@ -2950,7 +2949,6 @@ async def update_artifact_parameters(
         request: Parameter update request
         artifact_mgr: Artifact manager dependency
         collection_mgr: Collection manager dependency
-        artifact_repo: IArtifactRepository dependency (hexagonal DI)
         token: Authentication token
         collection: Optional collection filter
 
@@ -3148,16 +3146,20 @@ async def update_artifact_parameters(
                 try:
                     from skillmeat.core.services import TagService
 
-                    # Resolve UUID via repository (ADR-007 stable identity)
-                    artifact_dto = artifact_repo.get(artifact_id)
-                    if artifact_dto and artifact_dto.uuid:
-                        TagService().sync_artifact_tags(
-                            artifact_dto.uuid, pending_tag_sync
-                        )
-                    else:
-                        logger.warning(
-                            f"No artifact row found for {artifact_id}, skipping tag sync"
-                        )
+                    # Resolve UUID via DB cache (filesystem DTOs may lack uuid)
+                    tag_db_session = get_session()
+                    try:
+                        tag_db_art = tag_db_session.query(Artifact).filter_by(id=artifact_id).first()
+                        if tag_db_art and tag_db_art.uuid:
+                            TagService().sync_artifact_tags(
+                                tag_db_art.uuid, pending_tag_sync
+                            )
+                        else:
+                            logger.warning(
+                                f"No artifact row found for {artifact_id}, skipping tag sync"
+                            )
+                    finally:
+                        tag_db_session.close()
                 except Exception as e:
                     logger.warning(
                         f"Failed to sync tag associations for {artifact_id}: {e}",
