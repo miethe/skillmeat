@@ -2,7 +2,7 @@
 schema_version: 2
 doc_type: implementation_plan
 title: 'Implementation Plan: Repository Pattern Gap Closure'
-status: draft
+status: in-progress
 created: 2026-03-04
 updated: '2026-03-04'
 feature_slug: repo-pattern-gap-closure
