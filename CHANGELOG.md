@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Hexagonal Architecture / Repository Pattern Refactor (2026-03-04)
+
+**Phase 1: Core Interfaces**
+- 6 abstract repository interfaces (IArtifactRepository, IProjectRepository, ICollectionRepository, IDeploymentRepository, ITagRepository, ISettingsRepository) with domain DTOs
+- Separated API routers from all direct filesystem and SQLite access via hexagonal architecture
+- Domain-driven design with clear boundaries between presentation, application, and infrastructure layers
+
+**Phase 2: Local Repository Adapters**
+- Implemented LocalArtifactRepository, LocalProjectRepository, LocalCollectionRepository, LocalDeploymentRepository, LocalTagRepository, LocalSettingsRepository adapters
+- Write-through consistency pattern ensuring filesystem is source of truth while DB cache stays synchronized
+- 60+ integration tests validating adapter behavior and cache synchronization
+
+**Phase 3: FastAPI Dependency Injection**
+- Repository factory providers with singleton scope for adapters and FastAPI dependency injection
+- Typed DI aliases using Annotated for cleaner route signatures and better IDE support
+- Per-request scoped database sessions via FastAPI Depends() with automatic cleanup
+
+**Phase 4: Router Migration**
+- Migrated all 15+ API routers (artifacts, projects, collections, deployments, tags, settings, etc.) to use repository DI pattern
+- Eliminated direct imports of managers and storage classes from routers
+- Consistent error handling and response schemas across all migrated endpoints
+
+**Phase 5: Testing Infrastructure**
+- 6 in-memory mock repository implementations for filesystem-free unit testing
+- pytest fixtures (mock_repos, app_with_mocks, client_with_mocks) for DI override testing
+- 102 new test cases achieving >90% coverage on repository and interface code
+- Baseline test coverage for 8 previously untested routers
+
+**Phase 6: Future Multi-Backend Support**
+- Added config.EDITION field for enabling alternative storage backends
+- Repository interface contract stable and documented for custom implementations
+- Architecture documentation and implementation guide for storage backend developers
+
+---
+
 #### Workflow Orchestration Engine (2026-02-27)
 
 **Phase 0: Foundation**
