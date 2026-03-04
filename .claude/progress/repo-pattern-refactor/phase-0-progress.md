@@ -6,7 +6,7 @@ prd: repo-pattern-refactor
 feature_slug: repo-pattern-refactor
 phase: 0
 phase_title: Test Scaffolding & Prerequisites
-status: pending
+status: in_progress
 created: 2026-03-01
 updated: '2026-03-04'
 prd_ref: docs/project_plans/PRDs/refactors/repo-pattern-refactor-v1.md
@@ -69,7 +69,7 @@ tasks:
   estimate: 0.5 pts
 - id: TASK-0.8
   title: Run full test suite and document pre-existing failures
-  status: pending
+  status: in_progress
   assigned_to:
   - task-completion-validator
   dependencies:
@@ -94,7 +94,7 @@ parallelization:
   - TASK-0.8
 total_tasks: 8
 completed_tasks: 7
-in_progress_tasks: 0
+in_progress_tasks: 1
 blocked_tasks: 0
 progress: 87
 ---
