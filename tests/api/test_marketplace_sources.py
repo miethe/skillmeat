@@ -20,6 +20,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import get_marketplace_source_repository_concrete
 from skillmeat.api.schemas.marketplace import ScanResultDTO
 from skillmeat.api.server import create_app
 from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
@@ -206,7 +207,7 @@ def mock_import_coordinator():
 class TestCreateSource:
     """Test POST /marketplace/sources endpoint."""
 
-    def test_create_source_success(self, client, mock_source_repo, mock_source):
+    def test_create_source_success(self, app, client, mock_source_repo, mock_source):
         """Test creating a new GitHub source with valid URL and auto-scan."""
         # Mock the scan function to avoid complex dependencies
         async def mock_perform_scan(*args, **kwargs):
@@ -226,25 +227,25 @@ class TestCreateSource:
                 scanned_at=datetime(2025, 12, 6, 10, 35, 0),
             )
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
+            with patch(
                 "skillmeat.api.routers.marketplace_sources._perform_scan",
                 side_effect=mock_perform_scan,
-            ),
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/anthropics/anthropic-quickstarts",
-                    "ref": "main",
-                    "root_hint": "skills",
-                    "trust_level": "verified",
-                },
-            )
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources",
+                    json={
+                        "repo_url": "https://github.com/anthropics/anthropic-quickstarts",
+                        "ref": "main",
+                        "root_hint": "skills",
+                        "trust_level": "verified",
+                    },
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()

@@ -63,10 +63,19 @@ def app(temp_db: str, monkeypatch: pytest.MonkeyPatch):
 
     Wires the ``context_entities`` and ``settings`` routers to use the
     per-test SQLite database so tests never share state.
+
+    Uses dependency_overrides for DI-migrated routers and monkeypatches
+    ``skillmeat.cache.models.get_session`` so that repository implementations
+    that call ``get_session()`` directly (e.g. LocalSettingsRepository) also
+    resolve to the per-test database.
     """
     from skillmeat.api.config import get_settings
+    from skillmeat.api.dependencies import (
+        get_context_entity_repository,
+        get_settings_repository,
+    )
     from skillmeat.api.middleware.auth import verify_token
-    from skillmeat.api.routers import context_entities, settings as settings_router
+    from skillmeat.core.repositories import LocalContextEntityRepository
 
     api_settings = APISettings(
         env=Environment.TESTING,
@@ -88,12 +97,37 @@ def app(temp_db: str, monkeypatch: pytest.MonkeyPatch):
         seed_builtin_entity_types(seed_session)
         seed_session.commit()
 
-    def _get_session():
+    def _get_session(*args, **kwargs):
+        """Return a session connected to the per-test SQLite database."""
         return SessionLocal()
 
-    # Patch both routers to use the temp DB session factory
-    monkeypatch.setattr(context_entities, "get_session", _get_session)
-    monkeypatch.setattr(settings_router, "get_session", _get_session)
+    # Patch the global get_session so repository implementations that call it
+    # directly (e.g. LocalSettingsRepository entity-type-config methods) also
+    # resolve to the per-test database.  LocalSettingsRepository imports
+    # get_session inline inside each method (`from skillmeat.cache.models
+    # import get_session`), so patching the attribute on the source module is
+    # sufficient.
+    import skillmeat.cache.models as _models
+    monkeypatch.setattr(_models, "get_session", _get_session)
+
+    # Override context entity repository DI to use the temp DB directly.
+    fastapi_app.dependency_overrides[get_context_entity_repository] = (
+        lambda: LocalContextEntityRepository(db_path=temp_db)
+    )
+
+    # Override settings repository DI: construct one that can use the patched
+    # get_session. We replace the full factory so no AppState is needed.
+    from skillmeat.core.path_resolver import ProjectPathResolver
+    from skillmeat.core.repositories import LocalSettingsRepository
+    from skillmeat.config import ConfigManager
+
+    def _get_settings_repo():
+        return LocalSettingsRepository(
+            path_resolver=ProjectPathResolver(),
+            config_manager=ConfigManager(),
+        )
+
+    fastapi_app.dependency_overrides[get_settings_repository] = _get_settings_repo
 
     yield fastapi_app
 

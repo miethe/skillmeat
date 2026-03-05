@@ -11,6 +11,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import get_deployment_profile_repository
 from skillmeat.api.server import create_app
 from skillmeat.cache.models import Project, create_db_engine, create_tables
 from skillmeat.cache.repositories import DeploymentProfileRepository
@@ -31,7 +32,7 @@ def temp_db():
 
 
 @pytest.fixture
-def app(temp_db, monkeypatch):
+def app(temp_db):
     """Create API app with context-entities router bound to temp DB."""
     from sqlalchemy.orm import sessionmaker
     from skillmeat.api.config import get_settings
@@ -79,13 +80,10 @@ def app(temp_db, monkeypatch):
         lambda: LocalContextEntityRepository(db_path=temp_db)
     )
 
-    # Override DeploymentProfileRepository used by _resolve_deploy_profiles
-    # so it also targets the temp DB.
-    from skillmeat.api.routers import context_entities
-    monkeypatch.setattr(
-        context_entities,
-        "DeploymentProfileRepository",
-        lambda: DeploymentProfileRepository(db_path=temp_db),
+    # Override DeploymentProfileRepository DI so _resolve_deploy_profiles
+    # also targets the temp DB.
+    app.dependency_overrides[get_deployment_profile_repository] = (
+        lambda: DeploymentProfileRepository(db_path=temp_db)
     )
 
     return app

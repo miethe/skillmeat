@@ -16,6 +16,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import get_deployment_set_repository
 from skillmeat.api.server import create_app
 
 
@@ -110,41 +111,41 @@ def _make_member_orm(
 class TestCreateDeploymentSet:
     """Tests for POST /api/v1/deployment-sets."""
 
-    def test_create_deployment_set_success(self, client):
+    def test_create_deployment_set_success(self, app, client):
         """Creating a deployment set returns 201 with the new set data."""
         ds = _make_ds_orm(name="My Dev Setup")
         mock_repo = MagicMock()
         mock_repo.create.return_value = ds
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.post(
                 "/api/v1/deployment-sets",
                 json={"name": "My Dev Setup", "description": "A dev setup"},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["name"] == "My Dev Setup"
         assert data["id"] == "set-uuid-001"
 
-    def test_create_deployment_set_repo_error_returns_422(self, client):
+    def test_create_deployment_set_repo_error_returns_422(self, app, client):
         """Repository errors during creation return 422."""
         from skillmeat.cache.repositories import RepositoryError
 
         mock_repo = MagicMock()
         mock_repo.create.side_effect = RepositoryError("duplicate name")
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.post(
                 "/api/v1/deployment-sets",
                 json={"name": "Duplicate Set"},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -162,24 +163,24 @@ class TestCreateDeploymentSet:
 class TestListDeploymentSets:
     """Tests for GET /api/v1/deployment-sets."""
 
-    def test_list_deployment_sets_empty(self, client):
+    def test_list_deployment_sets_empty(self, app, client):
         """Listing deployment sets returns 200 with empty items list."""
         mock_repo = MagicMock()
         mock_repo.list.return_value = []
         mock_repo.count.return_value = 0
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/deployment-sets")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["items"] == []
         assert data["total"] == 0
 
-    def test_list_deployment_sets_returns_items(self, client):
+    def test_list_deployment_sets_returns_items(self, app, client):
         """Listing returns all sets with correct structure."""
         ds1 = _make_ds_orm(id="set-001", name="Set One")
         ds2 = _make_ds_orm(id="set-002", name="Set Two")
@@ -188,28 +189,28 @@ class TestListDeploymentSets:
         mock_repo.list.return_value = [ds1, ds2]
         mock_repo.count.return_value = 2
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/deployment-sets")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["total"] == 2
         assert len(data["items"]) == 2
 
-    def test_list_deployment_sets_with_name_filter(self, client):
+    def test_list_deployment_sets_with_name_filter(self, app, client):
         """Name query parameter is forwarded to the repository."""
         mock_repo = MagicMock()
         mock_repo.list.return_value = []
         mock_repo.count.return_value = 0
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/deployment-sets?name=Dev")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         mock_repo.list.assert_called_once()
@@ -225,31 +226,31 @@ class TestListDeploymentSets:
 class TestGetDeploymentSet:
     """Tests for GET /api/v1/deployment-sets/{set_id}."""
 
-    def test_get_deployment_set_success(self, client):
+    def test_get_deployment_set_success(self, app, client):
         """Fetching an existing set returns 200."""
         ds = _make_ds_orm(id="set-uuid-001", name="My Set")
         mock_repo = MagicMock()
         mock_repo.get.return_value = ds
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/deployment-sets/set-uuid-001")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["id"] == "set-uuid-001"
 
-    def test_get_deployment_set_not_found(self, client):
+    def test_get_deployment_set_not_found(self, app, client):
         """Fetching a non-existent set returns 404."""
         mock_repo = MagicMock()
         mock_repo.get.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/deployment-sets/nonexistent-id")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -262,55 +263,55 @@ class TestGetDeploymentSet:
 class TestUpdateDeploymentSet:
     """Tests for PUT /api/v1/deployment-sets/{set_id}."""
 
-    def test_update_deployment_set_success(self, client):
+    def test_update_deployment_set_success(self, app, client):
         """Updating an existing set returns 200 with updated data."""
         ds = _make_ds_orm(id="set-uuid-001", name="Updated Set")
         mock_repo = MagicMock()
         mock_repo.update.return_value = ds
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.put(
                 "/api/v1/deployment-sets/set-uuid-001",
                 json={"name": "Updated Set"},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["name"] == "Updated Set"
 
-    def test_update_deployment_set_not_found(self, client):
+    def test_update_deployment_set_not_found(self, app, client):
         """Updating a non-existent set returns 404."""
         mock_repo = MagicMock()
         mock_repo.update.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.put(
                 "/api/v1/deployment-sets/nonexistent-id",
                 json={"name": "Ghost Set"},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_update_deployment_set_repo_error_returns_422(self, client):
+    def test_update_deployment_set_repo_error_returns_422(self, app, client):
         """Repository errors during update return 422."""
         from skillmeat.cache.repositories import RepositoryError
 
         mock_repo = MagicMock()
         mock_repo.update.side_effect = RepositoryError("constraint violation")
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.put(
                 "/api/v1/deployment-sets/set-uuid-001",
                 json={"name": "Bad Update"},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -323,44 +324,44 @@ class TestUpdateDeploymentSet:
 class TestDeleteDeploymentSet:
     """Tests for DELETE /api/v1/deployment-sets/{set_id}."""
 
-    def test_delete_deployment_set_success(self, client):
+    def test_delete_deployment_set_success(self, app, client):
         """Deleting an existing set returns 204 with no content."""
         mock_repo = MagicMock()
         mock_repo.delete.return_value = True
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.delete("/api/v1/deployment-sets/set-uuid-001")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    def test_delete_deployment_set_not_found(self, client):
+    def test_delete_deployment_set_not_found(self, app, client):
         """Deleting a non-existent set returns 404."""
         mock_repo = MagicMock()
         mock_repo.delete.return_value = False
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.delete("/api/v1/deployment-sets/nonexistent-id")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_delete_deployment_set_repo_error_returns_422(self, client):
+    def test_delete_deployment_set_repo_error_returns_422(self, app, client):
         """Repository errors during deletion return 422."""
         from skillmeat.cache.repositories import RepositoryError
 
         mock_repo = MagicMock()
         mock_repo.delete.side_effect = RepositoryError("FK constraint")
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.delete("/api/v1/deployment-sets/set-uuid-001")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -373,7 +374,7 @@ class TestDeleteDeploymentSet:
 class TestCloneDeploymentSet:
     """Tests for POST /api/v1/deployment-sets/{set_id}/clone."""
 
-    def test_clone_deployment_set_success(self, client):
+    def test_clone_deployment_set_success(self, app, client):
         """Cloning an existing set returns 201 with the clone data."""
         source = _make_ds_orm(id="source-id", name="My Set", members=[])
         clone = _make_ds_orm(id="clone-id", name="My Set (copy)")
@@ -383,26 +384,26 @@ class TestCloneDeploymentSet:
         mock_repo.get.side_effect = [source, clone]
         mock_repo.create.return_value = clone
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.post("/api/v1/deployment-sets/source-id/clone")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert "copy" in data["name"]
 
-    def test_clone_deployment_set_source_not_found(self, client):
+    def test_clone_deployment_set_source_not_found(self, app, client):
         """Cloning a non-existent source set returns 404."""
         mock_repo = MagicMock()
         mock_repo.get.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.post("/api/v1/deployment-sets/ghost-id/clone")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -415,7 +416,7 @@ class TestCloneDeploymentSet:
 class TestListMembers:
     """Tests for GET /api/v1/deployment-sets/{set_id}/members."""
 
-    def test_list_members_success(self, client):
+    def test_list_members_success(self, app, client):
         """Listing members of a valid set returns 200 with member list."""
         ds = _make_ds_orm()
         member = _make_member_orm()
@@ -424,11 +425,11 @@ class TestListMembers:
         mock_repo.get.return_value = ds
         mock_repo.get_members.return_value = [member]
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/deployment-sets/set-uuid-001/members")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -436,16 +437,16 @@ class TestListMembers:
         assert len(data) == 1
         assert data[0]["artifact_uuid"] == "artifact-uuid-abc"
 
-    def test_list_members_set_not_found(self, client):
+    def test_list_members_set_not_found(self, app, client):
         """Listing members of a non-existent set returns 404."""
         mock_repo = MagicMock()
         mock_repo.get.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/deployment-sets/ghost-id/members")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -458,7 +459,7 @@ class TestListMembers:
 class TestAddMember:
     """Tests for POST /api/v1/deployment-sets/{set_id}/members."""
 
-    def test_add_artifact_member_success(self, client):
+    def test_add_artifact_member_success(self, app, client):
         """Adding an artifact member returns 201 with member data."""
         ds = _make_ds_orm()
         member = _make_member_orm(artifact_uuid="new-artifact-uuid")
@@ -469,35 +470,36 @@ class TestAddMember:
 
         mock_session = MagicMock()
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_sets.get_session",
-            return_value=mock_session,
-        ):
-            response = client.post(
-                "/api/v1/deployment-sets/set-uuid-001/members",
-                json={"artifact_uuid": "new-artifact-uuid", "position": 0},
-            )
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
+            with patch(
+                "skillmeat.api.routers.deployment_sets.get_session",
+                return_value=mock_session,
+            ):
+                response = client.post(
+                    "/api/v1/deployment-sets/set-uuid-001/members",
+                    json={"artifact_uuid": "new-artifact-uuid", "position": 0},
+                )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["member_type"] == "artifact"
 
-    def test_add_member_set_not_found(self, client):
+    def test_add_member_set_not_found(self, app, client):
         """Adding a member to a non-existent set returns 404."""
         mock_repo = MagicMock()
         mock_repo.get.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.post(
                 "/api/v1/deployment-sets/ghost-id/members",
                 json={"artifact_uuid": "some-uuid"},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -520,7 +522,7 @@ class TestAddMember:
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_add_nested_set_member_cycle_returns_422(self, client):
+    def test_add_nested_set_member_cycle_returns_422(self, app, client):
         """Adding a nested set that would create a cycle returns 422."""
         from skillmeat.core.exceptions import DeploymentSetCycleError
 
@@ -534,20 +536,21 @@ class TestAddMember:
             "set-uuid-001", path=["set-uuid-001", "set-uuid-001"]
         )
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_sets.get_session",
-            return_value=mock_session,
-        ), patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetService",
-            return_value=mock_svc,
-        ):
-            response = client.post(
-                "/api/v1/deployment-sets/set-uuid-001/members",
-                json={"nested_set_id": "set-uuid-001"},
-            )
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
+            with patch(
+                "skillmeat.api.routers.deployment_sets.get_session",
+                return_value=mock_session,
+            ), patch(
+                "skillmeat.api.routers.deployment_sets.DeploymentSetService",
+                return_value=mock_svc,
+            ):
+                response = client.post(
+                    "/api/v1/deployment-sets/set-uuid-001/members",
+                    json={"nested_set_id": "set-uuid-001"},
+                )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         assert "circular" in response.json()["detail"].lower()
@@ -561,52 +564,52 @@ class TestAddMember:
 class TestRemoveMember:
     """Tests for DELETE /api/v1/deployment-sets/{set_id}/members/{member_id}."""
 
-    def test_remove_member_success(self, client):
+    def test_remove_member_success(self, app, client):
         """Removing an existing member returns 204."""
         ds = _make_ds_orm()
         mock_repo = MagicMock()
         mock_repo.get.return_value = ds
         mock_repo.remove_member.return_value = True
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.delete(
                 "/api/v1/deployment-sets/set-uuid-001/members/member-uuid-001"
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    def test_remove_member_set_not_found(self, client):
+    def test_remove_member_set_not_found(self, app, client):
         """Removing a member from a non-existent set returns 404."""
         mock_repo = MagicMock()
         mock_repo.get.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.delete(
                 "/api/v1/deployment-sets/ghost-id/members/member-uuid-001"
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_remove_member_not_found(self, client):
+    def test_remove_member_not_found(self, app, client):
         """Removing a non-existent member returns 404."""
         ds = _make_ds_orm()
         mock_repo = MagicMock()
         mock_repo.get.return_value = ds
         mock_repo.remove_member.return_value = False
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.delete(
                 "/api/v1/deployment-sets/set-uuid-001/members/ghost-member-id"
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -619,7 +622,7 @@ class TestRemoveMember:
 class TestUpdateMemberPosition:
     """Tests for PUT /api/v1/deployment-sets/{set_id}/members/{member_id}."""
 
-    def test_update_member_position_success(self, client):
+    def test_update_member_position_success(self, app, client):
         """Updating a member position returns 200 with updated member."""
         ds = _make_ds_orm()
         member = _make_member_orm(position=3)
@@ -628,49 +631,49 @@ class TestUpdateMemberPosition:
         mock_repo.get.return_value = ds
         mock_repo.update_member_position.return_value = member
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.put(
                 "/api/v1/deployment-sets/set-uuid-001/members/member-uuid-001",
                 json={"position": 3},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["position"] == 3
 
-    def test_update_member_position_set_not_found(self, client):
+    def test_update_member_position_set_not_found(self, app, client):
         """Updating a member when the set does not exist returns 404."""
         mock_repo = MagicMock()
         mock_repo.get.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.put(
                 "/api/v1/deployment-sets/ghost-id/members/member-uuid-001",
                 json={"position": 1},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_update_member_position_member_not_found(self, client):
+    def test_update_member_position_member_not_found(self, app, client):
         """Updating a non-existent member returns 404."""
         ds = _make_ds_orm()
         mock_repo = MagicMock()
         mock_repo.get.return_value = ds
         mock_repo.update_member_position.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.put(
                 "/api/v1/deployment-sets/set-uuid-001/members/ghost-member",
                 json={"position": 1},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -691,7 +694,7 @@ class TestUpdateMemberPosition:
 class TestResolveDeploymentSet:
     """Tests for GET /api/v1/deployment-sets/{set_id}/resolve."""
 
-    def test_resolve_deployment_set_empty(self, client):
+    def test_resolve_deployment_set_empty(self, app, client):
         """Resolving an empty set returns 200 with zero artifacts."""
         ds = _make_ds_orm()
         mock_repo = MagicMock()
@@ -702,17 +705,18 @@ class TestResolveDeploymentSet:
         mock_svc.resolve.return_value = []
         mock_session.query.return_value.filter.return_value.all.return_value = []
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_sets.get_session",
-            return_value=mock_session,
-        ), patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetService",
-            return_value=mock_svc,
-        ):
-            response = client.get("/api/v1/deployment-sets/set-uuid-001/resolve")
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
+            with patch(
+                "skillmeat.api.routers.deployment_sets.get_session",
+                return_value=mock_session,
+            ), patch(
+                "skillmeat.api.routers.deployment_sets.DeploymentSetService",
+                return_value=mock_svc,
+            ):
+                response = client.get("/api/v1/deployment-sets/set-uuid-001/resolve")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -720,20 +724,20 @@ class TestResolveDeploymentSet:
         assert data["total_count"] == 0
         assert data["resolved_artifacts"] == []
 
-    def test_resolve_deployment_set_not_found(self, client):
+    def test_resolve_deployment_set_not_found(self, app, client):
         """Resolving a non-existent set returns 404."""
         mock_repo = MagicMock()
         mock_repo.get.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/deployment-sets/ghost-id/resolve")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_resolve_deployment_set_depth_limit_returns_422(self, client):
+    def test_resolve_deployment_set_depth_limit_returns_422(self, app, client):
         """Resolution depth-limit exceeded returns 422."""
         from skillmeat.core.exceptions import DeploymentSetResolutionError
 
@@ -747,17 +751,18 @@ class TestResolveDeploymentSet:
             "set-uuid-001", path=["set-uuid-001", "nested-set-id"], depth_limit=20
         )
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_sets.get_session",
-            return_value=mock_session,
-        ), patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetService",
-            return_value=mock_svc,
-        ):
-            response = client.get("/api/v1/deployment-sets/set-uuid-001/resolve")
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
+            with patch(
+                "skillmeat.api.routers.deployment_sets.get_session",
+                return_value=mock_session,
+            ), patch(
+                "skillmeat.api.routers.deployment_sets.DeploymentSetService",
+                return_value=mock_svc,
+            ):
+                response = client.get("/api/v1/deployment-sets/set-uuid-001/resolve")
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -770,7 +775,7 @@ class TestResolveDeploymentSet:
 class TestBatchDeploy:
     """Tests for POST /api/v1/deployment-sets/{set_id}/deploy."""
 
-    def test_batch_deploy_dry_run_success(self, client, tmp_path):
+    def test_batch_deploy_dry_run_success(self, app, client, tmp_path):
         """Dry-run batch deploy returns 200 with all results skipped."""
         ds = _make_ds_orm(id="set-uuid-001", name="My Set")
         mock_repo = MagicMock()
@@ -789,20 +794,21 @@ class TestBatchDeploy:
             art_row
         ]
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_sets.get_session",
-            return_value=mock_session,
-        ), patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetService",
-            return_value=mock_svc,
-        ):
-            response = client.post(
-                "/api/v1/deployment-sets/set-uuid-001/deploy",
-                json={"project_path": str(tmp_path), "dry_run": True},
-            )
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
+            with patch(
+                "skillmeat.api.routers.deployment_sets.get_session",
+                return_value=mock_session,
+            ), patch(
+                "skillmeat.api.routers.deployment_sets.DeploymentSetService",
+                return_value=mock_svc,
+            ):
+                response = client.post(
+                    "/api/v1/deployment-sets/set-uuid-001/deploy",
+                    json={"project_path": str(tmp_path), "dry_run": True},
+                )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -812,32 +818,30 @@ class TestBatchDeploy:
         assert data["succeeded"] == 0
         assert data["failed"] == 0
 
-    def test_batch_deploy_set_not_found(self, client, tmp_path):
+    def test_batch_deploy_set_not_found(self, app, client, tmp_path):
         """Batch deploy on a non-existent set returns 404."""
         mock_repo = MagicMock()
         mock_repo.get.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.post(
                 "/api/v1/deployment-sets/ghost-id/deploy",
                 json={"project_path": str(tmp_path), "dry_run": False},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_batch_deploy_invalid_project_path_returns_422(self, client):
+    def test_batch_deploy_invalid_project_path_returns_422(self, app, client):
         """Batch deploy with a non-existent project path returns 422."""
         ds = _make_ds_orm()
         mock_repo = MagicMock()
         mock_repo.get.return_value = ds
 
-        with patch(
-            "skillmeat.api.routers.deployment_sets.DeploymentSetRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        try:
             response = client.post(
                 "/api/v1/deployment-sets/set-uuid-001/deploy",
                 json={
@@ -845,5 +849,7 @@ class TestBatchDeploy:
                     "dry_run": False,
                 },
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY

@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import get_deployment_profile_repository
 from skillmeat.api.server import create_app
 from skillmeat.cache.migrations import get_alembic_config
 from skillmeat.cache.models import Project, create_db_engine, create_tables
@@ -30,11 +31,10 @@ def temp_db():
 
 
 @pytest.fixture
-def app(temp_db, monkeypatch):
+def app(temp_db):
     """Create app with deployment profile repository bound to a temp DB."""
     from skillmeat.api.config import get_settings
     from skillmeat.api.middleware.auth import verify_token
-    from skillmeat.api.routers import deployment_profiles
 
     settings = APISettings(
         env=Environment.TESTING,
@@ -72,7 +72,7 @@ def app(temp_db, monkeypatch):
         session.close()
         engine.dispose()
 
-    monkeypatch.setattr(deployment_profiles, "DeploymentProfileRepository", lambda: repo)
+    app.dependency_overrides[get_deployment_profile_repository] = lambda: repo
 
     return app
 

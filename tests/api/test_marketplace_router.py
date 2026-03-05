@@ -57,7 +57,17 @@ def test_settings():
 @pytest.fixture
 def client(test_settings):
     """Test client with mocked dependencies."""
+    from skillmeat.api.dependencies import get_marketplace_source_repository
+
     app = create_app(test_settings)
+    # Override MarketplaceSourceRepoDep so install_listing doesn't hit
+    # get_app_state() (which returns 503 when AppState is not initialized
+    # because the lifespan is not running in this test fixture).
+    mock_source_repo = MagicMock()
+    mock_source_repo.upsert_composite_memberships.return_value = 0
+    app.dependency_overrides[get_marketplace_source_repository] = (
+        lambda: mock_source_repo
+    )
     return TestClient(app)
 
 

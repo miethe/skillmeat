@@ -448,6 +448,7 @@ class LocalSettingsRepository(ISettingsRepository):
                 )
 
             session.delete(config)
+            session.commit()
 
     # ------------------------------------------------------------------
     # ISettingsRepository — Category CRUD

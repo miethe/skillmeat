@@ -14,6 +14,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import get_marketplace_source_repository_concrete
 from skillmeat.api.schemas.marketplace import ScanResultDTO
 from skillmeat.api.server import create_app
 from skillmeat.cache.models import MarketplaceSource
@@ -99,7 +100,7 @@ class TestCreateSourceIndexing:
     """Test POST /marketplace/sources with indexing_enabled field."""
 
     def test_create_source_with_indexing_enabled_true(
-        self, client, mock_source_repo, mock_source
+        self, app, client, mock_source_repo, mock_source
     ):
         """Test creating source with indexing_enabled=true."""
         # Update mock source with indexing enabled
@@ -121,28 +122,31 @@ class TestCreateSourceIndexing:
                 scanned_at=datetime.now(),
             )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources._perform_scan",
-            side_effect=mock_perform_scan,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/test/repo",
-                    "ref": "main",
-                    "indexing_enabled": True,
-                },
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = (
+            lambda: mock_source_repo
+        )
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources._perform_scan",
+                side_effect=mock_perform_scan,
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources",
+                    json={
+                        "repo_url": "https://github.com/test/repo",
+                        "ref": "main",
+                        "indexing_enabled": True,
+                    },
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["indexing_enabled"] is True
 
     def test_create_source_with_indexing_enabled_false(
-        self, client, mock_source_repo, mock_source
+        self, app, client, mock_source_repo, mock_source
     ):
         """Test creating source with indexing_enabled=false."""
         # Update mock source with indexing disabled
@@ -164,28 +168,31 @@ class TestCreateSourceIndexing:
                 scanned_at=datetime.now(),
             )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources._perform_scan",
-            side_effect=mock_perform_scan,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/test/repo",
-                    "ref": "main",
-                    "indexing_enabled": False,
-                },
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = (
+            lambda: mock_source_repo
+        )
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources._perform_scan",
+                side_effect=mock_perform_scan,
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources",
+                    json={
+                        "repo_url": "https://github.com/test/repo",
+                        "ref": "main",
+                        "indexing_enabled": False,
+                    },
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["indexing_enabled"] is False
 
     def test_create_source_with_indexing_enabled_null(
-        self, client, mock_source_repo, mock_source
+        self, app, client, mock_source_repo, mock_source
     ):
         """Test creating source without specifying indexing_enabled (NULL)."""
         # Mock source has indexing_enabled=None by default
@@ -206,21 +213,24 @@ class TestCreateSourceIndexing:
                 scanned_at=datetime.now(),
             )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources._perform_scan",
-            side_effect=mock_perform_scan,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/test/repo",
-                    "ref": "main",
-                    # indexing_enabled not specified
-                },
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = (
+            lambda: mock_source_repo
+        )
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources._perform_scan",
+                side_effect=mock_perform_scan,
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources",
+                    json={
+                        "repo_url": "https://github.com/test/repo",
+                        "ref": "main",
+                        # indexing_enabled not specified
+                    },
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
@@ -228,7 +238,7 @@ class TestCreateSourceIndexing:
         assert data["indexing_enabled"] is None
 
     def test_create_source_with_indexing_enabled_explicit_null(
-        self, client, mock_source_repo, mock_source
+        self, app, client, mock_source_repo, mock_source
     ):
         """Test creating source with indexing_enabled explicitly set to null."""
         # Mock source has indexing_enabled=None
@@ -249,21 +259,24 @@ class TestCreateSourceIndexing:
                 scanned_at=datetime.now(),
             )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources._perform_scan",
-            side_effect=mock_perform_scan,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/test/repo",
-                    "ref": "main",
-                    "indexing_enabled": None,
-                },
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = (
+            lambda: mock_source_repo
+        )
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources._perform_scan",
+                side_effect=mock_perform_scan,
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources",
+                    json={
+                        "repo_url": "https://github.com/test/repo",
+                        "ref": "main",
+                        "indexing_enabled": None,
+                    },
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
@@ -279,7 +292,7 @@ class TestUpdateSourceIndexing:
     """Test PATCH /marketplace/sources/{id} with indexing_enabled updates."""
 
     def test_update_source_indexing_enabled_to_true(
-        self, client, mock_source_repo, mock_source
+        self, app, client, mock_source_repo, mock_source
     ):
         """Test updating source indexing_enabled from None to True."""
         # Original source has indexing_enabled=None
@@ -305,21 +318,23 @@ class TestUpdateSourceIndexing:
         )
         mock_source_repo.update.return_value = updated_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = (
+            lambda: mock_source_repo
+        )
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src_test_123",
                 json={"indexing_enabled": True},
             )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["indexing_enabled"] is True
 
     def test_update_source_indexing_enabled_to_false(
-        self, client, mock_source_repo, mock_source
+        self, app, client, mock_source_repo, mock_source
     ):
         """Test updating source indexing_enabled from True to False."""
         # Original source has indexing_enabled=True
@@ -345,14 +360,16 @@ class TestUpdateSourceIndexing:
         )
         mock_source_repo.update.return_value = updated_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = (
+            lambda: mock_source_repo
+        )
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src_test_123",
                 json={"indexing_enabled": False},
             )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -364,7 +381,7 @@ class TestUpdateSourceIndexing:
         "Tracked as follow-up: support explicit null to reset to global default."
     )
     def test_update_source_indexing_enabled_to_null(
-        self, client, mock_source_repo, mock_source
+        self, app, client, mock_source_repo, mock_source
     ):
         """Test updating source indexing_enabled from True to None."""
         # Original source has indexing_enabled=True
@@ -390,14 +407,16 @@ class TestUpdateSourceIndexing:
         )
         mock_source_repo.update.return_value = updated_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = (
+            lambda: mock_source_repo
+        )
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src_test_123",
                 json={"indexing_enabled": None},
             )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -490,7 +509,7 @@ class TestIndexingIntegration:
     """Test combined indexing scenarios."""
 
     def test_create_then_update_indexing_enabled(
-        self, client, mock_source_repo, mock_source
+        self, app, client, mock_source_repo, mock_source
     ):
         """Test creating source with indexing, then updating it."""
         # Step 1: Create source with indexing_enabled=True
@@ -512,21 +531,24 @@ class TestIndexingIntegration:
                 scanned_at=datetime.now(),
             )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources._perform_scan",
-            side_effect=mock_perform_scan,
-        ):
-            create_response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/test/repo",
-                    "ref": "main",
-                    "indexing_enabled": True,
-                },
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = (
+            lambda: mock_source_repo
+        )
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources._perform_scan",
+                side_effect=mock_perform_scan,
+            ):
+                create_response = client.post(
+                    "/api/v1/marketplace/sources",
+                    json={
+                        "repo_url": "https://github.com/test/repo",
+                        "ref": "main",
+                        "indexing_enabled": True,
+                    },
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert create_response.status_code == status.HTTP_201_CREATED
         assert create_response.json()["indexing_enabled"] is True
@@ -551,20 +573,22 @@ class TestIndexingIntegration:
         )
         mock_source_repo.update.return_value = updated_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = (
+            lambda: mock_source_repo
+        )
+        try:
             update_response = client.patch(
                 "/api/v1/marketplace/sources/src_test_123",
                 json={"indexing_enabled": False},
             )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert update_response.status_code == status.HTTP_200_OK
         assert update_response.json()["indexing_enabled"] is False
 
     def test_null_indexing_persists_across_updates(
-        self, client, mock_source_repo, mock_source
+        self, app, client, mock_source_repo, mock_source
     ):
         """Test that NULL indexing_enabled persists when updating other fields."""
         # Source has indexing_enabled=None
@@ -590,14 +614,16 @@ class TestIndexingIntegration:
         )
         mock_source_repo.update.return_value = updated_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = (
+            lambda: mock_source_repo
+        )
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src_test_123",
                 json={"ref": "develop"},  # Only update ref
             )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()

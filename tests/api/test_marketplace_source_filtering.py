@@ -25,6 +25,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import get_marketplace_source_repository_concrete
 from skillmeat.api.schemas.marketplace import (
     CreateSourceRequest,
     ScanResultDTO,
@@ -564,7 +565,7 @@ class TestSchemaTagValidation:
 class TestListSourcesNoFilters:
     """Test GET /marketplace/sources without filters returns all sources."""
 
-    def test_list_sources_no_filters_returns_all(self, client, mock_source_repo):
+    def test_list_sources_no_filters_returns_all(self, app, client, mock_source_repo):
         """Test listing sources without filters returns all sources."""
         # Create mock sources
         mock_source1 = MarketplaceSource(
@@ -600,11 +601,13 @@ class TestListSourcesNoFilters:
             items=[mock_source1, mock_source2], has_more=False
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
             response = client.get("/api/v1/marketplace/sources")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()

@@ -103,7 +103,10 @@ def _populate_artifact_row(session, _artifact_mgr, _collection_id, entry):
                 source=entry.upstream_url,
             )
         )
-        session.flush()
+    # Commit so that the artifact rows are durable and visible to the separate
+    # session opened by upsert_composite_memberships() inside
+    # LocalMarketplaceSourceRepository.
+    session.commit()
 
 
 def test_child_import_links_and_commits_memberships_with_resolved_names(tmp_path):
@@ -170,9 +173,21 @@ def test_child_import_links_and_commits_memberships_with_resolved_names(tmp_path
             status=ImportStatus.SUCCESS,
         )
 
+        # _import_composite_children creates a LocalMarketplaceSourceRepository()
+        # internally for upsert_composite_memberships().  That repo calls
+        # _get_db_session() (imported from skillmeat.cache.models.get_session at
+        # module load) which opens a session to the *global* default database —
+        # not the per-test SQLite file.
+        #
+        # Patch the module-level _get_db_session to return a fresh session from
+        # the per-test engine.  _populate_artifact_row now commits (not just
+        # flushes) so artifact rows are visible to this new session.
         with patch(
             "skillmeat.api.routers.marketplace_sources.ImportCoordinator",
             _FakeImportCoordinator,
+        ), patch(
+            "skillmeat.core.repositories.local_marketplace_source._get_db_session",
+            new=lambda *args, **kwargs: SessionLocal(),
         ):
             children_added = _import_composite_children(
                 session=session,
