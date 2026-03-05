@@ -29,8 +29,11 @@ from typing import Any
 from skillmeat.core.interfaces.context import RequestContext
 from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
+    CategoryDTO,
     CollectionDTO,
+    CollectionMembershipDTO,
     DeploymentDTO,
+    EntityTypeConfigDTO,
     ProjectDTO,
     SettingsDTO,
     TagDTO,
@@ -287,6 +290,91 @@ class MockArtifactRepository(IArtifactRepository):
         self._artifact_tags[id] = set(tag_ids)
         return True
 
+    # ------------------------------------------------------------------
+    # UUID resolution (stub implementations)
+    # ------------------------------------------------------------------
+
+    def resolve_uuid_by_type_name(
+        self,
+        artifact_type: str,
+        name: str,
+        ctx: RequestContext | None = None,
+    ) -> str | None:
+        return None
+
+    def batch_resolve_uuids(
+        self,
+        artifacts: list[tuple[str, str]],
+        ctx: RequestContext | None = None,
+    ) -> dict[tuple[str, str], str]:
+        return {}
+
+    # ------------------------------------------------------------------
+    # Collection-context queries (stub implementations)
+    # ------------------------------------------------------------------
+
+    def get_with_collection_context(
+        self,
+        uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> ArtifactDTO | None:
+        return None
+
+    def get_collection_memberships(
+        self,
+        uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionMembershipDTO]:
+        return []
+
+    def get_collection_description(
+        self,
+        uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> str | None:
+        return None
+
+    # ------------------------------------------------------------------
+    # Deduplication cluster queries (stub implementations)
+    # ------------------------------------------------------------------
+
+    def get_duplicate_cluster_members(
+        self,
+        cluster_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[ArtifactDTO]:
+        return []
+
+    # ------------------------------------------------------------------
+    # Existence and type queries (stub implementations)
+    # ------------------------------------------------------------------
+
+    def validate_exists(
+        self,
+        uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        return False
+
+    def get_by_type(
+        self,
+        artifact_type: str,
+        ctx: RequestContext | None = None,
+    ) -> list[ArtifactDTO]:
+        return []
+
+    # ------------------------------------------------------------------
+    # Collection-level mutations (stub implementations)
+    # ------------------------------------------------------------------
+
+    def update_collection_tags(
+        self,
+        uuid: str,
+        tags: list[str],
+        ctx: RequestContext | None = None,
+    ) -> None:
+        return None
+
 
 # =============================================================================
 # MockProjectRepository
@@ -532,6 +620,113 @@ class MockCollectionRepository(ICollectionRepository):
         items = list(self._collection_artifacts.get(collection_id, []))
         items = _apply_dict_filters(items, filters)
         return items[offset : offset + limit]
+
+    # ------------------------------------------------------------------
+    # Mutations (stub implementations)
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        name: str,
+        description: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> CollectionDTO:
+        now = _now_iso()
+        collection_id = uuid.uuid4().hex
+        dto = CollectionDTO(
+            id=collection_id,
+            name=name,
+            description=description,
+            artifact_count=0,
+            created_at=now,
+            updated_at=now,
+        )
+        self._store[collection_id] = dto
+        return dto
+
+    def update(
+        self,
+        collection_id: str,
+        updates: dict[str, Any],
+        ctx: RequestContext | None = None,
+    ) -> CollectionDTO:
+        existing = self._store.get(collection_id)
+        if existing is None:
+            raise KeyError(f"Collection '{collection_id}' not found")
+        updated = dataclasses.replace(
+            existing,
+            **{k: v for k, v in updates.items() if k in existing.__dataclass_fields__},
+            updated_at=_now_iso(),
+        )
+        self._store[collection_id] = updated
+        return updated
+
+    def delete(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        if collection_id not in self._store:
+            raise KeyError(f"Collection '{collection_id}' not found")
+        self._store.pop(collection_id)
+        self._collection_artifacts.pop(collection_id, None)
+
+    def add_artifacts(
+        self,
+        collection_id: str,
+        artifact_uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> None:
+        if collection_id not in self._store:
+            raise KeyError(f"Collection '{collection_id}' not found")
+        # Stub: no-op (test helpers can use seed_artifacts instead)
+
+    def remove_artifact(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        if collection_id not in self._store:
+            raise KeyError(f"Collection '{collection_id}' not found")
+        # Stub: no-op
+
+    # ------------------------------------------------------------------
+    # Entity management (stub implementations)
+    # ------------------------------------------------------------------
+
+    def list_entities(
+        self,
+        collection_id: str,
+        entity_type: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[Any]:
+        return []
+
+    def add_entity(
+        self,
+        collection_id: str,
+        entity_type: str,
+        entity_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        return None
+
+    def remove_entity(
+        self,
+        collection_id: str,
+        entity_type: str,
+        entity_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        return None
+
+    def migrate_to_default(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        return None
 
 
 # =============================================================================
@@ -908,3 +1103,80 @@ class MockSettingsRepository(ISettingsRepository):
             # Accept any non-empty token by default
             return bool(token)
         return token in self._valid_tokens
+
+    # ------------------------------------------------------------------
+    # Entity type configuration (stub implementations)
+    # ------------------------------------------------------------------
+
+    def list_entity_type_configs(
+        self,
+        ctx: RequestContext | None = None,
+    ) -> list[EntityTypeConfigDTO]:
+        return []
+
+    def create_entity_type_config(
+        self,
+        entity_type: str,
+        display_name: str,
+        description: str | None = None,
+        icon: str | None = None,
+        color: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> EntityTypeConfigDTO:
+        now = _now_iso()
+        return EntityTypeConfigDTO(
+            id=uuid.uuid4().hex,
+            entity_type=entity_type,
+            display_name=display_name,
+            description=description,
+            icon=icon,
+            color=color,
+            is_system=False,
+            created_at=now,
+            updated_at=now,
+        )
+
+    def update_entity_type_config(
+        self,
+        config_id: str,
+        updates: dict[str, Any],
+        ctx: RequestContext | None = None,
+    ) -> EntityTypeConfigDTO:
+        raise KeyError(f"EntityTypeConfig '{config_id}' not found")
+
+    def delete_entity_type_config(
+        self,
+        config_id: str,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        return None
+
+    # ------------------------------------------------------------------
+    # Category management (stub implementations)
+    # ------------------------------------------------------------------
+
+    def list_categories(
+        self,
+        entity_type: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[CategoryDTO]:
+        return []
+
+    def create_category(
+        self,
+        name: str,
+        entity_type: str | None = None,
+        description: str | None = None,
+        color: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> CategoryDTO:
+        now = _now_iso()
+        return CategoryDTO(
+            id=uuid.uuid4().hex,
+            name=name,
+            entity_type=entity_type,
+            description=description,
+            color=color,
+            created_at=now,
+            updated_at=now,
+        )
