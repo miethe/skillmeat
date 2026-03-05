@@ -1165,6 +1165,7 @@ class MockSettingsRepository(ISettingsRepository):
     def list_categories(
         self,
         entity_type: str | None = None,
+        platform: str | None = None,
         ctx: RequestContext | None = None,
     ) -> list[CategoryDTO]:
         return []
@@ -1172,18 +1173,42 @@ class MockSettingsRepository(ISettingsRepository):
     def create_category(
         self,
         name: str,
+        slug: str | None = None,
         entity_type: str | None = None,
         description: str | None = None,
         color: str | None = None,
+        platform: str | None = None,
+        sort_order: int | None = None,
         ctx: RequestContext | None = None,
     ) -> CategoryDTO:
+        import re as _re
+        resolved_slug = slug if slug else _re.sub(r"[^a-z0-9-]", "-", name.lower()).strip("-") or "category"
         now = _now_iso()
         return CategoryDTO(
             id=uuid.uuid4().hex,
             name=name,
+            slug=resolved_slug,
             entity_type=entity_type,
             description=description,
             color=color,
+            platform=platform,
+            sort_order=sort_order or 0,
+            is_builtin=False,
             created_at=now,
             updated_at=now,
         )
+
+    def update_category(
+        self,
+        category_id: int,
+        updates: dict,
+        ctx: RequestContext | None = None,
+    ) -> CategoryDTO:
+        raise KeyError(f"Category '{category_id}' not found in mock")
+
+    def delete_category(
+        self,
+        category_id: int,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        raise KeyError(f"Category '{category_id}' not found in mock")

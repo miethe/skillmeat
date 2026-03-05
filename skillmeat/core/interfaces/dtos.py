@@ -512,6 +512,16 @@ class EntityTypeConfigDTO:
         icon: Optional icon identifier or URL.
         color: Optional hex color code for UI display (e.g. ``"#FF5733"``).
         is_system: True when this config is built-in (not user-created).
+        sort_order: Display ordering (ascending).
+        path_prefix: Default filesystem path prefix for this type.
+        required_frontmatter_keys: Frontmatter keys that must be present.
+        optional_frontmatter_keys: Frontmatter keys that may be present.
+        validation_rules: Additional validation configuration dict.
+        example_path: Example path illustrating this entity type.
+        content_template: Default Markdown template for new entities.
+        applicable_platforms: Platform slugs this type applies to; ``None``
+            means all platforms.
+        frontmatter_schema: JSON Schema subset for frontmatter validation.
         created_at: ISO-8601 creation timestamp.
         updated_at: ISO-8601 last-update timestamp.
     """
@@ -523,6 +533,15 @@ class EntityTypeConfigDTO:
     icon: str | None = None
     color: str | None = None
     is_system: bool = False
+    sort_order: int = 0
+    path_prefix: str | None = None
+    required_frontmatter_keys: List[str] | None = None
+    optional_frontmatter_keys: List[str] | None = None
+    validation_rules: Dict[str, Any] | None = None
+    example_path: str | None = None
+    content_template: str | None = None
+    applicable_platforms: List[str] | None = None
+    frontmatter_schema: Dict[str, Any] | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -545,6 +564,15 @@ class EntityTypeConfigDTO:
             icon=data.get("icon"),
             color=data.get("color"),
             is_system=bool(data.get("is_system", False)),
+            sort_order=int(data.get("sort_order") or 0),
+            path_prefix=data.get("path_prefix"),
+            required_frontmatter_keys=data.get("required_frontmatter_keys"),
+            optional_frontmatter_keys=data.get("optional_frontmatter_keys"),
+            validation_rules=data.get("validation_rules"),
+            example_path=data.get("example_path"),
+            content_template=data.get("content_template"),
+            applicable_platforms=data.get("applicable_platforms"),
+            frontmatter_schema=data.get("frontmatter_schema"),
             created_at=_to_iso(data.get("created_at")),
             updated_at=_to_iso(data.get("updated_at")),
         )
@@ -567,10 +595,14 @@ class CategoryDTO:
         id: Unique identifier for the category record.
         name: Human-readable category name (must be unique within
             ``entity_type``).
+        slug: URL-safe machine identifier.
         entity_type: The entity type this category applies to, or ``None``
             for cross-type categories.
         description: Optional description of what this category represents.
         color: Optional hex color code for UI display (e.g. ``"#00FF00"``).
+        platform: Optional platform scope filter.
+        sort_order: Ascending display order in the UI.
+        is_builtin: True when this category is system-seeded.
         artifact_count: Number of artifacts assigned to this category.
         created_at: ISO-8601 creation timestamp.
         updated_at: ISO-8601 last-update timestamp.
@@ -578,9 +610,13 @@ class CategoryDTO:
 
     id: str
     name: str
+    slug: str = ""
     entity_type: str | None = None
     description: str | None = None
     color: str | None = None
+    platform: str | None = None
+    sort_order: int = 0
+    is_builtin: bool = False
     artifact_count: int = 0
     created_at: str | None = None
     updated_at: str | None = None
@@ -598,9 +634,13 @@ class CategoryDTO:
         return cls(
             id=data["id"],
             name=data["name"],
+            slug=data.get("slug", ""),
             entity_type=data.get("entity_type"),
             description=data.get("description"),
             color=data.get("color"),
+            platform=data.get("platform"),
+            sort_order=int(data.get("sort_order") or 0),
+            is_builtin=bool(data.get("is_builtin", False)),
             artifact_count=int(data.get("artifact_count") or 0),
             created_at=_to_iso(data.get("created_at")),
             updated_at=_to_iso(data.get("updated_at")),

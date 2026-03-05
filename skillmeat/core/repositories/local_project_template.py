@@ -199,6 +199,34 @@ class LocalProjectTemplateRepository(IProjectTemplateRepository):
         finally:
             session.close()
 
+    def count(
+        self,
+        filters: dict[str, Any] | None = None,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Return the total number of project templates matching optional filters.
+
+        Args:
+            filters: Optional key/value filter map.  Supported keys:
+                ``collection_id`` (exact match).
+            ctx: Unused; accepted for interface compatibility.
+
+        Returns:
+            Integer count of matching project templates.
+        """
+        session = self._get_session()
+        try:
+            query = session.query(_DBProjectTemplate)
+            if filters:
+                collection_id = filters.get("collection_id")
+                if collection_id is not None:
+                    query = query.filter(
+                        _DBProjectTemplate.collection_id == collection_id
+                    )
+            return query.count()
+        finally:
+            session.close()
+
     # ------------------------------------------------------------------
     # Single-item lookup
     # ------------------------------------------------------------------

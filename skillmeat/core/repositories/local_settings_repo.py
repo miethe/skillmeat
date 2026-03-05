@@ -456,14 +456,18 @@ class LocalSettingsRepository(ISettingsRepository):
     def list_categories(
         self,
         entity_type: Optional[str] = None,
+        platform: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
     ) -> List[CategoryDTO]:
-        """Return all categories from the DB cache, optionally filtered by entity type.
+        """Return all categories from the DB cache, optionally filtered by entity type
+        and platform.
 
         Args:
             entity_type: When provided, return only categories whose
-                ``entity_type_slug`` matches (or is ``None`` for cross-type
-                categories).  When omitted, all categories are returned.
+                ``entity_type_slug`` matches.  When omitted, all categories
+                are returned.
+            platform: When provided, return only categories scoped to this
+                platform.
             ctx: Optional per-request metadata.
 
         Returns:
@@ -478,6 +482,8 @@ class LocalSettingsRepository(ISettingsRepository):
                     query = query.filter(
                         ContextEntityCategory.entity_type_slug == entity_type
                     )
+                if platform is not None:
+                    query = query.filter(ContextEntityCategory.platform == platform)
                 rows = query.order_by(ContextEntityCategory.sort_order).all()
                 return [self._category_to_dto(r) for r in rows]
         except Exception as exc:
@@ -487,65 +493,164 @@ class LocalSettingsRepository(ISettingsRepository):
     def create_category(
         self,
         name: str,
+        slug: Optional[str] = None,
         entity_type: Optional[str] = None,
         description: Optional[str] = None,
         color: Optional[str] = None,
+        platform: Optional[str] = None,
+        sort_order: Optional[int] = None,
         ctx: Optional[RequestContext] = None,
     ) -> CategoryDTO:
         """Create a new category in the DB cache.
 
         Args:
-            name: Human-readable category name.  Must be unique within the
-                same *entity_type* namespace.
+            name: Human-readable category name.
+            slug: Optional URL-safe slug; auto-generated from *name* when
+                omitted.
             entity_type: Optional entity type this category applies to.
                 Pass ``None`` for a cross-type (universal) category.
             description: Optional description text.
             color: Optional hex color code for UI display (e.g. ``"#00FF00"``).
+            platform: Optional platform scope filter.
+            sort_order: Optional explicit display order; auto-computed when
+                omitted.
             ctx: Optional per-request metadata.
 
         Returns:
             The created :class:`~skillmeat.core.interfaces.dtos.CategoryDTO`.
 
         Raises:
-            ValueError: If a category with the same *name* and *entity_type*
-                combination already exists.
+            ValueError: If a category with the same resolved slug already
+                exists.
         """
         from skillmeat.cache.models import ContextEntityCategory, get_session
 
-        # Generate a URL-safe slug from the name.
-        slug = _slugify(name)
+        # Generate a URL-safe slug from the name when not provided.
+        resolved_slug = slug if slug else _slugify(name)
 
         with get_session() as session:
             existing = (
                 session.query(ContextEntityCategory)
-                .filter(ContextEntityCategory.slug == slug)
+                .filter(ContextEntityCategory.slug == resolved_slug)
                 .first()
             )
             if existing is not None:
                 raise ValueError(
-                    f"Category with name='{name}' (slug='{slug}') already exists"
+                    f"Category with slug='{resolved_slug}' already exists"
                 )
 
-            # Compute next sort_order.
-            max_order_row = (
-                session.query(ContextEntityCategory.sort_order)
-                .order_by(ContextEntityCategory.sort_order.desc())
-                .first()
-            )
-            next_order = ((max_order_row[0] or 0) + 10) if max_order_row else 0
+            # Compute next sort_order when not explicitly provided.
+            if sort_order is None:
+                max_order_row = (
+                    session.query(ContextEntityCategory.sort_order)
+                    .order_by(ContextEntityCategory.sort_order.desc())
+                    .first()
+                )
+                sort_order = ((max_order_row[0] or 0) + 10) if max_order_row else 0
 
             category = ContextEntityCategory(
                 name=name,
-                slug=slug,
+                slug=resolved_slug,
                 description=description,
                 color=color,
                 entity_type_slug=entity_type,
-                sort_order=next_order,
+                platform=platform,
+                sort_order=sort_order,
                 is_builtin=False,
             )
             session.add(category)
             session.flush()
             return self._category_to_dto(category)
+
+    def update_category(
+        self,
+        category_id: int,
+        updates: Dict[str, Any],
+        ctx: Optional[RequestContext] = None,
+    ) -> CategoryDTO:
+        """Apply a partial update to an existing category.
+
+        Args:
+            category_id: Integer primary key of the category to update.
+            updates: Map of field names to new values.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated :class:`~skillmeat.core.interfaces.dtos.CategoryDTO`.
+
+        Raises:
+            KeyError: If no category with *category_id* exists.
+            ValueError: If the requested new slug is already taken.
+        """
+        from skillmeat.cache.models import ContextEntityCategory, get_session
+
+        with get_session() as session:
+            category = (
+                session.query(ContextEntityCategory)
+                .filter(ContextEntityCategory.id == category_id)
+                .first()
+            )
+            if category is None:
+                raise KeyError(f"Category with id='{category_id}' not found")
+
+            # Check slug uniqueness when slug is being changed.
+            new_slug = updates.get("slug")
+            if new_slug is not None and new_slug != category.slug:
+                collision = (
+                    session.query(ContextEntityCategory)
+                    .filter(ContextEntityCategory.slug == new_slug)
+                    .first()
+                )
+                if collision is not None:
+                    raise ValueError(
+                        f"Category with slug='{new_slug}' already exists"
+                    )
+
+            for field, value in updates.items():
+                setattr(category, field, value)
+
+            session.flush()
+            return self._category_to_dto(category)
+
+    def delete_category(
+        self,
+        category_id: int,
+        ctx: Optional[RequestContext] = None,
+    ) -> None:
+        """Delete a category by integer primary key.
+
+        Args:
+            category_id: Integer primary key of the category to delete.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no category with *category_id* exists.
+            ValueError: If the category has one or more artifact associations.
+        """
+        from skillmeat.cache.models import ArtifactCategoryAssociation, ContextEntityCategory, get_session
+
+        with get_session() as session:
+            category = (
+                session.query(ContextEntityCategory)
+                .filter(ContextEntityCategory.id == category_id)
+                .first()
+            )
+            if category is None:
+                raise KeyError(f"Category with id='{category_id}' not found")
+
+            association_count = (
+                session.query(ArtifactCategoryAssociation)
+                .filter(ArtifactCategoryAssociation.category_id == category_id)
+                .count()
+            )
+            if association_count > 0:
+                raise ValueError(
+                    f"Category '{category.slug}' has {association_count} artifact "
+                    "association(s) and cannot be deleted. Remove all artifact "
+                    "associations first."
+                )
+
+            session.delete(category)
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -598,6 +703,15 @@ class LocalSettingsRepository(ISettingsRepository):
             icon=config.icon,
             color=config.color,
             is_system=bool(config.is_builtin),
+            sort_order=int(config.sort_order) if config.sort_order is not None else 0,
+            path_prefix=getattr(config, "path_prefix", None),
+            required_frontmatter_keys=getattr(config, "required_frontmatter_keys", None),
+            optional_frontmatter_keys=getattr(config, "optional_frontmatter_keys", None),
+            validation_rules=getattr(config, "validation_rules", None),
+            example_path=getattr(config, "example_path", None),
+            content_template=getattr(config, "content_template", None),
+            applicable_platforms=getattr(config, "applicable_platforms", None),
+            frontmatter_schema=getattr(config, "frontmatter_schema", None),
             created_at=config.created_at.isoformat() if config.created_at else None,
             updated_at=config.updated_at.isoformat() if config.updated_at else None,
         )
@@ -621,9 +735,13 @@ class LocalSettingsRepository(ISettingsRepository):
         return CategoryDTO(
             id=str(category.id),
             name=category.name,
+            slug=category.slug or "",
             entity_type=category.entity_type_slug,
             description=category.description,
             color=category.color,
+            platform=getattr(category, "platform", None),
+            sort_order=int(category.sort_order) if category.sort_order is not None else 0,
+            is_builtin=bool(getattr(category, "is_builtin", False)),
             artifact_count=artifact_count,
             created_at=category.created_at.isoformat() if category.created_at else None,
             updated_at=category.updated_at.isoformat() if category.updated_at else None,

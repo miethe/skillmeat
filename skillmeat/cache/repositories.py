@@ -3092,6 +3092,215 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
         finally:
             session.close()
 
+    def get_composite_aggregates(self) -> Dict[str, Any]:
+        """Return composite-member aggregate data across all sources.
+
+        Executes a single JOIN query to collect deduplicated child-artifact
+        types and the total membership-edge count, avoiding N+1 round trips.
+
+        Returns:
+            Dict with keys ``member_count`` (int) and ``child_types``
+            (List[str]).  Returns ``{"member_count": 0, "child_types": []}``
+            on any DB error so that failures are non-fatal.
+        """
+        from skillmeat.cache.models import (
+            Artifact as _Artifact,
+            CompositeMembership as _CM,
+        )
+
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(_Artifact.type)
+                .join(_CM, _CM.child_artifact_uuid == _Artifact.uuid)
+                .distinct()
+                .all()
+            )
+            child_types = [row.type for row in rows if row.type]
+            member_count = session.query(_CM).count()
+            return {"member_count": member_count, "child_types": child_types}
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("get_composite_aggregates: DB query failed — %s", exc)
+            return {"member_count": 0, "child_types": []}
+        finally:
+            session.close()
+
+    def update_name(
+        self,
+        entry_id: str,
+        source_id: str,
+        name: str,
+    ) -> Optional[MarketplaceCatalogEntry]:
+        """Update the display name of a catalog entry.
+
+        Args:
+            entry_id: Unique catalog entry identifier.
+            source_id: Source ID — entry must belong to this source.
+            name: New artifact name.
+
+        Returns:
+            Updated :class:`MarketplaceCatalogEntry` if found and updated,
+            ``None`` if the entry does not exist.
+
+        Raises:
+            ValueError: If the entry does not belong to ``source_id``.
+        """
+        session = self._get_session()
+        try:
+            entry = (
+                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+            )
+            if not entry:
+                return None
+            if entry.source_id != source_id:
+                raise ValueError(
+                    f"Entry '{entry_id}' does not belong to source '{source_id}'"
+                )
+            entry.name = name
+            session.commit()
+            session.refresh(entry)
+            logger.info("update_name: updated entry %s -> %r", entry_id, name)
+            return entry
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def set_exclusion(
+        self,
+        entry_id: str,
+        source_id: str,
+        excluded: bool,
+        reason: Optional[str] = None,
+    ) -> Optional[MarketplaceCatalogEntry]:
+        """Mark or restore a catalog entry's exclusion state.
+
+        Args:
+            entry_id: Unique catalog entry identifier.
+            source_id: Source ID — entry must belong to this source.
+            excluded: ``True`` to exclude, ``False`` to restore.
+            reason: Optional human-readable reason (used when ``excluded=True``).
+
+        Returns:
+            Updated :class:`MarketplaceCatalogEntry` if found, ``None`` otherwise.
+
+        Raises:
+            ValueError: If the entry does not belong to ``source_id``.
+        """
+        from datetime import timezone
+
+        session = self._get_session()
+        try:
+            entry = (
+                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+            )
+            if not entry:
+                return None
+            if entry.source_id != source_id:
+                raise ValueError(
+                    f"Entry '{entry_id}' does not belong to source '{source_id}'"
+                )
+
+            if excluded:
+                if entry.excluded_at is None:
+                    entry.excluded_at = datetime.now(timezone.utc)
+                entry.excluded_reason = reason
+                entry.status = "excluded"
+            else:
+                entry.excluded_at = None
+                entry.excluded_reason = None
+                entry.status = "new" if entry.import_date is None else "imported"
+
+            session.commit()
+            session.refresh(entry)
+            logger.info(
+                "set_exclusion: entry %s excluded=%s", entry_id, excluded
+            )
+            return entry
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def get_with_path_segments(
+        self,
+        entry_id: str,
+        source_id: str,
+    ) -> Optional[MarketplaceCatalogEntry]:
+        """Fetch a catalog entry validating it belongs to the given source.
+
+        Convenience wrapper used by path-tag endpoints that need to both
+        retrieve and validate source ownership in one call.
+
+        Args:
+            entry_id: Unique catalog entry identifier.
+            source_id: Source ID — entry must belong to this source.
+
+        Returns:
+            :class:`MarketplaceCatalogEntry` if found and owned by source,
+            ``None`` if not found.
+
+        Raises:
+            ValueError: If the entry exists but does not belong to ``source_id``.
+        """
+        session = self._get_session()
+        try:
+            entry = (
+                session.query(MarketplaceCatalogEntry)
+                .filter(
+                    MarketplaceCatalogEntry.source_id == source_id,
+                    MarketplaceCatalogEntry.id == entry_id,
+                )
+                .first()
+            )
+            return entry
+        finally:
+            session.close()
+
+    def update_path_segments(
+        self,
+        entry_id: str,
+        source_id: str,
+        path_segments_json: str,
+    ) -> Optional[MarketplaceCatalogEntry]:
+        """Persist updated path-segments JSON for a catalog entry.
+
+        Args:
+            entry_id: Unique catalog entry identifier.
+            source_id: Source ID — used to validate ownership.
+            path_segments_json: Serialised JSON string to store.
+
+        Returns:
+            Updated :class:`MarketplaceCatalogEntry`, or ``None`` if not found.
+
+        Raises:
+            ValueError: If the entry does not belong to ``source_id``.
+        """
+        session = self._get_session()
+        try:
+            entry = (
+                session.query(MarketplaceCatalogEntry)
+                .filter(
+                    MarketplaceCatalogEntry.source_id == source_id,
+                    MarketplaceCatalogEntry.id == entry_id,
+                )
+                .first()
+            )
+            if not entry:
+                return None
+            entry.path_segments = path_segments_json
+            session.commit()
+            session.refresh(entry)
+            logger.info("update_path_segments: updated entry %s", entry_id)
+            return entry
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
 
 # =============================================================================
 # Deployment Profile Repository
@@ -3199,6 +3408,29 @@ class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
     def list_all_profiles(self, project_id: str) -> List[DeploymentProfile]:
         """Alias for listing all deployment profiles for a project."""
         return self.list_by_project(project_id)
+
+    def get_project_id_by_path(self, project_path: str) -> Optional[str]:
+        """Return the project ID for the given filesystem path.
+
+        Args:
+            project_path: Absolute path string to match against
+                ``Project.path``.
+
+        Returns:
+            Project ID string when a matching row exists, ``None`` otherwise.
+        """
+        from skillmeat.cache.models import Project as _Project
+
+        session = self._get_session()
+        try:
+            row = (
+                session.query(_Project)
+                .filter(_Project.path == project_path)
+                .first()
+            )
+            return row.id if row else None
+        finally:
+            session.close()
 
     def get_profile_by_platform(
         self, project_id: str, platform: str | Platform

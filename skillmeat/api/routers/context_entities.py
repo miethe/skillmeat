@@ -23,7 +23,6 @@ API Endpoints:
 
 import hashlib
 import logging
-import uuid
 from pathlib import Path
 from typing import Annotated, List, Optional
 
@@ -31,6 +30,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 
 from skillmeat.api.config import APISettings, get_settings
+from skillmeat.api.dependencies import ContextEntityRepoDep
 from skillmeat.api.schemas.context_entity import (
     ContextEntityCreateRequest,
     ContextEntityDeployRequest,
@@ -41,7 +41,9 @@ from skillmeat.api.schemas.context_entity import (
     ContextEntityUpdateRequest,
 )
 from skillmeat.api.schemas.common import PageInfo
+from skillmeat.cache.repositories import DeploymentProfileRepository
 from skillmeat.core.content_assembly import assemble_content
+from skillmeat.core.interfaces.dtos import ContextEntityDTO
 from skillmeat.core.path_resolver import default_project_config_filenames
 from skillmeat.core.validators.context_entity import validate_context_entity
 from skillmeat.core.validators.context_path_validator import (
@@ -51,9 +53,6 @@ from skillmeat.core.validators.context_path_validator import (
     validate_context_path,
 )
 
-from skillmeat.cache.models import Artifact, ArtifactCategoryAssociation, Project, get_session
-from skillmeat.cache.repositories import DeploymentProfileRepository
-
 # Type alias for injected settings dependency
 SettingsDep = Annotated[APISettings, Depends(get_settings)]
 
@@ -61,26 +60,6 @@ logger = logging.getLogger(__name__)
 
 # Sentinel project ID for context entities (not tied to a real project)
 CONTEXT_ENTITIES_PROJECT_ID = "ctx_project_global"
-
-
-def ensure_context_entities_project(session) -> None:
-    """Ensure the sentinel project for context entities exists.
-
-    Context entities are stored as Artifacts but aren't tied to any real project.
-    We use a sentinel project to satisfy the foreign key constraint.
-    """
-    project = session.query(Project).filter_by(id=CONTEXT_ENTITIES_PROJECT_ID).first()
-    if not project:
-        project = Project(
-            id=CONTEXT_ENTITIES_PROJECT_ID,
-            name="Context Entities",
-            path="~/.skillmeat/context-entities",
-            description="Virtual project for context entity storage",
-            status="active",
-        )
-        session.add(project)
-        session.commit()
-        logger.info(f"Created sentinel project for context entities: {project.id}")
 
 
 router = APIRouter(
@@ -104,59 +83,9 @@ def _as_target_platforms(raw: Optional[List[str]]) -> Optional[List[str]]:
     return [str(item) for item in raw]
 
 
-def _sync_category_associations(
-    session,
-    artifact_uuid: str,
-    category_ids: List[int],
-) -> None:
-    """Replace all category associations for an artifact.
-
-    Deletes existing ``ArtifactCategoryAssociation`` rows for *artifact_uuid*,
-    then inserts new rows for each ID in *category_ids*.  Silently ignores
-    category IDs that do not exist in the ``entity_categories`` table.
-
-    Args:
-        session: Active SQLAlchemy session.
-        artifact_uuid: The ``Artifact.uuid`` field (hex UUID).
-        category_ids: Ordered list of ``ContextEntityCategory.id`` values to
-                      associate with the artifact.  An empty list removes all
-                      existing associations.
-    """
-    # Remove existing associations
-    session.query(ArtifactCategoryAssociation).filter(
-        ArtifactCategoryAssociation.artifact_uuid == artifact_uuid
-    ).delete(synchronize_session=False)
-
-    # Insert new associations
-    for cat_id in category_ids:
-        assoc = ArtifactCategoryAssociation(
-            artifact_uuid=artifact_uuid,
-            category_id=cat_id,
-        )
-        session.add(assoc)
-
-
 def _empty_deployed_to() -> dict:
     # Phase 3 adds response shape; deployment aggregation wiring is added separately.
     return {}
-
-
-def _get_category_ids(session, artifact_uuid: str) -> List[int]:
-    """Return the ordered list of category IDs associated with an artifact.
-
-    Args:
-        session: Active SQLAlchemy session.
-        artifact_uuid: The ``Artifact.uuid`` hex field.
-
-    Returns:
-        Sorted list of ``ContextEntityCategory.id`` values.
-    """
-    rows = (
-        session.query(ArtifactCategoryAssociation)
-        .filter(ArtifactCategoryAssociation.artifact_uuid == artifact_uuid)
-        .all()
-    )
-    return sorted(row.category_id for row in rows)
 
 
 def _profile_platform(profile: object) -> str:
@@ -172,7 +101,6 @@ def _profile_id(profile: object) -> str:
 
 def _resolve_deploy_profiles(
     *,
-    session,
     project_path: Path,
     deployment_profile_id: Optional[str],
     all_profiles: bool,
@@ -180,14 +108,10 @@ def _resolve_deploy_profiles(
     if not all_profiles:
         return [resolve_project_profile(project_path, deployment_profile_id)]
 
-    project_row = (
-        session.query(Project)
-        .filter(Project.path == str(project_path))
-        .first()
-    )
-    if project_row:
-        repo = DeploymentProfileRepository()
-        profiles = repo.list_all_profiles(project_row.id)
+    repo = DeploymentProfileRepository()
+    project_id = repo.get_project_id_by_path(str(project_path))
+    if project_id:
+        profiles = repo.list_all_profiles(project_id)
         if profiles:
             # Deduplicate by profile_id in case repository data includes stale duplicates.
             seen: set[str] = set()
@@ -253,6 +177,34 @@ def decode_cursor(cursor: str) -> str:
         )
 
 
+def _dto_to_response(dto: ContextEntityDTO) -> ContextEntityResponse:
+    """Convert a ContextEntityDTO to a ContextEntityResponse.
+
+    Args:
+        dto: Repository DTO
+
+    Returns:
+        API response model
+    """
+    return ContextEntityResponse(
+        id=dto.id,
+        name=dto.name,
+        entity_type=dto.entity_type,
+        content=dto.content,
+        path_pattern=dto.path_pattern,
+        description=dto.description,
+        category=dto.category,
+        auto_load=dto.auto_load,
+        version=dto.version,
+        target_platforms=_as_target_platforms(dto.target_platforms) if dto.target_platforms else None,
+        deployed_to=_empty_deployed_to(),
+        content_hash=dto.content_hash,
+        category_ids=list(dto.category_ids),
+        created_at=dto.created_at,
+        updated_at=dto.updated_at,
+    )
+
+
 # =============================================================================
 # Context Entity CRUD Operations
 # =============================================================================
@@ -280,6 +232,7 @@ def decode_cursor(cursor: str) -> str:
     },
 )
 async def list_context_entities(
+    repo: ContextEntityRepoDep,
     entity_type: Optional[ContextEntityType] = Query(
         None, description="Filter by entity type"
     ),
@@ -302,6 +255,7 @@ async def list_context_entities(
     """List all context entities with filtering and pagination.
 
     Args:
+        repo: Context entity repository (injected)
         entity_type: Optional type filter
         category: Optional category filter
         auto_load: Optional auto-load filter
@@ -314,67 +268,27 @@ async def list_context_entities(
 
     Raises:
         HTTPException: On error
-
-    Note:
-        This endpoint uses Artifact model with type filtering.
     """
-    session = get_session()
     try:
-        # Build query - filter by context entity types
-        query = session.query(Artifact).filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
-
-        # Apply filters
+        # Build filters dict for the repository
+        filters: dict = {}
         if entity_type:
-            query = query.filter_by(type=entity_type.value)
+            filters["entity_type"] = entity_type.value
         if category:
-            query = query.filter_by(category=category)
+            filters["category"] = category
         if auto_load is not None:
-            query = query.filter_by(auto_load=auto_load)
+            filters["auto_load"] = auto_load
         if search:
-            search_pattern = f"%{search}%"
-            query = query.filter(
-                (Artifact.name.ilike(search_pattern))
-                | (Artifact.description.ilike(search_pattern))
-                | (Artifact.path_pattern.ilike(search_pattern))
-            )
+            filters["search"] = search
 
-        # Decode cursor if provided
-        if after:
-            cursor_id = decode_cursor(after)
-            query = query.filter(Artifact.id > cursor_id)
+        # Fetch limit + 1 to detect next page
+        dtos = repo.list(filters=filters, limit=limit + 1, after=after)
 
-        # Order by ID for consistent pagination
-        query = query.order_by(Artifact.id)
-
-        # Fetch limit + 1 to check for next page
-        artifacts = query.limit(limit + 1).all()
-
-        # Check if there are more pages
-        has_next = len(artifacts) > limit
+        has_next = len(dtos) > limit
         if has_next:
-            artifacts = artifacts[:limit]
+            dtos = dtos[:limit]
 
-        # Build response
-        items = [
-            ContextEntityResponse(
-                id=artifact.id,
-                name=artifact.name,
-                entity_type=artifact.type,
-                content=artifact.content or "",
-                path_pattern=artifact.path_pattern or "",
-                description=artifact.description,
-                category=artifact.category,
-                auto_load=artifact.auto_load,
-                version=artifact.deployed_version,
-                target_platforms=_as_target_platforms(artifact.target_platforms),
-                deployed_to=_empty_deployed_to(),
-                content_hash=artifact.content_hash,
-                category_ids=_get_category_ids(session, artifact.uuid),
-                created_at=artifact.created_at,
-                updated_at=artifact.updated_at,
-            )
-            for artifact in artifacts
-        ]
+        items = [_dto_to_response(dto) for dto in dtos]
 
         # Build pagination info
         start_cursor = encode_cursor(items[0].id) if items else None
@@ -399,8 +313,6 @@ async def list_context_entities(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list context entities: {str(e)}",
         )
-    finally:
-        session.close()
 
 
 @router.post(
@@ -430,12 +342,15 @@ async def list_context_entities(
 )
 async def create_context_entity(
     request: ContextEntityCreateRequest,
+    repo: ContextEntityRepoDep,
     settings: SettingsDep,
 ) -> ContextEntityResponse:
     """Create a new context entity.
 
     Args:
         request: Context entity creation request
+        repo: Context entity repository (injected)
+        settings: API settings (injected)
 
     Returns:
         Created context entity with metadata
@@ -443,10 +358,6 @@ async def create_context_entity(
     Raises:
         HTTPException 400: If validation fails
         HTTPException 500: If database operation fails
-
-    Note:
-        This endpoint requires TASK-1.2 (database model) to be completed.
-        Current implementation will raise 501 Not Implemented.
     """
     try:
         validate_context_path(
@@ -501,86 +412,55 @@ async def create_context_entity(
             request.entity_type.value,
         )
 
-    # Compute content hash from assembled content (used for change detection)
-    content_hash = compute_content_hash(assembled_content)
-
-    session = get_session()
     try:
-        # Ensure sentinel project exists
-        ensure_context_entities_project(session)
-
-        # Create artifact with context entity type
-        artifact = Artifact(
-            id=f"ctx_{uuid.uuid4().hex[:12]}",
-            project_id=CONTEXT_ENTITIES_PROJECT_ID,
+        dto = repo.create(
             name=request.name,
-            type=request.entity_type.value,
+            entity_type=request.entity_type.value,
             content=assembled_content,
-            core_content=stored_core_content,
             path_pattern=request.path_pattern,
             description=request.description,
             category=request.category,
-            auto_load=request.auto_load,
-            deployed_version=request.version if request.version else None,
+            auto_load=request.auto_load if request.auto_load is not None else False,
+            version=request.version if request.version else None,
             target_platforms=(
                 [platform.value for platform in request.target_platforms]
                 if request.target_platforms is not None
                 else None
             ),
-            content_hash=content_hash,
+            category_ids=request.category_ids,
         )
 
-        session.add(artifact)
-        session.flush()  # Flush so artifact.uuid is populated before associations
-
-        # Write category associations when category_ids provided
-        if request.category_ids is not None:
-            _sync_category_associations(session, artifact.uuid, request.category_ids)
-
-        session.commit()
-        session.refresh(artifact)
+        # If modular content architecture is enabled, update core_content separately
+        # since the create() method doesn't expose a core_content parameter.
+        # We rely on the repo's update() to set it when present.
+        if settings.modular_content_architecture and stored_core_content is not None:
+            dto = repo.update(dto.id, {"core_content": stored_core_content})
 
         logger.info(
-            f"Created context entity: {artifact.id} ('{artifact.name}') type={artifact.type}"
+            f"Created context entity: {dto.id} ('{dto.name}') type={dto.entity_type}"
         )
-
-        return ContextEntityResponse(
-            id=artifact.id,
-            name=artifact.name,
-            entity_type=artifact.type,
-            content=artifact.content or "",
-            path_pattern=artifact.path_pattern or "",
-            description=artifact.description,
-            category=artifact.category,
-            auto_load=artifact.auto_load,
-            version=artifact.deployed_version,
-            target_platforms=_as_target_platforms(artifact.target_platforms),
-            deployed_to=_empty_deployed_to(),
-            content_hash=artifact.content_hash,
-            category_ids=_get_category_ids(session, artifact.uuid),
-            created_at=artifact.created_at,
-            updated_at=artifact.updated_at,
-        )
+        return _dto_to_response(dto)
 
     except HTTPException:
-        session.rollback()
         raise
     except IntegrityError as e:
-        session.rollback()
         logger.error(f"Integrity error creating context entity: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Context entity with this name or path pattern already exists",
         ) from e
+    except ValueError as e:
+        logger.error(f"Validation error creating context entity: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
     except Exception as e:
-        session.rollback()
         logger.error(f"Failed to create context entity: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create context entity",
         ) from e
-    finally:
-        session.close()
 
 
 @router.get(
@@ -603,11 +483,15 @@ async def create_context_entity(
         500: {"description": "Internal server error"},
     },
 )
-async def get_context_entity(entity_id: str) -> ContextEntityResponse:
+async def get_context_entity(
+    entity_id: str,
+    repo: ContextEntityRepoDep,
+) -> ContextEntityResponse:
     """Get a single context entity by ID.
 
     Args:
         entity_id: Context entity identifier
+        repo: Context entity repository (injected)
 
     Returns:
         Context entity details
@@ -615,42 +499,17 @@ async def get_context_entity(entity_id: str) -> ContextEntityResponse:
     Raises:
         HTTPException 404: If entity not found
         HTTPException 500: If database operation fails
-
-    Note:
-        This endpoint uses Artifact model with type filtering.
     """
-    session = get_session()
     try:
-        artifact = (
-            session.query(Artifact)
-            .filter(Artifact.id == entity_id)
-            .filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
-            .first()
-        )
-        if not artifact:
+        dto = repo.get(entity_id)
+        if not dto:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Context entity '{entity_id}' not found",
             )
 
         logger.info(f"Retrieved context entity {entity_id}")
-        return ContextEntityResponse(
-            id=artifact.id,
-            name=artifact.name,
-            entity_type=artifact.type,
-            content=artifact.content or "",
-            path_pattern=artifact.path_pattern or "",
-            description=artifact.description,
-            category=artifact.category,
-            auto_load=artifact.auto_load,
-            version=artifact.deployed_version,
-            target_platforms=_as_target_platforms(artifact.target_platforms),
-            deployed_to=_empty_deployed_to(),
-            content_hash=artifact.content_hash,
-            category_ids=_get_category_ids(session, artifact.uuid),
-            created_at=artifact.created_at,
-            updated_at=artifact.updated_at,
-        )
+        return _dto_to_response(dto)
 
     except HTTPException:
         raise
@@ -660,8 +519,6 @@ async def get_context_entity(entity_id: str) -> ContextEntityResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get context entity: {str(e)}",
         )
-    finally:
-        session.close()
 
 
 @router.put(
@@ -686,6 +543,7 @@ async def get_context_entity(entity_id: str) -> ContextEntityResponse:
 async def update_context_entity(
     entity_id: str,
     request: ContextEntityUpdateRequest,
+    repo: ContextEntityRepoDep,
     settings: SettingsDep,
 ) -> ContextEntityResponse:
     """Update a context entity's metadata and/or content.
@@ -693,6 +551,8 @@ async def update_context_entity(
     Args:
         entity_id: Context entity identifier
         request: Update request with optional fields
+        repo: Context entity repository (injected)
+        settings: API settings (injected)
 
     Returns:
         Updated context entity
@@ -701,55 +561,17 @@ async def update_context_entity(
         HTTPException 400: If validation fails
         HTTPException 404: If entity not found
         HTTPException 500: If database operation fails
-
-    Note:
-        This endpoint uses Artifact model with type filtering.
     """
-    session = get_session()
     try:
-        artifact = (
-            session.query(Artifact)
-            .filter(Artifact.id == entity_id)
-            .filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
-            .first()
-        )
-        if not artifact:
+        # Fetch current state for validation
+        current = repo.get(entity_id)
+        if not current:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Context entity '{entity_id}' not found",
             )
 
-        # Track if content changed
-        content_changed = False
-
-        # Update fields
-        if request.name is not None:
-            artifact.name = request.name
-        if request.entity_type is not None:
-            artifact.type = request.entity_type.value
-        if request.content is not None:
-            if settings.modular_content_architecture:
-                # Store the raw author-supplied content as core_content and
-                # assemble the default platform-specific version into content.
-                artifact.core_content = request.content
-                entity_type_config = {"slug": artifact.type}
-                platforms = _as_target_platforms(artifact.target_platforms)
-                default_platform = platforms[0] if platforms else "claude-code"
-                artifact.content = assemble_content(
-                    core_content=request.content,
-                    entity_type_config=entity_type_config,
-                    platform=default_platform,
-                )
-                logger.debug(
-                    "modular_content_architecture: re-assembled content for "
-                    "platform=%r (entity_type=%r, entity_id=%r)",
-                    default_platform,
-                    artifact.type,
-                    entity_id,
-                )
-            else:
-                artifact.content = request.content
-            content_changed = True
+        # Validate path_pattern if being updated
         if request.path_pattern is not None:
             try:
                 validate_context_path(
@@ -761,82 +583,101 @@ async def update_context_entity(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=[{"field": "path_pattern", "hint": str(exc)}],
                 ) from exc
-            artifact.path_pattern = request.path_pattern
+
+        # Determine effective type and content for validation
+        effective_type = (
+            request.entity_type.value
+            if request.entity_type is not None
+            else current.entity_type
+        )
+        content_changed = request.content is not None
+
+        # Build the updates dict for the repository
+        updates: dict = {}
+        if request.name is not None:
+            updates["name"] = request.name
+        if request.entity_type is not None:
+            updates["entity_type"] = request.entity_type.value
+        if request.content is not None:
+            if settings.modular_content_architecture:
+                # Store the raw author-supplied content as core_content and
+                # assemble the default platform-specific version into content.
+                updates["core_content"] = request.content
+                entity_type_config = {"slug": effective_type}
+                platforms = _as_target_platforms(current.target_platforms)
+                default_platform = platforms[0] if platforms else "claude-code"
+                assembled = assemble_content(
+                    core_content=request.content,
+                    entity_type_config=entity_type_config,
+                    platform=default_platform,
+                )
+                updates["content"] = assembled
+                logger.debug(
+                    "modular_content_architecture: re-assembled content for "
+                    "platform=%r (entity_type=%r, entity_id=%r)",
+                    default_platform,
+                    effective_type,
+                    entity_id,
+                )
+            else:
+                updates["content"] = request.content
+        if request.path_pattern is not None:
+            updates["path_pattern"] = request.path_pattern
         if request.description is not None:
-            artifact.description = request.description
+            updates["description"] = request.description
         if request.category is not None:
-            artifact.category = request.category
+            updates["category"] = request.category
         if request.auto_load is not None:
-            artifact.auto_load = request.auto_load
+            updates["auto_load"] = request.auto_load
         if request.version is not None:
-            artifact.deployed_version = request.version
+            updates["version"] = request.version
         if request.target_platforms is not None:
-            artifact.target_platforms = [
+            updates["target_platforms"] = [
                 platform.value for platform in request.target_platforms
             ]
         if request.category_ids is not None:
-            _sync_category_associations(session, artifact.uuid, request.category_ids)
+            updates["category_ids"] = request.category_ids
 
         # Validate content if changed or type changed
         if content_changed or request.entity_type is not None:
+            effective_content = updates.get("content", current.content) or ""
+            effective_path = updates.get("path_pattern", current.path_pattern) or ""
             validation_errors = validate_context_entity(
-                entity_type=artifact.type,
-                content=artifact.content or "",
-                path=artifact.path_pattern or "",
+                entity_type=effective_type,
+                content=effective_content,
+                path=effective_path,
                 allowed_prefixes=[".claude/", ".codex/", ".gemini/", ".cursor/"],
             )
             if validation_errors:
-                session.rollback()
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=validation_errors,
                 )
 
-        # Recompute content hash if content changed
-        if content_changed:
-            artifact.content_hash = compute_content_hash(artifact.content or "")
-
-        session.commit()
-        session.refresh(artifact)
+        dto = repo.update(entity_id, updates)
 
         logger.info(f"Updated context entity {entity_id}")
-        return ContextEntityResponse(
-            id=artifact.id,
-            name=artifact.name,
-            entity_type=artifact.type,
-            content=artifact.content or "",
-            path_pattern=artifact.path_pattern or "",
-            description=artifact.description,
-            category=artifact.category,
-            auto_load=artifact.auto_load,
-            version=artifact.deployed_version,
-            target_platforms=_as_target_platforms(artifact.target_platforms),
-            deployed_to=_empty_deployed_to(),
-            content_hash=artifact.content_hash,
-            category_ids=_get_category_ids(session, artifact.uuid),
-            created_at=artifact.created_at,
-            updated_at=artifact.updated_at,
-        )
+        return _dto_to_response(dto)
 
     except HTTPException:
-        session.rollback()
         raise
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Context entity '{entity_id}' not found",
+        ) from e
     except IntegrityError as e:
-        session.rollback()
         logger.error(f"Integrity error updating context entity: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Context entity with this name or path pattern already exists",
         ) from e
     except Exception as e:
-        session.rollback()
         logger.error(f"Failed to update context entity {entity_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update context entity",
         ) from e
-    finally:
-        session.close()
 
 
 @router.delete(
@@ -855,50 +696,35 @@ async def update_context_entity(
         500: {"description": "Internal server error"},
     },
 )
-async def delete_context_entity(entity_id: str) -> None:
+async def delete_context_entity(
+    entity_id: str,
+    repo: ContextEntityRepoDep,
+) -> None:
     """Delete a context entity.
 
     Args:
         entity_id: Context entity identifier
+        repo: Context entity repository (injected)
 
     Raises:
         HTTPException 404: If entity not found
         HTTPException 500: If database operation fails
-
-    Note:
-        This endpoint uses Artifact model with type filtering.
     """
-    session = get_session()
     try:
-        artifact = (
-            session.query(Artifact)
-            .filter(Artifact.id == entity_id)
-            .filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
-            .first()
-        )
-        if not artifact:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Context entity '{entity_id}' not found",
-            )
-
-        session.delete(artifact)
-        session.commit()
-
+        repo.delete(entity_id)
         logger.info(f"Deleted context entity {entity_id}")
 
-    except HTTPException:
-        session.rollback()
-        raise
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Context entity '{entity_id}' not found",
+        ) from e
     except Exception as e:
-        session.rollback()
         logger.error(f"Failed to delete context entity {entity_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete context entity",
         ) from e
-    finally:
-        session.close()
 
 
 @router.post(
@@ -920,6 +746,7 @@ async def delete_context_entity(entity_id: str) -> None:
 async def deploy_context_entity(
     entity_id: str,
     request: ContextEntityDeployRequest,
+    repo: ContextEntityRepoDep,
     settings: SettingsDep,
 ) -> ContextEntityDeployResponse:
     if request.all_profiles and request.deployment_profile_id:
@@ -935,36 +762,29 @@ async def deploy_context_entity(
             detail=f"Project path does not exist: {project_path}",
         )
 
-    session = get_session()
     try:
-        artifact = (
-            session.query(Artifact)
-            .filter(Artifact.id == entity_id)
-            .filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
-            .first()
-        )
-        if not artifact:
+        dto = repo.get(entity_id)
+        if not dto:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Context entity '{entity_id}' not found",
             )
-        if not artifact.path_pattern:
+        if not dto.path_pattern:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Context entity '{entity_id}' has no path_pattern",
             )
 
         profiles = _resolve_deploy_profiles(
-            session=session,
             project_path=project_path,
             deployment_profile_id=request.deployment_profile_id,
             all_profiles=request.all_profiles,
         )
 
-        target_platforms = _as_target_platforms(artifact.target_platforms)
+        target_platforms = _as_target_platforms(dto.target_platforms) if dto.target_platforms else None
         # Base content used when no per-profile assembly is needed.
         # The per-profile assembly (below) may override this for each profile.
-        _base_content = artifact.content or ""
+        _base_content = dto.content or ""
         deployment_targets: List[tuple[str, str, Path]] = []
 
         # Validate all targets before writing files to avoid partial multi-profile deploys.
@@ -985,7 +805,7 @@ async def deploy_context_entity(
                     ),
                 )
 
-            selected_path = rewrite_path_for_profile(artifact.path_pattern, profile)
+            selected_path = rewrite_path_for_profile(dto.path_pattern, profile)
             config_filenames = list(getattr(profile, "config_filenames", []) or [])
             config_filenames.extend(
                 default_project_config_filenames(getattr(profile, "platform", None))
@@ -1018,11 +838,11 @@ async def deploy_context_entity(
         for profile_id, profile_platform, target_path in deployment_targets:
             # Assemble platform-specific content when the flag is enabled and
             # core_content is available; fall back to the pre-assembled content
-            # stored in artifact.content for backward compatibility.
-            if settings.modular_content_architecture and artifact.core_content is not None:
-                entity_type_config = {"slug": artifact.type}
+            # stored in dto.content for backward compatibility.
+            if settings.modular_content_architecture and dto.core_content is not None:
+                entity_type_config = {"slug": dto.entity_type}
                 content = assemble_content(
-                    core_content=artifact.core_content,
+                    core_content=dto.core_content,
                     entity_type_config=entity_type_config,
                     platform=profile_platform,
                 )
@@ -1030,7 +850,7 @@ async def deploy_context_entity(
                     "modular_content_architecture: assembled deploy content for "
                     "platform=%r (entity_type=%r, entity_id=%r)",
                     profile_platform,
-                    artifact.type,
+                    dto.entity_type,
                     entity_id,
                 )
             else:
@@ -1074,7 +894,7 @@ async def deploy_context_entity(
             deployed_paths=deployed_paths,
             deployed_profiles=deployed_profiles,
             message=(
-                f"Deployed '{artifact.name}' to {len(deployed_profiles)} profile(s)"
+                f"Deployed '{dto.name}' to {len(deployed_profiles)} profile(s)"
             ),
         )
     except HTTPException:
@@ -1091,8 +911,6 @@ async def deploy_context_entity(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to deploy context entity",
         ) from e
-    finally:
-        session.close()
 
 
 @router.get(
@@ -1119,11 +937,15 @@ async def deploy_context_entity(
         500: {"description": "Internal server error"},
     },
 )
-async def get_context_entity_content(entity_id: str) -> Response:
+async def get_context_entity_content(
+    entity_id: str,
+    repo: ContextEntityRepoDep,
+) -> Response:
     """Get raw markdown content of a context entity.
 
     Args:
         entity_id: Context entity identifier
+        repo: Context entity repository (injected)
 
     Returns:
         Response with text/plain content
@@ -1131,19 +953,11 @@ async def get_context_entity_content(entity_id: str) -> Response:
     Raises:
         HTTPException 404: If entity not found
         HTTPException 500: If database operation fails
-
-    Note:
-        This endpoint uses Artifact model with type filtering.
     """
-    session = get_session()
     try:
-        artifact = (
-            session.query(Artifact)
-            .filter(Artifact.id == entity_id)
-            .filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
-            .first()
-        )
-        if not artifact:
+        # First get the entity to retrieve the name for Content-Disposition
+        dto = repo.get(entity_id)
+        if not dto:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Context entity '{entity_id}' not found",
@@ -1151,10 +965,10 @@ async def get_context_entity_content(entity_id: str) -> Response:
 
         logger.info(f"Retrieved content for context entity {entity_id}")
         return Response(
-            content=artifact.content or "",
+            content=dto.content or "",
             media_type="text/plain",
             headers={
-                "Content-Disposition": f'attachment; filename="{artifact.name}.md"'
+                "Content-Disposition": f'attachment; filename="{dto.name}.md"'
             },
         )
 
@@ -1169,5 +983,3 @@ async def get_context_entity_content(entity_id: str) -> Response:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get context entity content: {str(e)}",
         )
-    finally:
-        session.close()

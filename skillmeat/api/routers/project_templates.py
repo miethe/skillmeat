@@ -15,13 +15,11 @@ API Endpoints:
 """
 
 import logging
-import uuid
-from datetime import datetime
-from typing import Annotated, List, Optional
+from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Query, status
 
+from skillmeat.api.dependencies import DbSessionDep, ProjectTemplateRepoDep
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.schemas.project_template import (
     DeployTemplateRequest,
@@ -32,12 +30,7 @@ from skillmeat.api.schemas.project_template import (
     ProjectTemplateUpdateRequest,
     TemplateEntitySchema,
 )
-from skillmeat.cache.models import (
-    Artifact,
-    ProjectTemplate,
-    TemplateEntity,
-    get_session,
-)
+from skillmeat.core.interfaces.dtos import ProjectTemplateDTO, TemplateEntityDTO
 
 logger = logging.getLogger(__name__)
 
@@ -48,80 +41,51 @@ router = APIRouter(
 
 
 # =============================================================================
-# Database Session Dependency
-# =============================================================================
-
-
-def get_db_session():
-    """Get database session with proper cleanup.
-
-    Yields:
-        SQLAlchemy session instance
-
-    Note:
-        Session is automatically closed after request completes
-    """
-    session = get_session()
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-DbSessionDep = Annotated[Session, Depends(get_db_session)]
-
-
-# =============================================================================
 # Helper Functions
 # =============================================================================
 
 
-def _build_template_response(
-    template: ProjectTemplate, session: Session
-) -> ProjectTemplateResponse:
-    """Build ProjectTemplateResponse from database model.
+def _entity_dto_to_schema(dto: TemplateEntityDTO) -> TemplateEntitySchema:
+    """Convert a TemplateEntityDTO to a TemplateEntitySchema response model.
 
     Args:
-        template: ProjectTemplate database model
-        session: Database session for entity queries
+        dto: TemplateEntityDTO from the repository layer.
 
     Returns:
-        ProjectTemplateResponse with complete entity details
+        TemplateEntitySchema suitable for API responses.
     """
-    # Query template entities with artifact details, ordered by deploy_order
-    template_entities = (
-        session.query(TemplateEntity)
-        .filter(TemplateEntity.template_id == template.id)
-        .order_by(TemplateEntity.deploy_order)
-        .all()
+    return TemplateEntitySchema(
+        artifact_id=dto.artifact_id,
+        name=dto.name,
+        type=dto.artifact_type,
+        deploy_order=dto.deploy_order,
+        required=dto.required,
+        path_pattern=dto.path_pattern,
     )
 
-    # Build entity schema list
-    entities = []
-    for te in template_entities:
-        artifact = session.query(Artifact).filter(Artifact.id == te.artifact_id).first()
-        if artifact:
-            entities.append(
-                TemplateEntitySchema(
-                    artifact_id=artifact.id,
-                    name=artifact.name,
-                    type=artifact.artifact_type,
-                    deploy_order=te.deploy_order,
-                    required=te.required,
-                    path_pattern=artifact.path_pattern,
-                )
-            )
 
+def _template_dto_to_response(dto: ProjectTemplateDTO) -> ProjectTemplateResponse:
+    """Convert a ProjectTemplateDTO to a ProjectTemplateResponse.
+
+    Args:
+        dto: ProjectTemplateDTO from the repository layer.
+
+    Returns:
+        ProjectTemplateResponse with entity details.
+    """
+    entities: List[TemplateEntitySchema] = [
+        _entity_dto_to_schema(e) for e in dto.entities
+    ]
     return ProjectTemplateResponse(
-        id=template.id,
-        name=template.name,
-        description=template.description,
-        collection_id=template.collection_id,
-        default_project_config_id=template.default_project_config_id,
+        id=dto.id,
+        name=dto.name,
+        description=dto.description,
+        collection_id=dto.collection_id,
+        default_project_config_id=dto.default_project_config_id,
         entities=entities,
-        entity_count=len(entities),
-        created_at=template.created_at,
-        updated_at=template.updated_at,
+        entity_count=dto.entity_count,
+        created_at=dto.created_at,
+        updated_at=dto.updated_at,
     )
 
 
@@ -137,7 +101,7 @@ def _build_template_response(
     description="Retrieve paginated list of project templates with entity counts",
 )
 async def list_templates(
-    session: DbSessionDep,
+    repo: ProjectTemplateRepoDep,
     limit: int = Query(
         50, ge=1, le=100, description="Maximum number of templates to return"
     ),
@@ -146,7 +110,7 @@ async def list_templates(
     """List all project templates with pagination.
 
     Args:
-        session: Database session
+        repo: Project template repository (injected).
         limit: Maximum number of templates to return (1-100)
         offset: Number of templates to skip
 
@@ -157,42 +121,11 @@ async def list_templates(
         HTTPException: 500 if database query fails
     """
     try:
-        # Query templates with pagination
-        templates = (
-            session.query(ProjectTemplate)
-            .order_by(ProjectTemplate.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-            .all()
-        )
-
-        # Build response list
-        items = []
-        for template in templates:
-            # Get entity count for each template
-            entity_count = (
-                session.query(TemplateEntity)
-                .filter(TemplateEntity.template_id == template.id)
-                .count()
-            )
-
-            items.append(
-                ProjectTemplateResponse(
-                    id=template.id,
-                    name=template.name,
-                    description=template.description,
-                    collection_id=template.collection_id,
-                    default_project_config_id=template.default_project_config_id,
-                    entities=[],  # Not loaded in list view for performance
-                    entity_count=entity_count,
-                    created_at=template.created_at,
-                    updated_at=template.updated_at,
-                )
-            )
-
-        # Build pagination info
-        total_count = session.query(ProjectTemplate).count()
+        templates = repo.list(limit=limit, offset=offset)
+        total_count = repo.count()
         has_next = (offset + limit) < total_count
+
+        items = [_template_dto_to_response(t) for t in templates]
 
         return ProjectTemplateListResponse(
             items=items,
@@ -223,13 +156,13 @@ async def list_templates(
 )
 async def get_template(
     template_id: str,
-    session: DbSessionDep,
+    repo: ProjectTemplateRepoDep,
 ) -> ProjectTemplateResponse:
     """Get project template by ID with full entity details.
 
     Args:
         template_id: Template identifier
-        session: Database session
+        repo: Project template repository (injected).
 
     Returns:
         ProjectTemplateResponse with complete entity details
@@ -238,20 +171,15 @@ async def get_template(
         HTTPException: 404 if template not found, 500 if database query fails
     """
     try:
-        # Query template
-        template = (
-            session.query(ProjectTemplate)
-            .filter(ProjectTemplate.id == template_id)
-            .first()
-        )
+        dto = repo.get(template_id)
 
-        if not template:
+        if dto is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Template '{template_id}' not found",
             )
 
-        return _build_template_response(template, session)
+        return _template_dto_to_response(dto)
 
     except HTTPException:
         raise
@@ -277,13 +205,13 @@ async def get_template(
 )
 async def create_template(
     request: ProjectTemplateCreateRequest,
-    session: DbSessionDep,
+    repo: ProjectTemplateRepoDep,
 ) -> ProjectTemplateResponse:
     """Create new project template from entity list.
 
     Args:
         request: Template creation request with entity IDs
-        session: Database session
+        repo: Project template repository (injected).
 
     Returns:
         ProjectTemplateResponse with complete entity details
@@ -292,66 +220,25 @@ async def create_template(
         HTTPException: 400 if entity IDs invalid, 422 if validation fails, 500 if creation fails
     """
     try:
-        # Validate all entity IDs exist
-        artifacts = (
-            session.query(Artifact).filter(Artifact.id.in_(request.entity_ids)).all()
-        )
-        found_ids = {a.id for a in artifacts}
-        missing_ids = set(request.entity_ids) - found_ids
-
-        if missing_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid entity IDs: {', '.join(sorted(missing_ids))}",
-            )
-
-        # Validate default_project_config_id if provided
-        if request.default_project_config_id:
-            config = (
-                session.query(Artifact)
-                .filter(Artifact.id == request.default_project_config_id)
-                .first()
-            )
-            if not config:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid default_project_config_id: {request.default_project_config_id}",
-                )
-
-        # Create template
-        template = ProjectTemplate(
-            id=uuid.uuid4().hex,
+        dto = repo.create(
             name=request.name,
+            entity_ids=request.entity_ids,
             description=request.description,
             collection_id=request.collection_id,
             default_project_config_id=request.default_project_config_id,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
         )
-        session.add(template)
-
-        # Create template entity associations
-        for idx, entity_id in enumerate(request.entity_ids):
-            template_entity = TemplateEntity(
-                template_id=template.id,
-                artifact_id=entity_id,
-                deploy_order=idx,
-                required=True,  # Default all to required
-            )
-            session.add(template_entity)
-
-        session.commit()
-
         logger.info(
-            f"Created template '{template.name}' with {len(request.entity_ids)} entities"
+            f"Created template '{dto.name}' with {len(request.entity_ids)} entities"
         )
-        return _build_template_response(template, session)
+        return _template_dto_to_response(dto)
 
-    except HTTPException:
-        session.rollback()
-        raise
+    except ValueError as e:
+        logger.warning(f"Invalid entity IDs in template creation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
     except Exception as e:
-        session.rollback()
         logger.exception(f"Failed to create template: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -373,14 +260,14 @@ async def create_template(
 async def update_template(
     template_id: str,
     request: ProjectTemplateUpdateRequest,
-    session: DbSessionDep,
+    repo: ProjectTemplateRepoDep,
 ) -> ProjectTemplateResponse:
     """Update existing project template.
 
     Args:
         template_id: Template identifier
         request: Template update request (partial update)
-        session: Database session
+        repo: Project template repository (injected).
 
     Returns:
         ProjectTemplateResponse with updated entity details
@@ -389,68 +276,30 @@ async def update_template(
         HTTPException: 404 if template not found, 400 if entity IDs invalid, 500 if update fails
     """
     try:
-        # Query template
-        template = (
-            session.query(ProjectTemplate)
-            .filter(ProjectTemplate.id == template_id)
-            .first()
-        )
-
-        if not template:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Template '{template_id}' not found",
-            )
-
-        # Update basic fields if provided
+        updates: dict = {}
         if request.name is not None:
-            template.name = request.name
+            updates["name"] = request.name
         if request.description is not None:
-            template.description = request.description
-
-        # Update entity associations if provided
+            updates["description"] = request.description
         if request.entity_ids is not None:
-            # Validate all entity IDs exist
-            artifacts = (
-                session.query(Artifact)
-                .filter(Artifact.id.in_(request.entity_ids))
-                .all()
-            )
-            found_ids = {a.id for a in artifacts}
-            missing_ids = set(request.entity_ids) - found_ids
+            updates["entity_ids"] = request.entity_ids
 
-            if missing_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid entity IDs: {', '.join(sorted(missing_ids))}",
-                )
+        dto = repo.update(template_id, updates)
+        logger.info(f"Updated template '{dto.name}'")
+        return _template_dto_to_response(dto)
 
-            # Delete existing associations
-            session.query(TemplateEntity).filter(
-                TemplateEntity.template_id == template_id
-            ).delete()
-
-            # Create new associations
-            for idx, entity_id in enumerate(request.entity_ids):
-                template_entity = TemplateEntity(
-                    template_id=template_id,
-                    artifact_id=entity_id,
-                    deploy_order=idx,
-                    required=True,
-                )
-                session.add(template_entity)
-
-        template.updated_at = datetime.utcnow()
-        session.commit()
-
-        logger.info(f"Updated template '{template.name}'")
-        return _build_template_response(template, session)
-
-    except HTTPException:
-        session.rollback()
-        raise
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template '{template_id}' not found",
+        )
+    except ValueError as e:
+        logger.warning(f"Invalid entity IDs in template update: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
     except Exception as e:
-        session.rollback()
         logger.exception(f"Failed to update template '{template_id}': {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -470,42 +319,27 @@ async def update_template(
 )
 async def delete_template(
     template_id: str,
-    session: DbSessionDep,
+    repo: ProjectTemplateRepoDep,
 ) -> None:
     """Delete project template and cascade to entity associations.
 
     Args:
         template_id: Template identifier
-        session: Database session
+        repo: Project template repository (injected).
 
     Raises:
         HTTPException: 404 if template not found, 500 if deletion fails
     """
     try:
-        # Query template
-        template = (
-            session.query(ProjectTemplate)
-            .filter(ProjectTemplate.id == template_id)
-            .first()
+        repo.delete(template_id)
+        logger.info(f"Deleted template '{template_id}'")
+
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template '{template_id}' not found",
         )
-
-        if not template:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Template '{template_id}' not found",
-            )
-
-        # Delete template (cascade will handle template_entities)
-        session.delete(template)
-        session.commit()
-
-        logger.info(f"Deleted template '{template.name}'")
-
-    except HTTPException:
-        session.rollback()
-        raise
     except Exception as e:
-        session.rollback()
         logger.exception(f"Failed to delete template '{template_id}': {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -528,6 +362,7 @@ async def delete_template(
 async def deploy_template_endpoint(
     template_id: str,
     request: DeployTemplateRequest,
+    repo: ProjectTemplateRepoDep,
     session: DbSessionDep,
 ) -> DeployTemplateResponse:
     """Deploy project template to target project path with performance optimizations.
@@ -544,7 +379,7 @@ async def deploy_template_endpoint(
     Args:
         template_id: Template identifier
         request: Deployment request with project path and variables
-        session: Database session
+        repo: Project template repository (injected).
 
     Returns:
         DeployTemplateResponse with deployment results
@@ -555,20 +390,17 @@ async def deploy_template_endpoint(
     from skillmeat.core.services.template_service import deploy_template_async
 
     try:
-        # Verify template exists (quick check before expensive deployment)
-        template = (
-            session.query(ProjectTemplate)
-            .filter(ProjectTemplate.id == template_id)
-            .first()
-        )
-
-        if not template:
+        # Verify template exists via repository before the expensive deployment.
+        dto = repo.get(template_id)
+        if dto is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Template '{template_id}' not found",
             )
 
-        # Execute optimized async deployment
+        # Execute optimized async deployment via the service directly.
+        # The injected session (DbSessionDep) is used for the async deployment
+        # coroutine, which manages its own transaction lifecycle.
         result = await deploy_template_async(
             session=session,
             template_id=template_id,

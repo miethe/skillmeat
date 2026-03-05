@@ -1545,20 +1545,21 @@ class ISettingsRepository(abc.ABC):
     def list_categories(
         self,
         entity_type: str | None = None,
+        platform: str | None = None,
         ctx: RequestContext | None = None,
     ) -> list[CategoryDTO]:
-        """Return all categories, optionally filtered by entity type.
+        """Return all categories, optionally filtered by entity type and platform.
 
         Args:
-            entity_type: When provided, return only categories that apply
-                to this entity type (or cross-type categories where
-                ``entity_type`` is ``None`` on the record).  When omitted,
-                all categories are returned.
+            entity_type: When provided, return only categories scoped to this
+                entity type.  When omitted, all categories are returned.
+            platform: When provided, return only categories scoped to this
+                platform.
             ctx: Optional per-request metadata.
 
         Returns:
             List of :class:`~skillmeat.core.interfaces.dtos.CategoryDTO`
-            objects.
+            objects ordered by sort_order.
         """
         raise NotImplementedError
 
@@ -1566,28 +1567,76 @@ class ISettingsRepository(abc.ABC):
     def create_category(
         self,
         name: str,
+        slug: str | None = None,
         entity_type: str | None = None,
         description: str | None = None,
         color: str | None = None,
+        platform: str | None = None,
+        sort_order: int | None = None,
         ctx: RequestContext | None = None,
     ) -> CategoryDTO:
         """Create a new category.
 
         Args:
-            name: Human-readable category name.  Must be unique within the
-                same *entity_type* namespace.
+            name: Human-readable category name.
+            slug: Optional URL-safe slug; auto-generated from *name* when
+                omitted.
             entity_type: Optional entity type this category applies to.
                 Pass ``None`` for a cross-type (universal) category.
             description: Optional description text.
             color: Optional hex color code for UI display (e.g. ``"#00FF00"``).
+            platform: Optional platform scope filter.
+            sort_order: Optional explicit display order; auto-computed when
+                omitted.
             ctx: Optional per-request metadata.
 
         Returns:
             The created :class:`~skillmeat.core.interfaces.dtos.CategoryDTO`.
 
         Raises:
-            ValueError: If a category with the same *name* and *entity_type*
-                combination already exists.
+            ValueError: If a category with the same resolved slug already
+                exists.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_category(
+        self,
+        category_id: int,
+        updates: dict[str, Any],
+        ctx: RequestContext | None = None,
+    ) -> CategoryDTO:
+        """Apply a partial update to an existing category.
+
+        Args:
+            category_id: Integer primary key of the category to update.
+            updates: Map of field names to new values.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated :class:`~skillmeat.core.interfaces.dtos.CategoryDTO`.
+
+        Raises:
+            KeyError: If no category with *category_id* exists.
+            ValueError: If the requested new slug is already taken.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete_category(
+        self,
+        category_id: int,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Delete a category by integer primary key.
+
+        Args:
+            category_id: Integer primary key of the category to delete.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no category with *category_id* exists.
+            ValueError: If the category has artifact associations.
         """
         raise NotImplementedError
 
@@ -2378,6 +2427,23 @@ class IProjectTemplateRepository(abc.ABC):
             A (possibly empty) list of
             :class:`~skillmeat.core.interfaces.dtos.ProjectTemplateDTO`
             objects ordered by ``created_at`` descending.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def count(
+        self,
+        filters: dict[str, Any] | None = None,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Return the total number of project templates matching optional filters.
+
+        Args:
+            filters: Optional key/value filter map (same keys as :meth:`list`).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Integer count of matching project templates.
         """
         raise NotImplementedError
 
