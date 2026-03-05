@@ -368,3 +368,91 @@ class LocalDeploymentRepository(IDeploymentRepository):
             List of matching :class:`~skillmeat.core.interfaces.dtos.DeploymentDTO`.
         """
         return self.list(filters={"artifact_id": artifact_id}, ctx=ctx)
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository — IDP DeploymentSet upsert
+    # ------------------------------------------------------------------
+
+    def upsert_idp_deployment_set(
+        self,
+        *,
+        remote_url: str,
+        name: str,
+        provisioned_by: str,
+        description: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> tuple:
+        """Idempotently create or update a DeploymentSet for an IDP registration.
+
+        Delegates to :class:`~skillmeat.cache.repositories.DeploymentSetRepository`
+        for the actual DB interaction.  The lookup key is the ``(remote_url, name)``
+        pair; if a record already exists it is updated in place, otherwise a
+        new record is created with ``owner_id="idp"``.
+
+        Args:
+            remote_url: Remote Git repository URL from the IDP caller.
+            name: Artifact target identifier used as the set name.
+            provisioned_by: Audit field (e.g. ``"idp"``).
+            description: Optional JSON-serialised metadata string.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            A ``(deployment_set_id, created)`` tuple where *created* is
+            ``True`` when a new record was inserted and ``False`` when an
+            existing record was updated.
+        """
+        from datetime import datetime
+
+        from skillmeat.cache.models import DeploymentSet, get_session
+
+        session = get_session()
+        try:
+            existing = (
+                session.query(DeploymentSet)
+                .filter(
+                    DeploymentSet.remote_url == remote_url,
+                    DeploymentSet.name == name,
+                )
+                .first()
+            )
+
+            if existing is not None:
+                existing.provisioned_by = provisioned_by
+                existing.updated_at = datetime.utcnow()
+                if description is not None:
+                    existing.description = description
+                session.commit()
+                logger.debug(
+                    "upsert_idp_deployment_set: updated id=%s remote_url=%s name=%s",
+                    existing.id,
+                    remote_url,
+                    name,
+                )
+                return (existing.id, False)
+
+            import uuid as _uuid
+
+            new_set = DeploymentSet(
+                id=_uuid.uuid4().hex,
+                name=name,
+                remote_url=remote_url,
+                provisioned_by=provisioned_by,
+                owner_id="idp",
+                description=description,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(new_set)
+            session.commit()
+            logger.debug(
+                "upsert_idp_deployment_set: created id=%s remote_url=%s name=%s",
+                new_set.id,
+                remote_url,
+                name,
+            )
+            return (new_set.id, True)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()

@@ -38,13 +38,13 @@ from skillmeat.api.schemas.deployment_sets import (
     ResolvedArtifactItem,
     ResolveResponse,
 )
-from skillmeat.cache.models import DeploymentSet, DeploymentSetMember, get_session
-from skillmeat.cache.repositories import DeploymentSetRepository, RepositoryError
+from skillmeat.cache.models import DeploymentSet, DeploymentSetMember
+from skillmeat.cache.repositories import RepositoryError
 from skillmeat.core.deployment_sets import DeploymentSetService
 from skillmeat.core.exceptions import DeploymentSetCycleError, DeploymentSetResolutionError
 
 from ..config import get_settings
-from ..dependencies import ArtifactManagerDep, SettingsDep
+from ..dependencies import ArtifactManagerDep, ArtifactRepoDep, DbSessionDep, DeploymentSetRepoDep, SettingsDep
 
 logger = logging.getLogger(__name__)
 
@@ -122,18 +122,19 @@ def _member_to_response(member: DeploymentSetMember) -> MemberResponse:
 def create_deployment_set(
     request: DeploymentSetCreate,
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
 ) -> DeploymentSetResponse:
     """Create a new named deployment set owned by the current user.
 
     Args:
         request: Deployment set creation payload.
         settings: API settings (owner derived from auth state).
+        repo: DeploymentSetRepository dependency.
 
     Returns:
         The newly created deployment set.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     try:
         ds = repo.create(
@@ -162,6 +163,7 @@ def create_deployment_set(
 )
 def list_deployment_sets(
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
     name: Optional[str] = Query(default=None, description="Filter by name substring"),
     tag: Optional[str] = Query(default=None, description="Filter by tag"),
     limit: int = Query(default=50, ge=1, le=200, description="Page size"),
@@ -171,6 +173,7 @@ def list_deployment_sets(
 
     Args:
         settings: API settings.
+        repo: DeploymentSetRepository dependency.
         name: Optional substring filter on set name.
         tag: Optional tag filter.
         limit: Maximum number of results to return.
@@ -180,7 +183,6 @@ def list_deployment_sets(
         Paginated list of deployment sets with total count.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     sets = repo.list(owner_id=owner_id, name=name, tag=tag, limit=limit, offset=offset)
     total = repo.count(owner_id=owner_id, name=name, tag=tag)
@@ -200,12 +202,14 @@ def list_deployment_sets(
 def get_deployment_set(
     set_id: str,
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
 ) -> DeploymentSetResponse:
     """Fetch a single deployment set by its ID including its members.
 
     Args:
         set_id: Primary key of the deployment set.
         settings: API settings (owner scoping).
+        repo: DeploymentSetRepository dependency.
 
     Returns:
         The requested deployment set.
@@ -214,7 +218,6 @@ def get_deployment_set(
         HTTPException 404: If the set does not exist or belongs to another owner.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     ds = repo.get(set_id, owner_id)
     if ds is None:
@@ -237,6 +240,7 @@ def update_deployment_set(
     set_id: str,
     request: DeploymentSetUpdate,
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
 ) -> DeploymentSetResponse:
     """Update mutable metadata fields on a deployment set.
 
@@ -244,6 +248,7 @@ def update_deployment_set(
         set_id: Primary key of the deployment set.
         request: Partial update payload (only provided fields are applied).
         settings: API settings.
+        repo: DeploymentSetRepository dependency.
 
     Returns:
         The updated deployment set.
@@ -252,7 +257,6 @@ def update_deployment_set(
         HTTPException 404: If the set does not exist or belongs to another owner.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     kwargs = {}
     if request.name is not None:
@@ -293,6 +297,7 @@ def update_deployment_set(
 def delete_deployment_set(
     set_id: str,
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
 ) -> None:
     """Delete a deployment set and cascade-delete its member rows.
 
@@ -302,12 +307,12 @@ def delete_deployment_set(
     Args:
         set_id: Primary key of the deployment set.
         settings: API settings.
+        repo: DeploymentSetRepository dependency.
 
     Raises:
         HTTPException 404: If the set does not exist or belongs to another owner.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     try:
         deleted = repo.delete(set_id, owner_id)
@@ -340,6 +345,7 @@ def delete_deployment_set(
 def clone_deployment_set(
     set_id: str,
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
 ) -> DeploymentSetResponse:
     """Clone a deployment set and all its members.
 
@@ -349,6 +355,7 @@ def clone_deployment_set(
     Args:
         set_id: Primary key of the source deployment set.
         settings: API settings.
+        repo: DeploymentSetRepository dependency.
 
     Returns:
         The newly created clone deployment set.
@@ -357,7 +364,6 @@ def clone_deployment_set(
         HTTPException 404: If the source set does not exist.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     source = repo.get(set_id, owner_id)
     if source is None:
@@ -418,12 +424,14 @@ def clone_deployment_set(
 def list_members(
     set_id: str,
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
 ) -> List[MemberResponse]:
     """Return all members of a deployment set ordered by position.
 
     Args:
         set_id: Primary key of the parent deployment set.
         settings: API settings.
+        repo: DeploymentSetRepository dependency.
 
     Returns:
         Ordered list of member rows.
@@ -432,7 +440,6 @@ def list_members(
         HTTPException 404: If the set does not exist or belongs to another owner.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     ds = repo.get(set_id, owner_id)
     if ds is None:
@@ -455,6 +462,8 @@ def add_member(
     set_id: str,
     request: MemberCreate,
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
+    db: DbSessionDep,
 ) -> MemberResponse:
     """Add an artifact, group, or nested deployment set as a member.
 
@@ -466,6 +475,8 @@ def add_member(
         set_id: Primary key of the parent deployment set.
         request: Member creation payload (exactly one ref must be set).
         settings: API settings.
+        repo: DeploymentSetRepository dependency.
+        db: Per-request SQLAlchemy session (used for DeploymentSetService).
 
     Returns:
         The newly created member row.
@@ -475,7 +486,6 @@ def add_member(
         HTTPException 422: If adding the member would create a circular reference.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     # Verify parent exists
     ds = repo.get(set_id, owner_id)
@@ -486,12 +496,8 @@ def add_member(
             detail=f"Deployment set '{set_id}' not found.",
         )
 
-    # TODO: migrate to repository — DeploymentSetService currently requires a
-    #   raw SQLAlchemy session; extract IDeploymentSetRepository to inject via
-    #   DI once the service layer is refactored to support the hexagonal pattern.
-    session = get_session()
     try:
-        svc = DeploymentSetService(session=session)
+        svc = DeploymentSetService(session=db)
 
         if request.nested_set_id is not None:
             # Cycle detection for set-type members
@@ -528,8 +534,6 @@ def add_member(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         ) from exc
-    finally:
-        session.close()
 
     return _member_to_response(member)
 
@@ -543,6 +547,7 @@ def remove_member(
     set_id: str,
     member_id: str,
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
 ) -> None:
     """Remove a member row from a deployment set.
 
@@ -550,12 +555,12 @@ def remove_member(
         set_id: Primary key of the parent deployment set (used for owner check).
         member_id: Primary key of the member row to remove.
         settings: API settings.
+        repo: DeploymentSetRepository dependency.
 
     Raises:
         HTTPException 404: If the set or member does not exist.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     # Verify parent exists and is owned by this user
     ds = repo.get(set_id, owner_id)
@@ -594,6 +599,7 @@ def update_member_position(
     member_id: str,
     request: MemberUpdatePosition,
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
 ) -> MemberResponse:
     """Update the ordering position of a member within a deployment set.
 
@@ -602,6 +608,7 @@ def update_member_position(
         member_id: Primary key of the member to update.
         request: Position update payload.
         settings: API settings.
+        repo: DeploymentSetRepository dependency.
 
     Returns:
         The updated member row.
@@ -610,7 +617,6 @@ def update_member_position(
         HTTPException 404: If the set or member does not exist.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     # Verify parent exists
     ds = repo.get(set_id, owner_id)
@@ -654,6 +660,9 @@ def update_member_position(
 def resolve_deployment_set(
     set_id: str,
     settings: SettingsDep,
+    repo: DeploymentSetRepoDep,
+    artifact_repo: ArtifactRepoDep,
+    db: DbSessionDep,
 ) -> ResolveResponse:
     """Recursively resolve a deployment set into an ordered, deduplicated list
     of artifact UUIDs.
@@ -666,6 +675,9 @@ def resolve_deployment_set(
     Args:
         set_id: Primary key of the root deployment set to resolve.
         settings: API settings.
+        repo: DeploymentSetRepository dependency.
+        artifact_repo: IArtifactRepository dependency (UUID → name/type lookup).
+        db: Per-request SQLAlchemy session (used for DeploymentSetService).
 
     Returns:
         Resolution result including the flat artifact list and traversal metadata.
@@ -675,7 +687,6 @@ def resolve_deployment_set(
         HTTPException 422: If the resolution depth limit is exceeded.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     ds = repo.get(set_id, owner_id)
     if ds is None:
@@ -685,46 +696,35 @@ def resolve_deployment_set(
             detail=f"Deployment set '{set_id}' not found.",
         )
 
-    # TODO: migrate to repository — DeploymentSetService.resolve() requires a
-    #   raw SQLAlchemy session; inject via DI once the service is refactored.
-    session = get_session()
+    svc = DeploymentSetService(session=db)
     try:
-        svc = DeploymentSetService(session=session)
-        try:
-            uuids = svc.resolve(set_id)
-        except DeploymentSetResolutionError as exc:
-            logger.warning("Resolution depth limit exceeded for set %s: %s", set_id, exc)
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=str(exc),
-            ) from exc
+        uuids = svc.resolve(set_id)
+    except DeploymentSetResolutionError as exc:
+        logger.warning("Resolution depth limit exceeded for set %s: %s", set_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
-        # Build resolved artifact items — enrich with name/type where possible
-        from skillmeat.cache.models import Artifact
+    # Build resolved artifact items — enrich with name/type where possible via
+    # IArtifactRepository.get_ids_by_uuids() (returns uuid → "type:name" mapping).
+    uuid_to_type_name: dict[str, str] = artifact_repo.get_ids_by_uuids(uuids) if uuids else {}
 
-        if uuids:
-            art_rows = (
-                session.query(Artifact.uuid, Artifact.name, Artifact.type)
-                .filter(Artifact.uuid.in_(uuids))
-                .all()
-            )
-            uuid_info = {row.uuid: (row.name, row.type) for row in art_rows}
+    resolved_artifacts = []
+    for artifact_uuid in uuids:
+        type_name = uuid_to_type_name.get(artifact_uuid)
+        if type_name and ":" in type_name:
+            art_type, art_name = type_name.split(":", 1)
         else:
-            uuid_info = {}
-
-        resolved_artifacts = []
-        for uuid in uuids:
-            name, art_type = uuid_info.get(uuid, (None, None))
-            resolved_artifacts.append(
-                ResolvedArtifactItem(
-                    artifact_uuid=uuid,
-                    artifact_name=name,
-                    artifact_type=art_type,
-                    source_path=[ds.name],
-                )
+            art_type, art_name = None, None
+        resolved_artifacts.append(
+            ResolvedArtifactItem(
+                artifact_uuid=artifact_uuid,
+                artifact_name=art_name,
+                artifact_type=art_type,
+                source_path=[ds.name],
             )
-    finally:
-        session.close()
+        )
 
     return ResolveResponse(
         set_id=set_id,
@@ -750,6 +750,9 @@ def batch_deploy(
     request: BatchDeployRequest,
     settings: SettingsDep,
     artifact_mgr: ArtifactManagerDep,
+    repo: DeploymentSetRepoDep,
+    artifact_repo: ArtifactRepoDep,
+    db: DbSessionDep,
 ) -> BatchDeployResponse:
     """Resolve the deployment set and deploy every artifact to the target project.
 
@@ -762,6 +765,9 @@ def batch_deploy(
         request: Batch deploy payload (project_path, dry_run).
         settings: API settings.
         artifact_mgr: ArtifactManager dependency.
+        repo: DeploymentSetRepository dependency.
+        artifact_repo: IArtifactRepository dependency (UUID → name/type lookup).
+        db: Per-request SQLAlchemy session (used for DeploymentSetService).
 
     Returns:
         Batch deployment result with per-artifact outcomes.
@@ -771,7 +777,6 @@ def batch_deploy(
         HTTPException 422: If the project path is invalid or resolution fails.
     """
     owner_id = _get_owner_id(settings)
-    repo = DeploymentSetRepository()
 
     ds = repo.get(set_id, owner_id)
     if ds is None:
@@ -791,107 +796,97 @@ def batch_deploy(
             detail=f"Project path '{request.project_path}' does not exist.",
         )
 
-    # TODO: migrate to repository — DeploymentSetService.resolve() and the
-    #   per-artifact deploy loop require a raw SQLAlchemy session; inject via
-    #   DI once the service is refactored to support the hexagonal pattern.
-    session = get_session()
+    svc = DeploymentSetService(session=db)
+
     try:
-        svc = DeploymentSetService(session=session)
+        uuids = svc.resolve(set_id)
+    except DeploymentSetResolutionError as exc:
+        logger.warning("Resolution failed for set %s during deploy: %s", set_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    # Resolve artifact metadata for result enrichment via IArtifactRepository.
+    # get_ids_by_uuids() returns a uuid → "type:name" mapping for known artifacts.
+    uuid_to_type_name: dict[str, str] = artifact_repo.get_ids_by_uuids(uuids) if uuids else {}
+
+    # Build a uuid → (name, type) lookup from the "type:name" strings.
+    uuid_info: dict[str, tuple[str, str]] = {}
+    for artifact_uuid, type_name in uuid_to_type_name.items():
+        if ":" in type_name:
+            art_type, art_name = type_name.split(":", 1)
+            uuid_info[artifact_uuid] = (art_name, art_type)
+
+    results: List[DeployResultItem] = []
+    succeeded = 0
+    failed = 0
+    skipped = 0
+
+    for artifact_uuid in uuids:
+        # Dry-run: skip all artifacts regardless of cache state
+        if request.dry_run:
+            artifact_name = uuid_info.get(artifact_uuid, (None, None))[0]
+            results.append(
+                DeployResultItem(
+                    artifact_uuid=artifact_uuid,
+                    artifact_name=artifact_name,
+                    status="skipped",
+                    error=None,
+                )
+            )
+            skipped += 1
+            continue
+
+        if artifact_uuid not in uuid_info:
+            logger.warning(
+                "batch_deploy: artifact UUID not in collection cache — skipping: %s",
+                artifact_uuid,
+            )
+            results.append(
+                DeployResultItem(
+                    artifact_uuid=artifact_uuid,
+                    artifact_name=None,
+                    status="failed",
+                    error=f"Artifact UUID '{artifact_uuid}' not found in collection cache.",
+                )
+            )
+            failed += 1
+            continue
+
+        artifact_name, artifact_type = uuid_info[artifact_uuid]
 
         try:
-            uuids = svc.resolve(set_id)
-        except DeploymentSetResolutionError as exc:
-            logger.warning("Resolution failed for set %s during deploy: %s", set_id, exc)
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=str(exc),
-            ) from exc
-
-        # Resolve artifact metadata for result enrichment
-        from skillmeat.cache.models import Artifact, CollectionArtifact
-
-        if uuids:
-            art_rows = (
-                session.query(Artifact.uuid, Artifact.name, Artifact.type)
-                .join(CollectionArtifact, CollectionArtifact.artifact_uuid == Artifact.uuid)
-                .filter(Artifact.uuid.in_(uuids))
-                .all()
+            artifact_mgr.deploy_artifacts(
+                artifact_names=[artifact_name],
+                project_path=project_path,
             )
-            uuid_info = {row.uuid: (row.name, row.type) for row in art_rows}
-        else:
-            uuid_info = {}
-
-        results: List[DeployResultItem] = []
-        succeeded = 0
-        failed = 0
-        skipped = 0
-
-        for artifact_uuid in uuids:
-            # Dry-run: skip all artifacts regardless of cache state
-            if request.dry_run:
-                artifact_name = uuid_info.get(artifact_uuid, (None, None))[0]
-                results.append(
-                    DeployResultItem(
-                        artifact_uuid=artifact_uuid,
-                        artifact_name=artifact_name,
-                        status="skipped",
-                        error=None,
-                    )
+            results.append(
+                DeployResultItem(
+                    artifact_uuid=artifact_uuid,
+                    artifact_name=artifact_name,
+                    status="success",
+                    error=None,
                 )
-                skipped += 1
-                continue
-
-            if artifact_uuid not in uuid_info:
-                logger.warning(
-                    "batch_deploy: artifact UUID not in collection cache — skipping: %s",
-                    artifact_uuid,
+            )
+            succeeded += 1
+            logger.info("batch_deploy: deployed %s:%s", artifact_type, artifact_name)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "batch_deploy: deploy failed for %s:%s — %s",
+                artifact_type,
+                artifact_name,
+                exc,
+            )
+            results.append(
+                DeployResultItem(
+                    artifact_uuid=artifact_uuid,
+                    artifact_name=artifact_name,
+                    status="failed",
+                    error=str(exc),
                 )
-                results.append(
-                    DeployResultItem(
-                        artifact_uuid=artifact_uuid,
-                        artifact_name=None,
-                        status="failed",
-                        error=f"Artifact UUID '{artifact_uuid}' not found in collection cache.",
-                    )
-                )
-                failed += 1
-                continue
-
-            artifact_name, artifact_type = uuid_info[artifact_uuid]
-
-            try:
-                artifact_mgr.deploy_artifacts(
-                    artifact_names=[artifact_name],
-                    project_path=project_path,
-                )
-                results.append(
-                    DeployResultItem(
-                        artifact_uuid=artifact_uuid,
-                        artifact_name=artifact_name,
-                        status="success",
-                        error=None,
-                    )
-                )
-                succeeded += 1
-                logger.info("batch_deploy: deployed %s:%s", artifact_type, artifact_name)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "batch_deploy: deploy failed for %s:%s — %s",
-                    artifact_type,
-                    artifact_name,
-                    exc,
-                )
-                results.append(
-                    DeployResultItem(
-                        artifact_uuid=artifact_uuid,
-                        artifact_name=artifact_name,
-                        status="failed",
-                        error=str(exc),
-                    )
-                )
-                failed += 1
-    finally:
-        session.close()
+            )
+            failed += 1
 
     logger.info(
         "batch_deploy complete: set_id=%s total=%d succeeded=%d failed=%d skipped=%d",

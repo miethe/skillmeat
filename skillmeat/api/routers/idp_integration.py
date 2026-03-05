@@ -10,15 +10,11 @@ API Endpoints:
 
 import json
 import logging
-import uuid
 from base64 import b64encode
-from datetime import datetime
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, status
 
-from skillmeat.api.dependencies import APIKeyDep, SettingsDep
+from skillmeat.api.dependencies import APIKeyDep, DbSessionDep, DeploymentRepoDep
 from skillmeat.api.schemas.idp_integration import (
     IDPRegisterDeploymentRequest,
     IDPRegisterDeploymentResponse,
@@ -26,7 +22,6 @@ from skillmeat.api.schemas.idp_integration import (
     IDPScaffoldResponse,
     RenderedFile,
 )
-from skillmeat.cache.models import DeploymentSet, get_session
 
 logger = logging.getLogger(__name__)
 
@@ -34,30 +29,6 @@ router = APIRouter(
     prefix="/integrations/idp",
     tags=["integrations-idp"],
 )
-
-
-# =============================================================================
-# Database Session Dependency
-# =============================================================================
-
-
-def get_db_session():
-    """Get database session with proper cleanup.
-
-    Yields:
-        SQLAlchemy session instance
-
-    Note:
-        Session is automatically closed after request completes
-    """
-    session = get_session()
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-DbSessionDep = Annotated[Session, Depends(get_db_session)]
 
 
 # =============================================================================
@@ -94,7 +65,7 @@ async def scaffold(
 
     Args:
         request: Scaffold request containing target_id and optional variables
-        session: Database session
+        session: Database session (required by render_in_memory service)
         _auth: API key authentication (enforced when auth is enabled)
 
     Returns:
@@ -186,7 +157,7 @@ async def scaffold(
 )
 async def register_deployment(
     request: IDPRegisterDeploymentRequest,
-    session: DbSessionDep,
+    deployment_repo: DeploymentRepoDep,
     _auth: APIKeyDep,
 ) -> IDPRegisterDeploymentResponse:
     """Register or idempotently update an IDP deployment set record.
@@ -202,7 +173,7 @@ async def register_deployment(
     Args:
         request: Register-deployment request containing repo_url, target_id,
                  and optional metadata
-        session: Database session
+        deployment_repo: Deployment repository (injected via DI)
         _auth: API key authentication (enforced when auth is enabled)
 
     Returns:
@@ -223,56 +194,13 @@ async def register_deployment(
     )
 
     try:
-        # Idempotency check: match on (remote_url, name) where name == target_id.
-        existing: DeploymentSet | None = (
-            session.query(DeploymentSet)
-            .filter(
-                DeploymentSet.remote_url == request.repo_url,
-                DeploymentSet.name == request.target_id,
-            )
-            .first()
-        )
-
-        if existing is not None:
-            # Update existing record.
-            existing.provisioned_by = "idp"
-            existing.updated_at = datetime.utcnow()
-            if metadata_json is not None:
-                existing.description = metadata_json
-            session.commit()
-
-            logger.info(
-                "IDP register-deployment: updated existing set id=%s", existing.id
-            )
-            return IDPRegisterDeploymentResponse(
-                deployment_set_id=existing.id,
-                created=False,
-            )
-
-        # Create new DeploymentSet record.
-        new_set = DeploymentSet(
-            id=uuid.uuid4().hex,
-            name=request.target_id,
+        deployment_set_id, created = deployment_repo.upsert_idp_deployment_set(
             remote_url=request.repo_url,
+            name=request.target_id,
             provisioned_by="idp",
-            owner_id="idp",
             description=metadata_json,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
         )
-        session.add(new_set)
-        session.commit()
-
-        logger.info(
-            "IDP register-deployment: created new set id=%s", new_set.id
-        )
-        return IDPRegisterDeploymentResponse(
-            deployment_set_id=new_set.id,
-            created=True,
-        )
-
     except Exception as exc:
-        session.rollback()
         logger.exception(
             "IDP register-deployment failed for repo_url=%s target_id=%s: %s",
             request.repo_url,
@@ -283,3 +211,14 @@ async def register_deployment(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to register deployment",
         )
+
+    logger.info(
+        "IDP register-deployment: %s set id=%s",
+        "created new" if created else "updated existing",
+        deployment_set_id,
+    )
+
+    return IDPRegisterDeploymentResponse(
+        deployment_set_id=deployment_set_id,
+        created=created,
+    )

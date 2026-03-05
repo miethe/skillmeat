@@ -10,7 +10,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from skillmeat.api.dependencies import verify_api_key
+from skillmeat.api.dependencies import DbSessionDep, DeploymentProfileRepoDep, verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse
 from skillmeat.api.schemas.deployment_profiles import (
@@ -18,8 +18,8 @@ from skillmeat.api.schemas.deployment_profiles import (
     DeploymentProfileRead,
     DeploymentProfileUpdate,
 )
-from skillmeat.cache.models import Project, get_session
-from skillmeat.cache.repositories import DeploymentProfileRepository
+from skillmeat.cache.models import Project
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -47,51 +47,50 @@ def _to_read_model(profile) -> DeploymentProfileRead:
     )
 
 
-def _resolve_project_db_id(project_id: str) -> str:
+def _resolve_project_db_id(project_id: str, session: Session) -> str:
     """Resolve API project id to cache project primary key.
 
     Supports both:
     - direct cache project IDs
     - base64-encoded project paths used by `/projects` endpoints
 
-    TODO: migrate to repository — this helper creates a raw session to look up
-    and optionally create a Project row.  Once IProjectRepository exposes a
-    ``get_or_create_by_path()`` method, inject ProjectRepoDep at the endpoint
-    level and pass it in instead.
+    Args:
+        project_id: Raw project id from the API path parameter.
+        session: Per-request SQLAlchemy session injected via ``DbSessionDep``.
+
+    TODO: migrate to repository — once IProjectRepository exposes a
+    ``get_or_create_by_path()`` method, replace this helper with
+    ``ProjectRepoDep`` injection at the endpoint level.
     """
-    session = get_session()
+    existing = session.query(Project).filter(Project.id == project_id).first()
+    if existing:
+        return existing.id
+
+    decoded_path: str | None = None
     try:
-        existing = session.query(Project).filter(Project.id == project_id).first()
-        if existing:
-            return existing.id
+        decoded_path = base64.b64decode(project_id.encode()).decode()
+    except Exception:
+        decoded_path = None
 
-        decoded_path: str | None = None
-        try:
-            decoded_path = base64.b64decode(project_id.encode()).decode()
-        except Exception:
-            decoded_path = None
+    if decoded_path:
+        resolved_path = str(Path(decoded_path).expanduser().resolve())
+        by_path = session.query(Project).filter(Project.path == resolved_path).first()
+        if by_path:
+            return by_path.id
 
-        if decoded_path:
-            resolved_path = str(Path(decoded_path).expanduser().resolve())
-            by_path = session.query(Project).filter(Project.path == resolved_path).first()
-            if by_path:
-                return by_path.id
+        created = Project(
+            id=uuid.uuid4().hex,
+            name=Path(resolved_path).name,
+            path=resolved_path,
+            status="active",
+        )
+        session.add(created)
+        session.commit()
+        session.refresh(created)
+        return created.id
 
-            created = Project(
-                id=uuid.uuid4().hex,
-                name=Path(resolved_path).name,
-                path=resolved_path,
-                status="active",
-            )
-            session.add(created)
-            session.commit()
-            session.refresh(created)
-            return created.id
-
-        # Fallback to legacy behavior: treat project_id as raw cache project id.
-        return project_id
-    finally:
-        session.close()
+    # Fallback to legacy behavior: treat project_id as raw cache project id.
+    return project_id
 
 
 @router.post(
@@ -107,9 +106,10 @@ async def create_profile(
     project_id: str,
     request: DeploymentProfileCreate,
     token: TokenDep,
+    repo: DeploymentProfileRepoDep,
+    db: DbSessionDep,
 ) -> DeploymentProfileRead:
-    repo = DeploymentProfileRepository()
-    resolved_project_id = _resolve_project_db_id(project_id)
+    resolved_project_id = _resolve_project_db_id(project_id, db)
     try:
         created = repo.create(
             project_id=resolved_project_id,
@@ -140,9 +140,10 @@ async def create_profile(
 async def list_profiles(
     project_id: str,
     token: TokenDep,
+    repo: DeploymentProfileRepoDep,
+    db: DbSessionDep,
 ) -> List[DeploymentProfileRead]:
-    repo = DeploymentProfileRepository()
-    resolved_project_id = _resolve_project_db_id(project_id)
+    resolved_project_id = _resolve_project_db_id(project_id, db)
     return [_to_read_model(profile) for profile in repo.list_by_project(resolved_project_id)]
 
 
@@ -155,9 +156,10 @@ async def get_profile(
     project_id: str,
     profile_id: str,
     token: TokenDep,
+    repo: DeploymentProfileRepoDep,
+    db: DbSessionDep,
 ) -> DeploymentProfileRead:
-    repo = DeploymentProfileRepository()
-    resolved_project_id = _resolve_project_db_id(project_id)
+    resolved_project_id = _resolve_project_db_id(project_id, db)
     profile = repo.read_by_project_and_profile_id(resolved_project_id, profile_id)
     if not profile:
         raise HTTPException(
@@ -177,9 +179,10 @@ async def update_profile(
     profile_id: str,
     request: DeploymentProfileUpdate,
     token: TokenDep,
+    repo: DeploymentProfileRepoDep,
+    db: DbSessionDep,
 ) -> DeploymentProfileRead:
-    repo = DeploymentProfileRepository()
-    resolved_project_id = _resolve_project_db_id(project_id)
+    resolved_project_id = _resolve_project_db_id(project_id, db)
     updated = repo.update(
         project_id=resolved_project_id,
         profile_id=profile_id,
@@ -209,9 +212,10 @@ async def delete_profile(
     project_id: str,
     profile_id: str,
     token: TokenDep,
+    repo: DeploymentProfileRepoDep,
+    db: DbSessionDep,
 ) -> None:
-    repo = DeploymentProfileRepository()
-    resolved_project_id = _resolve_project_db_id(project_id)
+    resolved_project_id = _resolve_project_db_id(project_id, db)
     deleted = repo.delete(resolved_project_id, profile_id)
     if not deleted:
         raise HTTPException(

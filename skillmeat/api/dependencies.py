@@ -28,6 +28,10 @@ from skillmeat.core.interfaces.repositories import (
     ISettingsRepository,
     ITagRepository,
 )
+from skillmeat.cache.repositories import (
+    DeploymentProfileRepository,
+    DeploymentSetRepository,
+)
 from skillmeat.cache.session import get_db_session
 from skillmeat.core.path_resolver import ProjectPathResolver
 from skillmeat.core.services.context_sync import ContextSyncService
@@ -600,6 +604,32 @@ def get_project_template_repository(
     )
 
 
+def get_deployment_set_repository() -> DeploymentSetRepository:
+    """Get DeploymentSetRepository dependency.
+
+    Returns a new ``DeploymentSetRepository`` instance.  The repository
+    manages its own session lifecycle internally, so no state injection is
+    required.
+
+    Returns:
+        DeploymentSetRepository instance.
+    """
+    return DeploymentSetRepository()
+
+
+def get_deployment_profile_repository() -> DeploymentProfileRepository:
+    """Get DeploymentProfileRepository dependency.
+
+    Returns a new ``DeploymentProfileRepository`` instance.  The repository
+    manages its own session lifecycle internally, so no state injection is
+    required.
+
+    Returns:
+        DeploymentProfileRepository instance.
+    """
+    return DeploymentProfileRepository()
+
+
 # Type aliases for cleaner dependency injection
 ConfigManagerDep = Annotated[ConfigManager, Depends(get_config_manager)]
 CollectionManagerDep = Annotated[CollectionManager, Depends(get_collection_manager)]
@@ -627,6 +657,10 @@ MarketplaceSourceRepoDep = Annotated[
 ]
 ProjectTemplateRepoDep = Annotated[
     IProjectTemplateRepository, Depends(get_project_template_repository)
+]
+DeploymentSetRepoDep = Annotated[DeploymentSetRepository, Depends(get_deployment_set_repository)]
+DeploymentProfileRepoDep = Annotated[
+    DeploymentProfileRepository, Depends(get_deployment_profile_repository)
 ]
 
 # Per-request SQLAlchemy session (hexagonal architecture)

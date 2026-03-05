@@ -1191,6 +1191,37 @@ class IDeploymentRepository(abc.ABC):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def upsert_idp_deployment_set(
+        self,
+        *,
+        remote_url: str,
+        name: str,
+        provisioned_by: str,
+        description: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> tuple[str, bool]:
+        """Idempotently create or update a DeploymentSet for an IDP registration.
+
+        Looks up an existing ``DeploymentSet`` by the ``(remote_url, name)``
+        pair.  If a match is found the record is updated with the supplied
+        *provisioned_by* and *description*; otherwise a new record is created.
+
+        Args:
+            remote_url: Remote Git repository URL (e.g. the Backstage repo URL).
+            name: Artifact target identifier (used as the set name).
+            provisioned_by: Audit field identifying the provisioning agent
+                (e.g. ``"idp"``).
+            description: Optional JSON-serialised metadata string.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A ``(deployment_set_id, created)`` tuple where *created* is
+            ``True`` when a new record was inserted and ``False`` when an
+            existing record was updated.
+        """
+        raise NotImplementedError
+
 
 # =============================================================================
 # ITagRepository
@@ -2384,6 +2415,156 @@ class IMarketplaceSourceRepository(abc.ABC):
         Raises:
             KeyError: If *composite_id* does not exist or is not a composite
                 artifact.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Catalog entry mutations (encapsulate direct session access)
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_catalog_entry_raw(
+        self,
+        entry_id: str,
+        source_id: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> Any | None:
+        """Return the raw ORM catalog entry object for read-only operations.
+
+        Intended for endpoints that must inspect ORM fields not yet covered
+        by :class:`~skillmeat.core.interfaces.dtos.CatalogItemDTO`.
+
+        Args:
+            entry_id: Catalog entry primary key.
+            source_id: When provided, verify that the entry belongs to this
+                source; returns ``None`` otherwise.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The ORM ``MarketplaceCatalogEntry`` object when found, ``None``
+            otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_catalog_entry_exclusion(
+        self,
+        entry_id: str,
+        source_id: str,
+        excluded: bool,
+        reason: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> Any:
+        """Toggle the exclusion status of a catalog entry.
+
+        When *excluded* is ``True`` the entry is stamped with ``excluded_at``
+        and ``excluded_reason`` and its ``status`` is set to ``"excluded"``.
+        When *excluded* is ``False`` the exclusion fields are cleared and
+        ``status`` is restored to ``"new"`` or ``"imported"`` depending on
+        whether the entry was previously imported.
+
+        Args:
+            entry_id: Catalog entry primary key.
+            source_id: Source the entry must belong to.
+            excluded: ``True`` to exclude, ``False`` to restore.
+            reason: Optional reason for the exclusion (ignored when restoring).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated ORM ``MarketplaceCatalogEntry`` object.
+
+        Raises:
+            KeyError: If *entry_id* is not found or does not belong to
+                *source_id*.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_catalog_entry_path_tags(
+        self,
+        entry_id: str,
+        source_id: str,
+        path_segments_json: str,
+        ctx: RequestContext | None = None,
+    ) -> Any:
+        """Persist updated ``path_segments`` JSON for a catalog entry.
+
+        Args:
+            entry_id: Catalog entry primary key.
+            source_id: Source the entry must belong to.
+            path_segments_json: Serialised JSON string for the
+                ``path_segments`` column.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated ORM ``MarketplaceCatalogEntry`` object.
+
+        Raises:
+            KeyError: If *entry_id* is not found or does not belong to
+                *source_id*.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_artifact_row(
+        self,
+        artifact_id: str,
+        ctx: RequestContext | None = None,
+    ) -> Any | None:
+        """Return the raw ORM ``Artifact`` row for the given ``type:name`` id.
+
+        Used internally by composite-wiring logic that needs the ORM object
+        (e.g. to call ``CompositeService``).
+
+        Args:
+            artifact_id: Artifact primary key in ``"type:name"`` format.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The ORM ``Artifact`` object when found, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def upsert_composite_memberships(
+        self,
+        composite_id: str,
+        child_artifact_ids: list[str],
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Create or update ``CompositeMembership`` rows for a composite artifact.
+
+        For each child artifact ID the method resolves the ``Artifact.uuid``
+        and inserts a ``CompositeMembership`` row if one does not already exist.
+        Existing rows are updated to reflect the current position.
+
+        Args:
+            composite_id: Primary key of the composite artifact
+                (``"composite:<name>"``).
+            child_artifact_ids: Ordered list of child ``type:name`` artifact
+                primary keys.
+            collection_id: Collection the composite belongs to.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Number of new membership rows created.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def commit_source_session(
+        self,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Flush pending changes on the source repository session.
+
+        Convenience wrapper used when mutations have been applied directly to
+        ORM objects retrieved via the source repository's own session and those
+        changes must be persisted without opening a new transaction.
+
+        Args:
+            ctx: Optional per-request metadata.
         """
         raise NotImplementedError
 
