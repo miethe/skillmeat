@@ -39,6 +39,7 @@ from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
     CatalogItemDTO,
     CategoryDTO,
+    CollectionArtifactDTO,
     CollectionDTO,
     CollectionMembershipDTO,
     ContextEntityDTO,
@@ -51,12 +52,14 @@ from skillmeat.core.interfaces.dtos import (
     ProjectTemplateDTO,
     SettingsDTO,
     TagDTO,
+    UserCollectionDTO,
 )
 
 __all__ = [
     "IArtifactRepository",
     "IProjectRepository",
     "ICollectionRepository",
+    "IDbUserCollectionRepository",
     "IDeploymentRepository",
     "ITagRepository",
     "ISettingsRepository",
@@ -64,6 +67,7 @@ __all__ = [
     "IContextEntityRepository",
     "IMarketplaceSourceRepository",
     "IProjectTemplateRepository",
+    "IDbCollectionArtifactRepository",
 ]
 
 
@@ -2770,5 +2774,565 @@ class IProjectTemplateRepository(abc.ABC):
         Raises:
             KeyError: If *template_id* does not exist.
             ValueError: If *project_path* does not exist or is invalid.
+        """
+        raise NotImplementedError
+
+
+# =============================================================================
+# IDbCollectionArtifactRepository
+# =============================================================================
+
+
+class IDbCollectionArtifactRepository(abc.ABC):
+    """Repository ABC for DB-backed collection artifact membership.
+
+    Covers the :class:`~skillmeat.cache.models.CollectionArtifact` ORM join
+    table that tracks which artifacts belong to which user collections.
+    All operations are scoped to a *collection_id* and operate on
+    ``artifact_uuid`` stable identifiers (ADR-007).
+
+    Operations map to the artifact-membership sub-resources of the
+    ``/api/v1/user-collections`` router.
+    """
+
+    # ------------------------------------------------------------------
+    # Queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list_by_collection(
+        self,
+        collection_id: str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        search: str | None = None,
+        artifact_type: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        """Return a paginated list of artifact memberships for a collection.
+
+        Args:
+            collection_id: Unique identifier of the owning user collection.
+            limit: Maximum number of records to return (default 50).
+            offset: Zero-based pagination offset (default 0).
+            search: Optional free-text search applied to artifact name or
+                description fields.
+            artifact_type: Optional artifact type filter
+                (e.g. ``"skill"``, ``"command"``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.core.interfaces.dtos.CollectionArtifactDTO`
+            objects.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_by_pk(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> CollectionArtifactDTO | None:
+        """Return a single membership record by composite primary key.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_uuid: Stable 32-char hex UUID of the artifact.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`~skillmeat.core.interfaces.dtos.CollectionArtifactDTO`
+            when the membership exists, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def count_by_collection(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Return the total number of artifacts in a collection.
+
+        Intended to back ``page_info.total`` in paginated list responses.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Non-negative integer count of collection memberships.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def list_with_tags(
+        self,
+        collection_id: str,
+        *,
+        tag: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        """Return collection artifact memberships, optionally filtered by tag.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            tag: Optional tag name to filter by.  When provided, only
+                memberships whose artifact carries this tag are returned.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.CollectionArtifactDTO`
+            objects (possibly empty).
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def list_deployment_info(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        """Return collection memberships enriched with deployment tracking data.
+
+        The returned DTOs include ``source``, ``origin``, ``resolved_sha``,
+        ``resolved_version``, and ``synced_at`` fields where available.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.CollectionArtifactDTO`
+            objects with deployment fields populated.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Mutations
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def add_artifacts(
+        self,
+        collection_id: str,
+        artifact_uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        """Add one or more artifacts to a collection by UUID.
+
+        Idempotent: artifacts already present in the collection are
+        silently skipped rather than duplicated.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_uuids: List of stable 32-char hex UUIDs to add.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of created (or pre-existing)
+            :class:`~skillmeat.core.interfaces.dtos.CollectionArtifactDTO`
+            records for the given UUIDs.
+
+        Raises:
+            KeyError: If *collection_id* does not correspond to a known
+                user collection.
+            ValueError: If any UUID in *artifact_uuids* is unknown.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def remove_artifact(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        """Remove a single artifact from a collection.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_uuid: Stable 32-char hex UUID of the artifact to remove.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            ``True`` when the membership was found and removed,
+            ``False`` when no matching membership existed.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def upsert_metadata(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+        **metadata: Any,
+    ) -> CollectionArtifactDTO:
+        """Create or update arbitrary metadata fields on a membership record.
+
+        If the membership does not yet exist it is created with the supplied
+        metadata.  If it already exists, only the provided fields are updated
+        (partial update semantics).
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_uuid: Stable 32-char hex UUID of the artifact.
+            ctx: Optional per-request metadata.
+            **metadata: Keyword arguments corresponding to writable fields
+                on :class:`~skillmeat.core.interfaces.dtos.CollectionArtifactDTO`
+                (e.g. ``description``, ``notes``, ``custom_tags``).
+
+        Returns:
+            The updated
+            :class:`~skillmeat.core.interfaces.dtos.CollectionArtifactDTO`.
+
+        Raises:
+            ValueError: If any key in *metadata* is not a recognised field.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_source_tracking(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        *,
+        source: str | None = None,
+        origin: str | None = None,
+        resolved_sha: str | None = None,
+        resolved_version: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> CollectionArtifactDTO:
+        """Update upstream source-tracking fields on a membership record.
+
+        Used by the sync subsystem to record the resolved upstream coordinates
+        for an artifact after a fetch or sync operation.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_uuid: Stable 32-char hex UUID of the artifact.
+            source: Optional GitHub source spec
+                (e.g. ``"owner/repo/path@version"``).
+            origin: Optional human-readable origin label
+                (e.g. ``"github"``).
+            resolved_sha: Optional resolved commit SHA for the artifact.
+            resolved_version: Optional resolved semantic version string.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated
+            :class:`~skillmeat.core.interfaces.dtos.CollectionArtifactDTO`.
+
+        Raises:
+            KeyError: If no membership for *(collection_id, artifact_uuid)*
+                exists.
+        """
+        raise NotImplementedError
+
+
+# =============================================================================
+# IDbUserCollectionRepository
+# =============================================================================
+
+
+class IDbUserCollectionRepository(abc.ABC):
+    """Contract for DB-backed user collection storage backends.
+
+    User collections are named, persisted groups of artifacts stored in the
+    ``Collection`` ORM model.  Unlike the filesystem-oriented
+    :class:`ICollectionRepository`, this interface operates entirely against
+    the DB cache and supports multi-collection, filtered queries, and
+    group associations.  Operations back the ``/api/v1/user-collections``
+    router.
+    """
+
+    # ------------------------------------------------------------------
+    # Collection queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list(
+        self,
+        *,
+        created_by: str | None = None,
+        collection_type: str | None = None,
+        context_category: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: RequestContext | None = None,
+    ) -> list[UserCollectionDTO]:
+        """Return a filtered, paginated list of user collections.
+
+        Args:
+            created_by: When provided, return only collections owned by this
+                user/agent identifier.
+            collection_type: When provided, restrict to collections of this
+                type (e.g. ``"default"``, ``"user"``).
+            context_category: When provided, restrict to collections tagged
+                with this context category string.
+            limit: Maximum number of records to return.
+            offset: Zero-based record offset for pagination.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO` objects.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Single-item lookup
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_by_id(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> UserCollectionDTO | None:
+        """Return a user collection by its UUID.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO` when
+            found, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Mutations
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def create(
+        self,
+        *,
+        name: str,
+        description: str | None = None,
+        created_by: str | None = None,
+        collection_type: str | None = None,
+        context_category: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> UserCollectionDTO:
+        """Persist a new user collection and return the stored representation.
+
+        Args:
+            name: Human-readable collection name.  Must be unique within the
+                scope of *created_by*.
+            description: Optional free-text description.
+            created_by: Optional owner identifier (user ID or agent name).
+            collection_type: Optional type discriminator (e.g. ``"default"``).
+            context_category: Optional context category tag string.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The persisted
+            :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO`.
+
+        Raises:
+            ValueError: If a collection with the same *name* already exists
+                for the given *created_by*.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+        **kwargs: Any,
+    ) -> UserCollectionDTO:
+        """Apply a partial update to an existing user collection.
+
+        Only provided keyword arguments are changed; unmentioned fields remain
+        at their current values.  Recognised keys mirror
+        :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO` fields:
+        ``name``, ``description``, ``collection_type``, ``context_category``.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+            **kwargs: Field names to new values for the partial update.
+
+        Returns:
+            The updated
+            :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO`.
+
+        Raises:
+            KeyError: If no collection with *collection_id* exists.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        """Delete a user collection and all its membership records.
+
+        Does not delete artifact files — only removes the DB collection record
+        and associated ``CollectionArtifact`` rows.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            ``True`` when the collection was found and deleted, ``False``
+            when no matching record existed.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Default collection management
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def ensure_default(
+        self,
+        *,
+        created_by: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> UserCollectionDTO:
+        """Return the default collection, creating it if it does not exist.
+
+        The implementation must be idempotent: concurrent callers must not
+        produce duplicate default collections.
+
+        Args:
+            created_by: Optional owner identifier.  When provided the default
+                collection is scoped to this owner.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The existing or newly created default
+            :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO`.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Enriched queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list_with_artifact_stats(
+        self,
+        *,
+        created_by: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: RequestContext | None = None,
+    ) -> list[UserCollectionDTO]:
+        """Return collections with ``artifact_count`` and ``total_size_bytes`` populated.
+
+        Performs an aggregation join so that the returned DTOs carry up-to-date
+        counts without additional round-trips by the caller.
+
+        Args:
+            created_by: When provided, return only collections owned by this
+                identifier.
+            limit: Maximum number of records to return.
+            offset: Zero-based record offset for pagination.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO` objects
+            with ``artifact_count`` and ``total_size_bytes`` set.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Group associations
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def add_group(
+        self,
+        collection_id: str,
+        group_id: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        """Associate an existing group with a user collection.
+
+        Idempotent: associating a group that is already linked is a no-op and
+        returns ``True``.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            group_id: Group identifier to associate.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            ``True`` on success (including when the association already existed),
+            ``False`` when *collection_id* or *group_id* does not exist.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def remove_group(
+        self,
+        collection_id: str,
+        group_id: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        """Disassociate a group from a user collection.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            group_id: Group identifier to remove.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            ``True`` when the association existed and was removed, ``False``
+            if the association was not found.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_groups(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[str]:
+        """Return the identifiers of all groups associated with a collection.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of group identifier strings.  Returns an empty list when the
+            collection does not exist or has no group associations.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Aggregate helpers
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_artifact_count(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Return the number of artifacts currently in a collection.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Non-negative integer artifact count.  Returns ``0`` when the
+            collection does not exist.
         """
         raise NotImplementedError
