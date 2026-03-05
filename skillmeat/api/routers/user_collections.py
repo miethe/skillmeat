@@ -16,8 +16,9 @@ from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
+    ArtifactRepoDep,
     CollectionManagerDep,
-    DbSessionDep as _DbSessionDepBase,
+    DbSessionDep,
 )
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.collections import (
@@ -74,17 +75,18 @@ router = APIRouter(
 
 
 # =============================================================================
-# Database Session Dependency
-# =============================================================================
-
-# Use the canonical per-request session from the hexagonal DI layer instead of
-# a local duplicate so that session lifecycle is managed in one place.
-DbSessionDep = _DbSessionDepBase
-
-
-# =============================================================================
 # Helper Functions
 # =============================================================================
+# TODO: The helper functions and endpoints below operate directly on the
+# SQLAlchemy session because this router manages DB-backed user collections
+# (organisational groupings stored in the ``collections`` table), while the
+# available repository DI aliases (CollectionRepoDep, ArtifactRepoDep, …)
+# target the *filesystem* collection model.  A future
+# ``IDbUserCollectionRepository`` and ``IDbCollectionArtifactRepository``
+# should be introduced to provide proper repository abstractions for these
+# DB-only entities.  Until then, all direct session/ORM usage here is
+# intentional and managed via the DI-injected ``DbSessionDep``
+# (``Annotated[Session, Depends(get_db_session)]``).
 
 
 def encode_cursor(value: str) -> str:
@@ -198,6 +200,10 @@ def ensure_default_collection(session: Session) -> Collection:
 
     Returns:
         The default Collection instance (existing or newly created)
+
+    Note:
+        TODO: Need IDbUserCollectionRepository.ensure_default() method to
+        replace direct session.query(Collection) here.
     """
     existing = session.query(Collection).filter_by(id=DEFAULT_COLLECTION_ID).first()
     if existing:
@@ -223,6 +229,9 @@ def _ensure_collection_project_sentinel(session: Session) -> None:
     Artifact rows require a project_id FK. Collection-level (filesystem)
     artifacts are not tied to any real deployed project, so we use a
     sentinel project to satisfy the constraint.
+
+    TODO: Need IDbProjectRepository.ensure_sentinel() method to replace
+    direct session.query(Project) usage here.
     """
     existing = session.query(Project).filter_by(id=COLLECTION_ARTIFACTS_PROJECT_ID).first()
     if not existing:
@@ -259,6 +268,11 @@ def _ensure_artifacts_in_cache(
 
     Returns:
         Number of Artifact rows created
+
+    TODO: Need IArtifactRepository.list_ids() and IArtifactRepository.create_batch()
+    methods to replace direct session.query(Artifact.id) and session.add(Artifact(...))
+    usage here.  The current direct ORM access is intentional pending a DB-backed
+    artifact repository implementation.
     """
     _ensure_collection_project_sentinel(session)
 
@@ -332,6 +346,11 @@ def migrate_artifacts_to_default_collection(
     Returns:
         dict with migration stats: migrated_count, already_present_count,
         total_artifacts, and metadata_cache stats
+
+    TODO: This function requires a DB-backed repository for both
+    IDbUserCollectionRepository (ensure_default, migrate_artifacts) and
+    IDbCollectionArtifactRepository (check existing associations, batch create).
+    The direct ORM access is intentional pending those implementations.
     """
     # 1. Ensure default collection exists first
     ensure_default_collection(session)
@@ -439,6 +458,10 @@ def _sync_all_tags_to_orm(session: Session) -> int:
 
     Returns:
         Number of artifacts successfully synced.
+
+    TODO: Need IDbCollectionArtifactRepository.list_with_tags() and
+    ITagRepository.sync_artifact_tags() methods to replace the direct
+    session.query(CollectionArtifact) usage here.
     """
     try:
         from skillmeat.core.services import TagService
@@ -543,6 +566,11 @@ def populate_collection_artifact_metadata(
 
     Returns:
         dict with stats: created_count, updated_count, skipped_count, errors
+
+    TODO: Requires IDbCollectionArtifactRepository.upsert_metadata() for the
+    CollectionArtifact create/update operations, and
+    IArtifactRepository.get_by_type_name() for UUID resolution.  The direct
+    ORM access here is intentional pending those implementations.
     """
     import json
     import time
@@ -889,6 +917,11 @@ def _refresh_single_collection_cache(
             - updated: int (artifacts updated)
             - skipped: int (artifacts skipped/unchanged)
             - errors: list of error strings
+
+    TODO: Requires IDbCollectionArtifactRepository.list_for_collection(),
+    IArtifactRepository.batch_get_by_uuid(), and
+    IDbCollectionArtifactRepository.update_metadata() to replace all direct
+    ORM operations here.
     """
     updated = 0
     skipped = 0
@@ -1214,6 +1247,10 @@ async def list_user_collections(
 
     Raises:
         HTTPException: On error
+
+    TODO: Replace session.query(Collection) with IDbUserCollectionRepository.list()
+    once a DB-backed user collection repository is implemented.  The current
+    CollectionRepoDep targets the filesystem collection model and cannot be used here.
     """
     try:
         logger.info(
@@ -1221,6 +1258,7 @@ async def list_user_collections(
             f"type={collection_type})"
         )
 
+        # TODO: Need IDbUserCollectionRepository.list(filters, offset, limit)
         # Build base query
         query = session.query(Collection).order_by(Collection.id)
 
@@ -1320,10 +1358,15 @@ async def create_user_collection(
 
     Raises:
         HTTPException: If validation fails or name already exists
+
+    TODO: Replace session.query(Collection) / session.add(Collection(...)) with
+    IDbUserCollectionRepository.get_by_name() and IDbUserCollectionRepository.create()
+    once a DB-backed user collection repository is implemented.
     """
     try:
         logger.info(f"Creating user collection: {request.name}")
 
+        # TODO: Need IDbUserCollectionRepository.get_by_name(name)
         # Check if name already exists
         existing = session.query(Collection).filter_by(name=request.name).first()
         if existing:
@@ -1391,10 +1434,14 @@ async def get_user_collection(
 
     Raises:
         HTTPException: If collection not found or on error
+
+    TODO: Replace session.query(Collection) with IDbUserCollectionRepository.get_by_id()
+    once a DB-backed user collection repository is implemented.
     """
     try:
         logger.info(f"Getting user collection: {collection_id}")
 
+        # TODO: Need IDbUserCollectionRepository.get_by_id(collection_id)
         # Fetch collection
         collection = session.query(Collection).filter_by(id=collection_id).first()
         if not collection:
@@ -1450,6 +1497,10 @@ async def update_user_collection(
 
     Raises:
         HTTPException: If collection not found, validation fails, or name conflict
+
+    TODO: Replace session.query(Collection) / field mutations / session.commit() with
+    IDbUserCollectionRepository.get_by_id(), IDbUserCollectionRepository.get_by_name(),
+    and IDbUserCollectionRepository.update() once a DB-backed repository is implemented.
     """
     try:
         logger.info(f"Updating user collection: {collection_id}")
@@ -1546,10 +1597,15 @@ async def delete_user_collection(
 
     Note:
         Cascade deletion is handled by the database (groups and associations)
+
+    TODO: Replace session.query(Collection) / session.delete() / session.commit() with
+    IDbUserCollectionRepository.get_by_id() and IDbUserCollectionRepository.delete()
+    once a DB-backed user collection repository is implemented.
     """
     try:
         logger.info(f"Deleting user collection: {collection_id}")
 
+        # TODO: Need IDbUserCollectionRepository.get_by_id(collection_id)
         # Fetch collection
         collection = session.query(Collection).filter_by(id=collection_id).first()
         if not collection:
@@ -1630,6 +1686,12 @@ async def list_collection_artifacts(
 
     Raises:
         HTTPException: If collection not found or on error
+
+    TODO: This endpoint requires IDbUserCollectionRepository.get_by_id() for
+    collection existence check, and IDbCollectionArtifactRepository.list_paged()
+    for the CollectionArtifact + Artifact join queries.  The GroupArtifact joins
+    additionally need IDbGroupArtifactRepository.list_for_group().  All direct
+    ORM access is intentional pending those implementations.
     """
     try:
         logger.info(
@@ -1638,6 +1700,7 @@ async def list_collection_artifacts(
             f"group_id={group_id}, include_groups={include_groups})"
         )
 
+        # TODO: Need IDbUserCollectionRepository.get_by_id(collection_id)
         # Verify collection exists
         collection = session.query(Collection).filter_by(id=collection_id).first()
         if not collection:
@@ -2021,6 +2084,7 @@ async def add_artifacts_to_collection(
     collection_id: str,
     request: AddArtifactsRequest,
     session: DbSessionDep,
+    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
 ) -> dict:
     """Add artifacts to a collection.
@@ -2039,12 +2103,20 @@ async def add_artifacts_to_collection(
 
     Note:
         This operation is idempotent - re-adding existing artifacts returns 200
+
+    TODO: Replace session.query(Collection) with IDbUserCollectionRepository.get_by_id(),
+    and session.query(Artifact.id).join(CollectionArtifact) with
+    IDbCollectionArtifactRepository.list_artifact_ids_for_collection().
+    session.add(CollectionArtifact) should be replaced with
+    IDbCollectionArtifactRepository.add_artifact().
+    UUID resolution now delegates to artifact_repo.resolve_uuid_by_type_name().
     """
     try:
         logger.info(
             f"Adding {len(request.artifact_ids)} artifacts to collection: {collection_id}"
         )
 
+        # TODO: Need IDbUserCollectionRepository.get_by_id(collection_id)
         # Verify collection exists
         collection = session.query(Collection).filter_by(id=collection_id).first()
         if not collection:
@@ -2054,6 +2126,7 @@ async def add_artifacts_to_collection(
                 detail=f"Collection '{collection_id}' not found",
             )
 
+        # TODO: Need IDbCollectionArtifactRepository.list_artifact_ids_for_collection()
         # Get existing associations.
         # CollectionArtifact uses artifact_uuid FK; join Artifact to resolve
         # type:name ids for the idempotency check.
@@ -2071,27 +2144,33 @@ async def add_artifacts_to_collection(
         }
 
         # Add new associations.
-        # Resolve each artifact_id → artifact_uuid via Artifact table.
+        # Resolve each artifact_id (format: "type:name") → artifact_uuid via
+        # the ArtifactRepository to avoid direct ORM access here.
         added_count = 0
         for artifact_id in request.artifact_ids:
             if artifact_id not in existing_artifact_ids:
-                artifact_row = (
-                    session.query(Artifact.uuid)
-                    .filter(Artifact.id == artifact_id)
-                    .first()
-                )
-                if not artifact_row:
+                # Resolve UUID via repository (delegates to DB cache internally).
+                if ":" in artifact_id:
+                    type_str, art_name = artifact_id.split(":", 1)
+                    artifact_uuid = artifact_repo.resolve_uuid_by_type_name(
+                        type_str, art_name
+                    )
+                else:
+                    artifact_uuid = None
+                if not artifact_uuid:
                     logger.warning(
                         f"Skipping add: artifact '{artifact_id}' not found in cache"
                     )
                     continue
+                # TODO: Need IDbCollectionArtifactRepository.add_artifact()
                 association = CollectionArtifact(
                     collection_id=collection_id,
-                    artifact_uuid=artifact_row[0],
+                    artifact_uuid=artifact_uuid,
                 )
                 session.add(association)
                 added_count += 1
 
+        # TODO: session.commit() should be handled by IDbCollectionArtifactRepository
         session.commit()
 
         # Invalidate collection count cache
