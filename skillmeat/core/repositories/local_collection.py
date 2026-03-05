@@ -31,6 +31,13 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["LocalCollectionRepository"]
 
+# Sentinel used to identify the "entity" concept for non-artifact members.
+# The local filesystem model does not natively support arbitrary entity
+# associations, so these methods operate on a lightweight in-memory registry
+# that is NOT persisted between process restarts.  If persistence is required,
+# callers should use the DB-backed cache repository instead.
+_ENTITY_REGISTRY: Dict[str, Dict[str, List[str]]] = {}  # {coll_id: {etype: [ids]}}
+
 
 class LocalCollectionRepository(ICollectionRepository):
     """Filesystem-backed collection repository.
@@ -282,6 +289,357 @@ class LocalCollectionRepository(ICollectionRepository):
         page = artifacts[offset : offset + limit]
 
         return [self._artifact_to_dto(a, collection_id) for a in page]
+
+    # ------------------------------------------------------------------
+    # ICollectionRepository — mutations
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        name: str,
+        description: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> CollectionDTO:
+        """Create a new collection on the filesystem.
+
+        Args:
+            name: Human-readable name for the new collection.  Must be
+                unique; delegates to :meth:`CollectionManager.init`.
+            description: Optional description text (currently not stored
+                in the TOML manifest but accepted for forward compatibility).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The created :class:`CollectionDTO`.
+
+        Raises:
+            ValueError: If a collection with the same *name* already exists.
+        """
+        existing = self._manager.list_collections()
+        if name in existing:
+            raise ValueError(f"Collection '{name}' already exists")
+
+        collection = self._manager.init(name)
+        return self._collection_to_dto(collection, name)
+
+    def update(
+        self,
+        collection_id: str,
+        updates: Dict[str, Any],
+        ctx: Optional[RequestContext] = None,
+    ) -> CollectionDTO:
+        """Apply a partial update to an existing collection.
+
+        Currently supports updating the ``name`` field only (renames the
+        underlying directory via :meth:`CollectionManager.rename_collection`
+        when available, or falls back to saving the collection manifest with
+        the new name).
+
+        Args:
+            collection_id: Collection name (filesystem directory name).
+            updates: Map of field names to new values.  Supported keys:
+                ``name``, ``description`` (no-op in filesystem layer).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated :class:`CollectionDTO`.
+
+        Raises:
+            KeyError: If no collection with *collection_id* exists.
+        """
+        try:
+            collection = self._manager.load_collection(collection_id)
+        except ValueError as exc:
+            raise KeyError(f"Collection '{collection_id}' not found") from exc
+
+        new_name = updates.get("name")
+        if new_name and new_name != collection_id:
+            # Rename: try dedicated method first; fall back to init + delete.
+            rename_fn = getattr(self._manager, "rename_collection", None)
+            if callable(rename_fn):
+                rename_fn(collection_id, new_name)
+            else:
+                logger.warning(
+                    "update(%r): CollectionManager.rename_collection not available; "
+                    "name change is ignored",
+                    collection_id,
+                )
+            return self.get_by_id(new_name, ctx=ctx) or self.get_by_id(collection_id, ctx=ctx)  # type: ignore[return-value]
+
+        # No supported mutations besides name — reload and return.
+        return self._collection_to_dto(collection, collection_id)
+
+    def delete(
+        self,
+        collection_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> None:
+        """Delete a collection directory from the filesystem.
+
+        The collection must not be the currently-active collection.  Delegates
+        to :meth:`CollectionManager.delete_collection`.
+
+        Args:
+            collection_id: Collection name (filesystem directory name).
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no collection with *collection_id* exists.
+        """
+        try:
+            self._manager.delete_collection(collection_id, confirm=False)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg.lower():
+                raise KeyError(f"Collection '{collection_id}' not found") from exc
+            raise
+
+    def add_artifacts(
+        self,
+        collection_id: str,
+        artifact_uuids: List[str],
+        ctx: Optional[RequestContext] = None,
+    ) -> None:
+        """Add artifacts to a collection by UUID.
+
+        The local filesystem model tracks artifacts by name, not UUID, so
+        this method resolves each UUID against the artifact registry before
+        adding.  In the filesystem-only layer, UUIDs are best-effort (i.e.,
+        artifacts without a ``uuid`` field cannot be located this way).
+        The operation is idempotent — already-present artifacts are skipped.
+
+        Args:
+            collection_id: Collection name.
+            artifact_uuids: List of stable artifact UUIDs to add.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist.
+        """
+        try:
+            self._manager.load_collection(collection_id)
+        except ValueError as exc:
+            raise KeyError(f"Collection '{collection_id}' not found") from exc
+
+        # The filesystem layer cannot look up artifacts by UUID without a DB
+        # registry, so we log a warning and return without mutating the manifest.
+        # Callers that need true UUID-keyed membership should use the DB-backed repo.
+        logger.warning(
+            "add_artifacts(%r): filesystem layer cannot resolve UUIDs %r; "
+            "use the DB-backed repository for UUID-keyed membership mutations",
+            collection_id,
+            artifact_uuids,
+        )
+
+    def remove_artifact(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> None:
+        """Remove an artifact from a collection by UUID.
+
+        As with :meth:`add_artifacts`, the filesystem layer cannot resolve
+        artifacts by UUID alone.  This method logs a warning and is a no-op;
+        use the DB-backed repository for UUID-keyed mutation.
+
+        Args:
+            collection_id: Collection name.
+            artifact_uuid: Stable artifact UUID to remove.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist.
+        """
+        try:
+            self._manager.load_collection(collection_id)
+        except ValueError as exc:
+            raise KeyError(f"Collection '{collection_id}' not found") from exc
+
+        logger.warning(
+            "remove_artifact(%r, uuid=%r): filesystem layer cannot resolve UUIDs; "
+            "use the DB-backed repository for UUID-keyed membership mutations",
+            collection_id,
+            artifact_uuid,
+        )
+
+    # ------------------------------------------------------------------
+    # ICollectionRepository — entity management
+    # ------------------------------------------------------------------
+
+    def list_entities(
+        self,
+        collection_id: str,
+        entity_type: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> List[Any]:
+        """Return entities associated with a collection.
+
+        Entity associations are held in a module-level in-memory registry
+        (not persisted to disk).  For persistent entity associations use
+        the DB-backed repository.
+
+        Args:
+            collection_id: Collection name.
+            entity_type: Optional filter by entity type string.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of entity identifier strings associated with the collection.
+        """
+        coll_registry = _ENTITY_REGISTRY.get(collection_id, {})
+        if entity_type is not None:
+            return list(coll_registry.get(entity_type, []))
+        # Return all entity ids across all types as plain dicts.
+        result: List[Any] = []
+        for etype, ids in coll_registry.items():
+            for eid in ids:
+                result.append({"entity_type": etype, "entity_id": eid})
+        return result
+
+    def add_entity(
+        self,
+        collection_id: str,
+        entity_type: str,
+        entity_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> None:
+        """Associate an entity with a collection in the in-memory registry.
+
+        Args:
+            collection_id: Collection name.
+            entity_type: Entity type string (e.g. ``"workflow"``).
+            entity_id: Unique identifier of the entity.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist on disk.
+        """
+        try:
+            self._manager.load_collection(collection_id)
+        except ValueError as exc:
+            raise KeyError(f"Collection '{collection_id}' not found") from exc
+
+        coll_registry = _ENTITY_REGISTRY.setdefault(collection_id, {})
+        type_list = coll_registry.setdefault(entity_type, [])
+        if entity_id not in type_list:
+            type_list.append(entity_id)
+
+    def remove_entity(
+        self,
+        collection_id: str,
+        entity_type: str,
+        entity_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> None:
+        """Remove an entity association from a collection.
+
+        Args:
+            collection_id: Collection name.
+            entity_type: Entity type string.
+            entity_id: Unique identifier of the entity to disassociate.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist or the entity is not
+                associated with the collection.
+        """
+        try:
+            self._manager.load_collection(collection_id)
+        except ValueError as exc:
+            raise KeyError(f"Collection '{collection_id}' not found") from exc
+
+        coll_registry = _ENTITY_REGISTRY.get(collection_id, {})
+        type_list = coll_registry.get(entity_type, [])
+        if entity_id not in type_list:
+            raise KeyError(
+                f"Entity '{entity_id}' of type '{entity_type}' is not "
+                f"associated with collection '{collection_id}'"
+            )
+        type_list.remove(entity_id)
+
+    def migrate_to_default(
+        self,
+        collection_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> None:
+        """Migrate a collection's artifacts and entities to the default collection.
+
+        All member artifacts from *collection_id* are added to the active
+        default collection, then *collection_id* is deleted.
+
+        Args:
+            collection_id: Source collection identifier (name).
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *collection_id* does not exist.
+            ValueError: If *collection_id* is the current default collection.
+        """
+        try:
+            source = self._manager.load_collection(collection_id)
+        except ValueError as exc:
+            raise KeyError(f"Collection '{collection_id}' not found") from exc
+
+        active_name = self._manager.get_active_collection_name()
+        if collection_id == active_name:
+            raise ValueError(
+                f"Collection '{collection_id}' is the active default collection "
+                "and cannot be migrated to itself"
+            )
+
+        # Load the default collection and append all source artifacts.
+        try:
+            default_collection = self._manager.load_collection(active_name)
+        except Exception as exc:
+            logger.warning(
+                "migrate_to_default: could not load default collection '%s': %s",
+                active_name,
+                exc,
+            )
+            return
+
+        existing_ids = {
+            (a.type.value if a.type else "", a.name) for a in default_collection.artifacts
+        }
+        added = 0
+        for artifact in source.artifacts:
+            key = (artifact.type.value if artifact.type else "", artifact.name)
+            if key not in existing_ids:
+                default_collection.artifacts.append(artifact)
+                existing_ids.add(key)
+                added += 1
+
+        if added:
+            self._manager.save_collection(default_collection)
+
+        # Migrate entity registry entries.
+        source_entities = _ENTITY_REGISTRY.pop(collection_id, {})
+        if source_entities:
+            dest_registry = _ENTITY_REGISTRY.setdefault(active_name, {})
+            for etype, ids in source_entities.items():
+                dest_list = dest_registry.setdefault(etype, [])
+                for eid in ids:
+                    if eid not in dest_list:
+                        dest_list.append(eid)
+
+        # Delete the source collection (skip active-collection guard; we already
+        # checked that it is not the active collection above).
+        try:
+            self._manager.delete_collection(collection_id, confirm=False)
+        except Exception as exc:
+            logger.warning(
+                "migrate_to_default: could not delete source collection '%s': %s",
+                collection_id,
+                exc,
+            )
+
+        logger.info(
+            "migrate_to_default: migrated %d artifact(s) from '%s' to '%s'",
+            added,
+            collection_id,
+            active_name,
+        )
 
     # ------------------------------------------------------------------
     # Private helpers

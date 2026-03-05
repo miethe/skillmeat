@@ -32,7 +32,7 @@ from typing import Any, Callable, List, Optional
 
 from skillmeat.core.artifact import ArtifactManager, ArtifactType
 from skillmeat.core.interfaces.context import RequestContext
-from skillmeat.core.interfaces.dtos import ArtifactDTO, TagDTO
+from skillmeat.core.interfaces.dtos import ArtifactDTO, CollectionMembershipDTO, TagDTO
 from skillmeat.core.interfaces.repositories import IArtifactRepository
 from skillmeat.core.path_resolver import ProjectPathResolver
 
@@ -42,10 +42,16 @@ from skillmeat.core.path_resolver import ProjectPathResolver
 try:
     from skillmeat.cache.models import get_session as _get_db_session
     from skillmeat.cache.models import Artifact as _DBArtifact
+    from skillmeat.cache.models import Collection as _DBCollection
+    from skillmeat.cache.models import CollectionArtifact as _DBCollectionArtifact
+    from skillmeat.cache.models import DuplicatePair as _DBDuplicatePair
     _db_available = True
 except ImportError:  # pragma: no cover
     _get_db_session = None  # type: ignore[assignment]
     _DBArtifact = None  # type: ignore[assignment]
+    _DBCollection = None  # type: ignore[assignment]
+    _DBCollectionArtifact = None  # type: ignore[assignment]
+    _DBDuplicatePair = None  # type: ignore[assignment]
     _db_available = False
 
 logger = logging.getLogger(__name__)
@@ -994,6 +1000,505 @@ class LocalArtifactRepository(IArtifactRepository):
             return False
 
         return True
+
+    # ------------------------------------------------------------------
+    # UUID resolution
+    # ------------------------------------------------------------------
+
+    def resolve_uuid_by_type_name(
+        self,
+        artifact_type: str,
+        name: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> Optional[str]:
+        """Resolve the stable UUID for an artifact identified by type and name.
+
+        Delegates to :meth:`_get_db_uuid` using the ``"type:name"`` format.
+
+        Args:
+            artifact_type: Artifact type string (e.g. ``"skill"``).
+            name: Artifact name string.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            32-char hex UUID string when found in DB, ``None`` otherwise.
+        """
+        artifact_id = f"{artifact_type}:{name}"
+        return self._get_db_uuid(artifact_id)
+
+    def batch_resolve_uuids(
+        self,
+        artifacts: List[tuple],
+        ctx: Optional[RequestContext] = None,
+    ) -> dict:
+        """Batch-resolve UUIDs for multiple ``(artifact_type, name)`` pairs.
+
+        Converts each pair to the ``"type:name"`` format and calls
+        :meth:`_get_db_uuid_batch` in a single round-trip.
+
+        Args:
+            artifacts: List of ``(artifact_type, name)`` tuples.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            Dict mapping each ``(artifact_type, name)`` tuple to its 32-char
+            hex UUID.  Unresolvable pairs are omitted.
+        """
+        id_to_pair = {f"{atype}:{name}": (atype, name) for atype, name in artifacts}
+        uuid_map = self._get_db_uuid_batch(list(id_to_pair.keys()))
+        return {
+            id_to_pair[artifact_id]: uuid_val
+            for artifact_id, uuid_val in uuid_map.items()
+        }
+
+    # ------------------------------------------------------------------
+    # Collection-context queries
+    # ------------------------------------------------------------------
+
+    def get_with_collection_context(
+        self,
+        uuid: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> Optional[ArtifactDTO]:
+        """Return an artifact with enriched collection-membership context.
+
+        Fetches the artifact via :meth:`get_by_uuid` and enriches it with
+        the collection-level description from the ``CollectionArtifact``
+        association row when available.
+
+        Args:
+            uuid: Stable artifact UUID (32-char hex).
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            An :class:`ArtifactDTO` with collection context populated where
+            available, ``None`` when the artifact does not exist.
+        """
+        dto = self.get_by_uuid(uuid, ctx=ctx)
+        if dto is None:
+            return None
+
+        # Enrich with collection-level description if available in DB.
+        if (
+            _db_available
+            and _get_db_session is not None
+            and _DBCollectionArtifact is not None
+        ):
+            get_session = _get_db_session
+            DBCollectionArtifact = _DBCollectionArtifact
+            try:
+                session = get_session()
+                try:
+                    row = (
+                        session.query(DBCollectionArtifact.description)
+                        .filter(DBCollectionArtifact.artifact_uuid == uuid)
+                        .order_by(DBCollectionArtifact.added_at.desc())
+                        .first()
+                    )
+                    if row and row[0]:
+                        # Return a new DTO with the collection-level description
+                        # overriding the intrinsic description.
+                        return ArtifactDTO(
+                            id=dto.id,
+                            name=dto.name,
+                            artifact_type=dto.artifact_type,
+                            uuid=dto.uuid,
+                            source=dto.source,
+                            version=dto.version,
+                            scope=dto.scope,
+                            description=row[0],
+                            content_path=dto.content_path,
+                            metadata=dto.metadata,
+                            tags=dto.tags,
+                            is_outdated=dto.is_outdated,
+                            local_modified=dto.local_modified,
+                            project_id=dto.project_id,
+                            created_at=dto.created_at,
+                            updated_at=dto.updated_at,
+                        )
+                finally:
+                    session.close()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(
+                    "get_with_collection_context() DB enrichment failed for uuid '%s': %s",
+                    uuid,
+                    exc,
+                )
+
+        return dto
+
+    def get_collection_memberships(
+        self,
+        uuid: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> List[CollectionMembershipDTO]:
+        """Return all collections that contain the artifact identified by *uuid*.
+
+        Queries the ``collection_artifacts`` join table and resolves collection
+        names from the ``collections`` table.
+
+        Args:
+            uuid: Stable artifact UUID (32-char hex).
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            List of :class:`CollectionMembershipDTO` objects, one per
+            collection membership.  Empty list when artifact is not found
+            or has no memberships.
+        """
+        if (
+            not _db_available
+            or _get_db_session is None
+            or _DBCollectionArtifact is None
+            or _DBCollection is None
+        ):
+            return []
+
+        get_session = _get_db_session
+        DBCollectionArtifact = _DBCollectionArtifact
+        DBCollection = _DBCollection
+        try:
+            session = get_session()
+            try:
+                rows = (
+                    session.query(
+                        DBCollectionArtifact.collection_id,
+                        DBCollectionArtifact.artifact_uuid,
+                        DBCollectionArtifact.added_at,
+                        DBCollection.name,
+                    )
+                    .join(
+                        DBCollection,
+                        DBCollection.id == DBCollectionArtifact.collection_id,
+                    )
+                    .filter(DBCollectionArtifact.artifact_uuid == uuid)
+                    .all()
+                )
+                memberships = []
+                for row in rows:
+                    collection_id, artifact_uuid, added_at, collection_name = row
+                    memberships.append(
+                        CollectionMembershipDTO(
+                            collection_id=collection_id,
+                            collection_name=collection_name or collection_id,
+                            artifact_uuid=artifact_uuid,
+                            artifact_id=None,
+                            added_at=(
+                                added_at.isoformat() if added_at is not None else None
+                            ),
+                        )
+                    )
+                return memberships
+            finally:
+                session.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "get_collection_memberships() failed for uuid '%s': %s",
+                uuid,
+                exc,
+            )
+            return []
+
+    def get_collection_description(
+        self,
+        uuid: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> Optional[str]:
+        """Return the collection-level description for an artifact.
+
+        Reads the ``description`` column from the most recent
+        ``CollectionArtifact`` association row for this UUID.
+
+        Args:
+            uuid: Stable artifact UUID (32-char hex).
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            Collection-level description string, or ``None`` when not set
+            or the artifact does not exist.
+        """
+        if (
+            not _db_available
+            or _get_db_session is None
+            or _DBCollectionArtifact is None
+        ):
+            return None
+
+        get_session = _get_db_session
+        DBCollectionArtifact = _DBCollectionArtifact
+        try:
+            session = get_session()
+            try:
+                row = (
+                    session.query(DBCollectionArtifact.description)
+                    .filter(DBCollectionArtifact.artifact_uuid == uuid)
+                    .order_by(DBCollectionArtifact.added_at.desc())
+                    .first()
+                )
+                return row[0] if row and row[0] else None
+            finally:
+                session.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(
+                "get_collection_description() failed for uuid '%s': %s",
+                uuid,
+                exc,
+            )
+            return None
+
+    # ------------------------------------------------------------------
+    # Deduplication cluster queries
+    # ------------------------------------------------------------------
+
+    def get_duplicate_cluster_members(
+        self,
+        cluster_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> List[ArtifactDTO]:
+        """Return all artifacts that belong to the given deduplication cluster.
+
+        In this implementation *cluster_id* is treated as an artifact UUID.
+        The method fetches all ``DuplicatePair`` rows where either
+        ``artifact1_uuid`` or ``artifact2_uuid`` matches *cluster_id*, then
+        loads the full artifact for each unique UUID in the cluster.
+
+        Args:
+            cluster_id: Artifact UUID that anchors the cluster.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            List of :class:`ArtifactDTO` objects representing cluster members,
+            including the anchor artifact.  Returns an empty list when the DB
+            is unavailable or no pairs are found.
+        """
+        if (
+            not _db_available
+            or _get_db_session is None
+            or _DBDuplicatePair is None
+            or _DBArtifact is None
+        ):
+            return []
+
+        get_session = _get_db_session
+        DBDuplicatePair = _DBDuplicatePair
+        DBArtifact = _DBArtifact
+        try:
+            session = get_session()
+            try:
+                rows = (
+                    session.query(
+                        DBDuplicatePair.artifact1_uuid,
+                        DBDuplicatePair.artifact2_uuid,
+                    )
+                    .filter(
+                        (DBDuplicatePair.artifact1_uuid == cluster_id)
+                        | (DBDuplicatePair.artifact2_uuid == cluster_id),
+                        DBDuplicatePair.ignored.is_(False),
+                    )
+                    .all()
+                )
+                # Collect all unique UUIDs in the cluster (including the anchor).
+                cluster_uuids: set[str] = {cluster_id}
+                for r1, r2 in rows:
+                    cluster_uuids.add(r1)
+                    cluster_uuids.add(r2)
+
+                # Resolve each UUID to an artifact ID, then fetch the DTO.
+                id_rows = (
+                    session.query(DBArtifact.id, DBArtifact.uuid)
+                    .filter(DBArtifact.uuid.in_(list(cluster_uuids)))
+                    .all()
+                )
+            finally:
+                session.close()
+
+            results: List[ArtifactDTO] = []
+            for artifact_id, db_uuid in id_rows:
+                dto = self.get(artifact_id, ctx=ctx)
+                if dto is not None:
+                    # Override uuid with the confirmed DB value.
+                    results.append(
+                        ArtifactDTO(
+                            id=dto.id,
+                            name=dto.name,
+                            artifact_type=dto.artifact_type,
+                            uuid=db_uuid,
+                            source=dto.source,
+                            version=dto.version,
+                            scope=dto.scope,
+                            description=dto.description,
+                            content_path=dto.content_path,
+                            metadata=dto.metadata,
+                            tags=dto.tags,
+                            is_outdated=dto.is_outdated,
+                            local_modified=dto.local_modified,
+                            project_id=dto.project_id,
+                            created_at=dto.created_at,
+                            updated_at=dto.updated_at,
+                        )
+                    )
+            return results
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "get_duplicate_cluster_members() failed for cluster_id '%s': %s",
+                cluster_id,
+                exc,
+            )
+            return []
+
+    # ------------------------------------------------------------------
+    # Existence and type queries
+    # ------------------------------------------------------------------
+
+    def validate_exists(
+        self,
+        uuid: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> bool:
+        """Check whether an artifact with the given UUID exists.
+
+        Attempts a lightweight DB lookup first.  Falls back to a full
+        filesystem scan when the DB is unavailable.
+
+        Args:
+            uuid: Stable artifact UUID (32-char hex).
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            ``True`` when an artifact with *uuid* exists, ``False`` otherwise.
+        """
+        if (
+            _db_available
+            and _get_db_session is not None
+            and _DBArtifact is not None
+        ):
+            get_session = _get_db_session
+            DBArtifact = _DBArtifact
+            try:
+                session = get_session()
+                try:
+                    count = (
+                        session.query(DBArtifact.uuid)
+                        .filter(DBArtifact.uuid == uuid)
+                        .count()
+                    )
+                    return count > 0
+                finally:
+                    session.close()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(
+                    "validate_exists() DB check failed for uuid '%s': %s",
+                    uuid,
+                    exc,
+                )
+
+        # Filesystem fallback — linear scan.
+        return self.get_by_uuid(uuid, ctx=ctx) is not None
+
+    def get_by_type(
+        self,
+        artifact_type: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> List[ArtifactDTO]:
+        """Return all artifacts of the specified type.
+
+        Convenience wrapper around :meth:`list` with an ``artifact_type``
+        filter and no pagination cap (returns all matching artifacts).
+
+        Args:
+            artifact_type: Artifact type string (e.g. ``"skill"``, ``"command"``).
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            List of :class:`ArtifactDTO` objects matching *artifact_type*.
+        """
+        return self.list(
+            filters={"artifact_type": artifact_type},
+            offset=0,
+            limit=10_000,
+            ctx=ctx,
+        )
+
+    # ------------------------------------------------------------------
+    # Collection-level mutations
+    # ------------------------------------------------------------------
+
+    def update_collection_tags(
+        self,
+        uuid: str,
+        tags: List[str],
+        ctx: Optional[RequestContext] = None,
+    ) -> None:
+        """Replace the collection-level tags for an artifact.
+
+        Updates the ``tags_json`` column on all ``CollectionArtifact`` rows
+        for this UUID so that the collection-level tag set is authoritative.
+        When the DB is unavailable, falls back to updating the intrinsic
+        artifact tags via the filesystem.
+
+        Args:
+            uuid: Stable artifact UUID (32-char hex).
+            tags: New complete list of tag name strings.
+            ctx: Optional per-request metadata (unused).
+
+        Raises:
+            KeyError: If no artifact with *uuid* exists.
+        """
+        import json as _json
+
+        if (
+            _db_available
+            and _get_db_session is not None
+            and _DBCollectionArtifact is not None
+            and _DBArtifact is not None
+        ):
+            get_session = _get_db_session
+            DBCollectionArtifact = _DBCollectionArtifact
+            DBArtifact = _DBArtifact
+            try:
+                session = get_session()
+                try:
+                    # Verify the artifact exists.
+                    exists = (
+                        session.query(DBArtifact.uuid)
+                        .filter(DBArtifact.uuid == uuid)
+                        .count()
+                        > 0
+                    )
+                    if not exists:
+                        raise KeyError(uuid)
+
+                    tags_json = _json.dumps(tags)
+                    (
+                        session.query(DBCollectionArtifact)
+                        .filter(DBCollectionArtifact.artifact_uuid == uuid)
+                        .update({"tags_json": tags_json})
+                    )
+                    session.commit()
+                    return
+                except KeyError:
+                    session.rollback()
+                    raise
+                except Exception:
+                    session.rollback()
+                    raise
+                finally:
+                    session.close()
+            except KeyError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "update_collection_tags() DB update failed for uuid '%s': %s",
+                    uuid,
+                    exc,
+                )
+                # Fall through to filesystem fallback.
+
+        # Filesystem fallback: locate the artifact by UUID and update its tags.
+        dto = self.get_by_uuid(uuid, ctx=ctx)
+        if dto is None:
+            raise KeyError(uuid)
+        self.set_tags(id=dto.id, tag_ids=tags, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------

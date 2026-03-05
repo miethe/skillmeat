@@ -23,18 +23,41 @@ Design notes:
 from __future__ import annotations
 
 import logging
+import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from skillmeat.config import ConfigManager
 from skillmeat.core.interfaces.context import RequestContext
-from skillmeat.core.interfaces.dtos import SettingsDTO
+from skillmeat.core.interfaces.dtos import CategoryDTO, EntityTypeConfigDTO, SettingsDTO
 from skillmeat.core.interfaces.repositories import ISettingsRepository
 from skillmeat.core.path_resolver import ProjectPathResolver
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["LocalSettingsRepository"]
+
+
+def _slugify(text: str) -> str:
+    """Convert *text* to a URL-safe kebab-case slug.
+
+    Lowercases, replaces spaces and underscores with hyphens, and strips any
+    character that is not alphanumeric or a hyphen.
+
+    Args:
+        text: Human-readable string to slugify.
+
+    Returns:
+        URL-safe slug string.
+    """
+    import re
+
+    slug = text.lower().strip()
+    slug = re.sub(r"[\s_]+", "-", slug)
+    slug = re.sub(r"[^a-z0-9\-]", "", slug)
+    slug = re.sub(r"-{2,}", "-", slug).strip("-")
+    return slug or "category"
+
 
 # TOML config key that stores the GitHub Personal Access Token.
 _GITHUB_TOKEN_KEY = "settings.github-token"
@@ -245,3 +268,363 @@ class LocalSettingsRepository(ISettingsRepository):
             else:
                 logger.debug("validate_github_token: unexpected error: %s", exc)
             return False
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository — EntityTypeConfig CRUD
+    # ------------------------------------------------------------------
+
+    def list_entity_type_configs(
+        self,
+        ctx: Optional[RequestContext] = None,
+    ) -> List[EntityTypeConfigDTO]:
+        """Return all registered entity type configurations from the DB cache.
+
+        Delegates to the ``entity_type_configs`` ORM table (``EntityTypeConfig``
+        model) ordered by ``sort_order``.
+
+        Args:
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.EntityTypeConfigDTO`
+            objects, including both system-defined and user-created entries.
+        """
+        try:
+            from skillmeat.cache.models import EntityTypeConfig, get_session
+
+            with get_session() as session:
+                rows = (
+                    session.query(EntityTypeConfig)
+                    .order_by(EntityTypeConfig.sort_order)
+                    .all()
+                )
+                return [self._entity_type_config_to_dto(r) for r in rows]
+        except Exception as exc:
+            logger.debug("list_entity_type_configs: DB unavailable: %s", exc)
+            return []
+
+    def create_entity_type_config(
+        self,
+        entity_type: str,
+        display_name: str,
+        description: Optional[str] = None,
+        icon: Optional[str] = None,
+        color: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> EntityTypeConfigDTO:
+        """Create a new user-defined entity type configuration.
+
+        Args:
+            entity_type: Machine-readable entity type key (used as ``slug``).
+                Must be unique.
+            display_name: Human-readable display name.
+            description: Optional description of this entity type.
+            icon: Optional icon identifier or URL.
+            color: Optional hex color code (e.g. ``"#FF5733"``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The created :class:`~skillmeat.core.interfaces.dtos.EntityTypeConfigDTO`.
+
+        Raises:
+            ValueError: If an entity type config with the same *entity_type*
+                already exists.
+        """
+        from skillmeat.cache.models import EntityTypeConfig, get_session
+
+        with get_session() as session:
+            existing = (
+                session.query(EntityTypeConfig)
+                .filter(EntityTypeConfig.slug == entity_type)
+                .first()
+            )
+            if existing is not None:
+                raise ValueError(
+                    f"EntityTypeConfig with entity_type='{entity_type}' already exists"
+                )
+
+            # Compute next sort_order.
+            max_order_row = (
+                session.query(EntityTypeConfig.sort_order)
+                .order_by(EntityTypeConfig.sort_order.desc())
+                .first()
+            )
+            next_order = ((max_order_row[0] or 0) + 10) if max_order_row else 0
+
+            config = EntityTypeConfig(
+                slug=entity_type,
+                display_name=display_name,
+                description=description,
+                icon=icon,
+                color=color,
+                is_builtin=False,
+                sort_order=next_order,
+            )
+            session.add(config)
+            session.flush()
+            return self._entity_type_config_to_dto(config)
+
+    def update_entity_type_config(
+        self,
+        config_id: str,
+        updates: Dict[str, Any],
+        ctx: Optional[RequestContext] = None,
+    ) -> EntityTypeConfigDTO:
+        """Apply a partial update to an existing entity type configuration.
+
+        Immutable fields (``entity_type`` / ``slug``, ``is_system`` /
+        ``is_builtin``) are rejected when present in *updates*.
+
+        Args:
+            config_id: Unique identifier of the entity type config — either
+                the integer PK (as a string) or the ``slug``.
+            updates: Map of field names to new values.  Recognised keys:
+                ``display_name``, ``description``, ``icon``, ``color``.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated :class:`~skillmeat.core.interfaces.dtos.EntityTypeConfigDTO`.
+
+        Raises:
+            KeyError: If no config with *config_id* exists.
+            ValueError: If the update attempts to mutate an immutable field.
+        """
+        from skillmeat.cache.models import EntityTypeConfig, get_session
+
+        # Reject immutable-field mutations.
+        immutable = {"entity_type", "slug", "is_system", "is_builtin"}
+        bad_keys = immutable.intersection(updates)
+        if bad_keys:
+            raise ValueError(
+                f"Cannot update immutable field(s): {', '.join(sorted(bad_keys))}"
+            )
+
+        with get_session() as session:
+            config = self._get_entity_type_config_row(session, config_id)
+            if config is None:
+                raise KeyError(f"EntityTypeConfig '{config_id}' not found")
+
+            mutable_map = {
+                "display_name": "display_name",
+                "description": "description",
+                "icon": "icon",
+                "color": "color",
+            }
+            for dto_key, orm_attr in mutable_map.items():
+                if dto_key in updates:
+                    setattr(config, orm_attr, updates[dto_key])
+
+            session.flush()
+            return self._entity_type_config_to_dto(config)
+
+    def delete_entity_type_config(
+        self,
+        config_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> None:
+        """Delete a user-defined entity type configuration.
+
+        System-defined / built-in configs cannot be deleted.
+
+        Args:
+            config_id: Unique identifier of the entity type config — either
+                the integer PK (as a string) or the ``slug``.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If no config with *config_id* exists.
+            ValueError: If the config is system-defined (``is_builtin=True``).
+        """
+        from skillmeat.cache.models import EntityTypeConfig, get_session
+
+        with get_session() as session:
+            config = self._get_entity_type_config_row(session, config_id)
+            if config is None:
+                raise KeyError(f"EntityTypeConfig '{config_id}' not found")
+
+            if config.is_builtin:
+                raise ValueError(
+                    f"EntityTypeConfig '{config_id}' is a built-in type and cannot be deleted"
+                )
+
+            session.delete(config)
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository — Category CRUD
+    # ------------------------------------------------------------------
+
+    def list_categories(
+        self,
+        entity_type: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> List[CategoryDTO]:
+        """Return all categories from the DB cache, optionally filtered by entity type.
+
+        Args:
+            entity_type: When provided, return only categories whose
+                ``entity_type_slug`` matches (or is ``None`` for cross-type
+                categories).  When omitted, all categories are returned.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.CategoryDTO` objects.
+        """
+        try:
+            from skillmeat.cache.models import ContextEntityCategory, get_session
+
+            with get_session() as session:
+                query = session.query(ContextEntityCategory)
+                if entity_type is not None:
+                    query = query.filter(
+                        ContextEntityCategory.entity_type_slug == entity_type
+                    )
+                rows = query.order_by(ContextEntityCategory.sort_order).all()
+                return [self._category_to_dto(r) for r in rows]
+        except Exception as exc:
+            logger.debug("list_categories: DB unavailable: %s", exc)
+            return []
+
+    def create_category(
+        self,
+        name: str,
+        entity_type: Optional[str] = None,
+        description: Optional[str] = None,
+        color: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> CategoryDTO:
+        """Create a new category in the DB cache.
+
+        Args:
+            name: Human-readable category name.  Must be unique within the
+                same *entity_type* namespace.
+            entity_type: Optional entity type this category applies to.
+                Pass ``None`` for a cross-type (universal) category.
+            description: Optional description text.
+            color: Optional hex color code for UI display (e.g. ``"#00FF00"``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The created :class:`~skillmeat.core.interfaces.dtos.CategoryDTO`.
+
+        Raises:
+            ValueError: If a category with the same *name* and *entity_type*
+                combination already exists.
+        """
+        from skillmeat.cache.models import ContextEntityCategory, get_session
+
+        # Generate a URL-safe slug from the name.
+        slug = _slugify(name)
+
+        with get_session() as session:
+            existing = (
+                session.query(ContextEntityCategory)
+                .filter(ContextEntityCategory.slug == slug)
+                .first()
+            )
+            if existing is not None:
+                raise ValueError(
+                    f"Category with name='{name}' (slug='{slug}') already exists"
+                )
+
+            # Compute next sort_order.
+            max_order_row = (
+                session.query(ContextEntityCategory.sort_order)
+                .order_by(ContextEntityCategory.sort_order.desc())
+                .first()
+            )
+            next_order = ((max_order_row[0] or 0) + 10) if max_order_row else 0
+
+            category = ContextEntityCategory(
+                name=name,
+                slug=slug,
+                description=description,
+                color=color,
+                entity_type_slug=entity_type,
+                sort_order=next_order,
+                is_builtin=False,
+            )
+            session.add(category)
+            session.flush()
+            return self._category_to_dto(category)
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_entity_type_config_row(
+        session: Any,
+        config_id: str,
+    ) -> Optional[Any]:
+        """Resolve an EntityTypeConfig row by integer PK string or slug.
+
+        Args:
+            session: Active SQLAlchemy session.
+            config_id: Integer PK (as string) or slug string.
+
+        Returns:
+            The matching ORM row, or ``None`` if not found.
+        """
+        from skillmeat.cache.models import EntityTypeConfig
+
+        # Try integer PK first.
+        if config_id.isdigit():
+            row = session.query(EntityTypeConfig).get(int(config_id))
+            if row is not None:
+                return row
+
+        # Fall back to slug lookup.
+        return (
+            session.query(EntityTypeConfig)
+            .filter(EntityTypeConfig.slug == config_id)
+            .first()
+        )
+
+    @staticmethod
+    def _entity_type_config_to_dto(config: Any) -> EntityTypeConfigDTO:
+        """Convert an ``EntityTypeConfig`` ORM row to a DTO.
+
+        Args:
+            config: ``EntityTypeConfig`` ORM instance.
+
+        Returns:
+            A frozen :class:`~skillmeat.core.interfaces.dtos.EntityTypeConfigDTO`.
+        """
+        return EntityTypeConfigDTO(
+            id=str(config.id),
+            entity_type=config.slug,
+            display_name=config.display_name,
+            description=config.description,
+            icon=config.icon,
+            color=config.color,
+            is_system=bool(config.is_builtin),
+            created_at=config.created_at.isoformat() if config.created_at else None,
+            updated_at=config.updated_at.isoformat() if config.updated_at else None,
+        )
+
+    @staticmethod
+    def _category_to_dto(category: Any) -> CategoryDTO:
+        """Convert a ``ContextEntityCategory`` ORM row to a DTO.
+
+        Args:
+            category: ``ContextEntityCategory`` ORM instance.
+
+        Returns:
+            A frozen :class:`~skillmeat.core.interfaces.dtos.CategoryDTO`.
+        """
+        artifact_count = 0
+        try:
+            artifact_count = len(category.artifacts) if category.artifacts else 0
+        except Exception:
+            pass
+
+        return CategoryDTO(
+            id=str(category.id),
+            name=category.name,
+            entity_type=category.entity_type_slug,
+            description=category.description,
+            color=category.color,
+            artifact_count=artifact_count,
+            created_at=category.created_at.isoformat() if category.created_at else None,
+            updated_at=category.updated_at.isoformat() if category.updated_at else None,
+        )
