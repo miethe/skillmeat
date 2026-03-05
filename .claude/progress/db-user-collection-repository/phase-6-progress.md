@@ -6,7 +6,7 @@ prd: db-user-collection-repository
 feature_slug: db-user-collection-repository
 phase: 6
 phase_title: Residual Router Cleanup
-status: pending
+status: completed
 created: 2026-03-05
 updated: '2026-03-05'
 prd_ref: null
@@ -20,7 +20,7 @@ contributors: []
 tasks:
 - id: TASK-6.1
   title: Migrate artifacts.py residual calls (15 session.query calls)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -28,7 +28,7 @@ tasks:
   estimate: 1.5 pts
 - id: TASK-6.2
   title: Migrate artifact_history.py (2 session.query calls)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -36,7 +36,7 @@ tasks:
   estimate: 0.5 pts
 - id: TASK-6.3
   title: Migrate deployment_profiles.py, projects.py, tags.py (4 calls total)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -44,7 +44,7 @@ tasks:
   estimate: 0.5 pts
 - id: TASK-6.4
   title: Cross-router validation audit (zero session.query across ALL routers)
-  status: pending
+  status: completed
   assigned_to:
   - task-completion-validator
   dependencies:
@@ -60,6 +60,10 @@ parallelization:
   batch_2:
   - TASK-6.4
 total_tasks: 4
+completed_tasks: 4
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 100
 ---
 
 ## Phase 6: Residual Router Cleanup
