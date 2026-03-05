@@ -455,15 +455,10 @@ def test_list_artifacts(artifact_repo):
 **Status**: Tracked under `db-user-collection-repository-v1` plan
 **Note**: `skillmeat/api/routers/user_collections.py` still contains approximately 50 direct `session.query()` calls. This is the largest remaining DI migration target. The `db-user-collection-repository-v1` implementation plan covers the full migration.
 
-### 2. `artifacts.py` — Direct Session Queries
+### 2. `artifacts.py` + 4 Other Routers — Residual Session Queries
 
-**Status**: Deferred
-**Note**: `skillmeat/api/routers/artifacts.py` retains approximately 15 direct `session.query()` calls alongside utility functions (`is_binary_file()`, path traversal checks) that use `os`/`pathlib`. Utility functions are acceptable for content-serving endpoints; the remaining session queries are tracked for future cleanup.
-
-### 3. Minor Occurrences in Other Routers
-
-**Status**: Low priority
-**Note**: `artifact_history.py`, `deployment_profiles.py`, `projects.py`, and `tags.py` each have 1-2 remaining direct session calls. These are isolated and low risk.
+**Status**: Tracked under `db-user-collection-repository-v1` Phase 6
+**Note**: 21 residual `session.query()` calls across 5 routers (artifacts.py: 15, artifact_history.py: 2, deployment_profiles.py: 2, projects.py: 1, tags.py: 1). These were over-claimed in gap-closure Phases 4-6 and are now tracked as Phase 6 of the db-user-collection-repository plan.
 
 ### 4. Exception Type Imports from `cache.repositories`
 
@@ -540,4 +535,4 @@ Use this checklist when migrating an existing router to repository DI:
 ---
 
 **Last Reviewed**: 2026-03-05
-**Next Review**: After `db-user-collection-repository-v1` plan completes (user_collections.py migration)
+**Next Review**: After `db-user-collection-repository-v1` plan completes (user_collections.py + residual router cleanup)
