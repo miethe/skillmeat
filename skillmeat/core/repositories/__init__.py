@@ -40,6 +40,32 @@ LocalSettingsRepository
     :class:`~skillmeat.core.interfaces.repositories.ISettingsRepository`.
     Delegates to :class:`~skillmeat.config.ConfigManager`.
 
+LocalProjectTemplateRepository
+    SQLAlchemy-backed implementation of
+    :class:`~skillmeat.core.interfaces.repositories.IProjectTemplateRepository`.
+    Delegates to SQLite DB via ``ProjectTemplate`` / ``TemplateEntity`` ORM
+    models and the ``deploy_template_async`` service for deployments.
+
+LocalContextEntityRepository
+    DB-backed implementation of
+    :class:`~skillmeat.core.interfaces.repositories.IContextEntityRepository`.
+    Stores context entities as ``Artifact`` rows in the SQLite cache via
+    ``get_session()``.
+
+LocalGroupRepository
+    DB-backed implementation of
+    :class:`~skillmeat.core.interfaces.repositories.IGroupRepository`.
+    Delegates to SQLite DB via ``Group`` / ``GroupArtifact`` ORM models,
+    preserves position ordering, and syncs groups to the collection manifest
+    after every mutation.
+
+LocalMarketplaceSourceRepository
+    SQLite-DB-backed implementation of
+    :class:`~skillmeat.core.interfaces.repositories.IMarketplaceSourceRepository`.
+    Wraps :class:`~skillmeat.cache.repositories.MarketplaceSourceRepository`
+    and :class:`~skillmeat.cache.repositories.MarketplaceCatalogRepository`,
+    converting ORM rows to DTOs at the boundary.
+
 Usage::
 
     from skillmeat.core.repositories import (
@@ -85,16 +111,28 @@ Usage::
 
 from skillmeat.core.repositories.local_artifact import LocalArtifactRepository
 from skillmeat.core.repositories.local_collection import LocalCollectionRepository
+from skillmeat.core.repositories.local_context_entity import LocalContextEntityRepository
 from skillmeat.core.repositories.local_deployment import LocalDeploymentRepository
+from skillmeat.core.repositories.local_group import LocalGroupRepository
+from skillmeat.core.repositories.local_marketplace_source import (
+    LocalMarketplaceSourceRepository,
+)
 from skillmeat.core.repositories.local_project import LocalProjectRepository
+from skillmeat.core.repositories.local_project_template import (
+    LocalProjectTemplateRepository,
+)
 from skillmeat.core.repositories.local_settings_repo import LocalSettingsRepository
 from skillmeat.core.repositories.local_tag import LocalTagRepository
 
 __all__ = [
     "LocalArtifactRepository",
     "LocalCollectionRepository",
+    "LocalContextEntityRepository",
     "LocalDeploymentRepository",
+    "LocalGroupRepository",
+    "LocalMarketplaceSourceRepository",
     "LocalProjectRepository",
+    "LocalProjectTemplateRepository",
     "LocalSettingsRepository",
     "LocalTagRepository",
 ]
