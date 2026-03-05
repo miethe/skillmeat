@@ -76,12 +76,14 @@ from skillmeat.cache.models import (
     Artifact,
     ArtifactTag,
     Base,
+    Collection,
     CollectionArtifact,
     CustomColor,
     DeploymentProfile,
     DeploymentSet,
     DeploymentSetMember,
     DeploymentSetTag,
+    Group,
     MarketplaceCatalogEntry,
     MarketplaceSource,
     Tag,
@@ -89,6 +91,12 @@ from skillmeat.cache.models import (
     create_tables,
 )
 from skillmeat.core.enums import Platform
+from skillmeat.core.interfaces.context import RequestContext
+from skillmeat.core.interfaces.dtos import CollectionArtifactDTO, UserCollectionDTO
+from skillmeat.core.interfaces.repositories import (
+    IDbCollectionArtifactRepository,
+    IDbUserCollectionRepository,
+)
 from skillmeat.core.path_resolver import (
     DEFAULT_ARTIFACT_PATH_MAP,
     default_project_config_filenames,
@@ -5414,6 +5422,1317 @@ class DuplicatePairRepository(BaseRepository["DuplicatePair"]):
             session.rollback()
             raise RepositoryError(
                 f"Failed to unmark pair id={pair_id!r}: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+
+# =============================================================================
+# DbUserCollectionRepository
+# =============================================================================
+
+
+def _collection_to_dto(
+    collection: Collection, artifact_count: int = 0
+) -> UserCollectionDTO:
+    """Convert a Collection ORM row to a UserCollectionDTO.
+
+    Args:
+        collection: SQLAlchemy ``Collection`` ORM instance.
+        artifact_count: Pre-computed artifact count for the collection.
+            Defaults to 0 when not explicitly provided.
+
+    Returns:
+        A frozen :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO`.
+    """
+    return UserCollectionDTO(
+        id=collection.id,
+        name=collection.name,
+        description=collection.description,
+        created_by=collection.created_by,
+        collection_type=collection.collection_type,
+        context_category=collection.context_category,
+        created_at=(
+            collection.created_at.isoformat() if collection.created_at else None
+        ),
+        updated_at=(
+            collection.updated_at.isoformat() if collection.updated_at else None
+        ),
+        artifact_count=artifact_count,
+    )
+
+
+class DbUserCollectionRepository(
+    BaseRepository[Collection], IDbUserCollectionRepository
+):
+    """DB-backed implementation of :class:`IDbUserCollectionRepository`.
+
+    Stores and retrieves user collections from the ``collections`` table via
+    SQLAlchemy.  All methods follow the session-per-operation pattern used
+    throughout this module: a fresh session is obtained at the start of each
+    call and closed in a ``finally`` block, with ``commit``/``rollback`` for
+    mutations.
+
+    Args:
+        db_path: Optional path to the SQLite database file.  Defaults to the
+            standard ``~/.skillmeat/cache/cache.db`` location.
+
+    Example:
+        >>> repo = DbUserCollectionRepository()
+        >>> coll = repo.create(name="My Collection", created_by="alice")
+        >>> repo.get_by_id(coll.id)
+        UserCollectionDTO(id=..., name='My Collection', ...)
+    """
+
+    def __init__(self, db_path: Optional[str | Path] = None) -> None:
+        """Initialise the repository bound to the given database file."""
+        super().__init__(db_path, Collection)
+
+    # ------------------------------------------------------------------
+    # Collection queries
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        *,
+        created_by: Optional[str] = None,
+        collection_type: Optional[str] = None,
+        context_category: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: Optional[RequestContext] = None,
+    ) -> List[UserCollectionDTO]:
+        """Return a filtered, paginated list of user collections.
+
+        Args:
+            created_by: When provided, return only collections owned by this
+                user/agent identifier.
+            collection_type: When provided, restrict to collections of this
+                type string.
+            context_category: When provided, restrict to collections tagged
+                with this context category string.
+            limit: Maximum number of records to return.
+            offset: Zero-based record offset for pagination.
+            ctx: Optional per-request metadata (ignored).
+
+        Returns:
+            A (possibly empty) list of :class:`UserCollectionDTO` objects.
+        """
+        session = self._get_session()
+        try:
+            query = session.query(Collection)
+            if created_by is not None:
+                query = query.filter(Collection.created_by == created_by)
+            if collection_type is not None:
+                query = query.filter(Collection.collection_type == collection_type)
+            if context_category is not None:
+                query = query.filter(
+                    Collection.context_category == context_category
+                )
+            rows = (
+                query.order_by(Collection.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+                .all()
+            )
+            return [_collection_to_dto(row) for row in rows]
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Single-item lookup
+    # ------------------------------------------------------------------
+
+    def get_by_id(
+        self,
+        collection_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> Optional[UserCollectionDTO]:
+        """Return a user collection by its UUID hex primary key.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`UserCollectionDTO` when found, ``None`` otherwise.
+        """
+        session = self._get_session()
+        try:
+            row = session.query(Collection).filter_by(id=collection_id).first()
+            if row is None:
+                return None
+            count = (
+                session.query(func.count(CollectionArtifact.artifact_uuid))
+                .filter(CollectionArtifact.collection_id == collection_id)
+                .scalar()
+                or 0
+            )
+            return _collection_to_dto(row, artifact_count=count)
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Mutations
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        *,
+        name: str,
+        description: Optional[str] = None,
+        created_by: Optional[str] = None,
+        collection_type: Optional[str] = None,
+        context_category: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> UserCollectionDTO:
+        """Persist a new user collection and return the stored representation.
+
+        Args:
+            name: Human-readable collection name.
+            description: Optional free-text description.
+            created_by: Optional owner identifier.
+            collection_type: Optional type discriminator.
+            context_category: Optional context category tag.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The persisted :class:`UserCollectionDTO`.
+
+        Raises:
+            ValueError: If *name* is empty or a collection with the same name
+                already exists for the given *created_by*.
+            RuntimeError: On any other database error.
+        """
+        if not name or not name.strip():
+            raise ValueError("Collection name must not be empty.")
+
+        session = self._get_session()
+        try:
+            existing_query = session.query(Collection).filter(
+                Collection.name == name
+            )
+            if created_by is not None:
+                existing_query = existing_query.filter(
+                    Collection.created_by == created_by
+                )
+            if existing_query.first() is not None:
+                raise ValueError(
+                    f"A collection named {name!r} already exists"
+                    + (f" for owner {created_by!r}" if created_by else "")
+                    + "."
+                )
+
+            row = Collection(
+                id=uuid.uuid4().hex,
+                name=name,
+                description=description,
+                created_by=created_by,
+                collection_type=collection_type,
+                context_category=context_category,
+            )
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+
+            logger.info(
+                "DbUserCollectionRepository: created collection id=%r name=%r.",
+                row.id,
+                row.name,
+            )
+            return _collection_to_dto(row)
+
+        except ValueError:
+            session.rollback()
+            raise
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to create collection {name!r}: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def update(
+        self,
+        collection_id: str,
+        ctx: Optional[RequestContext] = None,
+        **kwargs: Any,
+    ) -> UserCollectionDTO:
+        """Apply a partial update to an existing user collection.
+
+        Recognised keys: ``name``, ``description``, ``collection_type``,
+        ``context_category``.  Unknown keys are silently ignored.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+            **kwargs: Field names mapped to new values.
+
+        Returns:
+            The updated :class:`UserCollectionDTO`.
+
+        Raises:
+            KeyError: If no collection with *collection_id* exists.
+            RuntimeError: On any other database error.
+        """
+        _UPDATABLE = {"name", "description", "collection_type", "context_category"}
+        session = self._get_session()
+        try:
+            row = session.query(Collection).filter_by(id=collection_id).first()
+            if row is None:
+                raise KeyError(
+                    f"Collection with id={collection_id!r} not found."
+                )
+
+            for field_name, value in kwargs.items():
+                if field_name in _UPDATABLE:
+                    setattr(row, field_name, value)
+
+            row.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(row)
+
+            count = (
+                session.query(func.count(CollectionArtifact.artifact_uuid))
+                .filter(CollectionArtifact.collection_id == collection_id)
+                .scalar()
+                or 0
+            )
+
+            logger.info(
+                "DbUserCollectionRepository: updated collection id=%r.",
+                collection_id,
+            )
+            return _collection_to_dto(row, artifact_count=count)
+
+        except KeyError:
+            session.rollback()
+            raise
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to update collection id={collection_id!r}: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def delete(
+        self,
+        collection_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> bool:
+        """Delete a user collection and all its membership records.
+
+        Does not delete artifact files — only removes the DB collection record
+        and associated ``CollectionArtifact`` rows (via cascade).
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            ``True`` when the collection was found and deleted, ``False``
+            when no matching record existed.
+
+        Raises:
+            RuntimeError: On unexpected database errors.
+        """
+        session = self._get_session()
+        try:
+            row = session.query(Collection).filter_by(id=collection_id).first()
+            if row is None:
+                logger.debug(
+                    "DbUserCollectionRepository.delete: id=%r not found.",
+                    collection_id,
+                )
+                return False
+
+            session.delete(row)
+            session.commit()
+
+            logger.info(
+                "DbUserCollectionRepository: deleted collection id=%r.",
+                collection_id,
+            )
+            return True
+
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to delete collection id={collection_id!r}: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Default collection management
+    # ------------------------------------------------------------------
+
+    def ensure_default(
+        self,
+        *,
+        created_by: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> UserCollectionDTO:
+        """Return the default collection, creating it if it does not exist.
+
+        Searches for a collection of type ``"default"`` owned by *created_by*.
+        When none exists a new one is created atomically.
+
+        Args:
+            created_by: Optional owner identifier.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The existing or newly created default :class:`UserCollectionDTO`.
+
+        Raises:
+            RuntimeError: On unexpected database errors.
+        """
+        session = self._get_session()
+        try:
+            query = session.query(Collection).filter(
+                Collection.collection_type == "default"
+            )
+            if created_by is not None:
+                query = query.filter(Collection.created_by == created_by)
+
+            row = query.first()
+            if row is not None:
+                return _collection_to_dto(row)
+
+            row = Collection(
+                id=uuid.uuid4().hex,
+                name="Default Collection",
+                description="Default artifact collection",
+                created_by=created_by,
+                collection_type="default",
+                context_category=None,
+            )
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+
+            logger.info(
+                "DbUserCollectionRepository: created default collection id=%r "
+                "for owner=%r.",
+                row.id,
+                created_by,
+            )
+            return _collection_to_dto(row)
+
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to ensure default collection: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Enriched queries
+    # ------------------------------------------------------------------
+
+    def list_with_artifact_stats(
+        self,
+        *,
+        created_by: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: Optional[RequestContext] = None,
+    ) -> List[UserCollectionDTO]:
+        """Return collections with ``artifact_count`` populated.
+
+        Performs an aggregation join against ``CollectionArtifact`` so the
+        returned DTOs carry up-to-date counts without additional round-trips.
+
+        Args:
+            created_by: When provided, return only collections owned by this
+                identifier.
+            limit: Maximum number of records to return.
+            offset: Zero-based record offset for pagination.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A (possibly empty) list of :class:`UserCollectionDTO` objects
+            with ``artifact_count`` set.
+        """
+        session = self._get_session()
+        try:
+            count_subq = (
+                session.query(
+                    CollectionArtifact.collection_id,
+                    func.count(CollectionArtifact.artifact_uuid).label(
+                        "artifact_count"
+                    ),
+                )
+                .group_by(CollectionArtifact.collection_id)
+                .subquery()
+            )
+
+            query = session.query(
+                Collection,
+                func.coalesce(count_subq.c.artifact_count, 0).label(
+                    "artifact_count"
+                ),
+            ).outerjoin(
+                count_subq,
+                Collection.id == count_subq.c.collection_id,
+            )
+
+            if created_by is not None:
+                query = query.filter(Collection.created_by == created_by)
+
+            rows = (
+                query.order_by(Collection.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+                .all()
+            )
+
+            return [
+                _collection_to_dto(row, artifact_count=count)
+                for row, count in rows
+            ]
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Group associations
+    # ------------------------------------------------------------------
+
+    def add_group(
+        self,
+        collection_id: str,
+        group_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> bool:
+        """Associate an existing group with a user collection.
+
+        Idempotent: associating a group that is already linked returns ``True``.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            group_id: Group identifier to associate.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            ``True`` on success (including when the association already existed),
+            ``False`` when *collection_id* or *group_id* does not exist.
+
+        Raises:
+            RuntimeError: On unexpected database errors.
+        """
+        session = self._get_session()
+        try:
+            collection = (
+                session.query(Collection).filter_by(id=collection_id).first()
+            )
+            if collection is None:
+                logger.debug(
+                    "DbUserCollectionRepository.add_group: "
+                    "collection id=%r not found.",
+                    collection_id,
+                )
+                return False
+
+            group = session.query(Group).filter_by(id=group_id).first()
+            if group is None:
+                logger.debug(
+                    "DbUserCollectionRepository.add_group: "
+                    "group id=%r not found.",
+                    group_id,
+                )
+                return False
+
+            # Already associated — idempotent success
+            if group.collection_id == collection_id:
+                return True
+
+            group.collection_id = collection_id
+            group.updated_at = datetime.utcnow()
+            session.commit()
+
+            logger.info(
+                "DbUserCollectionRepository: associated group id=%r "
+                "with collection id=%r.",
+                group_id,
+                collection_id,
+            )
+            return True
+
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to add group id={group_id!r} to collection "
+                f"id={collection_id!r}: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def remove_group(
+        self,
+        collection_id: str,
+        group_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> bool:
+        """Disassociate a group from a user collection.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            group_id: Group identifier to remove.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            ``True`` when the association existed and was removed, ``False``
+            if the association was not found.
+
+        Raises:
+            RuntimeError: On unexpected database errors.
+        """
+        session = self._get_session()
+        try:
+            group = (
+                session.query(Group)
+                .filter(
+                    Group.id == group_id,
+                    Group.collection_id == collection_id,
+                )
+                .first()
+            )
+            if group is None:
+                logger.debug(
+                    "DbUserCollectionRepository.remove_group: "
+                    "association (collection=%r, group=%r) not found.",
+                    collection_id,
+                    group_id,
+                )
+                return False
+
+            session.delete(group)
+            session.commit()
+
+            logger.info(
+                "DbUserCollectionRepository: removed group id=%r "
+                "from collection id=%r.",
+                group_id,
+                collection_id,
+            )
+            return True
+
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to remove group id={group_id!r} from collection "
+                f"id={collection_id!r}: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def get_groups(
+        self,
+        collection_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> List[str]:
+        """Return the identifiers of all groups associated with a collection.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of group identifier strings.  Returns an empty list when the
+            collection does not exist or has no group associations.
+        """
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(Group.id)
+                .filter(Group.collection_id == collection_id)
+                .order_by(Group.position, Group.created_at)
+                .all()
+            )
+            return [row.id for row in rows]
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Aggregate helpers
+    # ------------------------------------------------------------------
+
+    def get_artifact_count(
+        self,
+        collection_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> int:
+        """Return the number of artifacts currently in a collection.
+
+        Args:
+            collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Non-negative integer artifact count.  Returns ``0`` when the
+            collection does not exist.
+        """
+        session = self._get_session()
+        try:
+            count = (
+                session.query(func.count(CollectionArtifact.artifact_uuid))
+                .filter(CollectionArtifact.collection_id == collection_id)
+                .scalar()
+            )
+            return int(count or 0)
+        finally:
+            session.close()
+
+
+# =============================================================================
+# DbCollectionArtifactRepository
+# =============================================================================
+
+
+def _collection_artifact_to_dto(ca: Any) -> CollectionArtifactDTO:
+    """Convert a :class:`~skillmeat.cache.models.CollectionArtifact` ORM row
+    to an immutable :class:`CollectionArtifactDTO`.
+
+    Handles JSON deserialisation of ``tags_json``, ``tools_json``, and
+    ``deployments_json`` columns gracefully: ``None``, empty string, and
+    invalid JSON all produce an empty list.
+
+    Args:
+        ca: A :class:`~skillmeat.cache.models.CollectionArtifact` ORM instance.
+
+    Returns:
+        A fully-populated :class:`CollectionArtifactDTO`.
+    """
+
+    def _safe_json_list(raw: Any) -> list[str]:
+        """Return a ``list[str]`` from a JSON string, a list, or ``None``."""
+        if raw is None:
+            return []
+        if isinstance(raw, list):
+            return [str(x) for x in raw]
+        if isinstance(raw, str) and raw.strip():
+            try:
+                parsed = json.loads(raw)
+                return [str(x) for x in parsed] if isinstance(parsed, list) else []
+            except (json.JSONDecodeError, TypeError):
+                return []
+        return []
+
+    added = ca.added_at
+    synced = ca.synced_at
+    return CollectionArtifactDTO(
+        collection_id=str(ca.collection_id),
+        artifact_uuid=str(ca.artifact_uuid),
+        added_at=(
+            added.isoformat()
+            if added and hasattr(added, "isoformat")
+            else (added if isinstance(added, str) else None)
+        ),
+        description=ca.description,
+        author=ca.author,
+        license=ca.license,
+        tags=_safe_json_list(ca.tags_json),
+        tools=_safe_json_list(ca.tools_json),
+        deployments=_safe_json_list(ca.deployments_json),
+        artifact_content_hash=ca.artifact_content_hash,
+        artifact_structure_hash=ca.artifact_structure_hash,
+        artifact_file_count=(
+            int(ca.artifact_file_count) if ca.artifact_file_count is not None else None
+        ),
+        artifact_total_size=(
+            int(ca.artifact_total_size) if ca.artifact_total_size is not None else None
+        ),
+        source=ca.source,
+        origin=ca.origin,
+        resolved_sha=ca.resolved_sha,
+        resolved_version=ca.resolved_version,
+        synced_at=(
+            synced.isoformat()
+            if synced and hasattr(synced, "isoformat")
+            else (synced if isinstance(synced, str) else None)
+        ),
+    )
+
+
+class DbCollectionArtifactRepository(IDbCollectionArtifactRepository):
+    """DB-backed implementation of :class:`IDbCollectionArtifactRepository`.
+
+    Persists collection–artifact associations via the SQLAlchemy ORM against
+    the ``collection_artifacts`` join table.
+
+    Session lifecycle follows the canonical pattern used throughout
+    ``skillmeat/cache/repositories.py``:
+
+    * Each public method obtains a session via ``self._get_session()``.
+    * A ``try/finally`` block guarantees ``session.close()`` on every exit
+      path.
+    * Mutations call ``session.commit()`` on success and ``session.rollback()``
+      before re-raising on error.
+    * The repository never raises :class:`HTTPException` — callers are
+      responsible for mapping domain exceptions to HTTP responses.
+
+    Args:
+        get_session: Zero-argument callable that returns a SQLAlchemy
+            :class:`~sqlalchemy.orm.Session`.  Defaults to the module-level
+            ``get_session`` singleton from :mod:`skillmeat.cache.models`.
+    """
+
+    def __init__(self, get_session: Any = None) -> None:
+        from skillmeat.cache.models import get_session as _default_get_session
+
+        self._get_session = get_session if get_session is not None else _default_get_session
+
+    # ------------------------------------------------------------------
+    # Queries
+    # ------------------------------------------------------------------
+
+    def list_by_collection(
+        self,
+        collection_id: str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        search: str | None = None,
+        artifact_type: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        """Return a paginated list of artifact memberships for a collection.
+
+        Args:
+            collection_id: Unique identifier of the owning user collection.
+            limit: Maximum number of records to return (default 50).
+            offset: Zero-based pagination offset (default 0).
+            search: Optional free-text search applied to artifact name or
+                description fields (matched against ``CollectionArtifact.description``
+                and ``Artifact.id``).
+            artifact_type: Optional artifact type filter applied via an inner join
+                to the ``artifacts`` table (e.g. ``"skill"``).
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            A (possibly empty) list of :class:`CollectionArtifactDTO` objects.
+        """
+        session = self._get_session()
+        try:
+            query = session.query(CollectionArtifact).filter(
+                CollectionArtifact.collection_id == collection_id
+            )
+
+            if search or artifact_type:
+                query = query.join(
+                    Artifact,
+                    Artifact.uuid == CollectionArtifact.artifact_uuid,
+                )
+                if search:
+                    like = f"%{search}%"
+                    query = query.filter(
+                        or_(
+                            CollectionArtifact.description.ilike(like),
+                            Artifact.id.ilike(like),
+                        )
+                    )
+                if artifact_type:
+                    # Artifact.id is "type:name" — filter by prefix
+                    query = query.filter(Artifact.id.like(f"{artifact_type}:%"))
+
+            rows = query.offset(offset).limit(limit).all()
+            logger.debug(
+                "DbCollectionArtifactRepository.list_by_collection: "
+                "collection=%s limit=%d offset=%d → %d rows",
+                collection_id,
+                limit,
+                offset,
+                len(rows),
+            )
+            return [_collection_artifact_to_dto(row) for row in rows]
+        finally:
+            session.close()
+
+    def get_by_pk(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> CollectionArtifactDTO | None:
+        """Return a single membership record by composite primary key.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_uuid: Stable 32-char hex UUID of the artifact.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            :class:`CollectionArtifactDTO` when the membership exists,
+            ``None`` otherwise.
+        """
+        session = self._get_session()
+        try:
+            row = (
+                session.query(CollectionArtifact)
+                .filter_by(collection_id=collection_id, artifact_uuid=artifact_uuid)
+                .first()
+            )
+            if row is None:
+                return None
+            return _collection_artifact_to_dto(row)
+        finally:
+            session.close()
+
+    def count_by_collection(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Return the total number of artifact memberships in a collection.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            Non-negative integer count.
+        """
+        session = self._get_session()
+        try:
+            count = (
+                session.query(func.count(CollectionArtifact.artifact_uuid))
+                .filter(CollectionArtifact.collection_id == collection_id)
+                .scalar()
+            )
+            return int(count or 0)
+        finally:
+            session.close()
+
+    def list_with_tags(
+        self,
+        collection_id: str,
+        *,
+        tag: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        """Return collection artifact memberships, optionally filtered by tag.
+
+        The ``tags_json`` column stores a JSON-encoded list of tag strings.
+        When *tag* is provided this method does a substring match on the raw
+        JSON column, which is fast and avoids a full deserialisation pass on
+        every row.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            tag: Optional tag name to filter by.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            List of :class:`CollectionArtifactDTO` objects (possibly empty).
+        """
+        session = self._get_session()
+        try:
+            query = session.query(CollectionArtifact).filter(
+                CollectionArtifact.collection_id == collection_id
+            )
+            if tag:
+                # Substring match on the JSON column — cheap and sufficient for
+                # tags that don't contain special JSON characters.
+                query = query.filter(
+                    CollectionArtifact.tags_json.ilike(f'%"{tag}"%')
+                )
+            rows = query.all()
+            logger.debug(
+                "DbCollectionArtifactRepository.list_with_tags: "
+                "collection=%s tag=%r → %d rows",
+                collection_id,
+                tag,
+                len(rows),
+            )
+            return [_collection_artifact_to_dto(row) for row in rows]
+        finally:
+            session.close()
+
+    def list_deployment_info(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        """Return collection memberships enriched with deployment tracking data.
+
+        Filters to rows that have a non-null ``deployments_json`` column so
+        that callers receive only artifacts that carry deployment information.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            List of :class:`CollectionArtifactDTO` objects with deployment
+            fields populated.
+        """
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(CollectionArtifact)
+                .filter(
+                    CollectionArtifact.collection_id == collection_id,
+                    CollectionArtifact.deployments_json.isnot(None),
+                )
+                .all()
+            )
+            logger.debug(
+                "DbCollectionArtifactRepository.list_deployment_info: "
+                "collection=%s → %d rows with deployment data",
+                collection_id,
+                len(rows),
+            )
+            return [_collection_artifact_to_dto(row) for row in rows]
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Mutations
+    # ------------------------------------------------------------------
+
+    def add_artifacts(
+        self,
+        collection_id: str,
+        artifact_uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        """Add one or more artifacts to a collection by UUID.
+
+        Idempotent: artifacts already present in the collection are silently
+        skipped rather than duplicated.  The entire batch is committed as a
+        single transaction — if any insertion fails the whole batch is rolled
+        back.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_uuids: List of stable 32-char hex UUIDs to add.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            List of created (or pre-existing)
+            :class:`CollectionArtifactDTO` records for the given UUIDs.
+
+        Raises:
+            KeyError: If *collection_id* does not correspond to a known
+                user collection.
+            ValueError: If any UUID in *artifact_uuids* is unknown.
+            RuntimeError: On unexpected database errors.
+        """
+        if not artifact_uuids:
+            return []
+
+        session = self._get_session()
+        try:
+            # Validate collection exists
+            collection = session.query(Collection).filter_by(id=collection_id).first()
+            if collection is None:
+                raise KeyError(f"Collection '{collection_id}' not found")
+
+            # Validate all UUIDs exist
+            existing_artifacts = (
+                session.query(Artifact)
+                .filter(Artifact.uuid.in_(artifact_uuids))
+                .all()
+            )
+            found_uuids = {a.uuid for a in existing_artifacts}
+            missing = set(artifact_uuids) - found_uuids
+            if missing:
+                raise ValueError(
+                    f"Unknown artifact UUIDs: {', '.join(sorted(missing))}"
+                )
+
+            # Fetch already-present memberships
+            already_present = {
+                row.artifact_uuid
+                for row in session.query(CollectionArtifact)
+                .filter(
+                    CollectionArtifact.collection_id == collection_id,
+                    CollectionArtifact.artifact_uuid.in_(artifact_uuids),
+                )
+                .all()
+            }
+
+            # Insert only new memberships
+            new_uuids = [u for u in artifact_uuids if u not in already_present]
+            for artifact_uuid in new_uuids:
+                ca = CollectionArtifact(
+                    collection_id=collection_id,
+                    artifact_uuid=artifact_uuid,
+                    added_at=datetime.utcnow(),
+                )
+                session.add(ca)
+
+            session.commit()
+
+            # Return DTOs for all requested UUIDs (existing + newly added)
+            rows = (
+                session.query(CollectionArtifact)
+                .filter(
+                    CollectionArtifact.collection_id == collection_id,
+                    CollectionArtifact.artifact_uuid.in_(artifact_uuids),
+                )
+                .all()
+            )
+            logger.info(
+                "DbCollectionArtifactRepository.add_artifacts: "
+                "collection=%s added=%d total=%d",
+                collection_id,
+                len(new_uuids),
+                len(rows),
+            )
+            return [_collection_artifact_to_dto(row) for row in rows]
+
+        except (KeyError, ValueError):
+            session.rollback()
+            raise
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to add artifacts to collection '{collection_id}': {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def remove_artifact(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        """Remove a single artifact from a collection.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_uuid: Stable 32-char hex UUID of the artifact to remove.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            ``True`` when the membership was found and removed,
+            ``False`` when no matching membership existed.
+
+        Raises:
+            RuntimeError: On unexpected database errors.
+        """
+        session = self._get_session()
+        try:
+            row = (
+                session.query(CollectionArtifact)
+                .filter_by(collection_id=collection_id, artifact_uuid=artifact_uuid)
+                .first()
+            )
+            if row is None:
+                logger.debug(
+                    "DbCollectionArtifactRepository.remove_artifact: "
+                    "no membership for collection=%s artifact_uuid=%s",
+                    collection_id,
+                    artifact_uuid,
+                )
+                return False
+
+            session.delete(row)
+            session.commit()
+            logger.info(
+                "DbCollectionArtifactRepository.remove_artifact: "
+                "removed artifact_uuid=%s from collection=%s",
+                artifact_uuid,
+                collection_id,
+            )
+            return True
+
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to remove artifact '{artifact_uuid}' from "
+                f"collection '{collection_id}': {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def upsert_metadata(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+        **metadata: Any,
+    ) -> CollectionArtifactDTO:
+        """Create or update arbitrary metadata fields on a membership record.
+
+        If the membership does not yet exist it is created with the supplied
+        metadata.  If it already exists, only the provided fields are updated
+        (partial-update semantics).
+
+        Recognised writable fields map 1-to-1 to
+        :class:`CollectionArtifactDTO` attributes:
+        ``description``, ``author``, ``license``, ``tags`` (stored as
+        ``tags_json``), ``tools`` (stored as ``tools_json``),
+        ``deployments`` (stored as ``deployments_json``),
+        ``artifact_content_hash``, ``artifact_structure_hash``,
+        ``artifact_file_count``, ``artifact_total_size``, ``source``,
+        ``origin``, ``resolved_sha``, ``resolved_version``.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_uuid: Stable 32-char hex UUID of the artifact.
+            ctx: Optional per-request metadata (unused by this backend).
+            **metadata: Keyword arguments for fields to write.
+
+        Returns:
+            The updated :class:`CollectionArtifactDTO`.
+
+        Raises:
+            ValueError: If any key in *metadata* is not a recognised field.
+            RuntimeError: On unexpected database errors.
+        """
+        # Map DTO field names → ORM column names (where they differ)
+        _FIELD_MAP: dict[str, str] = {
+            "tags": "tags_json",
+            "tools": "tools_json",
+            "deployments": "deployments_json",
+        }
+        _VALID_FIELDS = {
+            "description",
+            "author",
+            "license",
+            "tags",
+            "tools",
+            "deployments",
+            "artifact_content_hash",
+            "artifact_structure_hash",
+            "artifact_file_count",
+            "artifact_total_size",
+            "source",
+            "origin",
+            "resolved_sha",
+            "resolved_version",
+        }
+
+        bad_keys = set(metadata.keys()) - _VALID_FIELDS
+        if bad_keys:
+            raise ValueError(
+                f"Unrecognised metadata fields: {', '.join(sorted(bad_keys))}"
+            )
+
+        session = self._get_session()
+        try:
+            row = (
+                session.query(CollectionArtifact)
+                .filter_by(collection_id=collection_id, artifact_uuid=artifact_uuid)
+                .first()
+            )
+            if row is None:
+                row = CollectionArtifact(
+                    collection_id=collection_id,
+                    artifact_uuid=artifact_uuid,
+                    added_at=datetime.utcnow(),
+                )
+                session.add(row)
+
+            for key, value in metadata.items():
+                orm_key = _FIELD_MAP.get(key, key)
+                # Serialise list fields to JSON strings
+                if isinstance(value, list):
+                    value = json.dumps(value)
+                setattr(row, orm_key, value)
+
+            session.commit()
+            logger.info(
+                "DbCollectionArtifactRepository.upsert_metadata: "
+                "collection=%s artifact_uuid=%s fields=%s",
+                collection_id,
+                artifact_uuid,
+                list(metadata.keys()),
+            )
+            return _collection_artifact_to_dto(row)
+
+        except ValueError:
+            session.rollback()
+            raise
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to upsert metadata for artifact '{artifact_uuid}' in "
+                f"collection '{collection_id}': {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def update_source_tracking(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        *,
+        source: str | None = None,
+        origin: str | None = None,
+        resolved_sha: str | None = None,
+        resolved_version: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> CollectionArtifactDTO:
+        """Update upstream source-tracking fields on a membership record.
+
+        Used by the sync subsystem to record the resolved upstream coordinates
+        for an artifact after a fetch or sync operation.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_uuid: Stable 32-char hex UUID of the artifact.
+            source: Optional GitHub source spec (e.g. ``"owner/repo/path@version"``).
+            origin: Optional human-readable origin label (e.g. ``"github"``).
+            resolved_sha: Optional resolved commit SHA.
+            resolved_version: Optional resolved semantic version string.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            The updated :class:`CollectionArtifactDTO`.
+
+        Raises:
+            KeyError: If no membership for *(collection_id, artifact_uuid)* exists.
+            RuntimeError: On unexpected database errors.
+        """
+        session = self._get_session()
+        try:
+            row = (
+                session.query(CollectionArtifact)
+                .filter_by(collection_id=collection_id, artifact_uuid=artifact_uuid)
+                .first()
+            )
+            if row is None:
+                raise KeyError(
+                    f"No membership found for collection='{collection_id}' "
+                    f"artifact_uuid='{artifact_uuid}'"
+                )
+
+            if source is not None:
+                row.source = source
+            if origin is not None:
+                row.origin = origin
+            if resolved_sha is not None:
+                row.resolved_sha = resolved_sha
+            if resolved_version is not None:
+                row.resolved_version = resolved_version
+
+            session.commit()
+            logger.info(
+                "DbCollectionArtifactRepository.update_source_tracking: "
+                "collection=%s artifact_uuid=%s source=%r resolved_sha=%r",
+                collection_id,
+                artifact_uuid,
+                source,
+                resolved_sha,
+            )
+            return _collection_artifact_to_dto(row)
+
+        except KeyError:
+            session.rollback()
+            raise
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to update source tracking for artifact '{artifact_uuid}' in "
+                f"collection '{collection_id}': {exc}"
             ) from exc
         finally:
             session.close()
