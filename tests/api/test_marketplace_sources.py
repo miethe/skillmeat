@@ -20,7 +20,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings, Environment
-from skillmeat.api.dependencies import get_marketplace_source_repository_concrete
+from skillmeat.api.dependencies import get_marketplace_catalog_repository, get_marketplace_source_repository_concrete
 from skillmeat.api.schemas.marketplace import ScanResultDTO
 from skillmeat.api.server import create_app
 from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
@@ -261,7 +261,7 @@ class TestCreateSource:
         assert data["scan_status"] == "success"
         assert data["artifact_count"] == 5
 
-    def test_create_source_with_manual_map(self, client, mock_source_repo, mock_source):
+    def test_create_source_with_manual_map(self, app, client, mock_source_repo, mock_source):
         """Test creating source with manual artifact mapping."""
         # Mock the scan function
         async def mock_perform_scan(*args, **kwargs):
@@ -279,36 +279,29 @@ class TestCreateSource:
                 scanned_at=datetime(2025, 12, 6, 10, 35, 0),
             )
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
-                "skillmeat.api.routers.marketplace_sources._perform_scan",
-                side_effect=mock_perform_scan,
-            ),
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/user/repo",
-                    "ref": "main",
-                    "manual_map": {
-                        "skill": ["skills/my-skill", "custom/another-skill"],
-                        "command": ["commands/my-command"],
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with patch("skillmeat.api.routers.marketplace_sources._perform_scan", side_effect=mock_perform_scan):
+                response = client.post(
+                    "/api/v1/marketplace/sources",
+                    json={
+                        "repo_url": "https://github.com/user/repo",
+                        "ref": "main",
+                        "manual_map": {
+                            "skill": ["skills/my-skill", "custom/another-skill"],
+                            "command": ["commands/my-command"],
+                        },
                     },
-                },
-            )
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_201_CREATED
 
-    def test_create_source_invalid_url_format(self, client, mock_source_repo):
+    def test_create_source_invalid_url_format(self, app, client, mock_source_repo):
         """Test creating source with invalid GitHub URL format."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.post(
                 "/api/v1/marketplace/sources",
                 json={
@@ -317,15 +310,15 @@ class TestCreateSource:
                 },
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Invalid GitHub repository URL format" in response.json()["detail"]
 
-    def test_create_source_non_github_url(self, client, mock_source_repo):
+    def test_create_source_non_github_url(self, app, client, mock_source_repo):
         """Test creating source with non-GitHub URL."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.post(
                 "/api/v1/marketplace/sources",
                 json={
@@ -334,6 +327,8 @@ class TestCreateSource:
                 },
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_create_source_missing_required_fields(self, client):
@@ -348,15 +343,13 @@ class TestCreateSource:
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_create_source_duplicate_url(self, client, mock_source_repo, mock_source):
+    def test_create_source_duplicate_url(self, app, client, mock_source_repo, mock_source):
         """Test creating source with URL that already exists."""
         # Mock existing source
         mock_source_repo.get_by_repo_url.return_value = mock_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.post(
                 "/api/v1/marketplace/sources",
                 json={
@@ -365,10 +358,12 @@ class TestCreateSource:
                 },
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_409_CONFLICT
         assert "already exists" in response.json()["detail"]
 
-    def test_create_source_default_values(self, client, mock_source_repo, mock_source):
+    def test_create_source_default_values(self, app, client, mock_source_repo, mock_source):
         """Test creating source uses default values for optional fields."""
         # Mock the scan function to avoid complex dependencies
         async def mock_perform_scan(*args, **kwargs):
@@ -388,25 +383,20 @@ class TestCreateSource:
                 scanned_at=datetime(2025, 12, 6, 10, 35, 0),
             )
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
-                "skillmeat.api.routers.marketplace_sources._perform_scan",
-                side_effect=mock_perform_scan,
-            ),
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/user/repo",
-                    # ref defaults to "main"
-                    # trust_level defaults to "basic"
-                },
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with patch("skillmeat.api.routers.marketplace_sources._perform_scan", side_effect=mock_perform_scan):
+                response = client.post(
+                    "/api/v1/marketplace/sources",
+                    json={
+                        "repo_url": "https://github.com/user/repo",
+                        # ref defaults to "main"
+                        # trust_level defaults to "basic"
+                    },
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["ref"] == "main"  # Default value
@@ -420,14 +410,14 @@ class TestCreateSource:
 class TestListSources:
     """Test GET /marketplace/sources endpoint."""
 
-    def test_list_sources_success(self, client, mock_source_repo):
+    def test_list_sources_success(self, app, client, mock_source_repo):
         """Test listing sources returns paginated results."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get("/api/v1/marketplace/sources")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -442,45 +432,43 @@ class TestListSources:
         assert source["owner"] == "anthropics"
         assert source["repo_name"] == "anthropic-quickstarts"
 
-    def test_list_sources_pagination(self, client, mock_source_repo):
+    def test_list_sources_pagination(self, app, client, mock_source_repo):
         """Test listing sources with pagination parameters."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources?limit=10&cursor=src-test-123"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
         # Verify page info
         assert data["page_info"]["has_previous_page"] is True
 
-    def test_list_sources_empty(self, client, mock_source_repo):
+    def test_list_sources_empty(self, app, client, mock_source_repo):
         """Test listing sources when no sources exist."""
         mock_source_repo.list_paginated.return_value = MagicMock(
             items=[], has_more=False
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get("/api/v1/marketplace/sources")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["items"]) == 0
         assert data["page_info"]["has_next_page"] is False
 
-    def test_list_sources_limit_validation(self, client, mock_source_repo):
+    def test_list_sources_limit_validation(self, app, client, mock_source_repo):
         """Test limit parameter validation (1-100)."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             # Test valid limit
             response = client.get("/api/v1/marketplace/sources?limit=50")
             assert response.status_code == status.HTTP_200_OK
@@ -494,6 +482,8 @@ class TestListSources:
             assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 # =============================================================================
 # Test Get Source (GET /marketplace/sources/{source_id})
 # =============================================================================
@@ -502,14 +492,14 @@ class TestListSources:
 class TestGetSource:
     """Test GET /marketplace/sources/{source_id} endpoint."""
 
-    def test_get_source_success(self, client, mock_source_repo):
+    def test_get_source_success(self, app, client, mock_source_repo):
         """Test getting a specific source by ID."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src-test-123")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -519,16 +509,16 @@ class TestGetSource:
         assert data["scan_status"] == "success"
         assert data["artifact_count"] == 5
 
-    def test_get_source_not_found(self, client, mock_source_repo):
+    def test_get_source_not_found(self, app, client, mock_source_repo):
         """Test getting a non-existent source."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/nonexistent")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.json()["detail"]
 
@@ -541,7 +531,7 @@ class TestGetSource:
 class TestUpdateSource:
     """Test PATCH /marketplace/sources/{source_id} endpoint."""
 
-    def test_update_source_ref(self, client, mock_source_repo, mock_source):
+    def test_update_source_ref(self, app, client, mock_source_repo, mock_source):
         """Test updating source ref (branch/tag/SHA)."""
         # Create a copy by extracting only the data attributes (not SQLAlchemy state)
         updated_source = MarketplaceSource(
@@ -562,20 +552,20 @@ class TestUpdateSource:
         )
         mock_source_repo.update.return_value = updated_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src-test-123",
                 json={"ref": "v1.0.0"}
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["ref"] == "v1.0.0"
 
-    def test_update_source_root_hint(self, client, mock_source_repo, mock_source):
+    def test_update_source_root_hint(self, app, client, mock_source_repo, mock_source):
         """Test updating source root_hint."""
         updated_source = MarketplaceSource(
             id=mock_source.id,
@@ -595,20 +585,20 @@ class TestUpdateSource:
         )
         mock_source_repo.update.return_value = updated_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src-test-123",
                 json={"root_hint": "artifacts"}
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["root_hint"] == "artifacts"
 
-    def test_update_source_trust_level(self, client, mock_source_repo, mock_source):
+    def test_update_source_trust_level(self, app, client, mock_source_repo, mock_source):
         """Test updating source trust level."""
         updated_source = MarketplaceSource(
             id=mock_source.id,
@@ -628,20 +618,20 @@ class TestUpdateSource:
         )
         mock_source_repo.update.return_value = updated_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src-test-123",
                 json={"trust_level": "official"}
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["trust_level"] == "official"
 
-    def test_update_source_multiple_fields(self, client, mock_source_repo, mock_source):
+    def test_update_source_multiple_fields(self, app, client, mock_source_repo, mock_source):
         """Test updating multiple source fields at once."""
         updated_source = MarketplaceSource(
             id=mock_source.id,
@@ -661,47 +651,47 @@ class TestUpdateSource:
         )
         mock_source_repo.update.return_value = updated_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src-test-123",
                 json={"ref": "develop", "trust_level": "verified"}
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["ref"] == "develop"
         assert data["trust_level"] == "verified"
 
-    def test_update_source_no_params(self, client, mock_source_repo):
+    def test_update_source_no_params(self, app, client, mock_source_repo):
         """Test updating source with no parameters fails."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src-test-123",
                 json={}  # Empty body - no update parameters
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "At least one update parameter" in response.json()["detail"]
 
-    def test_update_source_not_found(self, client, mock_source_repo):
+    def test_update_source_not_found(self, app, client, mock_source_repo):
         """Test updating a non-existent source."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/nonexistent",
                 json={"ref": "main"}
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -714,23 +704,21 @@ class TestRescanSource:
     """Test POST /marketplace/sources/{source_id}/rescan endpoint."""
 
     def test_rescan_source_success(
-        self, client, mock_source_repo, mock_scanner, mock_transaction_handler
+        self, app, client, mock_source_repo, mock_scanner, mock_transaction_handler
     ):
         """Test triggering a successful repository rescan."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler",
-            return_value=mock_transaction_handler,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ):
-            response = client.post("/api/v1/marketplace/sources/src-test-123/rescan")
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: MagicMock()
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler", return_value=mock_transaction_handler),
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner)
+            ):
+                response = client.post("/api/v1/marketplace/sources/src-test-123/rescan")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -745,61 +733,57 @@ class TestRescanSource:
         assert data["errors"] == []
 
     def test_rescan_source_with_force(
-        self, client, mock_source_repo, mock_scanner, mock_transaction_handler
+        self, app, client, mock_source_repo, mock_scanner, mock_transaction_handler
     ):
         """Test forcing a rescan even if recently scanned."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler",
-            return_value=mock_transaction_handler,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources/src-test-123/rescan",
-                json={"force": True},
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: MagicMock()
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler", return_value=mock_transaction_handler),
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner)
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources/src-test-123/rescan",
+                    json={"force": True},
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
 
-    def test_rescan_source_not_found(self, client, mock_source_repo):
+    def test_rescan_source_not_found(self, app, client, mock_source_repo):
         """Test rescanning a non-existent source."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.post("/api/v1/marketplace/sources/nonexistent/rescan")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_rescan_source_scan_error(
-        self, client, mock_source_repo, mock_scanner, mock_transaction_handler
+        self, app, client, mock_source_repo, mock_scanner, mock_transaction_handler
     ):
         """Test rescan when scanner encounters an error."""
         # Mock scanner to raise exception
         mock_scanner.scan_repository.side_effect = Exception("GitHub API rate limit")
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler",
-            return_value=mock_transaction_handler,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ):
-            response = client.post("/api/v1/marketplace/sources/src-test-123/rescan")
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: MagicMock()
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler", return_value=mock_transaction_handler),
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner)
+            ):
+                response = client.post("/api/v1/marketplace/sources/src-test-123/rescan")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -817,19 +801,18 @@ class TestRescanSource:
 class TestListArtifacts:
     """Test GET /marketplace/sources/{source_id}/artifacts endpoint."""
 
-    def test_list_artifacts_success(self, client, mock_source_repo, mock_catalog_repo):
+    def test_list_artifacts_success(self, app, client, mock_source_repo, mock_catalog_repo):
         """Test listing artifacts from a source."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -854,105 +837,96 @@ class TestListArtifacts:
         assert data["counts_by_type"] == {"skill": 4, "command": 1}
 
     def test_list_artifacts_filter_by_type(
-        self, client, mock_source_repo, mock_catalog_repo
+        self, app, client, mock_source_repo, mock_catalog_repo
     ):
         """Test filtering artifacts by type."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?artifact_type=skill"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
 
     def test_list_artifacts_filter_by_status(
-        self, client, mock_source_repo, mock_catalog_repo
+        self, app, client, mock_source_repo, mock_catalog_repo
     ):
         """Test filtering artifacts by status."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?status=new"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
 
     def test_list_artifacts_filter_by_min_confidence(
-        self, client, mock_source_repo, mock_catalog_repo
+        self, app, client, mock_source_repo, mock_catalog_repo
     ):
         """Test filtering artifacts by minimum confidence score."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=80"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
 
     def test_list_artifacts_combined_filters(
-        self, client, mock_source_repo, mock_catalog_repo
+        self, app, client, mock_source_repo, mock_catalog_repo
     ):
         """Test applying multiple filters together."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?artifact_type=skill&status=new&min_confidence=90"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
 
     def test_list_artifacts_pagination(
-        self, client, mock_source_repo, mock_catalog_repo
+        self, app, client, mock_source_repo, mock_catalog_repo
     ):
         """Test pagination with cursor."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?limit=10&cursor=cat_test_456"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["page_info"]["has_previous_page"] is True
 
     def test_list_artifacts_min_confidence_validation(
-        self, client, mock_source_repo, mock_catalog_repo
+        self, app, client, mock_source_repo, mock_catalog_repo
     ):
         """Test min_confidence parameter validation (0-100)."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             # Valid range
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=50"
@@ -971,18 +945,21 @@ class TestListArtifacts:
             )
             assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_list_artifacts_source_not_found(self, client, mock_source_repo):
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
+    def test_list_artifacts_source_not_found(self, app, client, mock_source_repo):
         """Test listing artifacts for non-existent source."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/nonexistent/artifacts"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -1037,7 +1014,7 @@ class TestConfidenceFiltering:
         return entries
 
     def test_filter_by_min_confidence(
-        self, client, mock_source_repo, mock_catalog_entries_with_scores
+        self, app, client, mock_source_repo, mock_catalog_entries_with_scores
     ):
         """Test min_confidence parameter filters correctly."""
         mock_catalog_repo = MagicMock()
@@ -1048,17 +1025,16 @@ class TestConfidenceFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
         mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=50"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1073,7 +1049,7 @@ class TestConfidenceFiltering:
             assert item["confidence_score"] >= 50
 
     def test_filter_by_max_confidence(
-        self, client, mock_source_repo, mock_catalog_entries_with_scores
+        self, app, client, mock_source_repo, mock_catalog_entries_with_scores
     ):
         """Test max_confidence parameter filters correctly."""
         mock_catalog_repo = MagicMock()
@@ -1084,17 +1060,16 @@ class TestConfidenceFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
         mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?max_confidence=70"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1109,7 +1084,7 @@ class TestConfidenceFiltering:
             assert item["confidence_score"] <= 70
 
     def test_filter_by_confidence_range(
-        self, client, mock_source_repo, mock_catalog_entries_with_scores
+        self, app, client, mock_source_repo, mock_catalog_entries_with_scores
     ):
         """Test min and max confidence together."""
         mock_catalog_repo = MagicMock()
@@ -1123,18 +1098,17 @@ class TestConfidenceFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
         mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?min_confidence=40&max_confidence=80"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1151,7 +1125,7 @@ class TestConfidenceFiltering:
             assert 40 <= item["confidence_score"] <= 80
 
     def test_include_below_threshold_false(
-        self, client, mock_source_repo, mock_catalog_entries_with_scores
+        self, app, client, mock_source_repo, mock_catalog_entries_with_scores
     ):
         """Test default behavior hides entries < 30%."""
         mock_catalog_repo = MagicMock()
@@ -1166,18 +1140,17 @@ class TestConfidenceFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
         mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             # No parameters - should apply default threshold via get_source_catalog
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1192,7 +1165,7 @@ class TestConfidenceFiltering:
             assert item["confidence_score"] >= 30
 
     def test_include_below_threshold_true(
-        self, client, mock_source_repo, mock_catalog_entries_with_scores
+        self, app, client, mock_source_repo, mock_catalog_entries_with_scores
     ):
         """Test toggle shows hidden entries."""
         mock_catalog_repo = MagicMock()
@@ -1203,18 +1176,17 @@ class TestConfidenceFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": len(mock_catalog_entries_with_scores)}
         mock_catalog_repo.count_by_type.return_value = {"skill": len(mock_catalog_entries_with_scores)}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?include_below_threshold=true"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1224,7 +1196,7 @@ class TestConfidenceFiltering:
         assert min(confidence_scores) < 30  # Verify we have low-confidence entries
 
     def test_response_includes_raw_score(
-        self, client, mock_source_repo, mock_catalog_entries_with_scores
+        self, app, client, mock_source_repo, mock_catalog_entries_with_scores
     ):
         """Test API response includes raw_score field."""
         mock_catalog_repo = MagicMock()
@@ -1233,17 +1205,16 @@ class TestConfidenceFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": 1}
         mock_catalog_repo.count_by_type.return_value = {"skill": 1}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?include_below_threshold=true"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1253,7 +1224,7 @@ class TestConfidenceFiltering:
         assert isinstance(data["items"][0]["raw_score"], int)
 
     def test_response_includes_breakdown(
-        self, client, mock_source_repo, mock_catalog_entries_with_scores
+        self, app, client, mock_source_repo, mock_catalog_entries_with_scores
     ):
         """Test API response includes score_breakdown field."""
         mock_catalog_repo = MagicMock()
@@ -1262,17 +1233,16 @@ class TestConfidenceFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": 1}
         mock_catalog_repo.count_by_type.return_value = {"skill": 1}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?include_below_threshold=true"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1297,7 +1267,7 @@ class TestConfidenceFiltering:
             assert key in breakdown, f"Missing key: {key}"
 
     def test_threshold_interaction_with_min_confidence(
-        self, client, mock_source_repo, mock_catalog_entries_with_scores
+        self, app, client, mock_source_repo, mock_catalog_entries_with_scores
     ):
         """Test min_confidence=20 with include_below_threshold=False still applies 30 threshold."""
         mock_catalog_repo = MagicMock()
@@ -1309,18 +1279,17 @@ class TestConfidenceFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
         mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?min_confidence=20&include_below_threshold=false"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1335,7 +1304,7 @@ class TestConfidenceFiltering:
             assert item["confidence_score"] >= 30
 
     def test_min_confidence_overrides_threshold(
-        self, client, mock_source_repo, mock_catalog_entries_with_scores
+        self, app, client, mock_source_repo, mock_catalog_entries_with_scores
     ):
         """Test min_confidence=40 is stricter than 30 threshold."""
         mock_catalog_repo = MagicMock()
@@ -1347,18 +1316,17 @@ class TestConfidenceFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
         mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?min_confidence=40&include_below_threshold=false"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1373,59 +1341,59 @@ class TestConfidenceFiltering:
             assert item["confidence_score"] >= 40
 
     def test_confidence_validation_min_too_low(
-        self, client, mock_source_repo
+        self, app, client, mock_source_repo
     ):
         """Test min_confidence validation rejects values < 0."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=-1"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_confidence_validation_min_too_high(
-        self, client, mock_source_repo
+        self, app, client, mock_source_repo
     ):
         """Test min_confidence validation rejects values > 100."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?min_confidence=101"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_confidence_validation_max_too_low(
-        self, client, mock_source_repo
+        self, app, client, mock_source_repo
     ):
         """Test max_confidence validation rejects values < 0."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?max_confidence=-1"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_confidence_validation_max_too_high(
-        self, client, mock_source_repo
+        self, app, client, mock_source_repo
     ):
         """Test max_confidence validation rejects values > 100."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?max_confidence=101"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
@@ -1438,7 +1406,7 @@ class TestImportArtifacts:
     """Test POST /marketplace/sources/{source_id}/import endpoint."""
 
     def test_import_single_artifact(
-        self,
+        self, app, 
         client,
         mock_source_repo,
         mock_catalog_repo,
@@ -1446,27 +1414,24 @@ class TestImportArtifacts:
         mock_import_coordinator,
     ):
         """Test importing a single artifact."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler",
-            return_value=mock_transaction_handler,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.ImportCoordinator",
-            return_value=mock_import_coordinator,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources/src-test-123/import",
-                json={
-                    "entry_ids": ["cat_test_456"],
-                    "conflict_strategy": "skip",
-                },
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler", return_value=mock_transaction_handler),
+                patch("skillmeat.api.routers.marketplace_sources.ImportCoordinator", return_value=mock_import_coordinator)
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources/src-test-123/import",
+                    json={
+                        "entry_ids": ["cat_test_456"],
+                        "conflict_strategy": "skip",
+                    },
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1477,7 +1442,7 @@ class TestImportArtifacts:
         assert "cat_test_456" in data["imported_ids"]
 
     def test_import_bulk_artifacts(
-        self,
+        self, app, 
         client,
         mock_source_repo,
         mock_catalog_repo,
@@ -1506,37 +1471,32 @@ class TestImportArtifacts:
             "cat_test_457": entry2,
         }.get(id)
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler",
-            return_value=mock_transaction_handler,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.ImportCoordinator",
-            return_value=mock_import_coordinator,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources/src-test-123/import",
-                json={
-                    "entry_ids": ["cat_test_456", "cat_test_457"],
-                    "conflict_strategy": "overwrite",
-                },
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler", return_value=mock_transaction_handler),
+                patch("skillmeat.api.routers.marketplace_sources.ImportCoordinator", return_value=mock_import_coordinator)
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources/src-test-123/import",
+                    json={
+                        "entry_ids": ["cat_test_456", "cat_test_457"],
+                        "conflict_strategy": "overwrite",
+                    },
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["imported_count"] == 2
 
-    def test_import_empty_entry_ids(self, client, mock_source_repo):
+    def test_import_empty_entry_ids(self, app, client, mock_source_repo):
         """Test importing with empty entry_ids list fails with validation error."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.post(
                 "/api/v1/marketplace/sources/src-test-123/import",
                 json={
@@ -1545,21 +1505,19 @@ class TestImportArtifacts:
                 },
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_import_entry_not_found(
-        self, client, mock_source_repo, mock_catalog_repo
+        self, app, client, mock_source_repo, mock_catalog_repo
     ):
         """Test importing with non-existent entry ID."""
         mock_catalog_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.post(
                 "/api/v1/marketplace/sources/src-test-123/import",
                 json={
@@ -1568,11 +1526,14 @@ class TestImportArtifacts:
                 },
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.json()["detail"]
 
     def test_import_entry_wrong_source(
-        self, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry
+        self, app, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry
     ):
         """Test importing entry that belongs to different source."""
         # Entry belongs to different source — create a fresh instance to avoid SQLAlchemy state
@@ -1591,13 +1552,9 @@ class TestImportArtifacts:
         )
         mock_catalog_repo.get_by_id.return_value = wrong_entry
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.post(
                 "/api/v1/marketplace/sources/src-test-123/import",
                 json={
@@ -1606,11 +1563,14 @@ class TestImportArtifacts:
                 },
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "does not belong to source" in response.json()["detail"]
 
     def test_import_conflict_strategies(
-        self,
+        self, app, 
         client,
         mock_source_repo,
         mock_catalog_repo,
@@ -1621,37 +1581,32 @@ class TestImportArtifacts:
         strategies = ["skip", "overwrite", "rename"]
 
         for strategy in strategies:
-            with patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ), patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-                return_value=mock_catalog_repo,
-            ), patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler",
-                return_value=mock_transaction_handler,
-            ), patch(
-                "skillmeat.api.routers.marketplace_sources.ImportCoordinator",
-                return_value=mock_import_coordinator,
-            ):
-                response = client.post(
-                    "/api/v1/marketplace/sources/src-test-123/import",
-                    json={
-                        "entry_ids": ["cat_test_456"],
-                        "conflict_strategy": strategy,
-                    },
-                )
+            app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+            app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+            try:
+                with (
+                    patch("skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler", return_value=mock_transaction_handler),
+                    patch("skillmeat.api.routers.marketplace_sources.ImportCoordinator", return_value=mock_import_coordinator)
+                ):
+                    response = client.post(
+                        "/api/v1/marketplace/sources/src-test-123/import",
+                        json={
+                            "entry_ids": ["cat_test_456"],
+                            "conflict_strategy": strategy,
+                        },
+                    )
 
+            finally:
+                app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+                app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
             assert response.status_code == status.HTTP_200_OK
 
-    def test_import_source_not_found(self, client, mock_source_repo):
+    def test_import_source_not_found(self, app, client, mock_source_repo):
         """Test importing from non-existent source."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.post(
                 "/api/v1/marketplace/sources/nonexistent/import",
                 json={
@@ -1660,10 +1615,12 @@ class TestImportArtifacts:
                 },
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_import_default_conflict_strategy(
-        self,
+        self, app, 
         client,
         mock_source_repo,
         mock_catalog_repo,
@@ -1671,27 +1628,24 @@ class TestImportArtifacts:
         mock_import_coordinator,
     ):
         """Test import uses default conflict strategy if not specified."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler",
-            return_value=mock_transaction_handler,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.ImportCoordinator",
-            return_value=mock_import_coordinator,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources/src-test-123/import",
-                json={
-                    "entry_ids": ["cat_test_456"],
-                    # conflict_strategy defaults to "skip"
-                },
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler", return_value=mock_transaction_handler),
+                patch("skillmeat.api.routers.marketplace_sources.ImportCoordinator", return_value=mock_import_coordinator)
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources/src-test-123/import",
+                    json={
+                        "entry_ids": ["cat_test_456"],
+                        # conflict_strategy defaults to "skip"
+                    },
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
 
 
@@ -1703,40 +1657,38 @@ class TestImportArtifacts:
 class TestErrorHandling:
     """Test error handling across all endpoints."""
 
-    def test_database_connection_error(self, client):
+    def test_database_connection_error(self, app, client):
         """Test handling of database connection errors."""
         mock_repo = MagicMock()
         mock_repo.list_paginated.side_effect = Exception("Database connection failed")
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def test_github_api_rate_limit(
-        self, client, mock_source_repo, mock_transaction_handler
+        self, app, client, mock_source_repo, mock_transaction_handler
     ):
         """Test handling of GitHub API rate limit during rescan."""
         mock_scanner = MagicMock()
         mock_scanner.scan_repository.side_effect = Exception("API rate limit exceeded")
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler",
-            return_value=mock_transaction_handler,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ):
-            response = client.post("/api/v1/marketplace/sources/src-test-123/rescan")
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: MagicMock()
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.MarketplaceTransactionHandler", return_value=mock_transaction_handler),
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner)
+            ):
+                response = client.post("/api/v1/marketplace/sources/src-test-123/rescan")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "error"
@@ -1770,26 +1722,24 @@ class TestGetFileTree:
         return cache
 
     def test_get_file_tree_success(
-        self, client, mock_source_repo, mock_file_tree, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_file_tree, mock_github_file_cache
     ):
         """Test successful file tree retrieval."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_tree.return_value = mock_file_tree
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -1816,128 +1766,120 @@ class TestGetFileTree:
         assert src_dir["type"] == "tree"
         assert src_dir["size"] is None
 
-    def test_get_file_tree_source_not_found(self, client, mock_source_repo):
+    def test_get_file_tree_source_not_found(self, app, client, mock_source_repo):
         """Test 404 for non-existent source."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/nonexistent/artifacts/skills/canvas/files"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.json()["detail"].lower()
 
     def test_get_file_tree_artifact_not_found(
-        self, client, mock_source_repo, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_github_file_cache
     ):
         """Test 404 for non-existent artifact path."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_tree.return_value = []  # Empty means not found
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/nonexistent/path/files"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/nonexistent/path/files"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.json()["detail"].lower()
 
     def test_get_file_tree_cache_hit(
-        self, client, mock_source_repo, mock_file_tree, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_file_tree, mock_github_file_cache
     ):
         """Test cache is used on second request."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_tree.return_value = mock_file_tree
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            # First request - cache miss
-            response1 = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
-            )
-            assert response1.status_code == status.HTTP_200_OK
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                # First request - cache miss
+                response1 = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
+                )
+                assert response1.status_code == status.HTTP_200_OK
 
-            # GitHubScanner should be called once
-            assert mock_scanner.get_file_tree.call_count == 1
+                # GitHubScanner should be called once
+                assert mock_scanner.get_file_tree.call_count == 1
 
-            # Second request - cache hit (scanner should not be called again)
-            response2 = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
-            )
-            assert response2.status_code == status.HTTP_200_OK
+                # Second request - cache hit (scanner should not be called again)
+                response2 = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
+                )
+                assert response2.status_code == status.HTTP_200_OK
 
-            # Scanner should still have been called only once (cache hit)
-            assert mock_scanner.get_file_tree.call_count == 1
+                # Scanner should still have been called only once (cache hit)
+                assert mock_scanner.get_file_tree.call_count == 1
 
-            # Verify responses are identical
-            assert response1.json() == response2.json()
+                # Verify responses are identical
+                assert response1.json() == response2.json()
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
     def test_get_file_tree_github_api_error(
-        self, client, mock_source_repo, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_github_file_cache
     ):
         """Test handling of GitHub API errors."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_tree.side_effect = Exception("GitHub API rate limited")
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "Failed to retrieve file tree" in response.json()["detail"]
 
     def test_get_file_tree_nested_artifact_path(
-        self, client, mock_source_repo, mock_file_tree, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_file_tree, mock_github_file_cache
     ):
         """Test file tree retrieval for deeply nested artifact paths."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_tree.return_value = mock_file_tree
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/deep/nested/path/artifact/files"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/deep/nested/path/artifact/files"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["artifact_path"] == "deep/nested/path/artifact"
@@ -1989,26 +1931,24 @@ class TestGetFileContent:
         return cache
 
     def test_get_file_content_success(
-        self, client, mock_source_repo, mock_text_file_content, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_text_file_content, mock_github_file_cache
     ):
         """Test successful file content retrieval."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_content.return_value = mock_text_file_content
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -2033,26 +1973,24 @@ class TestGetFileContent:
         assert data["source_id"] == "src-test-123"
 
     def test_get_file_content_binary_file(
-        self, client, mock_source_repo, mock_binary_file_content, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_binary_file_content, mock_github_file_cache
     ):
         """Test binary file handling with base64 encoding."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_content.return_value = mock_binary_file_content
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/assets/logo.png"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/assets/logo.png"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -2063,134 +2001,126 @@ class TestGetFileContent:
         # Content should be base64 encoded
         assert len(data["content"]) > 0
 
-    def test_get_file_content_source_not_found(self, client, mock_source_repo):
+    def test_get_file_content_source_not_found(self, app, client, mock_source_repo):
         """Test 404 for non-existent source."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/nonexistent/artifacts/skills/canvas/files/SKILL.md"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.json()["detail"].lower()
 
     def test_get_file_content_file_not_found(
-        self, client, mock_source_repo, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_github_file_cache
     ):
         """Test 404 for non-existent file."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_content.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/nonexistent.md"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/nonexistent.md"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.json()["detail"].lower()
 
     def test_get_file_content_cache_hit(
-        self, client, mock_source_repo, mock_text_file_content, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_text_file_content, mock_github_file_cache
     ):
         """Test cache is used on second request."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_content.return_value = mock_text_file_content
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            # First request - cache miss
-            response1 = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
-            )
-            assert response1.status_code == status.HTTP_200_OK
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                # First request - cache miss
+                response1 = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
+                )
+                assert response1.status_code == status.HTTP_200_OK
 
-            # GitHubScanner should be called once
-            assert mock_scanner.get_file_content.call_count == 1
+                # GitHubScanner should be called once
+                assert mock_scanner.get_file_content.call_count == 1
 
-            # Second request - cache hit
-            response2 = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
-            )
-            assert response2.status_code == status.HTTP_200_OK
+                # Second request - cache hit
+                response2 = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
+                )
+                assert response2.status_code == status.HTTP_200_OK
 
-            # Scanner should still have been called only once (cache hit)
-            assert mock_scanner.get_file_content.call_count == 1
+                # Scanner should still have been called only once (cache hit)
+                assert mock_scanner.get_file_content.call_count == 1
 
-            # Verify responses are identical
-            assert response1.json() == response2.json()
+                # Verify responses are identical
+                assert response1.json() == response2.json()
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
     def test_get_file_content_github_api_error(
-        self, client, mock_source_repo, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_github_file_cache
     ):
         """Test handling of GitHub API errors."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_content.side_effect = Exception("GitHub API error")
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "Failed to retrieve file content" in response.json()["detail"]
 
     def test_get_file_content_nested_path(
-        self, client, mock_source_repo, mock_text_file_content, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_text_file_content, mock_github_file_cache
     ):
         """Test file content retrieval for deeply nested file paths."""
         mock_scanner = MagicMock()
         mock_scanner.get_file_content.return_value = mock_text_file_content
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/src/components/deep/nested/file.tsx"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/src/components/deep/nested/file.tsx"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["artifact_path"] == "skills/canvas"
 
     def test_get_file_content_different_file_types(
-        self, client, mock_source_repo, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_github_file_cache
     ):
         """Test content retrieval for various file types."""
         file_types = [
@@ -2215,20 +2145,18 @@ class TestGetFileContent:
             }
             mock_scanner.get_file_content.return_value = mock_content
 
-            with patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ), patch(
-                "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-                return_value=mock_scanner,
-            ), patch(
-                "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-                return_value=mock_github_file_cache,
-            ):
-                response = client.get(
-                    f"/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/{filename}"
-                )
+            app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+            try:
+                with (
+                    patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                    patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+                ):
+                    response = client.get(
+                        f"/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/{filename}"
+                    )
 
+            finally:
+                app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             assert data["name"] == filename
@@ -2360,26 +2288,26 @@ class TestGitHubCacheIntegration:
 class TestDeleteSource:
     """Test DELETE /marketplace/sources/{source_id} endpoint."""
 
-    def test_delete_source_success(self, client, mock_source_repo):
+    def test_delete_source_success(self, app, client, mock_source_repo):
         """Test successful source deletion."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.delete("/api/v1/marketplace/sources/src-test-123")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    def test_delete_source_not_found(self, client, mock_source_repo):
+    def test_delete_source_not_found(self, app, client, mock_source_repo):
         """Test deleting a non-existent source."""
         mock_source_repo.delete.return_value = False
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             response = client.delete("/api/v1/marketplace/sources/nonexistent")
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -2400,7 +2328,7 @@ class TestFileEndpointsRateLimiting:
         return cache
 
     def test_file_tree_rate_limit(
-        self, client, mock_source_repo, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_github_file_cache
     ):
         """Test 429 response with Retry-After header for file tree endpoint."""
         from skillmeat.core.marketplace.github_scanner import RateLimitError
@@ -2411,20 +2339,18 @@ class TestFileEndpointsRateLimiting:
             "Wait 3600 seconds before retrying."
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         # Verify 429 status code
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
@@ -2438,7 +2364,7 @@ class TestFileEndpointsRateLimiting:
         assert "rate limit" in data["detail"].lower()
 
     def test_file_content_rate_limit(
-        self, client, mock_source_repo, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_github_file_cache
     ):
         """Test 429 response with Retry-After header for file content endpoint."""
         from skillmeat.core.marketplace.github_scanner import RateLimitError
@@ -2449,20 +2375,18 @@ class TestFileEndpointsRateLimiting:
             "Wait 1800 seconds before retrying."
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         # Verify 429 status code
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
@@ -2476,7 +2400,7 @@ class TestFileEndpointsRateLimiting:
         assert "rate limit" in data["detail"].lower()
 
     def test_file_tree_rate_limit_retry_after_parsing(
-        self, client, mock_source_repo, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_github_file_cache
     ):
         """Test that Retry-After value is correctly parsed from error message."""
         from skillmeat.core.marketplace.github_scanner import RateLimitError
@@ -2488,25 +2412,23 @@ class TestFileEndpointsRateLimiting:
             f"GitHub API rate limit exceeded. Rate limited for {wait_time}s."
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
         assert response.headers["Retry-After"] == str(wait_time)
 
     def test_file_tree_rate_limit_default_retry_after(
-        self, client, mock_source_repo, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_github_file_cache
     ):
         """Test that default Retry-After is used when parsing fails."""
         from skillmeat.core.marketplace.github_scanner import RateLimitError
@@ -2517,27 +2439,25 @@ class TestFileEndpointsRateLimiting:
             "GitHub API rate limit exceeded with no time info"
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
         # Should use default value (typically 60 seconds)
         retry_after = int(response.headers["Retry-After"])
         assert retry_after > 0  # Default should be positive
 
     def test_file_content_rate_limit_retry_after_parsing(
-        self, client, mock_source_repo, mock_github_file_cache
+        self, app, client, mock_source_repo, mock_github_file_cache
     ):
         """Test Retry-After parsing for file content endpoint."""
         from skillmeat.core.marketplace.github_scanner import RateLimitError
@@ -2549,20 +2469,18 @@ class TestFileEndpointsRateLimiting:
             f"Rate limit exceeded, reset in {wait_time}s"
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=mock_github_file_cache,
-        ):
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=mock_github_file_cache)
+            ):
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-123/artifacts/skills/canvas/files/SKILL.md"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
         assert response.headers["Retry-After"] == str(wait_time)
 
@@ -2626,7 +2544,7 @@ class TestExcludeArtifact:
         return entry
 
     def test_exclude_artifact_success(
-        self, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry_for_exclusion
+        self, app, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry_for_exclusion
     ):
         """Test excluding an artifact successfully."""
         mock_session = MagicMock()
@@ -2635,13 +2553,9 @@ class TestExcludeArtifact:
         )
         mock_catalog_repo._get_session.return_value = mock_session
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_456/exclude",
                 json={
@@ -2650,6 +2564,9 @@ class TestExcludeArtifact:
                 },
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -2661,7 +2578,7 @@ class TestExcludeArtifact:
         assert data["excluded_reason"] == "False positive - documentation file"
 
     def test_exclude_artifact_without_reason(
-        self, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry_for_exclusion
+        self, app, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry_for_exclusion
     ):
         """Test excluding an artifact without providing a reason."""
         mock_session = MagicMock()
@@ -2670,18 +2587,17 @@ class TestExcludeArtifact:
         )
         mock_catalog_repo._get_session.return_value = mock_session
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_456/exclude",
                 json={"excluded": True},
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "excluded"
@@ -2689,7 +2605,7 @@ class TestExcludeArtifact:
         assert data["excluded_reason"] is None
 
     def test_exclude_artifact_idempotent(
-        self, client, mock_source_repo, mock_catalog_repo, mock_excluded_catalog_entry
+        self, app, client, mock_source_repo, mock_catalog_repo, mock_excluded_catalog_entry
     ):
         """Test excluding an already excluded artifact returns success (idempotent)."""
         mock_session = MagicMock()
@@ -2698,13 +2614,9 @@ class TestExcludeArtifact:
         )
         mock_catalog_repo._get_session.return_value = mock_session
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_789/exclude",
                 json={
@@ -2713,35 +2625,37 @@ class TestExcludeArtifact:
                 },
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "excluded"
         # The reason should be updated even on idempotent call
         assert data["excluded_reason"] == "New reason"
 
-    def test_exclude_artifact_not_found(self, client, mock_source_repo, mock_catalog_repo):
+    def test_exclude_artifact_not_found(self, app, client, mock_source_repo, mock_catalog_repo):
         """Test excluding a non-existent artifact returns 404."""
         mock_session = MagicMock()
         mock_session.query.return_value.filter_by.return_value.first.return_value = None
         mock_catalog_repo._get_session.return_value = mock_session
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src-test-123/artifacts/nonexistent/exclude",
                 json={"excluded": True},
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.json()["detail"].lower()
 
     def test_exclude_artifact_wrong_source(
-        self, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry_for_exclusion
+        self, app, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry_for_exclusion
     ):
         """Test excluding artifact that belongs to different source returns 400."""
         # Create an entry that belongs to a different source
@@ -2765,37 +2679,35 @@ class TestExcludeArtifact:
         )
         mock_catalog_repo._get_session.return_value = mock_session
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_999/exclude",
                 json={"excluded": True},
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "does not belong to source" in response.json()["detail"]
 
-    def test_exclude_artifact_source_not_found(self, client, mock_source_repo, mock_catalog_repo):
+    def test_exclude_artifact_source_not_found(self, app, client, mock_source_repo, mock_catalog_repo):
         """Test excluding artifact when source doesn't exist returns 404."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/nonexistent/artifacts/cat_test_456/exclude",
                 json={"excluded": True},
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "source" in response.json()["detail"].lower()
 
@@ -2849,7 +2761,7 @@ class TestRestoreExcludedArtifact:
         )
 
     def test_restore_excluded_artifact_success(
-        self, client, mock_source_repo, mock_catalog_repo, mock_excluded_entry
+        self, app, client, mock_source_repo, mock_catalog_repo, mock_excluded_entry
     ):
         """Test restoring an excluded artifact successfully."""
         mock_session = MagicMock()
@@ -2858,17 +2770,16 @@ class TestRestoreExcludedArtifact:
         )
         mock_catalog_repo._get_session.return_value = mock_session
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.delete(
                 "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_789/exclude"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -2881,7 +2792,7 @@ class TestRestoreExcludedArtifact:
         assert data["excluded_reason"] is None
 
     def test_restore_excluded_artifact_restores_to_imported(
-        self, client, mock_source_repo, mock_catalog_repo, mock_excluded_imported_entry
+        self, app, client, mock_source_repo, mock_catalog_repo, mock_excluded_imported_entry
     ):
         """Test restoring an artifact that was previously imported restores to 'imported' status."""
         mock_session = MagicMock()
@@ -2890,17 +2801,16 @@ class TestRestoreExcludedArtifact:
         )
         mock_catalog_repo._get_session.return_value = mock_session
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.delete(
                 "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_800/exclude"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -2910,7 +2820,7 @@ class TestRestoreExcludedArtifact:
         assert data["excluded_reason"] is None
 
     def test_restore_artifact_idempotent(
-        self, client, mock_source_repo, mock_catalog_repo
+        self, app, client, mock_source_repo, mock_catalog_repo
     ):
         """Test restoring a non-excluded artifact returns success (idempotent)."""
         # Create entry that is NOT excluded
@@ -2936,43 +2846,41 @@ class TestRestoreExcludedArtifact:
         )
         mock_catalog_repo._get_session.return_value = mock_session
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.delete(
                 "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_456/exclude"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         # Should still be "new", no change
         assert data["status"] == "new"
 
-    def test_restore_artifact_not_found(self, client, mock_source_repo, mock_catalog_repo):
+    def test_restore_artifact_not_found(self, app, client, mock_source_repo, mock_catalog_repo):
         """Test restoring a non-existent artifact returns 404."""
         mock_session = MagicMock()
         mock_session.query.return_value.filter_by.return_value.first.return_value = None
         mock_catalog_repo._get_session.return_value = mock_session
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.delete(
                 "/api/v1/marketplace/sources/src-test-123/artifacts/nonexistent/exclude"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_restore_artifact_wrong_source(
-        self, client, mock_source_repo, mock_catalog_repo
+        self, app, client, mock_source_repo, mock_catalog_repo
     ):
         """Test restoring artifact that belongs to different source returns 400."""
         wrong_source_entry = MarketplaceCatalogEntry(
@@ -2997,35 +2905,33 @@ class TestRestoreExcludedArtifact:
         )
         mock_catalog_repo._get_session.return_value = mock_session
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.delete(
                 "/api/v1/marketplace/sources/src-test-123/artifacts/cat_test_999/exclude"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "does not belong to source" in response.json()["detail"]
 
-    def test_restore_artifact_source_not_found(self, client, mock_source_repo, mock_catalog_repo):
+    def test_restore_artifact_source_not_found(self, app, client, mock_source_repo, mock_catalog_repo):
         """Test restoring artifact when source doesn't exist returns 404."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.delete(
                 "/api/v1/marketplace/sources/nonexistent/artifacts/cat_test_456/exclude"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -3090,7 +2996,7 @@ class TestListArtifactsExclusionFiltering:
         return entries
 
     def test_list_artifacts_excludes_excluded_by_default(
-        self, client, mock_source_repo, mock_catalog_repo, mock_entries_with_excluded
+        self, app, client, mock_source_repo, mock_catalog_repo, mock_entries_with_excluded
     ):
         """Test that excluded artifacts are NOT returned by default."""
         # Return all entries from the repo query
@@ -3098,17 +3004,16 @@ class TestListArtifactsExclusionFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": 1, "imported": 1, "excluded": 1}
         mock_catalog_repo.count_by_type.return_value = {"skill": 3}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -3120,7 +3025,7 @@ class TestListArtifactsExclusionFiltering:
         assert "cat_excluded_1" not in item_ids
 
     def test_list_artifacts_include_excluded_true(
-        self, client, mock_source_repo, mock_entries_with_excluded
+        self, app, client, mock_source_repo, mock_entries_with_excluded
     ):
         """Test that excluded artifacts ARE returned when include_excluded=true.
 
@@ -3138,18 +3043,17 @@ class TestListArtifactsExclusionFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": 1, "imported": 1, "excluded": 1}
         mock_catalog_repo.count_by_type.return_value = {"skill": 3}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?include_excluded=true&include_below_threshold=true"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -3159,7 +3063,7 @@ class TestListArtifactsExclusionFiltering:
         assert "cat_excluded_1" in item_ids
 
     def test_list_artifacts_status_excluded_filter(
-        self, client, mock_source_repo, mock_catalog_repo, mock_entries_with_excluded
+        self, app, client, mock_source_repo, mock_catalog_repo, mock_entries_with_excluded
     ):
         """Test filtering by status=excluded returns only excluded entries."""
         # Filter to only excluded entries
@@ -3168,17 +3072,16 @@ class TestListArtifactsExclusionFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": 1, "imported": 1, "excluded": 1}
         mock_catalog_repo.count_by_type.return_value = {"skill": 3}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?status=excluded"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -3188,24 +3091,23 @@ class TestListArtifactsExclusionFiltering:
         assert data["items"][0]["status"] == "excluded"
 
     def test_list_artifacts_include_excluded_false_explicit(
-        self, client, mock_source_repo, mock_catalog_repo, mock_entries_with_excluded
+        self, app, client, mock_source_repo, mock_catalog_repo, mock_entries_with_excluded
     ):
         """Test that explicitly setting include_excluded=false excludes entries."""
         mock_catalog_repo.get_source_catalog.return_value = mock_entries_with_excluded
         mock_catalog_repo.count_by_status.return_value = {"new": 1, "imported": 1, "excluded": 1}
         mock_catalog_repo.count_by_type.return_value = {"skill": 3}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts?include_excluded=false"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -3215,7 +3117,7 @@ class TestListArtifactsExclusionFiltering:
         assert "cat_excluded_1" not in item_ids
 
     def test_list_artifacts_excluded_entry_has_exclusion_fields(
-        self, client, mock_source_repo, mock_entries_with_excluded
+        self, app, client, mock_source_repo, mock_entries_with_excluded
     ):
         """Test that excluded entries include excluded_at and excluded_reason in response.
 
@@ -3233,18 +3135,17 @@ class TestListArtifactsExclusionFiltering:
         mock_catalog_repo.count_by_status.return_value = {"new": 1, "imported": 1, "excluded": 1}
         mock_catalog_repo.count_by_type.return_value = {"skill": 3}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        app.dependency_overrides[get_marketplace_catalog_repository] = lambda: mock_catalog_repo
+        try:
             response = client.get(
                 "/api/v1/marketplace/sources/src-test-123/artifacts"
                 "?include_excluded=true&include_below_threshold=true"
             )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -3333,7 +3234,7 @@ class TestFileServingPathResolution:
     # ------------------------------------------------------------------
 
     def test_directory_artifact_path_correct_resolution(
-        self, client, mock_source_repo, mock_text_file_response, fresh_file_cache
+        self, app, client, mock_source_repo, mock_text_file_response, fresh_file_cache
     ):
         """Directory-based artifact_path is correctly concatenated with file_path.
 
@@ -3345,23 +3246,21 @@ class TestFileServingPathResolution:
         mock_text_file_response["name"] = "SKILL.md"
         mock_scanner.get_file_content.return_value = mock_text_file_response
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=fresh_file_cache,
-        ):
-            # Use a source ID with no underscores — validate_source_id only allows
-            # alphanumeric characters and hyphens (^[a-zA-Z0-9\-]+$).
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-abc"
-                "/artifacts/skills/my-skill/files/SKILL.md"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=fresh_file_cache)
+            ):
+                # Use a source ID with no underscores — validate_source_id only allows
+                # alphanumeric characters and hyphens (^[a-zA-Z0-9\-]+$).
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-abc"
+                    "/artifacts/skills/my-skill/files/SKILL.md"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK
 
         # Verify the scanner received the concatenated path, not artifact_path alone
@@ -3380,7 +3279,7 @@ class TestFileServingPathResolution:
     # ------------------------------------------------------------------
 
     def test_embedded_artifact_path_defensive_fallback(
-        self, client, mock_source_repo, mock_text_file_response, fresh_file_cache
+        self, app, client, mock_source_repo, mock_text_file_response, fresh_file_cache
     ):
         """Embedded artifact with file-extension path must NOT 404.
 
@@ -3402,24 +3301,22 @@ class TestFileServingPathResolution:
         }
         mock_scanner.get_file_content.return_value = embedded_content
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-            return_value=mock_scanner,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-            return_value=fresh_file_cache,
-        ):
-            # artifact_path ends with ".md" → defensive fallback must fire.
-            # Use a source ID without underscores (validate_source_id rejects them).
-            response = client.get(
-                "/api/v1/marketplace/sources/src-test-abc"
-                "/artifacts/skills/my-skill/commands/foo.md"
-                "/files/foo.md"
-            )
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with (
+                patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=fresh_file_cache)
+            ):
+                # artifact_path ends with ".md" → defensive fallback must fire.
+                # Use a source ID without underscores (validate_source_id rejects them).
+                response = client.get(
+                    "/api/v1/marketplace/sources/src-test-abc"
+                    "/artifacts/skills/my-skill/commands/foo.md"
+                    "/files/foo.md"
+                )
 
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
         assert response.status_code == status.HTTP_200_OK, (
             f"Expected 200 for embedded artifact path; got {response.status_code}: "
             f"{response.json()}"
@@ -3438,7 +3335,7 @@ class TestFileServingPathResolution:
         assert data["artifact_path"] == "skills/my-skill/commands/foo.md"
 
     def test_embedded_artifact_path_various_extensions(
-        self, client, mock_source_repo, fresh_file_cache
+        self, app, client, mock_source_repo, fresh_file_cache
     ):
         """All recognised file extensions trigger the defensive fallback."""
         # Each tuple: (artifact_path_suffix, file_path, expected_resolved_path)
@@ -3465,22 +3362,20 @@ class TestFileServingPathResolution:
             mock_scanner = MagicMock()
             mock_scanner.get_file_content.return_value = content
 
-            with patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ), patch(
-                "skillmeat.api.routers.marketplace_sources.GitHubScanner",
-                return_value=mock_scanner,
-            ), patch(
-                "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
-                return_value=fresh_file_cache,
-            ):
-                response = client.get(
-                    f"/api/v1/marketplace/sources/src-test-abc"
-                    f"/artifacts/{artifact_path_param}"
-                    f"/files/{file_path_param}"
-                )
+            app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+            try:
+                with (
+                    patch("skillmeat.api.routers.marketplace_sources.GitHubScanner", return_value=mock_scanner),
+                    patch("skillmeat.api.routers.marketplace_sources.get_github_file_cache", return_value=fresh_file_cache)
+                ):
+                    response = client.get(
+                        f"/api/v1/marketplace/sources/src-test-abc"
+                        f"/artifacts/{artifact_path_param}"
+                        f"/files/{file_path_param}"
+                    )
 
+            finally:
+                app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
             assert response.status_code == status.HTTP_200_OK, (
                 f"Expected 200 for artifact_path='{artifact_path_param}'; "
                 f"got {response.status_code}"

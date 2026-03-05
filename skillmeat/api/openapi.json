@@ -2026,26 +2026,6 @@
               "title": "Project Id"
             },
             "description": "Base64-encoded project path to also record deployments for the imports"
-          },
-          {
-            "name": "db_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "string",
-                  "format": "path"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Db Path"
-            }
           }
         ],
         "requestBody": {
@@ -10747,7 +10727,7 @@
           "deployment-sets"
         ],
         "summary": "Create a new deployment set",
-        "description": "Create a new named deployment set owned by the current user.\n\nArgs:\n    request: Deployment set creation payload.\n    settings: API settings (owner derived from auth state).\n\nReturns:\n    The newly created deployment set.",
+        "description": "Create a new named deployment set owned by the current user.\n\nArgs:\n    request: Deployment set creation payload.\n    settings: API settings (owner derived from auth state).\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    The newly created deployment set.",
         "operationId": "create_deployment_set_api_v1_deployment_sets_post",
         "requestBody": {
           "required": true,
@@ -10788,7 +10768,7 @@
           "deployment-sets"
         ],
         "summary": "List deployment sets",
-        "description": "List deployment sets owned by the current user, with optional filtering.\n\nArgs:\n    settings: API settings.\n    name: Optional substring filter on set name.\n    tag: Optional tag filter.\n    limit: Maximum number of results to return.\n    offset: Number of results to skip.\n\nReturns:\n    Paginated list of deployment sets with total count.",
+        "description": "List deployment sets owned by the current user, with optional filtering.\n\nArgs:\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n    name: Optional substring filter on set name.\n    tag: Optional tag filter.\n    limit: Maximum number of results to return.\n    offset: Number of results to skip.\n\nReturns:\n    Paginated list of deployment sets with total count.",
         "operationId": "list_deployment_sets_api_v1_deployment_sets_get",
         "parameters": [
           {
@@ -10886,7 +10866,7 @@
           "deployment-sets"
         ],
         "summary": "Get a deployment set by ID",
-        "description": "Fetch a single deployment set by its ID including its members.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    settings: API settings (owner scoping).\n\nReturns:\n    The requested deployment set.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
+        "description": "Fetch a single deployment set by its ID including its members.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    settings: API settings (owner scoping).\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    The requested deployment set.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
         "operationId": "get_deployment_set_api_v1_deployment_sets__set_id__get",
         "parameters": [
           {
@@ -10928,7 +10908,7 @@
           "deployment-sets"
         ],
         "summary": "Update a deployment set",
-        "description": "Update mutable metadata fields on a deployment set.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    request: Partial update payload (only provided fields are applied).\n    settings: API settings.\n\nReturns:\n    The updated deployment set.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
+        "description": "Update mutable metadata fields on a deployment set.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    request: Partial update payload (only provided fields are applied).\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    The updated deployment set.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
         "operationId": "update_deployment_set_api_v1_deployment_sets__set_id__put",
         "parameters": [
           {
@@ -10980,7 +10960,7 @@
           "deployment-sets"
         ],
         "summary": "Delete a deployment set",
-        "description": "Delete a deployment set and cascade-delete its member rows.\n\nPer FR-10: any member rows in *other* sets that reference this set as a\nnested member are also removed before the set itself is deleted.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    settings: API settings.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
+        "description": "Delete a deployment set and cascade-delete its member rows.\n\nPer FR-10: any member rows in *other* sets that reference this set as a\nnested member are also removed before the set itself is deleted.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
         "operationId": "delete_deployment_set_api_v1_deployment_sets__set_id__delete",
         "parameters": [
           {
@@ -11017,7 +10997,7 @@
           "deployment-sets"
         ],
         "summary": "Clone a deployment set",
-        "description": "Clone a deployment set and all its members.\n\nThe clone receives a name of ``\"<original name> (copy)\"`` and a new UUID.\nMember rows are recreated preserving type, reference, and position.\n\nArgs:\n    set_id: Primary key of the source deployment set.\n    settings: API settings.\n\nReturns:\n    The newly created clone deployment set.\n\nRaises:\n    HTTPException 404: If the source set does not exist.",
+        "description": "Clone a deployment set and all its members.\n\nThe clone receives a name of ``\"<original name> (copy)\"`` and a new UUID.\nMember rows are recreated preserving type, reference, and position.\n\nArgs:\n    set_id: Primary key of the source deployment set.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    The newly created clone deployment set.\n\nRaises:\n    HTTPException 404: If the source set does not exist.",
         "operationId": "clone_deployment_set_api_v1_deployment_sets__set_id__clone_post",
         "parameters": [
           {
@@ -11061,7 +11041,7 @@
           "deployment-sets"
         ],
         "summary": "List members of a deployment set",
-        "description": "Return all members of a deployment set ordered by position.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    settings: API settings.\n\nReturns:\n    Ordered list of member rows.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
+        "description": "Return all members of a deployment set ordered by position.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    Ordered list of member rows.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
         "operationId": "list_members_api_v1_deployment_sets__set_id__members_get",
         "parameters": [
           {
@@ -11107,7 +11087,7 @@
           "deployment-sets"
         ],
         "summary": "Add a member to a deployment set",
-        "description": "Add an artifact, group, or nested deployment set as a member.\n\nFor nested set members (``nested_set_id`` provided), circular-reference\ndetection is performed before insertion.  If the proposed nesting would\ncreate a cycle, HTTP 422 is returned.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    request: Member creation payload (exactly one ref must be set).\n    settings: API settings.\n\nReturns:\n    The newly created member row.\n\nRaises:\n    HTTPException 404: If the parent set does not exist.\n    HTTPException 422: If adding the member would create a circular reference.",
+        "description": "Add an artifact, group, or nested deployment set as a member.\n\nFor nested set members (``nested_set_id`` provided), circular-reference\ndetection is performed before insertion.  If the proposed nesting would\ncreate a cycle, HTTP 422 is returned.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    request: Member creation payload (exactly one ref must be set).\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    The newly created member row.\n\nRaises:\n    HTTPException 404: If the parent set does not exist.\n    HTTPException 422: If adding the member would create a circular reference.",
         "operationId": "add_member_api_v1_deployment_sets__set_id__members_post",
         "parameters": [
           {
@@ -11161,7 +11141,7 @@
           "deployment-sets"
         ],
         "summary": "Remove a member from a deployment set",
-        "description": "Remove a member row from a deployment set.\n\nArgs:\n    set_id: Primary key of the parent deployment set (used for owner check).\n    member_id: Primary key of the member row to remove.\n    settings: API settings.\n\nRaises:\n    HTTPException 404: If the set or member does not exist.",
+        "description": "Remove a member row from a deployment set.\n\nArgs:\n    set_id: Primary key of the parent deployment set (used for owner check).\n    member_id: Primary key of the member row to remove.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nRaises:\n    HTTPException 404: If the set or member does not exist.",
         "operationId": "remove_member_api_v1_deployment_sets__set_id__members__member_id__delete",
         "parameters": [
           {
@@ -11205,7 +11185,7 @@
           "deployment-sets"
         ],
         "summary": "Update a member's position",
-        "description": "Update the ordering position of a member within a deployment set.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    member_id: Primary key of the member to update.\n    request: Position update payload.\n    settings: API settings.\n\nReturns:\n    The updated member row.\n\nRaises:\n    HTTPException 404: If the set or member does not exist.",
+        "description": "Update the ordering position of a member within a deployment set.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    member_id: Primary key of the member to update.\n    request: Position update payload.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    The updated member row.\n\nRaises:\n    HTTPException 404: If the set or member does not exist.",
         "operationId": "update_member_position_api_v1_deployment_sets__set_id__members__member_id__put",
         "parameters": [
           {
@@ -11268,7 +11248,7 @@
           "deployment-sets"
         ],
         "summary": "Resolve a deployment set to its flat artifact list",
-        "description": "Recursively resolve a deployment set into an ordered, deduplicated list\nof artifact UUIDs.\n\nTraversal is depth-first: artifact members are emitted directly, group\nmembers are expanded in position order, and nested set members are\nrecursed into.  The first occurrence of each UUID is kept; duplicates are\nsilently dropped.\n\nArgs:\n    set_id: Primary key of the root deployment set to resolve.\n    settings: API settings.\n\nReturns:\n    Resolution result including the flat artifact list and traversal metadata.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the resolution depth limit is exceeded.",
+        "description": "Recursively resolve a deployment set into an ordered, deduplicated list\nof artifact UUIDs.\n\nTraversal is depth-first: artifact members are emitted directly, group\nmembers are expanded in position order, and nested set members are\nrecursed into.  The first occurrence of each UUID is kept; duplicates are\nsilently dropped.\n\nArgs:\n    set_id: Primary key of the root deployment set to resolve.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n    artifact_repo: IArtifactRepository dependency (UUID → name/type lookup).\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    Resolution result including the flat artifact list and traversal metadata.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the resolution depth limit is exceeded.",
         "operationId": "resolve_deployment_set_api_v1_deployment_sets__set_id__resolve_get",
         "parameters": [
           {
@@ -11312,7 +11292,7 @@
           "deployment-sets"
         ],
         "summary": "Batch-deploy all artifacts in a deployment set",
-        "description": "Resolve the deployment set and deploy every artifact to the target project.\n\nEach artifact is deployed independently; per-artifact errors are captured\nand returned in the results list so a single failure does not abort the\nentire batch.\n\nArgs:\n    set_id: Primary key of the deployment set to deploy.\n    request: Batch deploy payload (project_path, dry_run).\n    settings: API settings.\n    artifact_mgr: ArtifactManager dependency.\n\nReturns:\n    Batch deployment result with per-artifact outcomes.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the project path is invalid or resolution fails.",
+        "description": "Resolve the deployment set and deploy every artifact to the target project.\n\nEach artifact is deployed independently; per-artifact errors are captured\nand returned in the results list so a single failure does not abort the\nentire batch.\n\nArgs:\n    set_id: Primary key of the deployment set to deploy.\n    request: Batch deploy payload (project_path, dry_run).\n    settings: API settings.\n    artifact_mgr: ArtifactManager dependency.\n    repo: DeploymentSetRepository dependency.\n    artifact_repo: IArtifactRepository dependency (UUID → name/type lookup).\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    Batch deployment result with per-artifact outcomes.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the project path is invalid or resolution fails.",
         "operationId": "batch_deploy_api_v1_deployment_sets__set_id__deploy_post",
         "parameters": [
           {

@@ -21,6 +21,10 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import (
+    get_marketplace_catalog_repository,
+    get_marketplace_source_repository_concrete,
+)
 from skillmeat.api.server import create_app
 from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
 
@@ -200,7 +204,7 @@ class TestListSourcesPerformance:
     """Test GET /marketplace/sources performance with many sources."""
 
     def test_list_sources_500_returns_under_200ms(
-        self, client, mock_source_repo_large, many_sources
+        self, app, client, mock_source_repo_large, many_sources
     ):
         """Test listing 500+ sources completes in under 200ms.
 
@@ -211,19 +215,21 @@ class TestListSourcesPerformance:
             items=many_sources[:50], has_more=True
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        try:
             start = time.perf_counter()
             response = client.get("/api/v1/marketplace/sources")
             duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert duration < 0.2, f"Response took {duration:.3f}s, expected <200ms"
 
     def test_list_sources_performance_scales_linearly(
-        self, client, mock_source_repo_large
+        self, app, client, mock_source_repo_large
     ):
         """Test that performance scales reasonably with data size.
 
@@ -231,10 +237,10 @@ class TestListSourcesPerformance:
         regardless of total dataset size.
         """
         # Test with small page (default pagination)
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        try:
             # First request
             start1 = time.perf_counter()
             response1 = client.get("/api/v1/marketplace/sources?limit=20")
@@ -244,6 +250,8 @@ class TestListSourcesPerformance:
             start2 = time.perf_counter()
             response2 = client.get("/api/v1/marketplace/sources?limit=20")
             duration2 = time.perf_counter() - start2
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response1.status_code == status.HTTP_200_OK
         assert response2.status_code == status.HTTP_200_OK
@@ -253,15 +261,15 @@ class TestListSourcesPerformance:
         assert duration2 < 0.2, f"Second request took {duration2:.3f}s"
 
     def test_list_sources_pagination_performance(
-        self, client, mock_source_repo_large, many_sources
+        self, app, client, mock_source_repo_large, many_sources
     ):
         """Test paginated queries maintain consistent performance."""
         page_times = []
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        try:
             # Simulate multiple page requests
             for offset in [0, 50, 100, 150, 200]:
                 mock_source_repo_large.list_paginated.return_value = MagicMock(
@@ -277,6 +285,8 @@ class TestListSourcesPerformance:
                 page_times.append(duration)
 
                 assert response.status_code == status.HTTP_200_OK
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # All pages should load in under 200ms
         for i, duration in enumerate(page_times):
@@ -294,7 +304,7 @@ class TestFilterPerformance:
     """Test filter query performance."""
 
     def test_tag_filter_performance_500_sources(
-        self, client, mock_source_repo_large, many_sources
+        self, app, client, mock_source_repo_large, many_sources
     ):
         """Test tag filtering with 500+ sources completes quickly."""
         # Filter for sources with 'python' tag (should be ~half)
@@ -308,19 +318,22 @@ class TestFilterPerformance:
             items=filtered_sources[:50], has_more=len(filtered_sources) > 50
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.SourceManager"
-        ) as MockSourceManager:
-            manager_instance = MagicMock()
-            manager_instance.apply_filters.return_value = filtered_sources
-            MockSourceManager.return_value = manager_instance
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources.SourceManager"
+            ) as MockSourceManager:
+                manager_instance = MagicMock()
+                manager_instance.apply_filters.return_value = filtered_sources
+                MockSourceManager.return_value = manager_instance
 
-            start = time.perf_counter()
-            response = client.get("/api/v1/marketplace/sources?tags=python")
-            duration = time.perf_counter() - start
+                start = time.perf_counter()
+                response = client.get("/api/v1/marketplace/sources?tags=python")
+                duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         # Tag filtering should still be fast
@@ -329,7 +342,7 @@ class TestFilterPerformance:
         ), f"Tag filter took {duration:.3f}s, expected <200ms with 500+ sources"
 
     def test_artifact_type_filter_performance(
-        self, client, mock_source_repo_large, many_sources
+        self, app, client, mock_source_repo_large, many_sources
     ):
         """Test artifact_type filtering performance."""
         # Filter for sources with skills
@@ -340,25 +353,28 @@ class TestFilterPerformance:
             and json.loads(s.counts_by_type or "{}").get("skill", 0) > 0
         ]
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.SourceManager"
-        ) as MockSourceManager:
-            manager_instance = MagicMock()
-            manager_instance.apply_filters.return_value = filtered_sources
-            MockSourceManager.return_value = manager_instance
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources.SourceManager"
+            ) as MockSourceManager:
+                manager_instance = MagicMock()
+                manager_instance.apply_filters.return_value = filtered_sources
+                MockSourceManager.return_value = manager_instance
 
-            start = time.perf_counter()
-            response = client.get("/api/v1/marketplace/sources?artifact_type=skill")
-            duration = time.perf_counter() - start
+                start = time.perf_counter()
+                response = client.get("/api/v1/marketplace/sources?artifact_type=skill")
+                duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert duration < 0.2, f"Artifact type filter took {duration:.3f}s"
 
     def test_combined_filter_performance(
-        self, client, mock_source_repo_large, many_sources
+        self, app, client, mock_source_repo_large, many_sources
     ):
         """Test combined tag + artifact_type filter performance."""
         # Combined filter should still be fast
@@ -372,44 +388,50 @@ class TestFilterPerformance:
             )
         ]
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.SourceManager"
-        ) as MockSourceManager:
-            manager_instance = MagicMock()
-            manager_instance.apply_filters.return_value = filtered_sources
-            MockSourceManager.return_value = manager_instance
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources.SourceManager"
+            ) as MockSourceManager:
+                manager_instance = MagicMock()
+                manager_instance.apply_filters.return_value = filtered_sources
+                MockSourceManager.return_value = manager_instance
 
-            start = time.perf_counter()
-            response = client.get(
-                "/api/v1/marketplace/sources?artifact_type=skill&tags=python"
-            )
-            duration = time.perf_counter() - start
+                start = time.perf_counter()
+                response = client.get(
+                    "/api/v1/marketplace/sources?artifact_type=skill&tags=python"
+                )
+                duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert duration < 0.2, f"Combined filter took {duration:.3f}s"
 
     def test_multiple_tags_filter_performance(
-        self, client, mock_source_repo_large, many_sources
+        self, app, client, mock_source_repo_large, many_sources
     ):
         """Test filtering with multiple tags."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.SourceManager"
-        ) as MockSourceManager:
-            manager_instance = MagicMock()
-            manager_instance.apply_filters.return_value = many_sources[:10]
-            MockSourceManager.return_value = manager_instance
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources.SourceManager"
+            ) as MockSourceManager:
+                manager_instance = MagicMock()
+                manager_instance.apply_filters.return_value = many_sources[:10]
+                MockSourceManager.return_value = manager_instance
 
-            start = time.perf_counter()
-            response = client.get(
-                "/api/v1/marketplace/sources?tags=python,backend,frontend"
-            )
-            duration = time.perf_counter() - start
+                start = time.perf_counter()
+                response = client.get(
+                    "/api/v1/marketplace/sources?tags=python,backend,frontend"
+                )
+                duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert duration < 0.2, f"Multiple tags filter took {duration:.3f}s"
@@ -419,7 +441,7 @@ class TestDetailFetchPerformance:
     """Test detail fetch performance (repo description/README)."""
 
     def test_get_source_detail_under_5_seconds(
-        self, client, mock_source_repo_large, many_sources
+        self, app, client, mock_source_repo_large, many_sources
     ):
         """Test fetching source details completes in <5s.
 
@@ -433,36 +455,41 @@ class TestDetailFetchPerformance:
 
         mock_source_repo_large.get_by_id.return_value = source_with_details
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        try:
             start = time.perf_counter()
             response = client.get(f"/api/v1/marketplace/sources/{source_with_details.id}")
             duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert duration < 5.0, f"Detail fetch took {duration:.3f}s, expected <5s"
 
     def test_get_source_artifacts_pagination_performance(
-        self, client, mock_source_repo_large, mock_catalog_repo_large, many_sources
+        self, app, client, mock_source_repo_large, mock_catalog_repo_large, many_sources
     ):
         """Test listing source artifacts with pagination performs well."""
         source = many_sources[0]
         mock_source_repo_large.get_by_id.return_value = source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo_large,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        app.dependency_overrides[
+            get_marketplace_catalog_repository
+        ] = lambda: mock_catalog_repo_large
+        try:
             start = time.perf_counter()
             response = client.get(
                 f"/api/v1/marketplace/sources/{source.id}/artifacts?limit=50"
             )
             duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert duration < 0.5, f"Artifacts list took {duration:.3f}s, expected <500ms"
@@ -471,7 +498,7 @@ class TestDetailFetchPerformance:
 class TestTagPerformanceWithManyTags:
     """Test tag-related operations with sources having many tags."""
 
-    def test_source_with_max_tags_serialization_performance(self, client):
+    def test_source_with_max_tags_serialization_performance(self, app, client):
         """Test that sources with maximum tags (20) serialize quickly.
 
         Note: The current source_to_response function doesn't fully populate
@@ -486,13 +513,15 @@ class TestTagPerformanceWithManyTags:
         mock_repo = MagicMock()
         mock_repo.get_by_id.return_value = source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_repo
+        try:
             start = time.perf_counter()
             response = client.get(f"/api/v1/marketplace/sources/{source.id}")
             duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert duration < 0.1, f"Max tags source took {duration:.3f}s"
@@ -504,7 +533,7 @@ class TestTagPerformanceWithManyTags:
         # When implemented: assert len(data.get("tags", [])) == 20
 
     def test_filter_sources_with_many_tags_each(
-        self, client, mock_source_repo_large
+        self, app, client, mock_source_repo_large
     ):
         """Test filtering when sources have many tags each."""
         # Generate sources with more tags
@@ -518,19 +547,22 @@ class TestTagPerformanceWithManyTags:
             items=sources_many_tags[:50], has_more=True
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.SourceManager"
-        ) as MockSourceManager:
-            manager_instance = MagicMock()
-            manager_instance.apply_filters.return_value = sources_many_tags[:25]
-            MockSourceManager.return_value = manager_instance
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources.SourceManager"
+            ) as MockSourceManager:
+                manager_instance = MagicMock()
+                manager_instance.apply_filters.return_value = sources_many_tags[:25]
+                MockSourceManager.return_value = manager_instance
 
-            start = time.perf_counter()
-            response = client.get("/api/v1/marketplace/sources?tags=tag5")
-            duration = time.perf_counter() - start
+                start = time.perf_counter()
+                response = client.get("/api/v1/marketplace/sources?tags=tag5")
+                duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert duration < 0.2, f"Filter with many tags took {duration:.3f}s"
@@ -540,15 +572,15 @@ class TestConcurrentRequestPerformance:
     """Test performance under simulated concurrent load."""
 
     def test_multiple_sequential_requests_consistent_performance(
-        self, client, mock_source_repo_large, many_sources
+        self, app, client, mock_source_repo_large, many_sources
     ):
         """Test that multiple sequential requests maintain consistent performance."""
         request_times = []
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo_large,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo_large
+        try:
             for i in range(10):
                 start = time.perf_counter()
                 response = client.get("/api/v1/marketplace/sources")
@@ -556,6 +588,8 @@ class TestConcurrentRequestPerformance:
                 request_times.append(duration)
 
                 assert response.status_code == status.HTTP_200_OK
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # All requests should be under 200ms
         for i, duration in enumerate(request_times):
@@ -571,7 +605,7 @@ class TestDataSizeScaling:
 
     @pytest.mark.parametrize("source_count", [100, 250, 500])
     def test_list_sources_scales_with_count(
-        self, client, source_count
+        self, app, client, source_count
     ):
         """Test listing sources scales appropriately with different counts."""
         sources = [generate_mock_source(i) for i in range(source_count)]
@@ -582,13 +616,15 @@ class TestDataSizeScaling:
         )
         mock_repo.list_all.return_value = sources
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_repo
+        try:
             start = time.perf_counter()
             response = client.get("/api/v1/marketplace/sources")
             duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         # Should always be under 200ms regardless of total count due to pagination
@@ -598,7 +634,7 @@ class TestDataSizeScaling:
 
     @pytest.mark.parametrize("artifact_count", [100, 250, 500])
     def test_list_artifacts_scales_with_count(
-        self, client, artifact_count
+        self, app, client, artifact_count
     ):
         """Test listing artifacts scales appropriately with different counts."""
         source_id = "src_test_000001"
@@ -618,16 +654,19 @@ class TestDataSizeScaling:
         mock_catalog_repo.count_by_status.return_value = {"new": artifact_count}
         mock_catalog_repo.count_by_type.return_value = {"skill": artifact_count}
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
-            return_value=mock_catalog_repo,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        app.dependency_overrides[
+            get_marketplace_catalog_repository
+        ] = lambda: mock_catalog_repo
+        try:
             start = time.perf_counter()
             response = client.get(f"/api/v1/marketplace/sources/{source_id}/artifacts")
             duration = time.perf_counter() - start
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+            app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
 
         assert response.status_code == status.HTTP_200_OK
         # Should always be under 500ms due to pagination

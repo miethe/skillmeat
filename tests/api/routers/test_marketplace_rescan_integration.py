@@ -27,6 +27,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import get_marketplace_source_repository_concrete
 from skillmeat.api.schemas.marketplace import ScanResultDTO
 from skillmeat.api.server import create_app
 from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
@@ -138,6 +139,7 @@ class TestRescanWithManualMap:
 
     def test_rescan_uses_manual_map(
         self,
+        app,
         client,
         mock_source,
         mock_scan_result_with_dedup,
@@ -161,18 +163,16 @@ class TestRescanWithManualMap:
         mock_source_repo.get_by_id.return_value = mock_source
         mock_source_repo.update.return_value = mock_source
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with patch(
                 "skillmeat.api.routers.marketplace_sources._perform_scan",
                 side_effect=mock_perform_scan,
-            ),
-        ):
-            # Trigger rescan
-            response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+            ):
+                # Trigger rescan
+                response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Verify response
         assert response.status_code == status.HTTP_200_OK
@@ -192,6 +192,7 @@ class TestRescanWithManualMap:
 
     def test_rescan_without_manual_map(
         self,
+        app,
         client,
         mock_source,
         mock_scan_result_with_dedup,
@@ -212,18 +213,16 @@ class TestRescanWithManualMap:
         mock_source_repo.get_by_id.return_value = mock_source
         mock_source_repo.update.return_value = mock_source
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with patch(
                 "skillmeat.api.routers.marketplace_sources._perform_scan",
                 side_effect=mock_perform_scan,
-            ),
-        ):
-            # Trigger rescan
-            response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+            ):
+                # Trigger rescan
+                response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Verify response
         assert response.status_code == status.HTTP_200_OK
@@ -234,6 +233,7 @@ class TestRescanDeduplicationCounts:
 
     def test_rescan_returns_accurate_dedup_counts(
         self,
+        app,
         client,
         mock_source,
     ):
@@ -267,18 +267,16 @@ class TestRescanDeduplicationCounts:
         mock_source_repo.get_by_id.return_value = mock_source
         mock_source_repo.update.return_value = mock_source
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with patch(
                 "skillmeat.api.routers.marketplace_sources._perform_scan",
                 side_effect=mock_perform_scan,
-            ),
-        ):
-            # Trigger rescan
-            response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+            ):
+                # Trigger rescan
+                response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Verify response
         assert response.status_code == status.HTTP_200_OK
@@ -299,6 +297,7 @@ class TestRescanDeduplicationCounts:
 
     def test_rescan_zero_duplicates(
         self,
+        app,
         client,
         mock_source,
     ):
@@ -332,18 +331,16 @@ class TestRescanDeduplicationCounts:
         mock_source_repo.get_by_id.return_value = mock_source
         mock_source_repo.update.return_value = mock_source
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with patch(
                 "skillmeat.api.routers.marketplace_sources._perform_scan",
                 side_effect=mock_perform_scan,
-            ),
-        ):
-            # Trigger rescan
-            response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+            ):
+                # Trigger rescan
+                response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Verify response
         assert response.status_code == status.HTTP_200_OK
@@ -361,6 +358,7 @@ class TestRescanEndToEndFlow:
 
     def test_complete_manual_map_rescan_flow(
         self,
+        app,
         client,
         mock_source,
         mock_scan_result_with_dedup,
@@ -384,30 +382,28 @@ class TestRescanEndToEndFlow:
             "main",
         )
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with patch(
                 "skillmeat.api.routers.marketplace_sources.GitHubScanner",
                 return_value=mock_scanner,
-            ),
-        ):
-            # PATCH manual_map
-            patch_response = client.patch(
-                f"/api/v1/marketplace/sources/{mock_source.id}",
-                json={"manual_map": manual_map},
-            )
+            ):
+                # PATCH manual_map
+                patch_response = client.patch(
+                    f"/api/v1/marketplace/sources/{mock_source.id}",
+                    json={"manual_map": manual_map},
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert patch_response.status_code == status.HTTP_200_OK
 
         # Step 2: GET source to verify manual_map persisted
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             get_response = client.get(f"/api/v1/marketplace/sources/{mock_source.id}")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert get_response.status_code == status.HTTP_200_OK
         source_data = get_response.json()
@@ -420,19 +416,17 @@ class TestRescanEndToEndFlow:
             source.scan_status = "success"
             return mock_scan_result_with_dedup
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with patch(
                 "skillmeat.api.routers.marketplace_sources._perform_scan",
                 side_effect=mock_perform_scan,
-            ),
-        ):
-            rescan_response = client.post(
-                f"/api/v1/marketplace/sources/{mock_source.id}/rescan"
-            )
+            ):
+                rescan_response = client.post(
+                    f"/api/v1/marketplace/sources/{mock_source.id}/rescan"
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Step 4: Verify rescan used manual_map
         assert rescan_response.status_code == status.HTTP_200_OK
@@ -446,6 +440,7 @@ class TestRescanEndToEndFlow:
 
     def test_manual_map_overrides_heuristic_detection(
         self,
+        app,
         client,
         mock_source,
     ):
@@ -485,18 +480,16 @@ class TestRescanEndToEndFlow:
         mock_source_repo.get_by_id.return_value = mock_source
         mock_source_repo.update.return_value = mock_source
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with patch(
                 "skillmeat.api.routers.marketplace_sources._perform_scan",
                 side_effect=mock_perform_scan,
-            ),
-        ):
-            # Trigger rescan
-            response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+            ):
+                # Trigger rescan
+                response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Verify response
         assert response.status_code == status.HTTP_200_OK
@@ -510,18 +503,18 @@ class TestRescanEndToEndFlow:
 class TestRescanErrorCases:
     """Test rescan endpoint error handling."""
 
-    def test_rescan_source_not_found(self, client):
+    def test_rescan_source_not_found(self, app, client):
         """Rescan should return 404 when source not found."""
         # Setup repository mock
         mock_source_repo = Mock()
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
             # Trigger rescan
             response = client.post("/api/v1/marketplace/sources/nonexistent/rescan")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Verify 404 error
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -529,6 +522,7 @@ class TestRescanErrorCases:
 
     def test_rescan_scan_failure_returns_500(
         self,
+        app,
         client,
         mock_source,
     ):
@@ -542,18 +536,16 @@ class TestRescanErrorCases:
         mock_source_repo.get_by_id.return_value = mock_source
         mock_source_repo.update.return_value = mock_source
 
-        with (
-            patch(
-                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-                return_value=mock_source_repo,
-            ),
-            patch(
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_source_repo
+        try:
+            with patch(
                 "skillmeat.api.routers.marketplace_sources._perform_scan",
                 side_effect=mock_perform_scan,
-            ),
-        ):
-            # Trigger rescan
-            response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+            ):
+                # Trigger rescan
+                response = client.post(f"/api/v1/marketplace/sources/{mock_source.id}/rescan")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Verify 500 error
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
