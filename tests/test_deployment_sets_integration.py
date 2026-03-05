@@ -96,18 +96,20 @@ def db(session_factory) -> Generator[Session, None, None]:
 def app(test_settings, test_engine, session_factory):
     """FastAPI app wired to the per-test in-memory DB.
 
-    Patching strategy mirrors ``test_groups.py``:
+    Patching strategy:
 
     1. Patch ``DeploymentSetRepository._get_session`` so the repo uses the
        per-test engine rather than building its own from disk.  This avoids
        running migrations on a fresh file and the resulting
        ``table already exists`` / ``no such table`` errors.
-    2. Patch ``get_session`` in the router's namespace so
-       ``DeploymentSetService`` (created inline in route handlers) also uses
-       the per-test engine.
+    2. Override ``get_db_session`` via FastAPI dependency overrides so
+       ``DeploymentSetService`` (created inline in route handlers via
+       ``DbSessionDep``) also uses the per-test engine.
     """
     from skillmeat.api.config import get_settings
+    from skillmeat.api.dependencies import get_deployment_set_repository
     from skillmeat.cache.repositories import DeploymentSetRepository
+    from skillmeat.cache.session import get_db_session
 
     _sf = session_factory
 
@@ -116,10 +118,10 @@ def app(test_settings, test_engine, session_factory):
 
     application = create_app(test_settings)
     application.dependency_overrides[get_settings] = lambda: test_settings
+    application.dependency_overrides[get_db_session] = lambda: _sf()
 
     with patch.object(DeploymentSetRepository, "_get_session", patched_get_session):
-        with patch("skillmeat.api.routers.deployment_sets.get_session", _sf):
-            yield application
+        yield application
 
     application.dependency_overrides.clear()
 
