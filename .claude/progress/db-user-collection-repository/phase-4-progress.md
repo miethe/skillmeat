@@ -6,7 +6,7 @@ prd: db-user-collection-repository
 feature_slug: db-user-collection-repository
 phase: 4
 phase_title: Router Migration — Core CRUD
-status: pending
+status: in_progress
 created: 2026-03-05
 updated: '2026-03-05'
 prd_ref: null
@@ -27,7 +27,7 @@ tasks:
   estimate: 1.5 pts
 - id: TASK-4.2
   title: Migrate list/create/get/update/delete collection endpoints
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -50,7 +50,7 @@ parallelization:
   - TASK-4.3
 total_tasks: 3
 completed_tasks: 1
-in_progress_tasks: 0
+in_progress_tasks: 1
 blocked_tasks: 0
 progress: 33
 ---

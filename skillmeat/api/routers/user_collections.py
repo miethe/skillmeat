@@ -1226,7 +1226,7 @@ async def refresh_all_collections_cache(
     },
 )
 async def list_user_collections(
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
     limit: int = Query(
         default=20,
@@ -1250,7 +1250,7 @@ async def list_user_collections(
     """List all user collections with cursor-based pagination.
 
     Args:
-        session: Database session
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
         limit: Number of items per page
         after: Cursor for next page
@@ -1262,10 +1262,6 @@ async def list_user_collections(
 
     Raises:
         HTTPException: On error
-
-    TODO: Replace session.query(Collection) with IDbUserCollectionRepository.list()
-    once a DB-backed user collection repository is implemented.  The current
-    CollectionRepoDep targets the filesystem collection model and cannot be used here.
     """
     try:
         logger.info(
@@ -1273,28 +1269,31 @@ async def list_user_collections(
             f"type={collection_type})"
         )
 
-        # TODO: Need IDbUserCollectionRepository.list(filters, offset, limit)
-        # Build base query
-        query = session.query(Collection).order_by(Collection.id)
+        # Fetch all collections via repository (large limit to support cursor pagination).
+        # The repo list() does not support name search or order-by-id natively, so we
+        # fetch a large batch and filter/sort in Python.  For realistic collection counts
+        # (<<10k) this is acceptable; a dedicated search method can replace this later.
+        all_dtos = collection_repo.list(
+            collection_type=collection_type,
+            limit=10000,
+            offset=0,
+        )
 
-        # Apply search filter if provided
+        # Apply case-insensitive name search if provided
         if search:
-            query = query.filter(Collection.name.ilike(f"%{search}%"))
+            search_lower = search.lower()
+            all_dtos = [d for d in all_dtos if search_lower in d.name.lower()]
 
-        # Apply collection_type filter if provided
-        if collection_type:
-            query = query.filter(Collection.collection_type == collection_type)
-
-        # Get all matching collections (for pagination)
-        all_collections = query.all()
+        # Sort by id to provide stable cursor-based pagination
+        all_dtos.sort(key=lambda d: d.id)
 
         # Decode cursor if provided
         start_idx = 0
         if after:
             cursor_value = decode_cursor(after)
             try:
-                collection_ids = [c.id for c in all_collections]
-                start_idx = collection_ids.index(cursor_value) + 1
+                dto_ids = [d.id for d in all_dtos]
+                start_idx = dto_ids.index(cursor_value) + 1
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -1303,23 +1302,23 @@ async def list_user_collections(
 
         # Paginate
         end_idx = start_idx + limit
-        page_collections = all_collections[start_idx:end_idx]
+        page_dtos = all_dtos[start_idx:end_idx]
 
         # Convert to response format
         items: List[UserCollectionResponse] = [
-            collection_to_response(collection, session)
-            for collection in page_collections
+            collection_to_response(dto, collection_repo)
+            for dto in page_dtos
         ]
 
         # Build pagination info
-        has_next = end_idx < len(all_collections)
+        has_next = end_idx < len(all_dtos)
         has_previous = start_idx > 0
 
         start_cursor = (
-            encode_cursor(page_collections[0].id) if page_collections else None
+            encode_cursor(page_dtos[0].id) if page_dtos else None
         )
         end_cursor = (
-            encode_cursor(page_collections[-1].id) if page_collections else None
+            encode_cursor(page_dtos[-1].id) if page_dtos else None
         )
 
         page_info = PageInfo(
@@ -1327,7 +1326,7 @@ async def list_user_collections(
             has_previous_page=has_previous,
             start_cursor=start_cursor,
             end_cursor=end_cursor,
-            total_count=len(all_collections),
+            total_count=len(all_dtos),
         )
 
         logger.info(f"Retrieved {len(items)} user collections")
@@ -1358,14 +1357,14 @@ async def list_user_collections(
 )
 async def create_user_collection(
     request: UserCollectionCreateRequest,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
 ) -> UserCollectionResponse:
     """Create a new user collection.
 
     Args:
         request: Collection creation request
-        session: Database session
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
 
     Returns:
@@ -1373,47 +1372,32 @@ async def create_user_collection(
 
     Raises:
         HTTPException: If validation fails or name already exists
-
-    TODO: Replace session.query(Collection) / session.add(Collection(...)) with
-    IDbUserCollectionRepository.get_by_name() and IDbUserCollectionRepository.create()
-    once a DB-backed user collection repository is implemented.
     """
     try:
         logger.info(f"Creating user collection: {request.name}")
 
-        # TODO: Need IDbUserCollectionRepository.get_by_name(name)
-        # Check if name already exists
-        existing = session.query(Collection).filter_by(name=request.name).first()
-        if existing:
+        # Delegate to repository — raises ValueError on duplicate name
+        try:
+            collection_dto = collection_repo.create(
+                name=request.name,
+                description=request.description,
+                collection_type=request.collection_type,
+                context_category=request.context_category,
+                created_by=None,  # TODO: Set from authentication context
+            )
+        except ValueError as exc:
             logger.warning(f"Collection name already exists: {request.name}")
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Collection with name '{request.name}' already exists",
-            )
+            ) from exc
 
-        # Create new collection
-        collection_id = uuid.uuid4().hex
-        collection = Collection(
-            id=collection_id,
-            name=request.name,
-            description=request.description,
-            collection_type=request.collection_type,
-            context_category=request.context_category,
-            created_by=None,  # TODO: Set from authentication context
-        )
-
-        session.add(collection)
-        session.commit()
-        session.refresh(collection)
-
-        logger.info(f"Created user collection: {collection_id} ({request.name})")
-        return collection_to_response(collection, session)
+        logger.info(f"Created user collection: {collection_dto.id} ({request.name})")
+        return collection_to_response(collection_dto, collection_repo)
 
     except HTTPException:
-        session.rollback()
         raise
     except Exception as e:
-        session.rollback()
         logger.error(f"Error creating user collection: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1434,14 +1418,16 @@ async def create_user_collection(
 )
 async def get_user_collection(
     collection_id: str,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
+    group_repo: GroupRepoDep,
     token: TokenDep,
 ) -> UserCollectionWithGroupsResponse:
     """Get details for a specific user collection.
 
     Args:
         collection_id: Collection identifier
-        session: Database session
+        collection_repo: DB user collection repository (injected)
+        group_repo: Group repository (injected)
         token: Authentication token
 
     Returns:
@@ -1449,24 +1435,19 @@ async def get_user_collection(
 
     Raises:
         HTTPException: If collection not found or on error
-
-    TODO: Replace session.query(Collection) with IDbUserCollectionRepository.get_by_id()
-    once a DB-backed user collection repository is implemented.
     """
     try:
         logger.info(f"Getting user collection: {collection_id}")
 
-        # TODO: Need IDbUserCollectionRepository.get_by_id(collection_id)
-        # Fetch collection
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        collection_dto = collection_repo.get_by_id(collection_id)
+        if not collection_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        return collection_to_response_with_groups(collection, session)
+        return collection_to_response_with_groups(collection_dto, collection_repo, group_repo)
 
     except HTTPException:
         raise
@@ -1496,7 +1477,7 @@ async def get_user_collection(
 async def update_user_collection(
     collection_id: str,
     request: UserCollectionUpdateRequest,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
 ) -> UserCollectionResponse:
     """Update a user collection.
@@ -1504,7 +1485,7 @@ async def update_user_collection(
     Args:
         collection_id: Collection identifier
         request: Update request with fields to modify
-        session: Database session
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
 
     Returns:
@@ -1512,10 +1493,6 @@ async def update_user_collection(
 
     Raises:
         HTTPException: If collection not found, validation fails, or name conflict
-
-    TODO: Replace session.query(Collection) / field mutations / session.commit() with
-    IDbUserCollectionRepository.get_by_id(), IDbUserCollectionRepository.get_by_name(),
-    and IDbUserCollectionRepository.update() once a DB-backed repository is implemented.
     """
     try:
         logger.info(f"Updating user collection: {collection_id}")
@@ -1532,49 +1509,57 @@ async def update_user_collection(
                 detail="At least one update parameter must be provided",
             )
 
-        # Fetch collection
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        # Verify the collection exists before attempting update
+        existing_dto = collection_repo.get_by_id(collection_id)
+        if not existing_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        # Check name uniqueness if changing name
-        if request.name is not None and request.name != collection.name:
-            existing = session.query(Collection).filter_by(name=request.name).first()
-            if existing:
+        # Check name uniqueness if changing name — the repo.update() will raise
+        # KeyError on missing and RuntimeError on DB errors; name conflicts may
+        # surface as RuntimeError wrapping an IntegrityError.  We do a pre-check
+        # here to return a 409 with a clear message before delegating to the repo.
+        if request.name is not None and request.name != existing_dto.name:
+            all_dtos = collection_repo.list(limit=10000)
+            name_taken = any(
+                d.id != collection_id and d.name == request.name
+                for d in all_dtos
+            )
+            if name_taken:
                 logger.warning(f"Collection name already exists: {request.name}")
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Collection with name '{request.name}' already exists",
                 )
-            collection.name = request.name
 
-        # Update description if provided
+        # Build kwargs for partial update
+        update_kwargs: dict = {}
+        if request.name is not None:
+            update_kwargs["name"] = request.name
         if request.description is not None:
-            collection.description = request.description
-
-        # Update collection_type if provided
+            update_kwargs["description"] = request.description
         if request.collection_type is not None:
-            collection.collection_type = request.collection_type
-
-        # Update context_category if provided
+            update_kwargs["collection_type"] = request.collection_type
         if request.context_category is not None:
-            collection.context_category = request.context_category
+            update_kwargs["context_category"] = request.context_category
 
-        session.commit()
-        session.refresh(collection)
+        try:
+            updated_dto = collection_repo.update(collection_id, **update_kwargs)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_id}' not found",
+            ) from exc
 
         logger.info(f"Updated user collection: {collection_id}")
-        return collection_to_response(collection, session)
+        return collection_to_response(updated_dto, collection_repo)
 
     except HTTPException:
-        session.rollback()
         raise
     except Exception as e:
-        session.rollback()
         logger.error(
             f"Error updating user collection '{collection_id}': {e}", exc_info=True
         )
@@ -1597,14 +1582,14 @@ async def update_user_collection(
 )
 async def delete_user_collection(
     collection_id: str,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
 ) -> None:
     """Delete a user collection.
 
     Args:
         collection_id: Collection identifier
-        session: Database session
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
 
     Raises:
@@ -1612,26 +1597,17 @@ async def delete_user_collection(
 
     Note:
         Cascade deletion is handled by the database (groups and associations)
-
-    TODO: Replace session.query(Collection) / session.delete() / session.commit() with
-    IDbUserCollectionRepository.get_by_id() and IDbUserCollectionRepository.delete()
-    once a DB-backed user collection repository is implemented.
     """
     try:
         logger.info(f"Deleting user collection: {collection_id}")
 
-        # TODO: Need IDbUserCollectionRepository.get_by_id(collection_id)
-        # Fetch collection
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        deleted = collection_repo.delete(collection_id)
+        if not deleted:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
-
-        session.delete(collection)
-        session.commit()
 
         # Invalidate cache for deleted collection
         cache = get_collection_count_cache()
@@ -1640,10 +1616,8 @@ async def delete_user_collection(
         logger.info(f"Deleted user collection: {collection_id}")
 
     except HTTPException:
-        session.rollback()
         raise
     except Exception as e:
-        session.rollback()
         logger.error(
             f"Error deleting user collection '{collection_id}': {e}", exc_info=True
         )
@@ -2098,6 +2072,7 @@ async def list_collection_artifacts(
 async def add_artifacts_to_collection(
     collection_id: str,
     request: AddArtifactsRequest,
+    collection_repo: DbUserCollectionRepoDep,
     session: DbSessionDep,
     artifact_repo: ArtifactRepoDep,
     token: TokenDep,
@@ -2107,7 +2082,10 @@ async def add_artifacts_to_collection(
     Args:
         collection_id: Collection identifier
         request: Request with artifact IDs
-        session: Database session
+        collection_repo: DB user collection repository (injected)
+        session: Database session (used for CollectionArtifact ORM operations
+            pending IDbCollectionArtifactRepository.add_artifacts())
+        artifact_repo: Artifact repository for UUID resolution (injected)
         token: Authentication token
 
     Returns:
@@ -2118,23 +2096,15 @@ async def add_artifacts_to_collection(
 
     Note:
         This operation is idempotent - re-adding existing artifacts returns 200
-
-    TODO: Replace session.query(Collection) with IDbUserCollectionRepository.get_by_id(),
-    and session.query(Artifact.id).join(CollectionArtifact) with
-    IDbCollectionArtifactRepository.list_artifact_ids_for_collection().
-    session.add(CollectionArtifact) should be replaced with
-    IDbCollectionArtifactRepository.add_artifact().
-    UUID resolution now delegates to artifact_repo.resolve_uuid_by_type_name().
     """
     try:
         logger.info(
             f"Adding {len(request.artifact_ids)} artifacts to collection: {collection_id}"
         )
 
-        # TODO: Need IDbUserCollectionRepository.get_by_id(collection_id)
-        # Verify collection exists
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        # Verify collection exists via repository
+        collection_dto = collection_repo.get_by_id(collection_id)
+        if not collection_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -2243,6 +2213,7 @@ async def add_artifacts_to_collection(
 async def remove_artifact_from_collection(
     collection_id: str,
     artifact_id: str,
+    collection_repo: DbUserCollectionRepoDep,
     session: DbSessionDep,
     token: TokenDep,
 ) -> None:
@@ -2251,7 +2222,9 @@ async def remove_artifact_from_collection(
     Args:
         collection_id: Collection identifier
         artifact_id: Artifact identifier
-        session: Database session
+        collection_repo: DB user collection repository (injected)
+        session: Database session (used for CollectionArtifact ORM operations
+            pending IDbCollectionArtifactRepository.remove_artifact())
         token: Authentication token
 
     Raises:
@@ -2263,9 +2236,9 @@ async def remove_artifact_from_collection(
     try:
         logger.info(f"Removing artifact {artifact_id} from collection: {collection_id}")
 
-        # Verify collection exists
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        # Verify collection exists via repository
+        collection_dto = collection_repo.get_by_id(collection_id)
+        if not collection_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
