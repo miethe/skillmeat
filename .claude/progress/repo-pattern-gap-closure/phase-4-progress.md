@@ -5,8 +5,8 @@ doc_type: progress
 prd: repo-pattern-gap-closure
 feature_slug: repo-pattern-gap-closure
 phase: 4
-phase_title: "Router Migration \u2014 Critical"
-status: in_progress
+phase_title: Router Migration — Critical
+status: completed
 created: 2026-03-04
 updated: '2026-03-04'
 prd_ref: docs/project_plans/PRDs/refactors/repo-pattern-refactor-v1.md
@@ -20,7 +20,7 @@ contributors: []
 tasks:
 - id: TASK-4.1
   title: Migrate user_collections.py (180+ session calls, 16 endpoints)
-  status: pending
+  status: completed
   assigned_to:
   - refactoring-expert
   dependencies:
@@ -28,7 +28,7 @@ tasks:
   estimate: 4 pts
 - id: TASK-4.2
   title: Migrate groups.py (70+ session calls, 11 endpoints)
-  status: pending
+  status: completed
   assigned_to:
   - refactoring-expert
   dependencies:
@@ -36,7 +36,7 @@ tasks:
   estimate: 3 pts
 - id: TASK-4.3
   title: Migrate artifacts.py fallbacks (31 session queries)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -47,6 +47,11 @@ parallelization:
   - TASK-4.1
   - TASK-4.2
   - TASK-4.3
+total_tasks: 3
+completed_tasks: 3
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 100
 ---
 
 # Phase 4: Router Migration — Critical
