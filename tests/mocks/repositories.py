@@ -516,6 +516,37 @@ class MockProjectRepository(IProjectRepository):
         self._store[id] = refreshed
         return refreshed
 
+    def get_by_path(
+        self,
+        path: str,
+        ctx: RequestContext | None = None,
+    ) -> ProjectDTO | None:
+        for project in self._store.values():
+            if project.path == path:
+                return project
+        return None
+
+    def get_or_create_by_path(
+        self,
+        path: str,
+        ctx: RequestContext | None = None,
+    ) -> ProjectDTO:
+        import base64
+
+        existing = self.get_by_path(path, ctx)
+        if existing is not None:
+            return existing
+        project_id = base64.b64encode(path.encode()).decode()
+        from pathlib import Path as _Path
+
+        dto = ProjectDTO(
+            id=project_id,
+            name=_Path(path).name,
+            path=path,
+            status="active",
+        )
+        return self.create(dto, ctx)
+
 
 # =============================================================================
 # MockCollectionRepository
@@ -864,6 +895,31 @@ class MockDeploymentRepository(IDeploymentRepository):
         set_id = f"ds-{name}"
         created = set_id not in self._store
         return (set_id, created)
+
+    def sync_deployment_cache(
+        self,
+        artifact_id: str,
+        project_path: str,
+        project_name: str,
+        deployed_at: Any,
+        content_hash: str | None = None,
+        deployment_profile_id: str | None = None,
+        local_modifications: bool = False,
+        platform: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        # In-memory mock: track calls but perform no real cache write.
+        return True
+
+    def remove_deployment_cache(
+        self,
+        artifact_id: str,
+        project_path: str,
+        profile_id: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        # In-memory mock: always succeeds.
+        return True
 
 
 # =============================================================================
@@ -1307,6 +1363,16 @@ class MockDbUserCollectionRepository(IDbUserCollectionRepository):
     ) -> UserCollectionDTO | None:
         return self._store.get(collection_id)
 
+    def get_by_name(
+        self,
+        name: str,
+        ctx: RequestContext | None = None,
+    ) -> UserCollectionDTO | None:
+        for dto in self._store.values():
+            if dto.name == name:
+                return dto
+        return None
+
     def create(
         self,
         *,
@@ -1551,6 +1617,17 @@ class MockDbCollectionArtifactRepository(IDbCollectionArtifactRepository):
     ) -> list[CollectionArtifactDTO]:
         # Return all memberships; deployment fields are already on the DTO.
         return list(self._store.get(collection_id, {}).values())
+
+    def get_source_deployments_batch(
+        self,
+        artifact_ids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> list[dict]:
+        # The mock store is keyed by (collection_id, artifact_uuid); we don't
+        # have a type:name → uuid index here, so return an empty list as a
+        # safe no-op stub.  Tests that need this method should seed the store
+        # and override as needed.
+        return []
 
     def add_artifacts(
         self,

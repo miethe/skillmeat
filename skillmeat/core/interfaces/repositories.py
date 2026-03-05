@@ -730,6 +730,46 @@ class IProjectRepository(abc.ABC):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def get_by_path(
+        self,
+        path: str,
+        ctx: RequestContext | None = None,
+    ) -> ProjectDTO | None:
+        """Return the project whose filesystem path matches *path*.
+
+        Args:
+            path: Absolute filesystem path (resolved).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`~skillmeat.core.interfaces.dtos.ProjectDTO` when a
+            project with the given path is found, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_or_create_by_path(
+        self,
+        path: str,
+        ctx: RequestContext | None = None,
+    ) -> ProjectDTO:
+        """Return the project for *path*, creating a DB record if absent.
+
+        Resolves the absolute path, looks up an existing project by path,
+        and creates a new one if none is found.  Used by endpoints that
+        accept base64-encoded paths that may not yet have a DB entry.
+
+        Args:
+            path: Absolute filesystem path (will be resolved).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`~skillmeat.core.interfaces.dtos.ProjectDTO` (existing
+            or newly created).
+        """
+        raise NotImplementedError
+
 
 # =============================================================================
 # ICollectionRepository
@@ -1223,6 +1263,69 @@ class IDeploymentRepository(abc.ABC):
             A ``(deployment_set_id, created)`` tuple where *created* is
             ``True`` when a new record was inserted and ``False`` when an
             existing record was updated.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def sync_deployment_cache(
+        self,
+        artifact_id: str,
+        project_path: str,
+        project_name: str,
+        deployed_at: Any,
+        content_hash: str | None = None,
+        deployment_profile_id: str | None = None,
+        local_modifications: bool = False,
+        platform: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        """Upsert a single deployment entry into the artifact cache.
+
+        Performs a write-through update of the ``deployments_json`` column in
+        ``collection_artifacts`` so the cache reflects the most-recent
+        deployment state without a full cache refresh.
+
+        Args:
+            artifact_id: Artifact primary key in ``"type:name"`` format.
+            project_path: Absolute filesystem path of the deployment target.
+            project_name: Human-readable project directory name.
+            deployed_at: Deployment timestamp (``datetime`` or ISO string).
+            content_hash: Optional SHA of the deployed content snapshot.
+            deployment_profile_id: Optional deployment profile identifier.
+            local_modifications: Whether local modifications are present.
+            platform: Optional platform identifier string.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            ``True`` when the cache entry was updated, ``False`` when the
+            artifact was not found in the cache (non-fatal).
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def remove_deployment_cache(
+        self,
+        artifact_id: str,
+        project_path: str,
+        profile_id: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        """Remove a deployment entry from the artifact cache.
+
+        Performs a write-through removal of the matching entry from the
+        ``deployments_json`` column in ``collection_artifacts`` so the cache
+        reflects the current deployment state without a full cache refresh.
+
+        Args:
+            artifact_id: Artifact primary key in ``"type:name"`` format.
+            project_path: Absolute filesystem path of the deployment target.
+            profile_id: Optional profile ID to narrow the removal to a
+                specific deployment profile entry.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            ``True`` when the cache entry was updated, ``False`` when the
+            artifact was not found in the cache (non-fatal).
         """
         raise NotImplementedError
 
@@ -2911,6 +3014,32 @@ class IDbCollectionArtifactRepository(abc.ABC):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def get_source_deployments_batch(
+        self,
+        artifact_ids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> list[dict]:
+        """Return source and deployments_json for a batch of artifact IDs.
+
+        Executes a single JOIN query against the ``artifacts`` and
+        ``collection_artifacts`` tables to retrieve the ``source`` and
+        ``deployments_json`` columns for the given ``type:name`` artifact
+        identifiers.
+
+        Args:
+            artifact_ids: List of ``"type:name"`` artifact identifier strings.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of dicts, each containing keys ``id`` (the ``type:name``
+            artifact ID string), ``source`` (upstream source spec or ``None``),
+            and ``deployments_json`` (raw JSON string or ``None``).  Only
+            artifacts that have a matching ``CollectionArtifact`` row are
+            included in the result.
+        """
+        raise NotImplementedError
+
     # ------------------------------------------------------------------
     # Mutations
     # ------------------------------------------------------------------
@@ -3098,6 +3227,24 @@ class IDbUserCollectionRepository(abc.ABC):
 
         Args:
             collection_id: Collection hex-UUID primary key.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO` when
+            found, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_by_name(
+        self,
+        name: str,
+        ctx: RequestContext | None = None,
+    ) -> UserCollectionDTO | None:
+        """Return a user collection by its human-readable name.
+
+        Args:
+            name: Collection name string (case-sensitive).
             ctx: Optional per-request metadata.
 
         Returns:

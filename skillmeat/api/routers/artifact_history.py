@@ -13,8 +13,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from skillmeat.api.dependencies import ConfigManagerDep, verify_api_key
+from skillmeat.api.dependencies import ConfigManagerDep, DbSessionDep, verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.artifacts import (
     ArtifactHistoryEventResponse,
@@ -22,7 +24,7 @@ from skillmeat.api.schemas.artifacts import (
 )
 from skillmeat.api.schemas.common import ErrorResponse
 from skillmeat.cache.models import Artifact as CacheArtifact
-from skillmeat.cache.models import ArtifactVersion, Project, get_session
+from skillmeat.cache.models import ArtifactVersion
 from skillmeat.storage.deployment import DeploymentTracker
 
 logger = logging.getLogger(__name__)
@@ -36,7 +38,6 @@ router = APIRouter(
 _ARTIFACT_ID_EXTENSIONS = (".md", ".txt", ".json", ".yaml", ".yml")
 
 
-
 def _normalize_artifact_name(name: str) -> str:
     """Normalize artifact names by stripping common text extensions."""
     normalized = name
@@ -47,8 +48,9 @@ def _normalize_artifact_name(name: str) -> str:
     return normalized
 
 
-
-def _parse_artifact_id(artifact_id: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def _parse_artifact_id(
+    artifact_id: str,
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Parse artifact path parameter as either 'type:name' or UUID.
 
     Returns:
@@ -58,7 +60,6 @@ def _parse_artifact_id(artifact_id: str) -> Tuple[Optional[str], Optional[str], 
         artifact_type, artifact_name = artifact_id.split(":", 1)
         return artifact_type, _normalize_artifact_name(artifact_name), None
     return None, None, artifact_id
-
 
 
 def _parse_timestamp(value: Any) -> Optional[datetime]:
@@ -93,7 +94,6 @@ def _parse_timestamp(value: Any) -> Optional[datetime]:
     return dt.astimezone(timezone.utc)
 
 
-
 def _parse_metadata(raw: Any) -> Dict[str, Any]:
     """Parse optional metadata payload into a dictionary."""
     if raw is None:
@@ -109,12 +109,18 @@ def _parse_metadata(raw: Any) -> Dict[str, Any]:
     return {}
 
 
-
 def _build_version_events(
     artifacts: List[CacheArtifact],
     include_versions: bool,
+    session: Session,
 ) -> List[ArtifactHistoryEventResponse]:
-    """Build timeline events from artifact_versions lineage records."""
+    """Build timeline events from artifact_versions lineage records.
+
+    Args:
+        artifacts: CacheArtifact ORM instances for the target artifact.
+        include_versions: When False, returns an empty list immediately.
+        session: Per-request SQLAlchemy session (injected via DbSessionDep).
+    """
     if not include_versions:
         return []
 
@@ -123,48 +129,46 @@ def _build_version_events(
     if not artifact_ids:
         return []
 
-    session = get_session()
-    try:
-        versions = (
-            session.query(ArtifactVersion)
-            .filter(ArtifactVersion.artifact_id.in_(artifact_ids))
+    versions = (
+        session.execute(
+            select(ArtifactVersion)
+            .where(ArtifactVersion.artifact_id.in_(artifact_ids))
             .order_by(ArtifactVersion.created_at.desc())
-            .all()
+        )
+        .scalars()
+        .all()
+    )
+
+    result: List[ArtifactHistoryEventResponse] = []
+    for version in versions:
+        ts = _parse_timestamp(version.created_at) or datetime.now(timezone.utc)
+        lineage = version.get_lineage_list()
+        metadata = version.get_metadata_dict() or {}
+
+        cache_artifact = artifact_map.get(version.artifact_id)
+        project_path = None
+        if cache_artifact and cache_artifact.project:
+            project_path = cache_artifact.project.path
+
+        result.append(
+            ArtifactHistoryEventResponse(
+                id=f"version:{version.id}",
+                timestamp=ts,
+                event_category="version",
+                event_type=version.change_origin,
+                source="artifact_versions",
+                artifact_name=cache_artifact.name if cache_artifact else "unknown",
+                artifact_type=cache_artifact.type if cache_artifact else "unknown",
+                collection_name=None,
+                project_path=project_path,
+                content_sha=version.content_hash,
+                parent_sha=version.parent_hash,
+                version_lineage=lineage if lineage else None,
+                metadata=metadata,
+            )
         )
 
-        result: List[ArtifactHistoryEventResponse] = []
-        for version in versions:
-            ts = _parse_timestamp(version.created_at) or datetime.now(timezone.utc)
-            lineage = version.get_lineage_list()
-            metadata = version.get_metadata_dict() or {}
-
-            cache_artifact = artifact_map.get(version.artifact_id)
-            project_path = None
-            if cache_artifact and cache_artifact.project:
-                project_path = cache_artifact.project.path
-
-            result.append(
-                ArtifactHistoryEventResponse(
-                    id=f"version:{version.id}",
-                    timestamp=ts,
-                    event_category="version",
-                    event_type=version.change_origin,
-                    source="artifact_versions",
-                    artifact_name=cache_artifact.name if cache_artifact else "unknown",
-                    artifact_type=cache_artifact.type if cache_artifact else "unknown",
-                    collection_name=None,
-                    project_path=project_path,
-                    content_sha=version.content_hash,
-                    parent_sha=version.parent_hash,
-                    version_lineage=lineage if lineage else None,
-                    metadata=metadata,
-                )
-            )
-
-        return result
-    finally:
-        session.close()
-
+    return result
 
 
 def _build_analytics_events(
@@ -223,7 +227,6 @@ def _build_analytics_events(
         return result
     finally:
         db.close()
-
 
 
 def _build_deployment_events(
@@ -318,7 +321,6 @@ def _build_deployment_events(
     return result
 
 
-
 def _compute_statistics(events: List[ArtifactHistoryEventResponse]) -> Dict[str, Any]:
     """Compute aggregate provenance statistics for history timelines."""
     lineage_depths = [
@@ -329,7 +331,9 @@ def _compute_statistics(events: List[ArtifactHistoryEventResponse]) -> Dict[str,
 
     return {
         "total_events": len(events),
-        "version_events": sum(1 for event in events if event.event_category == "version"),
+        "version_events": sum(
+            1 for event in events if event.event_category == "version"
+        ),
         "analytics_events": sum(
             1 for event in events if event.event_category == "analytics"
         ),
@@ -375,6 +379,7 @@ async def get_artifact_history(
     artifact_id: str,
     config_mgr: ConfigManagerDep,
     token: TokenDep,
+    db_session: DbSessionDep,
     include_versions: bool = Query(
         default=True,
         description="Include version lineage records from artifact_versions",
@@ -397,12 +402,11 @@ async def get_artifact_history(
     """Get unified artifact history timeline for modal History tabs."""
     artifact_type, artifact_name, artifact_uuid = _parse_artifact_id(artifact_id)
 
-    session = get_session()
     try:
-        artifact_query = session.query(CacheArtifact)
-
         if artifact_uuid:
-            anchor = artifact_query.filter(CacheArtifact.uuid == artifact_uuid).first()
+            anchor = db_session.execute(
+                select(CacheArtifact).where(CacheArtifact.uuid == artifact_uuid)
+            ).scalar_one_or_none()
             if anchor is None:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -415,8 +419,12 @@ async def get_artifact_history(
         assert artifact_type is not None
 
         artifacts = (
-            artifact_query.filter(CacheArtifact.name == artifact_name)
-            .filter(CacheArtifact.type == artifact_type)
+            db_session.execute(
+                select(CacheArtifact)
+                .where(CacheArtifact.name == artifact_name)
+                .where(CacheArtifact.type == artifact_type)
+            )
+            .scalars()
             .all()
         )
 
@@ -426,7 +434,11 @@ async def get_artifact_history(
                 detail=f"Artifact '{artifact_id}' not found",
             )
 
-        version_events = _build_version_events(artifacts, include_versions=include_versions)
+        version_events = _build_version_events(
+            artifacts,
+            include_versions=include_versions,
+            session=db_session,
+        )
         analytics_events = _build_analytics_events(
             config_mgr=config_mgr,
             artifact_name=artifact_name,
@@ -462,5 +474,3 @@ async def get_artifact_history(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve artifact history: {str(e)}",
         )
-    finally:
-        session.close()

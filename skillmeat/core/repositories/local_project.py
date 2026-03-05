@@ -182,9 +182,7 @@ def _build_project_dto_from_path(project_path: Path) -> ProjectDTO:
     try:
         deployments = DeploymentTracker.read_deployments(project_path) or []
     except Exception as exc:
-        logger.debug(
-            "Could not read deployments for %s: %s", path_str, exc
-        )
+        logger.debug("Could not read deployments for %s: %s", path_str, exc)
 
     return ProjectDTO(
         id=project_id,
@@ -229,9 +227,7 @@ def _discover_project_paths() -> List[Path]:
             continue
 
         try:
-            for deployment_file in resolved_search.rglob(
-                f"*/{deployment_filename}"
-            ):
+            for deployment_file in resolved_search.rglob(f"*/{deployment_filename}"):
                 # The deployment file lives inside .<platform>/ which is
                 # a direct child of the project root.
                 project_path = deployment_file.parent.parent
@@ -438,9 +434,7 @@ class LocalProjectRepository(IProjectRepository):
             ValueError: If a project with the same ID already exists.
         """
         if self.get(dto.id, ctx) is not None:
-            raise ValueError(
-                f"A project with ID '{dto.id}' already exists."
-            )
+            raise ValueError(f"A project with ID '{dto.id}' already exists.")
 
         project_data: Dict[str, Any] = {
             "id": dto.id,
@@ -455,9 +449,7 @@ class LocalProjectRepository(IProjectRepository):
                 self._cache_manager.upsert_project(project_data)
                 logger.debug("create(): upserted project %r to DB cache", dto.id)
             except Exception as exc:
-                logger.warning(
-                    "create(): DB upsert failed for %r: %s", dto.id, exc
-                )
+                logger.warning("create(): DB upsert failed for %r: %s", dto.id, exc)
 
         # Return a DTO with the current timestamp populated
         return ProjectDTO(
@@ -510,9 +502,7 @@ class LocalProjectRepository(IProjectRepository):
                         id,
                     )
                 except Exception as exc:
-                    logger.warning(
-                        "update(): DB update failed for %r: %s", id, exc
-                    )
+                    logger.warning("update(): DB update failed for %r: %s", id, exc)
 
         # Re-fetch to return a consistent DTO
         refreshed = self.get(id, ctx)
@@ -620,7 +610,9 @@ class LocalProjectRepository(IProjectRepository):
                 else str(raw_type)
             )
             artifact_name = getattr(dep, "name", "")
-            artifact_id = f"{artifact_type}:{artifact_name}" if artifact_name else artifact_type
+            artifact_id = (
+                f"{artifact_type}:{artifact_name}" if artifact_name else artifact_type
+            )
 
             result.append(
                 ArtifactDTO(
@@ -672,9 +664,7 @@ class LocalProjectRepository(IProjectRepository):
 
         project_path = Path(path_str)
         if not project_path.is_dir():
-            raise KeyError(
-                f"Project directory '{path_str}' does not exist on disk."
-            )
+            raise KeyError(f"Project directory '{path_str}' does not exist on disk.")
 
         # Re-read deployments from filesystem
         deployments: List[Any] = []
@@ -704,9 +694,7 @@ class LocalProjectRepository(IProjectRepository):
                     artifact_count,
                 )
             except Exception as exc:
-                logger.warning(
-                    "refresh(): DB sync failed for %r: %s", id, exc
-                )
+                logger.warning("refresh(): DB sync failed for %r: %s", id, exc)
 
         # Return a fresh DTO.  Prefer reading from the DB so timestamps
         # reflect the actual committed values.
@@ -737,3 +725,74 @@ class LocalProjectRepository(IProjectRepository):
             artifact_count=artifact_count,
             last_fetched=_now_iso(),
         )
+
+    # ------------------------------------------------------------------
+    # IProjectRepository — path-based lookup and upsert
+    # ------------------------------------------------------------------
+
+    def get_by_path(
+        self,
+        path: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> Optional[ProjectDTO]:
+        """Return the project whose filesystem path matches *path*.
+
+        Tries DB cache first (via ``CacheManager.get_project_by_path``);
+        falls back to filesystem existence check.
+
+        Args:
+            path: Absolute filesystem path (will be resolved).
+            ctx: Optional per-request metadata (unused here).
+
+        Returns:
+            :class:`ProjectDTO` when found, ``None`` otherwise.
+        """
+        resolved = str(Path(path).expanduser().resolve())
+
+        if self._cache_manager is not None:
+            try:
+                orm_project = self._cache_manager.get_project_by_path(resolved)
+                if orm_project is not None:
+                    return _project_orm_to_dto(orm_project)
+            except Exception as exc:
+                logger.debug(
+                    "get_by_path(): DB lookup failed for %r: %s", resolved, exc
+                )
+
+        # Filesystem fallback
+        project_path = Path(resolved)
+        if project_path.is_dir():
+            return _build_project_dto_from_path(project_path)
+
+        return None
+
+    def get_or_create_by_path(
+        self,
+        path: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> ProjectDTO:
+        """Return the project for *path*, creating a DB record if absent.
+
+        Resolves *path* to an absolute string, looks up an existing project,
+        and calls :meth:`create` if none is found.
+
+        Args:
+            path: Absolute filesystem path (will be resolved).
+            ctx: Optional per-request metadata (unused here).
+
+        Returns:
+            A :class:`ProjectDTO` (existing or newly created).
+        """
+        resolved = str(Path(path).expanduser().resolve())
+        existing = self.get_by_path(resolved, ctx)
+        if existing is not None:
+            return existing
+
+        project_id = _encode_project_id(resolved)
+        dto = ProjectDTO(
+            id=project_id,
+            name=Path(resolved).name,
+            path=resolved,
+            status="active",
+        )
+        return self.create(dto, ctx)

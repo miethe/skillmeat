@@ -22,8 +22,13 @@ import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
-from skillmeat.api.dependencies import CollectionManagerDep
+from skillmeat.api.dependencies import (
+    CollectionManagerDep,
+    CollectionRepoDep,
+    DbSessionDep,
+)
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.schemas.tags import (
     TagCreateRequest,
@@ -78,29 +83,33 @@ def decode_cursor(cursor: str) -> str:
 # =============================================================================
 
 
-def _sync_tag_definitions_to_manifest() -> None:
+def _sync_tag_definitions_to_manifest(
+    session: Session, collection_id: Optional[str] = None
+) -> None:
     """Write-through helper: sync all tag definitions to collection.toml.
 
-    Opens a fresh session (tags are workspace-scoped so any collection
-    works), resolves the first available collection, and delegates to
-    ManifestSyncService.  Failures are logged but never propagate so that
-    the API request always succeeds even if the TOML write fails.
+    Delegates to ManifestSyncService using the provided session.  When
+    *collection_id* is supplied (resolved via ``CollectionRepoDep``) the
+    sync is performed; when it is ``None`` the call is a no-op (no
+    active collection).  Failures are logged but never propagated so the
+    API request always succeeds even if the TOML write fails.
+
+    Args:
+        session: Active SQLAlchemy session injected via ``DbSessionDep``.
+        collection_id: ID of the collection to sync tag definitions into.
+            Pass the value from ``collection_repo.get().id``.  When
+            ``None`` the sync is skipped silently.
     """
+    if collection_id is None:
+        logger.debug(
+            "manifest_sync: no active collection; skipping tag definition sync"
+        )
+        return
+
     try:
-        from skillmeat.cache.models import Collection as DBCollection, get_session
         from skillmeat.core.services.manifest_sync_service import ManifestSyncService
 
-        session = get_session()
-        try:
-            collection = session.query(DBCollection).first()
-            if collection is None:
-                logger.debug(
-                    "manifest_sync: no collections in DB; skipping tag definition sync"
-                )
-                return
-            ManifestSyncService().sync_tag_definitions(session, collection.id)
-        finally:
-            session.close()
+        ManifestSyncService().sync_tag_definitions(session, collection_id)
     except Exception as e:
         logger.warning(f"Failed to sync tag definitions to manifest: {e}")
 
@@ -124,7 +133,11 @@ def _sync_tag_definitions_to_manifest() -> None:
         500: {"description": "Internal server error"},
     },
 )
-async def create_tag(request: TagCreateRequest) -> TagResponse:
+async def create_tag(
+    request: TagCreateRequest,
+    collection_repo: CollectionRepoDep,
+    db_session: DbSessionDep,
+) -> TagResponse:
     """Create a new tag.
 
     Args:
@@ -149,7 +162,11 @@ async def create_tag(request: TagCreateRequest) -> TagResponse:
 
         logger.info(f"Created tag: {tag.id} ('{tag.name}')")
 
-        _sync_tag_definitions_to_manifest()
+        collection_dto = collection_repo.get()
+        _sync_tag_definitions_to_manifest(
+            session=db_session,
+            collection_id=collection_dto.id if collection_dto is not None else None,
+        )
 
         return tag
 
@@ -440,7 +457,11 @@ async def get_tag_by_slug(slug: str) -> TagResponse:
     },
 )
 async def update_tag(
-    tag_id: str, request: TagUpdateRequest, collection_mgr: CollectionManagerDep
+    tag_id: str,
+    request: TagUpdateRequest,
+    collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
+    db_session: DbSessionDep,
 ) -> TagResponse:
     """Update tag metadata.
 
@@ -504,7 +525,11 @@ async def update_tag(
 
         logger.info(f"Updated tag: {tag.id} ('{tag.name}')")
 
-        _sync_tag_definitions_to_manifest()
+        collection_dto = collection_repo.get()
+        _sync_tag_definitions_to_manifest(
+            session=db_session,
+            collection_id=collection_dto.id if collection_dto is not None else None,
+        )
 
         return tag
 
@@ -552,7 +577,12 @@ async def update_tag(
         500: {"description": "Internal server error"},
     },
 )
-async def delete_tag(tag_id: str, collection_mgr: CollectionManagerDep) -> None:
+async def delete_tag(
+    tag_id: str,
+    collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
+    db_session: DbSessionDep,
+) -> None:
     """Delete tag by ID.
 
     The tag is first removed from filesystem sources (collection.toml and
@@ -607,7 +637,11 @@ async def delete_tag(tag_id: str, collection_mgr: CollectionManagerDep) -> None:
 
         logger.info(f"Deleted tag: {tag_id}")
 
-        _sync_tag_definitions_to_manifest()
+        collection_dto = collection_repo.get()
+        _sync_tag_definitions_to_manifest(
+            session=db_session,
+            collection_id=collection_dto.id if collection_dto is not None else None,
+        )
 
     except HTTPException:
         raise
@@ -622,6 +656,7 @@ async def delete_tag(tag_id: str, collection_mgr: CollectionManagerDep) -> None:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete tag: {str(e)}",
         )
+
 
 # =============================================================================
 # Note: Artifact-Tag Association Endpoints

@@ -2085,6 +2085,33 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
         finally:
             session.close()
 
+    def list_artifact_ids_by_import_id(self, import_id: str) -> set[str]:
+        """Return the set of ``type:name`` artifact IDs for a given import batch.
+
+        Queries the ``import_id`` column on ``MarketplaceCatalogEntry`` and
+        returns a set of ``"artifact_type:name"`` strings for all matching rows.
+
+        Args:
+            import_id: Unique identifier of the import batch operation.
+
+        Returns:
+            Set of ``"artifact_type:name"`` strings; empty when no entries
+            match.
+        """
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(
+                    MarketplaceCatalogEntry.artifact_type,
+                    MarketplaceCatalogEntry.name,
+                )
+                .filter(MarketplaceCatalogEntry.import_id == import_id)
+                .all()
+            )
+            return {f"{row.artifact_type}:{row.name}" for row in rows}
+        finally:
+            session.close()
+
     def find_by_artifact_name_and_type(
         self, name: str, artifact_type: str, source_id: Optional[str] = None
     ) -> Optional[MarketplaceCatalogEntry]:
@@ -5426,6 +5453,36 @@ class DuplicatePairRepository(BaseRepository["DuplicatePair"]):
         finally:
             session.close()
 
+    def list_pairs_for_artifact(
+        self, artifact_uuid: str
+    ) -> List["DuplicatePair"]:
+        """Return all non-ignored ``DuplicatePair`` rows involving *artifact_uuid*.
+
+        Returns pairs where ``artifact1_uuid`` or ``artifact2_uuid`` matches the
+        given UUID and ``ignored`` is ``False``.
+
+        Args:
+            artifact_uuid: Stable hex UUID of the artifact.
+
+        Returns:
+            List of ``DuplicatePair`` instances (may be empty).
+        """
+        from skillmeat.cache.models import DuplicatePair
+
+        session = self._get_session()
+        try:
+            return (
+                session.query(DuplicatePair)
+                .filter(
+                    DuplicatePair.ignored.is_(False),
+                    (DuplicatePair.artifact1_uuid == artifact_uuid)
+                    | (DuplicatePair.artifact2_uuid == artifact_uuid),
+                )
+                .all()
+            )
+        finally:
+            session.close()
+
 
 # =============================================================================
 # DbUserCollectionRepository
@@ -5565,6 +5622,35 @@ class DbUserCollectionRepository(
             count = (
                 session.query(func.count(CollectionArtifact.artifact_uuid))
                 .filter(CollectionArtifact.collection_id == collection_id)
+                .scalar()
+                or 0
+            )
+            return _collection_to_dto(row, artifact_count=count)
+        finally:
+            session.close()
+
+    def get_by_name(
+        self,
+        name: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> Optional[UserCollectionDTO]:
+        """Return a user collection by its human-readable name.
+
+        Args:
+            name: Collection name string (case-sensitive).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`UserCollectionDTO` when found, ``None`` otherwise.
+        """
+        session = self._get_session()
+        try:
+            row = session.query(Collection).filter(Collection.name == name).first()
+            if row is None:
+                return None
+            count = (
+                session.query(func.count(CollectionArtifact.artifact_uuid))
+                .filter(CollectionArtifact.collection_id == row.id)
                 .scalar()
                 or 0
             )
@@ -6387,6 +6473,58 @@ class DbCollectionArtifactRepository(IDbCollectionArtifactRepository):
                 len(rows),
             )
             return [_collection_artifact_to_dto(row) for row in rows]
+        finally:
+            session.close()
+
+    def get_source_deployments_batch(
+        self,
+        artifact_ids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> list[dict]:
+        """Return source and deployments_json for a batch of artifact IDs.
+
+        Executes a single JOIN query against the ``artifacts`` and
+        ``collection_artifacts`` tables to retrieve the ``source`` and
+        ``deployments_json`` columns for the given ``type:name`` artifact
+        identifiers.
+
+        Args:
+            artifact_ids: List of ``"type:name"`` artifact identifier strings.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            List of dicts with keys ``id`` (``type:name`` string), ``source``
+            (upstream source spec or ``None``), and ``deployments_json`` (raw
+            JSON string or ``None``).  Only artifacts with a matching
+            ``CollectionArtifact`` row are included.
+        """
+        if not artifact_ids:
+            return []
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(
+                    Artifact.id,
+                    CollectionArtifact.source,
+                    CollectionArtifact.deployments_json,
+                )
+                .join(
+                    CollectionArtifact,
+                    CollectionArtifact.artifact_uuid == Artifact.uuid,
+                )
+                .filter(Artifact.id.in_(artifact_ids))
+                .all()
+            )
+            logger.debug(
+                "DbCollectionArtifactRepository.get_source_deployments_batch: "
+                "%d ids → %d rows",
+                len(artifact_ids),
+                len(rows),
+            )
+            return [
+                {"id": row[0], "source": row[1], "deployments_json": row[2]}
+                for row in rows
+            ]
         finally:
             session.close()
 

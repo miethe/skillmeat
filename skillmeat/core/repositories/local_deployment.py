@@ -93,9 +93,7 @@ def _deployment_to_dto(
     target_path: Optional[str] = None
     if project_path and deployment.artifact_path:
         try:
-            target_path = str(
-                project_path / ".claude" / deployment.artifact_path
-            )
+            target_path = str(project_path / ".claude" / deployment.artifact_path)
         except Exception:
             target_path = str(deployment.artifact_path)
 
@@ -110,16 +108,16 @@ def _deployment_to_dto(
         from_collection=deployment.from_collection,
         scope=None,
         status="modified" if deployment.local_modifications else "deployed",
-        deployed_at=deployment.deployed_at.isoformat() if deployment.deployed_at else None,
+        deployed_at=(
+            deployment.deployed_at.isoformat() if deployment.deployed_at else None
+        ),
         source_path=None,
         target_path=target_path,
         collection_sha=deployment.content_hash,
         local_modifications=deployment.local_modifications,
         deployment_profile_id=deployment.deployment_profile_id,
         platform=(
-            deployment.platform.value
-            if deployment.platform is not None
-            else None
+            deployment.platform.value if deployment.platform is not None else None
         ),
     )
 
@@ -204,7 +202,9 @@ class LocalDeploymentRepository(IDeploymentRepository):
             try:
                 project_path = _decode_project_id(project_id)
             except ValueError:
-                logger.warning("list: invalid project_id '%s' — returning empty", project_id)
+                logger.warning(
+                    "list: invalid project_id '%s' — returning empty", project_id
+                )
                 return []
             raw = self._mgr.list_deployments(project_path=project_path)
             dtos = [_deployment_to_dto(d, project_path) for d in raw]
@@ -282,10 +282,15 @@ class LocalDeploymentRepository(IDeploymentRepository):
         # Fallback: reload from tracker.
         raw = self._mgr.list_deployments(project_path=project_path)
         for dep in raw:
-            if dep.artifact_name == artifact_name and dep.artifact_type == artifact_type_str:
+            if (
+                dep.artifact_name == artifact_name
+                and dep.artifact_type == artifact_type_str
+            ):
                 return _deployment_to_dto(dep, project_path)
 
-        raise KeyError(f"Deployment for '{artifact_id}' not found after deploy operation")
+        raise KeyError(
+            f"Deployment for '{artifact_id}' not found after deploy operation"
+        )
 
     def undeploy(
         self,
@@ -454,5 +459,125 @@ class LocalDeploymentRepository(IDeploymentRepository):
         except Exception:
             session.rollback()
             raise
+        finally:
+            session.close()
+
+    def sync_deployment_cache(
+        self,
+        artifact_id: str,
+        project_path: str,
+        project_name: str,
+        deployed_at: Any,
+        content_hash: Optional[str] = None,
+        deployment_profile_id: Optional[str] = None,
+        local_modifications: bool = False,
+        platform: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> bool:
+        """Upsert a single deployment entry into the artifact cache.
+
+        Delegates to :func:`~skillmeat.api.services.artifact_cache_service.add_deployment_to_cache`
+        using a fresh DB session.  Returns ``False`` (non-fatal) when the
+        artifact is not yet in the cache.
+
+        Args:
+            artifact_id: Artifact primary key in ``"type:name"`` format.
+            project_path: Absolute filesystem path of the deployment target.
+            project_name: Human-readable project directory name.
+            deployed_at: Deployment timestamp (``datetime`` or ISO string).
+            content_hash: Optional SHA of the deployed content snapshot.
+            deployment_profile_id: Optional deployment profile identifier.
+            local_modifications: Whether local modifications are present.
+            platform: Optional platform identifier string.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            ``True`` when the cache entry was updated, ``False`` otherwise.
+        """
+        from skillmeat.api.services.artifact_cache_service import (
+            add_deployment_to_cache as _add_deployment_to_cache,
+        )
+        from skillmeat.cache.models import get_session
+
+        session = get_session()
+        try:
+            result = _add_deployment_to_cache(
+                session=session,
+                artifact_id=artifact_id,
+                project_path=project_path,
+                project_name=project_name,
+                deployed_at=deployed_at,
+                content_hash=content_hash,
+                deployment_profile_id=deployment_profile_id,
+                local_modifications=local_modifications,
+                platform=platform,
+            )
+            session.commit()
+            return result
+        except Exception as exc:
+            logger.warning(
+                "sync_deployment_cache(): failed for %s → %s: %s",
+                artifact_id,
+                project_path,
+                exc,
+            )
+            try:
+                session.rollback()
+            except Exception:
+                pass
+            return False
+        finally:
+            session.close()
+
+    def remove_deployment_cache(
+        self,
+        artifact_id: str,
+        project_path: str,
+        profile_id: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> bool:
+        """Remove a deployment entry from the artifact cache.
+
+        Delegates to
+        :func:`~skillmeat.api.services.artifact_cache_service.remove_deployment_from_cache`
+        using a fresh DB session.  Returns ``False`` (non-fatal) when the
+        artifact is not yet in the cache.
+
+        Args:
+            artifact_id: Artifact primary key in ``"type:name"`` format.
+            project_path: Absolute filesystem path of the deployment target.
+            profile_id: Optional profile ID to narrow the removal.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            ``True`` when the cache entry was updated, ``False`` otherwise.
+        """
+        from skillmeat.api.services.artifact_cache_service import (
+            remove_deployment_from_cache as _remove_deployment_from_cache,
+        )
+        from skillmeat.cache.models import get_session
+
+        session = get_session()
+        try:
+            result = _remove_deployment_from_cache(
+                session=session,
+                artifact_id=artifact_id,
+                project_path=project_path,
+                profile_id=profile_id,
+            )
+            session.commit()
+            return result
+        except Exception as exc:
+            logger.warning(
+                "remove_deployment_cache(): failed for %s → %s: %s",
+                artifact_id,
+                project_path,
+                exc,
+            )
+            try:
+                session.rollback()
+            except Exception:
+                pass
+            return False
         finally:
             session.close()

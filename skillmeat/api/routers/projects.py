@@ -15,12 +15,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import (
+    DbSessionDep,
     DeploymentProfileRepoDep,
     ProjectRepoDep,
     get_app_state,
     get_collection_manager,
     verify_api_key,
 )
+from skillmeat.core.interfaces.repositories import IProjectRepository
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.artifacts import (
     DeploymentModificationStatus,
@@ -259,6 +261,7 @@ def build_project_summary(project_path: Path) -> ProjectSummary:
 def build_project_detail(
     project_path: Path,
     profile_repo: object,
+    project_repo: Optional[IProjectRepository] = None,
     db_session: Optional[Session] = None,
 ) -> ProjectDetail:
     """Build a ProjectDetail from a project path.
@@ -266,48 +269,55 @@ def build_project_detail(
     Args:
         project_path: Absolute path to project directory
         profile_repo: DeploymentProfileRepository instance (injected via DI).
-        db_session: Optional database session for collection lookups
+        project_repo: IProjectRepository for path-based project lookup (injected
+            via DI).  When provided, used instead of a raw session query to
+            resolve the cache project ID for deployment-profile listing.
+        db_session: Active SQLAlchemy session injected via ``DbSessionDep``.
+            When ``None``, collection membership lookup is skipped gracefully.
 
     Returns:
         ProjectDetail object
     """
     from skillmeat.api.services import CollectionService
-    from skillmeat.cache.models import Project, get_session
 
     deployments = DeploymentTracker.read_deployments(project_path)
-
-    session = db_session or get_session()
-    close_session = db_session is None
 
     # Fetch collection memberships for all artifacts (batch query)
     collections_map = {}
     deployment_profiles = []
-    try:
-        if deployments:
-            # Construct artifact IDs: {type}:{name}
-            artifact_ids = [f"{d.artifact_type}:{d.artifact_name}" for d in deployments]
-            collection_service = CollectionService(session)
-            collections_map = collection_service.get_collection_membership_batch(artifact_ids)
 
-        project_row = (
-            session.query(Project)
-            .filter(Project.path == str(project_path.resolve()))
-            .first()
-        )
-        if project_row:
-            deployment_profiles = [
-                {
-                    "profile_id": profile.profile_id,
-                    "platform": profile.platform,
-                    "root_dir": profile.root_dir,
-                    "artifact_path_map": profile.artifact_path_map or {},
-                    "context_path_prefixes": profile.context_prefixes or [],
-                }
-                for profile in profile_repo.list_all_profiles(project_row.id)
-            ]
-    finally:
-        if close_session:
-            session.close()
+    if deployments:
+        # Construct artifact IDs: {type}:{name}
+        artifact_ids = [f"{d.artifact_type}:{d.artifact_name}" for d in deployments]
+        if db_session is not None:
+            collection_service = CollectionService(db_session)
+            collections_map = collection_service.get_collection_membership_batch(
+                artifact_ids
+            )
+
+    # Resolve the cache project ID via repository DI.
+    project_db_id: Optional[str] = None
+    if project_repo is not None:
+        try:
+            project_dto = project_repo.get_by_path(str(project_path.resolve()))
+            if project_dto is not None:
+                project_db_id = project_dto.id
+        except Exception as exc:
+            logger.debug(
+                "build_project_detail: project_repo.get_by_path failed: %s", exc
+            )
+
+    if project_db_id is not None:
+        deployment_profiles = [
+            {
+                "profile_id": profile.profile_id,
+                "platform": profile.platform,
+                "root_dir": profile.root_dir,
+                "artifact_path_map": profile.artifact_path_map or {},
+                "context_path_prefixes": profile.context_prefixes or [],
+            }
+            for profile in profile_repo.list_all_profiles(project_db_id)
+        ]
 
     # Convert to API schema with collection memberships
     deployed_artifacts = [
@@ -489,9 +499,7 @@ async def list_projects(
                     all_projects.append(build_project_summary(discovered_path))
                 used_legacy_discovery = True
             except Exception as discovery_error:
-                logger.warning(
-                    "Legacy discovery fallback failed: %s", discovery_error
-                )
+                logger.warning("Legacy discovery fallback failed: %s", discovery_error)
 
         # If no cache hit or force refresh, fall back to ProjectRegistry
         if (not cache_hit and not used_legacy_discovery) or force_refresh:
@@ -733,7 +741,11 @@ async def create_project(
             description=request.description,
             status="active",
             artifact_count=0,
-            created_at=metadata.created_at.isoformat() if hasattr(metadata.created_at, "isoformat") else str(metadata.created_at) if metadata.created_at else None,
+            created_at=(
+                metadata.created_at.isoformat()
+                if hasattr(metadata.created_at, "isoformat")
+                else str(metadata.created_at) if metadata.created_at else None
+            ),
         )
         try:
             project_repo.create(new_dto)
@@ -802,6 +814,7 @@ async def get_project(
     token: TokenDep,
     project_repo: ProjectRepoDep,
     profile_repo: DeploymentProfileRepoDep,
+    db_session: DbSessionDep,
     cache_manager: CacheManagerDep,
     response: Response,
 ) -> ProjectDetail:
@@ -871,7 +884,12 @@ async def get_project(
             )
 
         # Build project detail from filesystem (always read fresh for detail view)
-        project_detail = build_project_detail(project_path, profile_repo=profile_repo)
+        project_detail = build_project_detail(
+            project_path,
+            profile_repo=profile_repo,
+            project_repo=project_repo,
+            db_session=db_session,
+        )
 
         # Set cache miss header if not hit
         if not cache_hit:
@@ -916,6 +934,7 @@ async def update_project(
     token: TokenDep,
     project_repo: ProjectRepoDep,
     profile_repo: DeploymentProfileRepoDep,
+    db_session: DbSessionDep,
 ) -> ProjectDetail:
     """Update project metadata.
 
@@ -1007,7 +1026,12 @@ async def update_project(
         await registry.refresh_entry(project_path)
 
         # Build and return updated project detail
-        project_detail = build_project_detail(project_path, profile_repo=profile_repo)
+        project_detail = build_project_detail(
+            project_path,
+            profile_repo=profile_repo,
+            project_repo=project_repo,
+            db_session=db_session,
+        )
         return project_detail
 
     except HTTPException:
@@ -1236,6 +1260,7 @@ async def remove_project_deployment(
         # Validate artifact type
         try:
             from skillmeat.core.artifact import ArtifactType
+
             artifact_type_enum = ArtifactType(artifact_type)
         except ValueError:
             raise HTTPException(
@@ -1264,6 +1289,7 @@ async def remove_project_deployment(
             # Remove files from filesystem if requested and they exist
             if remove_files and files_existed:
                 from skillmeat.utils.filesystem import FilesystemManager
+
                 fs_mgr = FilesystemManager()
                 fs_mgr.remove_artifact(artifact_path)
                 files_removed = True
