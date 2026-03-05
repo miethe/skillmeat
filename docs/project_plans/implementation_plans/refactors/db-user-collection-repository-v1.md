@@ -1,17 +1,26 @@
 ---
 schema_version: 2
 doc_type: implementation_plan
-title: 'Implementation Plan: DB Repository Migration — Complete Session Cleanup'
-status: draft
+title: "Implementation Plan: DB Repository Migration \u2014 Complete Session Cleanup"
+status: in-progress
 created: 2026-03-05
 updated: '2026-03-05'
 feature_slug: db-user-collection-repository
 feature_version: v1
 prd_ref: null
 plan_ref: null
-scope: Create IDbUserCollectionRepository + IDbCollectionArtifactRepository ABCs, implement concrete DB-backed repositories with full transactional session management, wire DI factories, migrate all 16 user_collections.py endpoints to zero direct SQLAlchemy session usage; also clean up 21 residual session.query() calls in artifacts.py (15), artifact_history.py (2), deployment_profiles.py (2), projects.py (1), tags.py (1) from gap-closure Phases 4-6 over-claims
+scope: Create IDbUserCollectionRepository + IDbCollectionArtifactRepository ABCs,
+  implement concrete DB-backed repositories with full transactional session management,
+  wire DI factories, migrate all 16 user_collections.py endpoints to zero direct SQLAlchemy
+  session usage; also clean up 21 residual session.query() calls in artifacts.py (15),
+  artifact_history.py (2), deployment_profiles.py (2), projects.py (1), tags.py (1)
+  from gap-closure Phases 4-6 over-claims
 effort_estimate: 22 pts
-architecture_summary: New DB-specific repository ABCs for Collection and CollectionArtifact domains, concrete implementations in cache/repositories.py using SQLAlchemy session management pattern, DI factory wiring with typed aliases, full router migration eliminating 110+ direct session calls, plus residual cleanup of 21 session.query() calls in 5 other routers
+architecture_summary: New DB-specific repository ABCs for Collection and CollectionArtifact
+  domains, concrete implementations in cache/repositories.py using SQLAlchemy session
+  management pattern, DI factory wiring with typed aliases, full router migration
+  eliminating 110+ direct session calls, plus residual cleanup of 21 session.query()
+  calls in 5 other routers
 related_documents:
 - docs/project_plans/implementation_plans/refactors/repo-pattern-gap-closure-v1.md
 - docs/project_plans/PRDs/refactors/enterprise-db-storage-v1.md
