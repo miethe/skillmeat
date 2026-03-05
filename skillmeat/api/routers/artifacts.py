@@ -29,7 +29,6 @@ from fastapi import (
     Response,
     status,
 )
-from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
@@ -39,6 +38,7 @@ from skillmeat.api.dependencies import (
     DbSessionDep,
     SettingsDep,
     SyncManagerDep,
+    TagRepoDep,
     get_app_state,
     verify_api_key,
 )
@@ -127,7 +127,6 @@ from skillmeat.core.importer import (
 )
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
-from sqlalchemy import func
 from skillmeat.api.services import (
     CollectionService,
     delete_artifact_cache,
@@ -143,7 +142,6 @@ from skillmeat.cache.models import (
     Artifact,
     Collection,
     CollectionArtifact,
-    CompositeArtifact,
     MarketplaceCatalogEntry,
     get_session,
 )
@@ -1120,6 +1118,7 @@ async def bulk_import_artifacts(
     request: BulkImportRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    session: DbSessionDep,
     _token: TokenDep,
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
@@ -1128,7 +1127,6 @@ async def bulk_import_artifacts(
         None,
         description="Base64-encoded project path to also record deployments for the imports",
     ),
-    session: Session = Depends(get_session),
 ) -> BulkImportResult:
     """
     Bulk import multiple artifacts with graceful error handling.
@@ -1964,16 +1962,7 @@ async def create_artifact(
 
         # Refresh DB cache after successful create (non-blocking)
         artifact_id = f"{artifact.type.value}:{artifact.name}"
-        try:
-            db_session = get_session()
-            try:
-                refresh_single_artifact_cache(
-                    db_session, artifact_mgr, artifact_id, collection_name
-                )
-            finally:
-                db_session.close()
-        except Exception as cache_err:
-            logger.warning(f"Cache refresh failed for {artifact_id}: {cache_err}")
+        _refresh_cache_safe(artifact_mgr, artifact_id, collection_name)
 
         return ArtifactCreateResponse(
             success=True,
@@ -2010,7 +1999,9 @@ async def create_artifact(
 )
 async def list_artifacts(
     artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
+    db_session: DbSessionDep,
     sync_mgr: SyncManagerDep,
     token: TokenDep,
     limit: int = Query(
@@ -2185,8 +2176,6 @@ async def list_artifacts(
             try:
                 # TODO: Replace with repository method when IArtifactRepository
                 # supports import_id filtering (MarketplaceCatalogEntry join).
-                db_session = get_session()
-                # Query catalog entries that were imported in this batch
                 entries = (
                     db_session.query(
                         MarketplaceCatalogEntry.artifact_type,
@@ -2199,7 +2188,6 @@ async def list_artifacts(
                 matching_ids: set[str] = {
                     f"{entry.artifact_type}:{entry.name}" for entry in entries
                 }
-                db_session.close()
             except Exception as e:
                 logger.warning(f"Failed to query import_id from DB: {e}")
                 matching_ids = set()
@@ -2283,7 +2271,6 @@ async def list_artifacts(
                 # TODO: Replace CollectionService and CollectionArtifact join with
                 # repository methods when ICollectionRepository exposes batch
                 # collection-membership lookup and deployment summary queries.
-                db_session = get_session()
                 collection_service = CollectionService(db_session)
                 collections_map = collection_service.get_collection_membership_batch(
                     artifact_ids
@@ -2310,26 +2297,19 @@ async def list_artifacts(
                     parsed = parse_deployments(row.deployments_json)
                     if parsed:
                         deployments_lookup[row.id] = parsed
-                db_session.close()
             except Exception as e:
                 logger.warning(f"Failed to query collection memberships: {e}")
 
-        # Build uuid lookup from DB cache via batch query.
-        # CollectionArtifact uses artifact_uuid FK (ADR-007); query Artifact table
-        # directly so artifacts in any collection (not just "active") are found.
+        # Build uuid lookup from DB cache via batch repository query (ADR-007).
         uuid_lookup: dict = {}
         try:
-            artifact_keys = [f"{a.type.value}:{a.name}" for a in page_artifacts]
-            db_session_uuid = get_session()
-            try:
-                rows = (
-                    db_session_uuid.query(Artifact.id, Artifact.uuid)
-                    .filter(Artifact.id.in_(artifact_keys))
-                    .all()
-                )
-                uuid_lookup = {row.id: row.uuid for row in rows if row.uuid}
-            finally:
-                db_session_uuid.close()
+            pairs = [(a.type.value, a.name) for a in page_artifacts]
+            resolved = artifact_repo.batch_resolve_uuids(pairs)
+            # Convert (type, name) tuple keys to "type:name" string keys
+            uuid_lookup = {
+                f"{art_type}:{name}": uuid_val
+                for (art_type, name), uuid_val in resolved.items()
+            }
         except Exception as e:
             logger.warning(f"Failed to query uuids from DB cache: {e}")
 
@@ -2416,6 +2396,7 @@ async def list_artifacts(
 async def get_artifact(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     db_session: DbSessionDep,
     token: TokenDep,
@@ -2508,16 +2489,8 @@ async def get_artifact(
             artifact_id
         )
 
-        # Get UUID from DB cache (filesystem artifacts may have uuid=None)
-        db_artifact = (
-            db_session.query(Artifact)
-            .filter(
-                Artifact.type == artifact_type.value,
-                Artifact.name == artifact_name,
-            )
-            .first()
-        )
-        db_uuid = db_artifact.uuid if db_artifact else None
+        # Get UUID from DB cache via repository (filesystem artifacts may have uuid=None)
+        db_uuid = artifact_repo.resolve_uuid_by_type_name(artifact_type.value, artifact_name)
 
         # Build base response with collections
         response = artifact_to_response(
@@ -2885,16 +2858,7 @@ async def update_artifact(
             logger.info(f"Successfully updated artifact: {artifact_id}")
 
             # Refresh DB cache after successful update (non-blocking)
-            try:
-                db_session = get_session()
-                try:
-                    refresh_single_artifact_cache(
-                        db_session, artifact_mgr, artifact_id, collection_name
-                    )
-                finally:
-                    db_session.close()
-            except Exception as cache_err:
-                logger.warning(f"Cache refresh failed for {artifact_id}: {cache_err}")
+            _refresh_cache_safe(artifact_mgr, artifact_id, collection_name)
 
             # Invalidate upstream fetch cache — cached diff results are now stale
             try:
@@ -2934,6 +2898,7 @@ async def update_artifact_parameters(
     artifact_id: str,
     request: ParameterUpdateRequest,
     artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
     collection: Optional[str] = Query(
@@ -3148,20 +3113,17 @@ async def update_artifact_parameters(
                 try:
                     from skillmeat.core.services import TagService
 
-                    # Resolve UUID via DB cache (filesystem DTOs may lack uuid)
-                    tag_db_session = get_session()
-                    try:
-                        tag_db_art = tag_db_session.query(Artifact).filter_by(id=artifact_id).first()
-                        if tag_db_art and tag_db_art.uuid:
-                            TagService().sync_artifact_tags(
-                                tag_db_art.uuid, pending_tag_sync
-                            )
-                        else:
-                            logger.warning(
-                                f"No artifact row found for {artifact_id}, skipping tag sync"
-                            )
-                    finally:
-                        tag_db_session.close()
+                    # Resolve UUID via repository (filesystem DTOs may lack uuid)
+                    art_type_str, art_name = artifact_id.split(":", 1)
+                    artifact_uuid = artifact_repo.resolve_uuid_by_type_name(
+                        art_type_str, art_name
+                    )
+                    if artifact_uuid:
+                        TagService().sync_artifact_tags(artifact_uuid, pending_tag_sync)
+                    else:
+                        logger.warning(
+                            f"No artifact row found for {artifact_id}, skipping tag sync"
+                        )
                 except Exception as e:
                     logger.warning(
                         f"Failed to sync tag associations for {artifact_id}: {e}",
@@ -3208,6 +3170,7 @@ async def delete_artifact(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    db_session: DbSessionDep,
     token: TokenDep,
     collection: Optional[str] = Query(
         default=None,
@@ -3220,6 +3183,7 @@ async def delete_artifact(
         artifact_id: Artifact identifier (format: "type:name")
         artifact_mgr: Artifact manager dependency
         collection_mgr: Collection manager dependency
+        db_session: Database session dependency
         token: Authentication token
         collection: Optional collection filter
 
@@ -3320,11 +3284,7 @@ async def delete_artifact(
 
         # Delete DB cache entry after successful artifact deletion (non-blocking)
         try:
-            db_session = get_session()
-            try:
-                delete_artifact_cache(db_session, artifact_id, collection_name)
-            finally:
-                db_session.close()
+            delete_artifact_cache(db_session, artifact_id, collection_name)
         except Exception as cache_err:
             logger.warning(f"Cache deletion failed for {artifact_id}: {cache_err}")
 
@@ -4052,18 +4012,7 @@ async def sync_artifact(
 
             # Refresh DB cache after successful project sync (non-blocking)
             if success:
-                try:
-                    db_session = get_session()
-                    try:
-                        refresh_single_artifact_cache(
-                            db_session, artifact_mgr, artifact_id, collection_name
-                        )
-                    finally:
-                        db_session.close()
-                except Exception as cache_err:
-                    logger.warning(
-                        f"Cache refresh failed for {artifact_id}: {cache_err}"
-                    )
+                _refresh_cache_safe(artifact_mgr, artifact_id, collection_name)
 
                 # Invalidate upstream fetch cache — collection version has changed
                 try:
@@ -6354,19 +6303,8 @@ async def update_artifact_file_content(
         logger.info(f"Successfully updated file content: {artifact_id}/{file_path}")
 
         # Refresh DB cache after successful file update (non-blocking)
-        try:
-            db_session = get_session()
-            try:
-                refresh_single_artifact_cache(
-                    db_session, _artifact_mgr, artifact_id, collection_name
-                )
-                logger.debug(f"Refreshed cache after file update: {artifact_id}")
-            finally:
-                db_session.close()
-        except Exception as cache_err:
-            logger.warning(
-                f"Cache refresh failed after file update for {artifact_id}: {cache_err}"
-            )
+        _refresh_cache_safe(_artifact_mgr, artifact_id, collection_name)
+        logger.debug(f"Refreshed cache after file update: {artifact_id}")
 
         return FileContentResponse(
             artifact_id=artifact_id,
@@ -6635,19 +6573,8 @@ async def create_artifact_file(
         logger.info(f"Successfully created file: {artifact_id}/{file_path}")
 
         # Refresh DB cache after successful file create (non-blocking)
-        try:
-            db_session = get_session()
-            try:
-                refresh_single_artifact_cache(
-                    db_session, _artifact_mgr, artifact_id, collection_name
-                )
-                logger.debug(f"Refreshed cache after file create: {artifact_id}")
-            finally:
-                db_session.close()
-        except Exception as cache_err:
-            logger.warning(
-                f"Cache refresh failed after file create for {artifact_id}: {cache_err}"
-            )
+        _refresh_cache_safe(_artifact_mgr, artifact_id, collection_name)
+        logger.debug(f"Refreshed cache after file create: {artifact_id}")
 
         return FileContentResponse(
             artifact_id=artifact_id,
@@ -6874,19 +6801,8 @@ async def delete_artifact_file(
         logger.info(f"Successfully deleted file: {artifact_id}/{file_path}")
 
         # Refresh DB cache after successful file delete (non-blocking)
-        try:
-            db_session = get_session()
-            try:
-                refresh_single_artifact_cache(
-                    db_session, _artifact_mgr, artifact_id, collection_name
-                )
-                logger.debug(f"Refreshed cache after file delete: {artifact_id}")
-            finally:
-                db_session.close()
-        except Exception as cache_err:
-            logger.warning(
-                f"Cache refresh failed after file delete for {artifact_id}: {cache_err}"
-            )
+        _refresh_cache_safe(_artifact_mgr, artifact_id, collection_name)
+        logger.debug(f"Refreshed cache after file delete: {artifact_id}")
 
     except HTTPException:
         raise
@@ -7478,11 +7394,13 @@ async def list_skip_preferences(
 )
 async def get_artifact_tags(
     artifact_id: str,
+    artifact_repo: ArtifactRepoDep,
 ) -> List[TagResponse]:
     """Get all tags assigned to a specific artifact.
 
     Args:
         artifact_id: Unique identifier of the artifact (type:name format)
+        artifact_repo: Artifact repository dependency
 
     Returns:
         List of tags assigned to the artifact
@@ -7496,17 +7414,13 @@ async def get_artifact_tags(
     service = TagService()
 
     try:
-        # Resolve type:name artifact_id → UUID via DB cache (ADR-007 stable identity)
-        db_session = get_session()
-        try:
-            db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
-            if not db_art:
-                raise HTTPException(
-                    status_code=404, detail=f"Artifact '{artifact_id}' not found"
-                )
-            artifact_uuid = db_art.uuid
-        finally:
-            db_session.close()
+        # Resolve type:name artifact_id → UUID via repository (ADR-007 stable identity)
+        art_type_str, art_name = artifact_id.split(":", 1)
+        artifact_uuid = artifact_repo.resolve_uuid_by_type_name(art_type_str, art_name)
+        if not artifact_uuid:
+            raise HTTPException(
+                status_code=404, detail=f"Artifact '{artifact_id}' not found"
+            )
 
         return service.get_artifact_tags(artifact_uuid)
     except HTTPException:
@@ -7541,6 +7455,7 @@ async def get_artifact_tags(
 async def update_artifact_tags(
     artifact_id: str,
     request: ArtifactTagsUpdate,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
     collection: Optional[str] = Query(
@@ -7614,23 +7529,14 @@ async def update_artifact_tags(
         # Save collection back to disk
         collection_mgr.save_collection(coll)
 
-        # Refresh CollectionArtifact cache to keep tags in sync.
-        # TODO: Replace with IArtifactRepository.set_tags() or a dedicated
-        # write-through helper when the repository interface exposes tag cache sync.
+        # Refresh CollectionArtifact cache to keep tags in sync via repository.
         try:
-            db_session = get_session()
-            # Resolve type:name artifact_id → artifacts.uuid for the FK lookup
-            db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
-            if db_art:
-                cas = (
-                    db_session.query(CollectionArtifact)
-                    .filter_by(artifact_uuid=db_art.uuid)
-                    .all()
-                )
-                for ca in cas:
-                    ca.tags_json = json.dumps(request.tags) if request.tags else None
-                db_session.commit()
-            db_session.close()
+            art_type_str, art_name = artifact_id.split(":", 1)
+            artifact_uuid = artifact_repo.resolve_uuid_by_type_name(
+                art_type_str, art_name
+            )
+            if artifact_uuid:
+                artifact_repo.update_collection_tags(artifact_uuid, request.tags or [])
         except Exception as cache_err:
             logger.warning(
                 f"Failed to update CollectionArtifact tags cache: {cache_err}"
@@ -7665,6 +7571,7 @@ async def update_artifact_tags(
 async def add_tag_to_artifact(
     artifact_id: str,
     tag_id: str,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
 ) -> dict[str, str]:
@@ -7687,17 +7594,13 @@ async def add_tag_to_artifact(
 
     service = TagService()
 
-    # Resolve type:name artifact_id → UUID via DB cache (ADR-007 stable identity)
-    db_session = get_session()
-    try:
-        db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
-        if not db_art:
-            raise HTTPException(
-                status_code=404, detail=f"Artifact '{artifact_id}' not found"
-            )
-        artifact_uuid = db_art.uuid
-    finally:
-        db_session.close()
+    # Resolve type:name artifact_id → UUID via repository (ADR-007 stable identity)
+    art_type_str, art_name = artifact_id.split(":", 1)
+    artifact_uuid = artifact_repo.resolve_uuid_by_type_name(art_type_str, art_name)
+    if not artifact_uuid:
+        raise HTTPException(
+            status_code=404, detail=f"Artifact '{artifact_id}' not found"
+        )
 
     try:
         service.add_tag_to_artifact(artifact_uuid, tag_id)
@@ -7705,20 +7608,9 @@ async def add_tag_to_artifact(
         # Write-through: sync tags to CollectionArtifact.tags_json and filesystem
         updated_tags = [t.name for t in service.get_artifact_tags(artifact_uuid)]
 
-        # Update CollectionArtifact.tags_json in DB cache.
-        # TODO: Replace with IArtifactRepository.set_tags() write-through helper
-        # when the repository interface exposes tag cache sync.
+        # Update CollectionArtifact.tags_json in DB cache via repository.
         try:
-            db_session = get_session()
-            cas = (
-                db_session.query(CollectionArtifact)
-                .filter_by(artifact_uuid=artifact_uuid)
-                .all()
-            )
-            for ca in cas:
-                ca.tags_json = json.dumps(updated_tags) if updated_tags else None
-            db_session.commit()
-            db_session.close()
+            artifact_repo.update_collection_tags(artifact_uuid, updated_tags)
         except Exception as cache_err:
             logger.warning(
                 f"Failed to update CollectionArtifact tags cache: {cache_err}"
@@ -7726,11 +7618,11 @@ async def add_tag_to_artifact(
 
         # Update filesystem artifact
         try:
-            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
-            artifact_type = ArtifactType(artifact_type_str)
+            artifact_type_str_fs, artifact_name_fs = parse_artifact_id(artifact_id)
+            artifact_type_fs = ArtifactType(artifact_type_str_fs)
             collection_name = collection_mgr.get_active_collection_name()
             coll = collection_mgr.load_collection(collection_name)
-            artifact = coll.find_artifact(artifact_name, artifact_type)
+            artifact = coll.find_artifact(artifact_name_fs, artifact_type_fs)
             if artifact:
                 artifact.tags = updated_tags
                 collection_mgr.save_collection(coll)
@@ -7756,6 +7648,7 @@ async def add_tag_to_artifact(
 async def remove_tag_from_artifact(
     artifact_id: str,
     tag_id: str,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
 ) -> None:
@@ -7778,17 +7671,13 @@ async def remove_tag_from_artifact(
 
     service = TagService()
 
-    # Resolve type:name artifact_id → UUID via DB cache (ADR-007 stable identity)
-    db_session = get_session()
-    try:
-        db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
-        if not db_art:
-            raise HTTPException(
-                status_code=404, detail=f"Artifact '{artifact_id}' not found"
-            )
-        artifact_uuid = db_art.uuid
-    finally:
-        db_session.close()
+    # Resolve type:name artifact_id → UUID via repository (ADR-007 stable identity)
+    art_type_str, art_name = artifact_id.split(":", 1)
+    artifact_uuid = artifact_repo.resolve_uuid_by_type_name(art_type_str, art_name)
+    if not artifact_uuid:
+        raise HTTPException(
+            status_code=404, detail=f"Artifact '{artifact_id}' not found"
+        )
 
     try:
         if not service.remove_tag_from_artifact(artifact_uuid, tag_id):
@@ -7797,20 +7686,9 @@ async def remove_tag_from_artifact(
         # Write-through: sync tags to CollectionArtifact.tags_json and filesystem
         updated_tags = [t.name for t in service.get_artifact_tags(artifact_uuid)]
 
-        # Update CollectionArtifact.tags_json in DB cache.
-        # TODO: Replace with IArtifactRepository.set_tags() write-through helper
-        # when the repository interface exposes tag cache sync.
+        # Update CollectionArtifact.tags_json in DB cache via repository.
         try:
-            db_session = get_session()
-            cas = (
-                db_session.query(CollectionArtifact)
-                .filter_by(artifact_uuid=artifact_uuid)
-                .all()
-            )
-            for ca in cas:
-                ca.tags_json = json.dumps(updated_tags) if updated_tags else None
-            db_session.commit()
-            db_session.close()
+            artifact_repo.update_collection_tags(artifact_uuid, updated_tags)
         except Exception as cache_err:
             logger.warning(
                 f"Failed to update CollectionArtifact tags cache: {cache_err}"
@@ -7818,11 +7696,11 @@ async def remove_tag_from_artifact(
 
         # Update filesystem artifact
         try:
-            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
-            artifact_type = ArtifactType(artifact_type_str)
+            artifact_type_str_fs, artifact_name_fs = parse_artifact_id(artifact_id)
+            artifact_type_fs = ArtifactType(artifact_type_str_fs)
             collection_name = collection_mgr.get_active_collection_name()
             coll = collection_mgr.load_collection(collection_name)
-            artifact = coll.find_artifact(artifact_name, artifact_type)
+            artifact = coll.find_artifact(artifact_name_fs, artifact_type_fs)
             if artifact:
                 artifact.tags = updated_tags
                 collection_mgr.save_collection(coll)
@@ -8420,6 +8298,7 @@ async def get_unlinked_references(
 async def get_skill_sync_diff(
     artifact_id: str,
     collection_mgr: CollectionManagerDep,
+    db_session: DbSessionDep,
     _token: TokenDep,
     collection: Optional[str] = Query(
         default=None,
@@ -8484,7 +8363,7 @@ async def get_skill_sync_diff(
             collection_id=collection_name,
             project_id=effective_project_id,
             db_path=db_path or "",
-            _session=get_session() if not db_path else None,
+            _session=db_session if not db_path else None,
         )
 
         return [
@@ -8537,6 +8416,7 @@ async def get_skill_sync_diff(
 )
 async def get_artifact_associations(
     artifact_id: str,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
     include_parents: bool = Query(
@@ -8662,12 +8542,14 @@ async def get_artifact_associations(
 
         # Resolve the collection_id used in the DB (the collection UUID / name key)
         # The composite_memberships table stores collection_id as the Collection.id
-        # We look it up via the DB session so we use the canonical value.
-        db_session = get_session()
+        # We look it up via a direct DB session so we use the canonical value.
+        # TODO: Need repo method for ICollectionRepository.get_db_id(name) to
+        # replace this direct ORM query.
+        _coll_session = get_session()
         collection_id: Optional[str] = None
         try:
             col_row = (
-                db_session.query(Collection)
+                _coll_session.query(Collection)
                 .filter(Collection.name == resolved_collection_name)
                 .first()
             )
@@ -8675,7 +8557,7 @@ async def get_artifact_associations(
                 # Backward-compatible fallback when callers provide UUIDs or
                 # human-friendly collection names.
                 col_row = (
-                    db_session.query(Collection)
+                    _coll_session.query(Collection)
                     .filter(
                         (Collection.id == collection) | (Collection.name == collection)
                     )
@@ -8684,7 +8566,7 @@ async def get_artifact_associations(
             if col_row is not None:
                 collection_id = col_row.id
         finally:
-            db_session.close()
+            _coll_session.close()
 
         # Fall back to resolved filesystem name when DB row is unavailable.
         if collection_id is None:
@@ -8747,28 +8629,23 @@ async def get_artifact_associations(
             # embedded member artifacts (commands, agents, etc.) that live
             # inside the skill directory.
             if artifact_type_str == "skill" and not children:
-                skill_uuid_session = get_session()
-                try:
-                    skill_art = (
-                        skill_uuid_session.query(Artifact)
-                        .filter(Artifact.id == artifact_id)
-                        .first()
+                # Resolve UUID via repository (ADR-007 stable identity)
+                skill_uuid = artifact_repo.resolve_uuid_by_type_name(
+                    "skill", artifact_name
+                )
+                if skill_uuid is not None:
+                    skill_members = repo.get_skill_composite_children(
+                        skill_artifact_uuid=skill_uuid,
+                        collection_id=collection_id,
                     )
-                    if skill_art is not None:
-                        skill_members = repo.get_skill_composite_children(
-                            skill_artifact_uuid=str(skill_art.uuid),
-                            collection_id=collection_id,
+                    children = [_build_child_dto(r) for r in skill_members]
+                    if skill_members:
+                        logger.debug(
+                            "Associations: found %d embedded member(s) via "
+                            "skill composite for '%s'",
+                            len(skill_members),
+                            artifact_id,
                         )
-                        children = [_build_child_dto(r) for r in skill_members]
-                        if skill_members:
-                            logger.debug(
-                                "Associations: found %d embedded member(s) via "
-                                "skill composite for '%s'",
-                                len(skill_members),
-                                artifact_id,
-                            )
-                finally:
-                    skill_uuid_session.close()
 
             if relationship_type is not None:
                 children = [
@@ -9487,6 +9364,7 @@ async def merge_consolidation_cluster(
     cluster_id: str,
     request: ConsolidationActionRequest,
     artifact_mgr: ArtifactManagerDep,
+    db_session: DbSessionDep,
     token: TokenDep,
 ) -> ConsolidationActionResponse:
     """Merge secondary artifacts into the primary for a consolidation cluster.
@@ -9543,46 +9421,45 @@ async def merge_consolidation_cluster(
 
         primary_uuid = request.primary_artifact_uuid
 
-        with get_session() as session:
-            # Validate primary artifact exists
-            primary_art = (
-                session.query(Artifact)
-                .filter(Artifact.uuid == primary_uuid)
-                .first()
+        # Validate primary artifact exists via DI-injected db_session
+        primary_art = (
+            db_session.query(Artifact)
+            .filter(Artifact.uuid == primary_uuid)
+            .first()
+        )
+        if primary_art is None:
+            logger.warning(
+                "Merge cluster %r: primary artifact UUID %r not found",
+                cluster_id,
+                primary_uuid,
             )
-            if primary_art is None:
-                logger.warning(
-                    "Merge cluster %r: primary artifact UUID %r not found",
-                    cluster_id,
-                    primary_uuid,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Primary artifact '{primary_uuid}' not found",
-                )
-
-            # Collect all UUIDs in the cluster via DuplicatePair records
-            pairs = (
-                session.query(DuplicatePair)
-                .filter(
-                    DuplicatePair.ignored.is_(False),
-                    (DuplicatePair.artifact1_uuid == primary_uuid)
-                    | (DuplicatePair.artifact2_uuid == primary_uuid),
-                )
-                .all()
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Primary artifact '{primary_uuid}' not found",
             )
 
-            secondary_uuids: List[str] = []
-            for pair in pairs:
-                other = (
-                    pair.artifact2_uuid
-                    if pair.artifact1_uuid == primary_uuid
-                    else pair.artifact1_uuid
-                )
-                if other not in secondary_uuids:
-                    secondary_uuids.append(other)
+        # Collect all UUIDs in the cluster via DuplicatePair records
+        pairs = (
+            db_session.query(DuplicatePair)
+            .filter(
+                DuplicatePair.ignored.is_(False),
+                (DuplicatePair.artifact1_uuid == primary_uuid)
+                | (DuplicatePair.artifact2_uuid == primary_uuid),
+            )
+            .all()
+        )
 
-            pair_ids = [pair.id for pair in pairs]
+        secondary_uuids: List[str] = []
+        for pair in pairs:
+            other = (
+                pair.artifact2_uuid
+                if pair.artifact1_uuid == primary_uuid
+                else pair.artifact1_uuid
+            )
+            if other not in secondary_uuids:
+                secondary_uuids.append(other)
+
+        pair_ids = [pair.id for pair in pairs]
 
         logger.info(
             "Merge cluster %r: primary=%r, secondaries=%r",
@@ -9593,44 +9470,43 @@ async def merge_consolidation_cluster(
 
         # --- Step 3: Remove each secondary artifact from the collection ---
         removed_uuids: List[str] = []
-        with get_session() as session:
-            for sec_uuid in secondary_uuids:
-                sec_art = (
-                    session.query(Artifact)
-                    .filter(Artifact.uuid == sec_uuid)
-                    .first()
+        for sec_uuid in secondary_uuids:
+            sec_art = (
+                db_session.query(Artifact)
+                .filter(Artifact.uuid == sec_uuid)
+                .first()
+            )
+            if sec_art is None:
+                logger.warning(
+                    "Merge cluster %r: secondary artifact UUID %r not found, skipping",
+                    cluster_id,
+                    sec_uuid,
                 )
-                if sec_art is None:
-                    logger.warning(
-                        "Merge cluster %r: secondary artifact UUID %r not found, skipping",
-                        cluster_id,
-                        sec_uuid,
-                    )
-                    continue
+                continue
 
-                try:
-                    from skillmeat.core.enums import ArtifactType as CoreArtifactType
+            try:
+                from skillmeat.core.enums import ArtifactType as CoreArtifactType
 
-                    art_type = CoreArtifactType(sec_art.artifact_type)
-                    artifact_mgr.remove(
-                        artifact_name=sec_art.name,
-                        artifact_type=art_type,
-                        collection_name=request.collection_name,
-                    )
-                    removed_uuids.append(sec_uuid)
-                    logger.info(
-                        "Merge cluster %r: removed secondary artifact %r (%r)",
-                        cluster_id,
-                        sec_art.name,
-                        sec_uuid,
-                    )
-                except Exception as rm_err:
-                    logger.warning(
-                        "Merge cluster %r: could not remove secondary %r: %s",
-                        cluster_id,
-                        sec_uuid,
-                        rm_err,
-                    )
+                art_type = CoreArtifactType(sec_art.artifact_type)
+                artifact_mgr.remove(
+                    artifact_name=sec_art.name,
+                    artifact_type=art_type,
+                    collection_name=request.collection_name,
+                )
+                removed_uuids.append(sec_uuid)
+                logger.info(
+                    "Merge cluster %r: removed secondary artifact %r (%r)",
+                    cluster_id,
+                    sec_art.name,
+                    sec_uuid,
+                )
+            except Exception as rm_err:
+                logger.warning(
+                    "Merge cluster %r: could not remove secondary %r: %s",
+                    cluster_id,
+                    sec_uuid,
+                    rm_err,
+                )
 
         # --- Step 4: Mark pairs as resolved (ignored) ---
         repo = DuplicatePairRepository()
@@ -9692,6 +9568,7 @@ async def replace_consolidation_cluster(
     cluster_id: str,
     request: ConsolidationActionRequest,
     artifact_mgr: ArtifactManagerDep,
+    db_session: DbSessionDep,
     token: TokenDep,
 ) -> ConsolidationActionResponse:
     """Keep the primary artifact and discard all secondaries in the cluster.
@@ -9751,46 +9628,45 @@ async def replace_consolidation_cluster(
 
         primary_uuid = request.primary_artifact_uuid
 
-        with get_session() as session:
-            # Validate primary artifact exists
-            primary_art = (
-                session.query(Artifact)
-                .filter(Artifact.uuid == primary_uuid)
-                .first()
+        # Validate primary artifact exists via DI-injected db_session
+        primary_art = (
+            db_session.query(Artifact)
+            .filter(Artifact.uuid == primary_uuid)
+            .first()
+        )
+        if primary_art is None:
+            logger.warning(
+                "Replace cluster %r: primary artifact UUID %r not found",
+                cluster_id,
+                primary_uuid,
             )
-            if primary_art is None:
-                logger.warning(
-                    "Replace cluster %r: primary artifact UUID %r not found",
-                    cluster_id,
-                    primary_uuid,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Primary artifact '{primary_uuid}' not found",
-                )
-
-            # Collect all UUIDs in the cluster via DuplicatePair records
-            pairs = (
-                session.query(DuplicatePair)
-                .filter(
-                    DuplicatePair.ignored.is_(False),
-                    (DuplicatePair.artifact1_uuid == primary_uuid)
-                    | (DuplicatePair.artifact2_uuid == primary_uuid),
-                )
-                .all()
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Primary artifact '{primary_uuid}' not found",
             )
 
-            secondary_uuids: List[str] = []
-            for pair in pairs:
-                other = (
-                    pair.artifact2_uuid
-                    if pair.artifact1_uuid == primary_uuid
-                    else pair.artifact1_uuid
-                )
-                if other not in secondary_uuids:
-                    secondary_uuids.append(other)
+        # Collect all UUIDs in the cluster via DuplicatePair records
+        pairs = (
+            db_session.query(DuplicatePair)
+            .filter(
+                DuplicatePair.ignored.is_(False),
+                (DuplicatePair.artifact1_uuid == primary_uuid)
+                | (DuplicatePair.artifact2_uuid == primary_uuid),
+            )
+            .all()
+        )
 
-            pair_ids = [pair.id for pair in pairs]
+        secondary_uuids: List[str] = []
+        for pair in pairs:
+            other = (
+                pair.artifact2_uuid
+                if pair.artifact1_uuid == primary_uuid
+                else pair.artifact1_uuid
+            )
+            if other not in secondary_uuids:
+                secondary_uuids.append(other)
+
+        pair_ids = [pair.id for pair in pairs]
 
         logger.info(
             "Replace cluster %r: primary=%r, secondaries=%r",
@@ -9801,39 +9677,38 @@ async def replace_consolidation_cluster(
 
         # --- Step 3: Remove each secondary artifact from the collection ---
         removed_uuids: List[str] = []
-        with get_session() as session:
-            for sec_uuid in secondary_uuids:
-                sec_art = (
-                    session.query(Artifact)
-                    .filter(Artifact.uuid == sec_uuid)
-                    .first()
+        for sec_uuid in secondary_uuids:
+            sec_art = (
+                db_session.query(Artifact)
+                .filter(Artifact.uuid == sec_uuid)
+                .first()
+            )
+            if sec_art is None:
+                logger.warning(
+                    "Replace cluster %r: secondary artifact UUID %r not found, skipping",
+                    cluster_id,
+                    sec_uuid,
                 )
-                if sec_art is None:
-                    logger.warning(
-                        "Replace cluster %r: secondary artifact UUID %r not found, skipping",
-                        cluster_id,
-                        sec_uuid,
-                    )
-                    continue
+                continue
 
-                try:
-                    from skillmeat.core.enums import ArtifactType as CoreArtifactType
+            try:
+                from skillmeat.core.enums import ArtifactType as CoreArtifactType
 
-                    art_type = CoreArtifactType(sec_art.artifact_type)
-                    artifact_mgr.remove(
-                        artifact_name=sec_art.name,
-                        artifact_type=art_type,
-                        collection_name=request.collection_name,
-                    )
-                    removed_uuids.append(sec_uuid)
-                    logger.info(
-                        "Replace cluster %r: removed secondary artifact %r (%r)",
-                        cluster_id,
-                        sec_art.name,
-                        sec_uuid,
-                    )
-                except Exception as rm_err:
-                    logger.warning(
+                art_type = CoreArtifactType(sec_art.artifact_type)
+                artifact_mgr.remove(
+                    artifact_name=sec_art.name,
+                    artifact_type=art_type,
+                    collection_name=request.collection_name,
+                )
+                removed_uuids.append(sec_uuid)
+                logger.info(
+                    "Replace cluster %r: removed secondary artifact %r (%r)",
+                    cluster_id,
+                    sec_art.name,
+                    sec_uuid,
+                )
+            except Exception as rm_err:
+                logger.warning(
                         "Replace cluster %r: could not remove secondary %r: %s",
                         cluster_id,
                         sec_uuid,
