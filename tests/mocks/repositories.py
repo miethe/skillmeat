@@ -30,6 +30,7 @@ from skillmeat.core.interfaces.context import RequestContext
 from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
     CategoryDTO,
+    CollectionArtifactDTO,
     CollectionDTO,
     CollectionMembershipDTO,
     DeploymentDTO,
@@ -37,10 +38,13 @@ from skillmeat.core.interfaces.dtos import (
     ProjectDTO,
     SettingsDTO,
     TagDTO,
+    UserCollectionDTO,
 )
 from skillmeat.core.interfaces.repositories import (
     IArtifactRepository,
     ICollectionRepository,
+    IDbCollectionArtifactRepository,
+    IDbUserCollectionRepository,
     IDeploymentRepository,
     IProjectRepository,
     ISettingsRepository,
@@ -54,6 +58,8 @@ __all__ = [
     "MockDeploymentRepository",
     "MockTagRepository",
     "MockSettingsRepository",
+    "MockDbUserCollectionRepository",
+    "MockDbCollectionArtifactRepository",
 ]
 
 # ---------------------------------------------------------------------------
@@ -121,7 +127,7 @@ class MockArtifactRepository(IArtifactRepository):
         # In-memory content store: artifact_id -> str
         self._content: dict[str, str] = {}
 
-        for artifact in (initial_artifacts or []):
+        for artifact in initial_artifacts or []:
             self._store[artifact.id] = artifact
             if artifact.uuid:
                 self._uuid_index[artifact.uuid] = artifact.id
@@ -276,10 +282,7 @@ class MockArtifactRepository(IArtifactRepository):
         # Returns TagDTO stubs; callers who need full TagDTO must use
         # MockTagRepository and join the data in tests.
         tag_ids = self._artifact_tags.get(id, set())
-        return [
-            TagDTO(id=tid, name=tid, slug=_slugify(tid))
-            for tid in sorted(tag_ids)
-        ]
+        return [TagDTO(id=tid, name=tid, slug=_slugify(tid)) for tid in sorted(tag_ids)]
 
     def set_tags(
         self,
@@ -407,7 +410,7 @@ class MockProjectRepository(IProjectRepository):
         # project_id -> list of deployed ArtifactDTOs
         self._project_artifacts: dict[str, list[ArtifactDTO]] = {}
 
-        for project in (initial_projects or []):
+        for project in initial_projects or []:
             self._store[project.id] = project
         if initial_project_artifacts:
             self._project_artifacts.update(initial_project_artifacts)
@@ -537,7 +540,7 @@ class MockCollectionRepository(ICollectionRepository):
         self._store: dict[str, CollectionDTO] = {}
         self._collection_artifacts: dict[str, list[ArtifactDTO]] = {}
 
-        for collection in (initial_collections or []):
+        for collection in initial_collections or []:
             self._store[collection.id] = collection
         if initial_collection_artifacts:
             self._collection_artifacts.update(initial_collection_artifacts)
@@ -555,9 +558,7 @@ class MockCollectionRepository(ICollectionRepository):
         """Add *collection* to the store."""
         self._store[collection.id] = collection
 
-    def seed_artifacts(
-        self, collection_id: str, artifacts: list[ArtifactDTO]
-    ) -> None:
+    def seed_artifacts(self, collection_id: str, artifacts: list[ArtifactDTO]) -> None:
         """Pre-populate the artifact list for a collection."""
         self._collection_artifacts[collection_id] = list(artifacts)
 
@@ -755,7 +756,7 @@ class MockDeploymentRepository(IDeploymentRepository):
     ) -> None:
         self._store: dict[str, DeploymentDTO] = {}
 
-        for deployment in (initial_deployments or []):
+        for deployment in initial_deployments or []:
             self._store[deployment.id] = deployment
 
     # ------------------------------------------------------------------
@@ -888,7 +889,7 @@ class MockTagRepository(ITagRepository):
         # tag_id -> set[artifact_id]
         self._assignments: dict[str, set[str]] = {}
 
-        for tag in (initial_tags or []):
+        for tag in initial_tags or []:
             self._store[tag.id] = tag
             self._slug_index[tag.slug] = tag.id
 
@@ -1195,7 +1196,12 @@ class MockSettingsRepository(ISettingsRepository):
         ctx: RequestContext | None = None,
     ) -> CategoryDTO:
         import re as _re
-        resolved_slug = slug if slug else _re.sub(r"[^a-z0-9-]", "-", name.lower()).strip("-") or "category"
+
+        resolved_slug = (
+            slug
+            if slug
+            else _re.sub(r"[^a-z0-9-]", "-", name.lower()).strip("-") or "category"
+        )
         now = _now_iso()
         return CategoryDTO(
             id=uuid.uuid4().hex,
@@ -1225,3 +1231,412 @@ class MockSettingsRepository(ISettingsRepository):
         ctx: RequestContext | None = None,
     ) -> None:
         raise KeyError(f"Category '{category_id}' not found in mock")
+
+
+# =============================================================================
+# MockDbUserCollectionRepository
+# =============================================================================
+
+
+class MockDbUserCollectionRepository(IDbUserCollectionRepository):
+    """In-memory implementation of :class:`IDbUserCollectionRepository`.
+
+    Stores user collections in a plain dict keyed by ``collection_id``.
+    A parallel dict tracks group associations (``collection_id`` →
+    ``set[group_id]``).
+
+    Args:
+        initial_collections: Optional list of :class:`UserCollectionDTO`
+            objects to pre-seed the store.
+    """
+
+    _DEFAULT_COLLECTION_NAME = "Default"
+
+    def __init__(
+        self,
+        initial_collections: list[UserCollectionDTO] | None = None,
+    ) -> None:
+        # id -> UserCollectionDTO
+        self._store: dict[str, UserCollectionDTO] = {}
+        # collection_id -> set of group_id strings
+        self._groups: dict[str, set[str]] = {}
+
+        for collection in initial_collections or []:
+            self._store[collection.id] = collection
+
+    # ------------------------------------------------------------------
+    # Control methods
+    # ------------------------------------------------------------------
+
+    def reset(self) -> None:
+        """Clear all stored data.  Call between tests to ensure isolation."""
+        self._store.clear()
+        self._groups.clear()
+
+    def seed(self, collection: UserCollectionDTO) -> None:
+        """Add *collection* without going through :meth:`create`."""
+        self._store[collection.id] = collection
+
+    # ------------------------------------------------------------------
+    # IDbUserCollectionRepository implementation
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        *,
+        created_by: str | None = None,
+        collection_type: str | None = None,
+        context_category: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: RequestContext | None = None,
+    ) -> list[UserCollectionDTO]:
+        items: list[UserCollectionDTO] = list(self._store.values())
+        if created_by is not None:
+            items = [c for c in items if c.created_by == created_by]
+        if collection_type is not None:
+            items = [c for c in items if c.collection_type == collection_type]
+        if context_category is not None:
+            items = [c for c in items if c.context_category == context_category]
+        return items[offset : offset + limit]
+
+    def get_by_id(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> UserCollectionDTO | None:
+        return self._store.get(collection_id)
+
+    def create(
+        self,
+        *,
+        name: str,
+        description: str | None = None,
+        created_by: str | None = None,
+        collection_type: str | None = None,
+        context_category: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> UserCollectionDTO:
+        # Enforce unique name per owner.
+        for existing in self._store.values():
+            if existing.name == name and existing.created_by == created_by:
+                raise ValueError(
+                    f"Collection '{name}' already exists for created_by='{created_by}'"
+                )
+        now = _now_iso()
+        collection_id = uuid.uuid4().hex
+        dto = UserCollectionDTO(
+            id=collection_id,
+            name=name,
+            description=description,
+            created_by=created_by,
+            collection_type=collection_type,
+            context_category=context_category,
+            created_at=now,
+            updated_at=now,
+            artifact_count=0,
+        )
+        self._store[collection_id] = dto
+        return dto
+
+    def update(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+        **kwargs: Any,
+    ) -> UserCollectionDTO:
+        existing = self._store.get(collection_id)
+        if existing is None:
+            raise KeyError(f"UserCollection '{collection_id}' not found")
+        allowed = {"name", "description", "collection_type", "context_category"}
+        filtered = {k: v for k, v in kwargs.items() if k in allowed}
+        updated = dataclasses.replace(
+            existing,
+            **filtered,
+            updated_at=_now_iso(),
+        )
+        self._store[collection_id] = updated
+        return updated
+
+    def delete(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        removed = self._store.pop(collection_id, None)
+        if removed is None:
+            return False
+        self._groups.pop(collection_id, None)
+        return True
+
+    def ensure_default(
+        self,
+        *,
+        created_by: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> UserCollectionDTO:
+        # Find an existing default collection for this owner.
+        for collection in self._store.values():
+            if (
+                collection.collection_type == "default"
+                and collection.created_by == created_by
+            ):
+                return collection
+        # None found — create one.
+        return self.create(
+            name=self._DEFAULT_COLLECTION_NAME,
+            created_by=created_by,
+            collection_type="default",
+            ctx=ctx,
+        )
+
+    def list_with_artifact_stats(
+        self,
+        *,
+        created_by: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: RequestContext | None = None,
+    ) -> list[UserCollectionDTO]:
+        # Simple pass-through; artifact_count already set on stored DTOs.
+        return self.list(
+            created_by=created_by,
+            limit=limit,
+            offset=offset,
+            ctx=ctx,
+        )
+
+    def add_group(
+        self,
+        collection_id: str,
+        group_id: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        if collection_id not in self._store:
+            return False
+        self._groups.setdefault(collection_id, set()).add(group_id)
+        return True
+
+    def remove_group(
+        self,
+        collection_id: str,
+        group_id: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        groups = self._groups.get(collection_id)
+        if groups is None or group_id not in groups:
+            return False
+        groups.discard(group_id)
+        return True
+
+    def get_groups(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[str]:
+        return sorted(self._groups.get(collection_id, set()))
+
+    def get_artifact_count(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        collection = self._store.get(collection_id)
+        if collection is None:
+            return 0
+        return collection.artifact_count
+
+
+# =============================================================================
+# MockDbCollectionArtifactRepository
+# =============================================================================
+
+
+class MockDbCollectionArtifactRepository(IDbCollectionArtifactRepository):
+    """In-memory implementation of :class:`IDbCollectionArtifactRepository`.
+
+    Memberships are stored in a nested dict:
+    ``_store[collection_id][artifact_uuid] = CollectionArtifactDTO``.
+
+    Args:
+        initial_memberships: Optional list of :class:`CollectionArtifactDTO`
+            objects to pre-seed the store.
+    """
+
+    def __init__(
+        self,
+        initial_memberships: list[CollectionArtifactDTO] | None = None,
+    ) -> None:
+        # collection_id -> (artifact_uuid -> CollectionArtifactDTO)
+        self._store: dict[str, dict[str, CollectionArtifactDTO]] = {}
+
+        for membership in initial_memberships or []:
+            self._store.setdefault(membership.collection_id, {})[
+                membership.artifact_uuid
+            ] = membership
+
+    # ------------------------------------------------------------------
+    # Control methods
+    # ------------------------------------------------------------------
+
+    def reset(self) -> None:
+        """Clear all stored data.  Call between tests to ensure isolation."""
+        self._store.clear()
+
+    def seed(self, membership: CollectionArtifactDTO) -> None:
+        """Add *membership* without going through :meth:`add_artifacts`."""
+        self._store.setdefault(membership.collection_id, {})[
+            membership.artifact_uuid
+        ] = membership
+
+    # ------------------------------------------------------------------
+    # IDbCollectionArtifactRepository implementation
+    # ------------------------------------------------------------------
+
+    def list_by_collection(
+        self,
+        collection_id: str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        search: str | None = None,
+        artifact_type: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        items: list[CollectionArtifactDTO] = list(
+            self._store.get(collection_id, {}).values()
+        )
+        if search:
+            search_lower = search.lower()
+            items = [
+                m
+                for m in items
+                if (m.description and search_lower in m.description.lower())
+                or search_lower in m.artifact_uuid.lower()
+            ]
+        # artifact_type filter is a no-op in this stub (type not stored on DTO).
+        return items[offset : offset + limit]
+
+    def get_by_pk(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> CollectionArtifactDTO | None:
+        return self._store.get(collection_id, {}).get(artifact_uuid)
+
+    def count_by_collection(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        return len(self._store.get(collection_id, {}))
+
+    def list_with_tags(
+        self,
+        collection_id: str,
+        *,
+        tag: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        items = list(self._store.get(collection_id, {}).values())
+        if tag:
+            items = [m for m in items if tag in (m.tags or [])]
+        return items
+
+    def list_deployment_info(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        # Return all memberships; deployment fields are already on the DTO.
+        return list(self._store.get(collection_id, {}).values())
+
+    def add_artifacts(
+        self,
+        collection_id: str,
+        artifact_uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        bucket = self._store.setdefault(collection_id, {})
+        now = _now_iso()
+        result: list[CollectionArtifactDTO] = []
+        for artifact_uuid in artifact_uuids:
+            if artifact_uuid not in bucket:
+                dto = CollectionArtifactDTO(
+                    collection_id=collection_id,
+                    artifact_uuid=artifact_uuid,
+                    added_at=now,
+                )
+                bucket[artifact_uuid] = dto
+            result.append(bucket[artifact_uuid])
+        return result
+
+    def remove_artifact(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> bool:
+        bucket = self._store.get(collection_id, {})
+        if artifact_uuid not in bucket:
+            return False
+        del bucket[artifact_uuid]
+        return True
+
+    def upsert_metadata(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: RequestContext | None = None,
+        **metadata: Any,
+    ) -> CollectionArtifactDTO:
+        bucket = self._store.setdefault(collection_id, {})
+        now = _now_iso()
+        existing = bucket.get(artifact_uuid)
+        if existing is None:
+            existing = CollectionArtifactDTO(
+                collection_id=collection_id,
+                artifact_uuid=artifact_uuid,
+                added_at=now,
+            )
+        allowed_fields = {f.name for f in dataclasses.fields(CollectionArtifactDTO)}
+        unknown = set(metadata) - allowed_fields
+        if unknown:
+            raise ValueError(
+                f"Unrecognised CollectionArtifactDTO fields: {sorted(unknown)}"
+            )
+        updated = dataclasses.replace(existing, **metadata)
+        bucket[artifact_uuid] = updated
+        return updated
+
+    def update_source_tracking(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        *,
+        source: str | None = None,
+        origin: str | None = None,
+        resolved_sha: str | None = None,
+        resolved_version: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> CollectionArtifactDTO:
+        bucket = self._store.get(collection_id, {})
+        existing = bucket.get(artifact_uuid)
+        if existing is None:
+            raise KeyError(
+                f"No membership for collection='{collection_id}' "
+                f"artifact_uuid='{artifact_uuid}'"
+            )
+        updates: dict[str, Any] = {}
+        if source is not None:
+            updates["source"] = source
+        if origin is not None:
+            updates["origin"] = origin
+        if resolved_sha is not None:
+            updates["resolved_sha"] = resolved_sha
+        if resolved_version is not None:
+            updates["resolved_version"] = resolved_version
+        updated = dataclasses.replace(existing, **updates)
+        bucket[artifact_uuid] = updated
+        return updated
