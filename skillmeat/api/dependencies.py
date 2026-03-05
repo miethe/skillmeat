@@ -762,6 +762,12 @@ MarketplaceSourceConcreteRepoDep = Annotated[
 MarketplaceTransactionHandlerDep = Annotated[
     MarketplaceTransactionHandler, Depends(get_marketplace_transaction_handler)
 ]
+DbUserCollectionRepoDep = Annotated[
+    IDbUserCollectionRepository, Depends(get_db_user_collection_repository)
+]
+DbCollectionArtifactRepoDep = Annotated[
+    IDbCollectionArtifactRepository, Depends(get_db_collection_artifact_repository)
+]
 
 # Per-request SQLAlchemy session (hexagonal architecture)
 DbSessionDep = Annotated[Session, Depends(get_db_session)]
