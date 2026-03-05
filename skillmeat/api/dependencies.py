@@ -19,8 +19,12 @@ from skillmeat.core.collection import CollectionManager
 from skillmeat.core.interfaces.repositories import (
     IArtifactRepository,
     ICollectionRepository,
+    IContextEntityRepository,
     IDeploymentRepository,
+    IGroupRepository,
+    IMarketplaceSourceRepository,
     IProjectRepository,
+    IProjectTemplateRepository,
     ISettingsRepository,
     ITagRepository,
 )
@@ -496,6 +500,106 @@ def get_settings_repository(
     )
 
 
+def get_group_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IGroupRepository:
+    """Get IGroupRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IGroupRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalGroupRepository
+
+        return LocalGroupRepository()
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_context_entity_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IContextEntityRepository:
+    """Get IContextEntityRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IContextEntityRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalContextEntityRepository
+
+        return LocalContextEntityRepository()
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_marketplace_source_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IMarketplaceSourceRepository:
+    """Get IMarketplaceSourceRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IMarketplaceSourceRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalMarketplaceSourceRepository
+
+        return LocalMarketplaceSourceRepository()
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_project_template_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IProjectTemplateRepository:
+    """Get IProjectTemplateRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IProjectTemplateRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalProjectTemplateRepository
+
+        return LocalProjectTemplateRepository()
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
 # Type aliases for cleaner dependency injection
 ConfigManagerDep = Annotated[ConfigManager, Depends(get_config_manager)]
 CollectionManagerDep = Annotated[CollectionManager, Depends(get_collection_manager)]
@@ -514,6 +618,16 @@ CollectionRepoDep = Annotated[ICollectionRepository, Depends(get_collection_repo
 DeploymentRepoDep = Annotated[IDeploymentRepository, Depends(get_deployment_repository)]
 TagRepoDep = Annotated[ITagRepository, Depends(get_tag_repository)]
 SettingsRepoDep = Annotated[ISettingsRepository, Depends(get_settings_repository)]
+GroupRepoDep = Annotated[IGroupRepository, Depends(get_group_repository)]
+ContextEntityRepoDep = Annotated[
+    IContextEntityRepository, Depends(get_context_entity_repository)
+]
+MarketplaceSourceRepoDep = Annotated[
+    IMarketplaceSourceRepository, Depends(get_marketplace_source_repository)
+]
+ProjectTemplateRepoDep = Annotated[
+    IProjectTemplateRepository, Depends(get_project_template_repository)
+]
 
 # Per-request SQLAlchemy session (hexagonal architecture)
 DbSessionDep = Annotated[Session, Depends(get_db_session)]
