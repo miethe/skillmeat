@@ -18,7 +18,16 @@ from skillmeat.api.dependencies import (
     ArtifactManagerDep,
     ArtifactRepoDep,
     CollectionManagerDep,
+    DbCollectionArtifactRepoDep,
     DbSessionDep,
+    DbUserCollectionRepoDep,
+    GroupRepoDep,
+)
+from skillmeat.core.interfaces.dtos import UserCollectionDTO
+from skillmeat.core.interfaces.repositories import (
+    IDbCollectionArtifactRepository,
+    IDbUserCollectionRepository,
+    IGroupRepository,
 )
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.collections import (
@@ -77,16 +86,16 @@ router = APIRouter(
 # =============================================================================
 # Helper Functions
 # =============================================================================
-# TODO: The helper functions and endpoints below operate directly on the
-# SQLAlchemy session because this router manages DB-backed user collections
-# (organisational groupings stored in the ``collections`` table), while the
-# available repository DI aliases (CollectionRepoDep, ArtifactRepoDep, …)
-# target the *filesystem* collection model.  A future
-# ``IDbUserCollectionRepository`` and ``IDbCollectionArtifactRepository``
-# should be introduced to provide proper repository abstractions for these
-# DB-only entities.  Until then, all direct session/ORM usage here is
-# intentional and managed via the DI-injected ``DbSessionDep``
-# (``Annotated[Session, Depends(get_db_session)]``).
+# Helper functions have been migrated to use repository DI
+# (IDbUserCollectionRepository, IDbCollectionArtifactRepository, IGroupRepository)
+# in place of direct SQLAlchemy session access.
+#
+# Remaining direct session/ORM usage is confined to functions that have no
+# repository ABC counterpart yet (e.g. _ensure_collection_project_sentinel uses
+# Project ORM directly because IProjectRepository.ensure_sentinel() is not yet
+# defined).  Those cases carry explicit TODO comments.
+#
+# Endpoint bodies still use DbSessionDep directly — that migration is TASK-4.2.
 
 
 def encode_cursor(value: str) -> str:
@@ -123,65 +132,73 @@ def decode_cursor(cursor: str) -> str:
 
 
 def collection_to_response(
-    collection: Collection, session: Session
+    collection_dto: UserCollectionDTO,
+    collection_repo: IDbUserCollectionRepository,
 ) -> UserCollectionResponse:
-    """Convert Collection ORM model to API response.
+    """Convert a UserCollectionDTO to an API response model.
+
+    Uses the repository to compute live group and artifact counts rather than
+    relying on cached values embedded in the DTO, which may be stale.
 
     Args:
-        collection: Collection ORM instance
-        session: Database session for computing counts
+        collection_dto: DTO representation of the collection.
+        collection_repo: Repository used to query live group and artifact counts.
 
     Returns:
-        UserCollectionResponse DTO
+        UserCollectionResponse Pydantic model ready for serialisation.
+
+    Note:
+        The previous signature ``(collection: Collection, session: Session)``
+        accepted ORM models and a raw SQLAlchemy session.  Endpoints that still
+        use the old call pattern will be updated in TASK-4.2.
     """
-    # Compute counts
-    group_count = len(collection.groups)
-    artifact_count = (
-        session.query(CollectionArtifact).filter_by(collection_id=collection.id).count()
-    )
+    group_count = len(collection_repo.get_groups(collection_dto.id))
+    artifact_count = collection_repo.get_artifact_count(collection_dto.id)
 
     return UserCollectionResponse(
-        id=collection.id,
-        name=collection.name,
-        description=collection.description,
-        created_by=collection.created_by,
-        collection_type=collection.collection_type,
-        context_category=collection.context_category,
-        created_at=collection.created_at,
-        updated_at=collection.updated_at,
+        id=collection_dto.id,
+        name=collection_dto.name,
+        description=collection_dto.description,
+        created_by=collection_dto.created_by,
+        collection_type=collection_dto.collection_type,
+        context_category=collection_dto.context_category,
+        created_at=collection_dto.created_at,
+        updated_at=collection_dto.updated_at,
         group_count=group_count,
         artifact_count=artifact_count,
     )
 
 
 def collection_to_response_with_groups(
-    collection: Collection, session: Session
+    collection_dto: UserCollectionDTO,
+    collection_repo: IDbUserCollectionRepository,
+    group_repo: IGroupRepository,
 ) -> UserCollectionWithGroupsResponse:
-    """Convert Collection ORM model to API response with groups.
+    """Convert a UserCollectionDTO to an API response model with nested groups.
 
     Args:
-        collection: Collection ORM instance
-        session: Database session for computing counts
+        collection_dto: DTO representation of the collection.
+        collection_repo: Repository used to compute live group/artifact counts.
+        group_repo: Repository used to list groups belonging to this collection.
 
     Returns:
-        UserCollectionWithGroupsResponse DTO with nested groups
+        UserCollectionWithGroupsResponse Pydantic model with nested group list.
     """
-    # Get base response
-    base_response = collection_to_response(collection, session)
+    base_response = collection_to_response(collection_dto, collection_repo)
 
-    # Build group summaries
-    groups = []
-    for group in sorted(collection.groups, key=lambda g: g.position):
-        artifact_count = len(group.group_artifacts)
-        groups.append(
-            GroupSummary(
-                id=group.id,
-                name=group.name,
-                description=group.description,
-                position=group.position,
-                artifact_count=artifact_count,
-            )
+    group_dtos = sorted(
+        group_repo.list(collection_dto.id), key=lambda g: g.position
+    )
+    groups = [
+        GroupSummary(
+            id=g.id,
+            name=g.name,
+            description=g.description,
+            position=g.position,
+            artifact_count=g.artifact_count,
         )
+        for g in group_dtos
+    ]
 
     return UserCollectionWithGroupsResponse(
         **base_response.model_dump(),
@@ -189,38 +206,30 @@ def collection_to_response_with_groups(
     )
 
 
-def ensure_default_collection(session: Session) -> Collection:
+def ensure_default_collection(
+    collection_repo: IDbUserCollectionRepository,
+) -> UserCollectionDTO:
     """Ensure the default collection exists, creating it if necessary.
 
     This function should be called during server startup to guarantee
     the default collection exists for artifact assignments.
 
+    Delegates to :meth:`IDbUserCollectionRepository.ensure_default` which is
+    idempotent: concurrent callers will not produce duplicate collections.
+
     Args:
-        session: Database session
+        collection_repo: Repository used to find or create the default
+            collection.
 
     Returns:
-        The default Collection instance (existing or newly created)
-
-    Note:
-        TODO: Need IDbUserCollectionRepository.ensure_default() method to
-        replace direct session.query(Collection) here.
+        UserCollectionDTO for the default collection (existing or newly created).
     """
-    existing = session.query(Collection).filter_by(id=DEFAULT_COLLECTION_ID).first()
-    if existing:
-        logger.debug(f"Default collection '{DEFAULT_COLLECTION_ID}' already exists")
-        return existing
-
-    default_collection = Collection(
-        id=DEFAULT_COLLECTION_ID,
-        name=DEFAULT_COLLECTION_NAME,
-        description="Default collection for all artifacts. Artifacts are automatically added here when no specific collection is specified.",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+    dto = collection_repo.ensure_default()
+    logger.info(
+        "ensure_default_collection: verified/created default collection id=%r",
+        dto.id,
     )
-    session.add(default_collection)
-    session.commit()
-    logger.info(f"Created default collection '{DEFAULT_COLLECTION_ID}'")
-    return default_collection
+    return dto
 
 
 def _ensure_collection_project_sentinel(session: Session) -> None:
@@ -230,8 +239,11 @@ def _ensure_collection_project_sentinel(session: Session) -> None:
     artifacts are not tied to any real deployed project, so we use a
     sentinel project to satisfy the constraint.
 
-    TODO: Need IDbProjectRepository.ensure_sentinel() method to replace
-    direct session.query(Project) usage here.
+    Note:
+        This helper still uses a raw SQLAlchemy session because
+        ``IProjectRepository`` does not yet expose an ``ensure_sentinel()``
+        method.  Migrating this call is deferred to the phase that introduces
+        that method.  See TASK-4.3 for removal of direct session imports.
     """
     existing = session.query(Project).filter_by(id=COLLECTION_ARTIFACTS_PROJECT_ID).first()
     if not existing:
@@ -352,8 +364,9 @@ def migrate_artifacts_to_default_collection(
     IDbCollectionArtifactRepository (check existing associations, batch create).
     The direct ORM access is intentional pending those implementations.
     """
-    # 1. Ensure default collection exists first
-    ensure_default_collection(session)
+    # 1. Ensure default collection exists first (repo-based helper)
+    from skillmeat.cache.repositories import DbUserCollectionRepository as _CollRepo
+    ensure_default_collection(_CollRepo())
 
     # 2. Ensure every filesystem artifact has an Artifact ORM row.
     # populate_collection_artifact_metadata() and the migration loop both
@@ -583,8 +596,9 @@ def populate_collection_artifact_metadata(
     skipped_count = 0
     errors = []
 
-    # Ensure default collection exists
-    ensure_default_collection(session)
+    # Ensure default collection exists (repo-based helper)
+    from skillmeat.cache.repositories import DbUserCollectionRepository as _CollRepo
+    ensure_default_collection(_CollRepo())
 
     # Iterate all file-based collections
     for coll_name in collection_mgr.list_collections():

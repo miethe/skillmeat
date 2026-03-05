@@ -150,10 +150,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         from skillmeat.api.utils.fts5 import check_fts5_available
         from skillmeat.cache.models import get_session
+        from skillmeat.cache.repositories import DbUserCollectionRepository
 
         session = get_session()
         try:
-            ensure_default_collection(session)
+            ensure_default_collection(DbUserCollectionRepository())
             logger.info("Default collection verified/created")
 
             # Check FTS5 availability at startup
