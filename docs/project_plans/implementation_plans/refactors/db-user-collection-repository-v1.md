@@ -2,7 +2,7 @@
 schema_version: 2
 doc_type: implementation_plan
 title: "Implementation Plan: DB Repository Migration \u2014 Complete Session Cleanup"
-status: in-progress
+status: completed
 created: 2026-03-05
 updated: '2026-03-05'
 feature_slug: db-user-collection-repository
