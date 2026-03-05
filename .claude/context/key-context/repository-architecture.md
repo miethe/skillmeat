@@ -1,8 +1,8 @@
 # Repository Architecture (Hexagonal Pattern)
 
 **Status**: Active Policy
-**Phase**: Phase 4 (Router Migration) and beyond
-**Last Updated**: 2026-03-04
+**Phase**: Complete (gap-closure done)
+**Last Updated**: 2026-03-05
 
 ---
 
@@ -81,6 +81,10 @@ from skillmeat.api.dependencies import (
     DeploymentRepoDep,         # Annotated[IDeploymentRepository, Depends(...)]
     TagRepoDep,                # Annotated[ITagRepository, Depends(...)]
     SettingsRepoDep,           # Annotated[ISettingsRepository, Depends(...)]
+    GroupRepoDep,              # Annotated[IGroupRepository, Depends(...)]
+    ContextEntityRepoDep,      # Annotated[IContextEntityRepository, Depends(...)]
+    MarketplaceSourceRepoDep,  # Annotated[IMarketplaceSourceRepository, Depends(...)]
+    ProjectTemplateRepoDep,    # Annotated[IProjectTemplateRepository, Depends(...)]
 )
 
 @router.get("/artifacts")
@@ -174,8 +178,8 @@ class MockArtifactRepository(IArtifactRepository):
 
 | File | Purpose |
 |------|---------|
-| `repositories.py` | 6 ABC interfaces (IArtifactRepository, IProjectRepository, ICollectionRepository, IDeploymentRepository, ITagRepository, ISettingsRepository) |
-| `dtos.py` | Frozen dataclasses: ArtifactDTO, ProjectDTO, CollectionDTO, DeploymentDTO, TagDTO, SettingsDTO |
+| `repositories.py` | 10 ABC interfaces: `IArtifactRepository`, `IProjectRepository`, `ICollectionRepository`, `IDeploymentRepository`, `ITagRepository`, `ISettingsRepository`, `IGroupRepository`, `IContextEntityRepository`, `IMarketplaceSourceRepository`, `IProjectTemplateRepository` |
+| `dtos.py` | 16 frozen dataclasses: `ArtifactDTO`, `ProjectDTO`, `CollectionDTO`, `DeploymentDTO`, `TagDTO`, `SettingsDTO`, `CollectionMembershipDTO`, `EntityTypeConfigDTO`, `CategoryDTO`, `GroupDTO`, `GroupArtifactDTO`, `ContextEntityDTO`, `MarketplaceSourceDTO`, `CatalogItemDTO`, `ProjectTemplateDTO`, `TemplateEntityDTO` |
 | `context.py` | RequestContext (per-request metadata: auth, tracing, etc.) |
 | `__init__.py` | Public exports |
 
@@ -188,10 +192,14 @@ class MockArtifactRepository(IArtifactRepository):
 |------|-----------|----------------|
 | `local_artifact.py` | IArtifactRepository | Filesystem + SQLAlchemy cache |
 | `local_project.py` | IProjectRepository | Filesystem + SQLAlchemy cache |
-| `local_collection.py` | ICollectionRepository | Filesystem + SQLAlchemy cache |
+| `local_collection.py` | ICollectionRepository | Filesystem (CollectionManager) |
 | `local_deployment.py` | IDeploymentRepository | Filesystem + SQLAlchemy cache |
-| `local_tag.py` | ITagRepository | SQLAlchemy cache |
+| `local_tag.py` | ITagRepository | SQLAlchemy cache only |
 | `local_settings_repo.py` | ISettingsRepository | TOML files + SQLAlchemy cache |
+| `local_group.py` | IGroupRepository | SQLAlchemy cache only |
+| `local_context_entity.py` | IContextEntityRepository | SQLAlchemy cache only |
+| `local_marketplace_source.py` | IMarketplaceSourceRepository | SQLAlchemy cache only |
+| `local_project_template.py` | IProjectTemplateRepository | SQLAlchemy cache only |
 
 Each implementation:
 - Receives **managers** (ArtifactManager, CollectionManager, etc.) via constructor DI
@@ -210,6 +218,10 @@ Each implementation:
 | `get_deployment_repository()` | IDeploymentRepository | `DeploymentRepoDep` |
 | `get_tag_repository()` | ITagRepository | `TagRepoDep` |
 | `get_settings_repository()` | ISettingsRepository | `SettingsRepoDep` |
+| `get_group_repository()` | IGroupRepository | `GroupRepoDep` |
+| `get_context_entity_repository()` | IContextEntityRepository | `ContextEntityRepoDep` |
+| `get_marketplace_source_repository()` | IMarketplaceSourceRepository | `MarketplaceSourceRepoDep` |
+| `get_project_template_repository()` | IProjectTemplateRepository | `ProjectTemplateRepoDep` |
 
 **Edition-Based Routing** (Future):
 ```python
@@ -228,14 +240,16 @@ Currently, only `"local"` edition is implemented.
 ### 4. Mock Repositories (Testing)
 **Location**: `tests/mocks/repositories.py`
 
-| Class | Purpose |
-|-------|---------|
-| `MockArtifactRepository` | In-memory artifact storage (no filesystem I/O) |
-| `MockProjectRepository` | In-memory project storage |
-| `MockCollectionRepository` | In-memory collection storage |
-| `MockDeploymentRepository` | In-memory deployment storage |
-| `MockTagRepository` | In-memory tag storage |
-| `MockSettingsRepository` | In-memory settings storage |
+| Class | Implements |
+|-------|-----------|
+| `MockArtifactRepository` | IArtifactRepository |
+| `MockProjectRepository` | IProjectRepository |
+| `MockCollectionRepository` | ICollectionRepository |
+| `MockDeploymentRepository` | IDeploymentRepository |
+| `MockTagRepository` | ITagRepository |
+| `MockSettingsRepository` | ISettingsRepository |
+
+All mocks are in-memory (no filesystem or DB I/O). `IGroupRepository`, `IContextEntityRepository`, `IMarketplaceSourceRepository`, and `IProjectTemplateRepository` do not yet have dedicated mocks — tests for those interfaces use the DI override pattern with `MagicMock` or `patch.object` directly.
 
 **Use in Tests**:
 ```python
@@ -327,7 +341,7 @@ def test_list_artifacts(artifact_repo):
 
 **Steps**:
 
-1. **Implement all 6 ABCs** (IProjectRepository, ICollectionRepository, IDeploymentRepository, ITagRepository, ISettingsRepository):
+1. **Implement all 10 ABCs** (IArtifactRepository, IProjectRepository, ICollectionRepository, IDeploymentRepository, ITagRepository, ISettingsRepository, IGroupRepository, IContextEntityRepository, IMarketplaceSourceRepository, IProjectTemplateRepository):
    ```python
    # skillmeat/core/repositories/postgres_artifact.py
    from skillmeat.core.interfaces.repositories import IArtifactRepository
@@ -436,22 +450,25 @@ def test_list_artifacts(artifact_repo):
 
 ## Known Remaining Cleanup
 
-### 1. Utility Functions in `artifacts.py`
+### 1. `user_collections.py` — Largest Remaining Footprint
+
+**Status**: Tracked under `db-user-collection-repository-v1` plan
+**Note**: `skillmeat/api/routers/user_collections.py` still contains approximately 50 direct `session.query()` calls. This is the largest remaining DI migration target. The `db-user-collection-repository-v1` implementation plan covers the full migration.
+
+### 2. `artifacts.py` — Direct Session Queries
 
 **Status**: Deferred
-**Note**: Router file `skillmeat/api/routers/artifacts.py` contains utility functions (`is_binary_file()`, path traversal checks) that use `os`/`pathlib`. These are **utility concerns**, not repository concerns, and should eventually be extracted to a **service layer** (`skillmeat/api/utils/`) or **domain service** (`skillmeat/core/services/`).
+**Note**: `skillmeat/api/routers/artifacts.py` retains approximately 15 direct `session.query()` calls alongside utility functions (`is_binary_file()`, path traversal checks) that use `os`/`pathlib`. Utility functions are acceptable for content-serving endpoints; the remaining session queries are tracked for future cleanup.
 
-**Current State**: Acceptable for now (utilities support content-serving endpoints). Tracked for future refactoring.
+### 3. Minor Occurrences in Other Routers
 
-### 2. Routers with Direct Path Access
+**Status**: Low priority
+**Note**: `artifact_history.py`, `deployment_profiles.py`, `projects.py`, and `tags.py` each have 1-2 remaining direct session calls. These are isolated and low risk.
 
-**Status**: Partially Refactored
-**Note**: Some routers still import `pathlib` for content-serving endpoints (e.g., `GET /artifacts/{id}/raw-content`). This is acceptable for now because:
-- Content serving is a special case (streaming files)
-- Can be moved to a service layer in the future
-- Not a data access concern (not querying collections)
+### 4. Exception Type Imports from `cache.repositories`
 
-**Future**: Extract content-serving logic to `skillmeat/api/services/content_service.py`.
+**Status**: Whitelisted
+**Note**: Imports of `ConstraintError`, `NotFoundError`, and `RepositoryError` from `skillmeat.cache.repositories` are permitted in routers and services. These exception types are not ORM models and carry no data-access coupling.
 
 ---
 
@@ -522,5 +539,5 @@ Use this checklist when migrating an existing router to repository DI:
 
 ---
 
-**Last Reviewed**: 2026-03-04
-**Next Review**: After Phase 5 (when all routers are migrated to repository DI)
+**Last Reviewed**: 2026-03-05
+**Next Review**: After `db-user-collection-repository-v1` plan completes (user_collections.py migration)

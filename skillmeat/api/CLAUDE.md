@@ -133,7 +133,7 @@ export SKILLMEAT_GITHUB_TOKEN=ghp_xxx
 4. **Mock repositories in tests** — update `tests/mocks/repositories.py` when ABCs change
 
 **Module Map**:
-- **Interfaces**: `skillmeat/core/interfaces/repositories.py` (6 ABCs), `dtos.py` (frozen dataclasses)
+- **Interfaces**: `skillmeat/core/interfaces/repositories.py` (10 ABCs), `dtos.py` (frozen dataclasses)
 - **Implementations**: `skillmeat/core/repositories/local_*.py` (filesystem + SQLAlchemy)
 - **Factories**: `skillmeat/api/dependencies.py` (DI providers with edition-based routing)
 - **Mocks**: `tests/mocks/repositories.py` (in-memory test doubles)
@@ -146,6 +146,10 @@ CollectionRepoDep = Annotated[ICollectionRepository, Depends(get_collection_repo
 DeploymentRepoDep = Annotated[IDeploymentRepository, Depends(get_deployment_repository)]
 TagRepoDep = Annotated[ITagRepository, Depends(get_tag_repository)]
 SettingsRepoDep = Annotated[ISettingsRepository, Depends(get_settings_repository)]
+GroupRepoDep = Annotated[IGroupRepository, Depends(get_group_repository)]
+ContextEntityRepoDep = Annotated[IContextEntityRepository, Depends(get_context_entity_repository)]
+MarketplaceSourceRepoDep = Annotated[IMarketplaceSourceRepository, Depends(get_marketplace_source_repository)]
+ProjectTemplateRepoDep = Annotated[IProjectTemplateRepository, Depends(get_project_template_repository)]
 ```
 
 **When Adding an Endpoint**: Read `.claude/context/key-context/repository-architecture.md` § "Recipe 1" for step-by-step guide.
@@ -386,16 +390,16 @@ See `utils/error_handlers.py` for centralized error handling patterns.
 **Architecture**:
 
 ```
-Routers → Dependencies → Managers (core/)
+Routers → Repository DI (I*Repository ABCs) → Local*Repository implementations
+    ↓                                                  ↓
+  (or legacy path)                          SQLAlchemy ORM (cache/models.py)
+    ↓                                                  ↓
+Services (api/services/)                   SQLite Database
     ↓
-Services (api/services/)
-    ↓
-SQLAlchemy ORM (cache/models.py)
-    ↓
-Repositories (cache/repositories.py)
-    ↓
-SQLite Database
+cache/repositories.py (internal helpers)
 ```
+
+**Note**: Routers access the database exclusively through repository DI aliases (`*RepoDep`). Direct `session.query()` calls in routers are prohibited — all DB access is mediated by `I*Repository` implementations in `skillmeat/core/repositories/`.
 
 **Components**:
 
