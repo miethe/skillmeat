@@ -6,7 +6,7 @@ prd: db-user-collection-repository
 feature_slug: db-user-collection-repository
 phase: 4
 phase_title: Router Migration — Core CRUD
-status: in_progress
+status: completed
 created: 2026-03-05
 updated: '2026-03-05'
 prd_ref: null
@@ -35,7 +35,7 @@ tasks:
   estimate: 2.5 pts
 - id: TASK-4.3
   title: Remove direct session imports from migrated paths
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -49,10 +49,10 @@ parallelization:
   batch_3:
   - TASK-4.3
 total_tasks: 3
-completed_tasks: 2
-in_progress_tasks: 1
+completed_tasks: 3
+in_progress_tasks: 0
 blocked_tasks: 0
-progress: 66
+progress: 100
 ---
 
 # Phase 4: Router Migration — Core CRUD
