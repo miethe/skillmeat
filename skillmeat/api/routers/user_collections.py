@@ -988,6 +988,7 @@ def _refresh_single_collection_cache(
                 file_artifact = artifact_mgr.show(
                     artifact_name=artifact_name,
                     artifact_type=artifact_type_enum,
+                    collection_name=collection.id,
                 )
             except Exception as e:
                 logger.debug(f"File-based lookup failed for {ca_artifact_id}: {e}")
@@ -2760,6 +2761,7 @@ async def refresh_collection_cache(
                 file_artifact = artifact_mgr.show(
                     artifact_name=artifact_name,
                     artifact_type=artifact_type_enum,
+                    collection_name=collection_id,
                 )
             except Exception as e:
                 logger.debug(
