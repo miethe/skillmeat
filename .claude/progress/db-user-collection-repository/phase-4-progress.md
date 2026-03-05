@@ -27,7 +27,7 @@ tasks:
   estimate: 1.5 pts
 - id: TASK-4.2
   title: Migrate list/create/get/update/delete collection endpoints
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -35,7 +35,7 @@ tasks:
   estimate: 2.5 pts
 - id: TASK-4.3
   title: Remove direct session imports from migrated paths
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -49,10 +49,10 @@ parallelization:
   batch_3:
   - TASK-4.3
 total_tasks: 3
-completed_tasks: 1
+completed_tasks: 2
 in_progress_tasks: 1
 blocked_tasks: 0
-progress: 33
+progress: 66
 ---
 
 # Phase 4: Router Migration — Core CRUD

@@ -95,7 +95,10 @@ router = APIRouter(
 # Project ORM directly because IProjectRepository.ensure_sentinel() is not yet
 # defined).  Those cases carry explicit TODO comments.
 #
-# Endpoint bodies still use DbSessionDep directly — that migration is TASK-4.2.
+# CRUD endpoint bodies (list, create, get, update, delete) were migrated to
+# repository DI in TASK-4.1 and TASK-4.2.  Non-CRUD endpoints (artifact ops,
+# cache/sync, entity management) still use DbSessionDep directly — that
+# migration is Phase 5 work (TASK-5.1, TASK-5.2).
 
 
 def encode_cursor(value: str) -> str:
@@ -149,8 +152,8 @@ def collection_to_response(
 
     Note:
         The previous signature ``(collection: Collection, session: Session)``
-        accepted ORM models and a raw SQLAlchemy session.  Endpoints that still
-        use the old call pattern will be updated in TASK-4.2.
+        accepted ORM models and a raw SQLAlchemy session.  All CRUD endpoints
+        were updated to the repository-based call pattern in TASK-4.1/TASK-4.2.
     """
     group_count = len(collection_repo.get_groups(collection_dto.id))
     artifact_count = collection_repo.get_artifact_count(collection_dto.id)
@@ -243,7 +246,7 @@ def _ensure_collection_project_sentinel(session: Session) -> None:
         This helper still uses a raw SQLAlchemy session because
         ``IProjectRepository`` does not yet expose an ``ensure_sentinel()``
         method.  Migrating this call is deferred to the phase that introduces
-        that method.  See TASK-4.3 for removal of direct session imports.
+        that method (Phase 5 scope).
     """
     existing = session.query(Project).filter_by(id=COLLECTION_ARTIFACTS_PROJECT_ID).first()
     if not existing:
