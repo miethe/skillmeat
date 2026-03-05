@@ -2755,10 +2755,18 @@ async def refresh_collection_cache(
             except ValueError:
                 pass
 
-            file_artifact = artifact_mgr.show(
-                artifact_name=artifact_name,
-                artifact_type=artifact_type_enum,
-            )
+            file_artifact = None
+            try:
+                file_artifact = artifact_mgr.show(
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type_enum,
+                )
+            except Exception as e:
+                logger.debug(
+                    f"File-based lookup failed for {ca_artifact_id}: {e}"
+                )
+                skipped_count += 1
+                continue
 
             if file_artifact is None:
                 # Artifact no longer exists in file system
