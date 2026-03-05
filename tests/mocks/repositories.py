@@ -851,6 +851,19 @@ class MockDeploymentRepository(IDeploymentRepository):
     ) -> list[DeploymentDTO]:
         return [d for d in self._store.values() if d.artifact_id == artifact_id]
 
+    def upsert_idp_deployment_set(
+        self,
+        *,
+        remote_url: str,
+        name: str,
+        provisioned_by: str,
+        description: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> tuple[str, bool]:
+        set_id = f"ds-{name}"
+        created = set_id not in self._store
+        return (set_id, created)
+
 
 # =============================================================================
 # MockTagRepository

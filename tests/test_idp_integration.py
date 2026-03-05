@@ -23,7 +23,7 @@ from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings, Environment
 from skillmeat.api.server import create_app
-from skillmeat.api.routers.idp_integration import get_db_session
+from skillmeat.cache.session import get_db_session
 from skillmeat.core.services.template_service import RenderedFile
 
 

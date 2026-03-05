@@ -12,7 +12,7 @@ TokenDep dependencies; both are bypassed in tests by overriding dependencies.
 """
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import status
@@ -94,6 +94,15 @@ def _make_profile_orm(
     return p
 
 
+def _make_mock_session(project_id="project-db-id-001"):
+    """Build a mock SQLAlchemy session that resolves project_id directly."""
+    mock_project = MagicMock()
+    mock_project.id = project_id
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_project
+    return mock_session
+
+
 # Minimal valid create payload
 VALID_CREATE_PAYLOAD = {
     "profile_id": "default",
@@ -121,51 +130,47 @@ def _url(project_id="test-project-001", profile_id=None):
 class TestCreateProfile:
     """Tests for POST /api/v1/projects/{project_id}/profiles."""
 
-    def test_create_profile_success(self, client):
+    def test_create_profile_success(self, app, client):
         """Creating a deployment profile returns 201 with profile data."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         profile = _make_profile_orm()
         mock_repo = MagicMock()
         mock_repo.create.return_value = profile
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.post(_url("test-project-001"), json=VALID_CREATE_PAYLOAD)
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["profile_id"] == "default"
         assert data["platform"] == "claude_code"
 
-    def test_create_profile_duplicate_returns_409(self, client):
+    def test_create_profile_duplicate_returns_409(self, app, client):
         """Creating a duplicate profile returns 409 Conflict."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         mock_repo = MagicMock()
         mock_repo.create.side_effect = Exception(
             "UNIQUE constraint failed: deployment_profiles.project_id"
         )
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.post(_url("test-project-001"), json=VALID_CREATE_PAYLOAD)
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_409_CONFLICT
 
@@ -189,49 +194,45 @@ class TestCreateProfile:
 class TestListProfiles:
     """Tests for GET /api/v1/projects/{project_id}/profiles."""
 
-    def test_list_profiles_empty(self, client):
+    def test_list_profiles_empty(self, app, client):
         """Listing profiles for a project with none returns 200 empty list."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         mock_repo = MagicMock()
         mock_repo.list_by_project.return_value = []
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.get(_url("test-project-001"))
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == []
 
-    def test_list_profiles_returns_all_profiles(self, client):
+    def test_list_profiles_returns_all_profiles(self, app, client):
         """Listing profiles returns all profiles for the project."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         p1 = _make_profile_orm(profile_id="default")
         p2 = _make_profile_orm(id="prof-002", profile_id="staging", platform="cursor")
 
         mock_repo = MagicMock()
         mock_repo.list_by_project.return_value = [p1, p2]
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.get(_url("test-project-001"))
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -248,47 +249,43 @@ class TestListProfiles:
 class TestGetProfile:
     """Tests for GET /api/v1/projects/{project_id}/profiles/{profile_id}."""
 
-    def test_get_profile_success(self, client):
+    def test_get_profile_success(self, app, client):
         """Fetching an existing profile returns 200 with profile data."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         profile = _make_profile_orm(profile_id="default")
         mock_repo = MagicMock()
         mock_repo.read_by_project_and_profile_id.return_value = profile
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.get(_url("test-project-001", "default"))
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["profile_id"] == "default"
 
-    def test_get_profile_not_found(self, client):
+    def test_get_profile_not_found(self, app, client):
         """Fetching a non-existent profile returns 404."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         mock_repo = MagicMock()
         mock_repo.read_by_project_and_profile_id.return_value = None
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.get(_url("test-project-001", "ghost-profile"))
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "ghost-profile" in response.json()["detail"]
@@ -302,78 +299,72 @@ class TestGetProfile:
 class TestUpdateProfile:
     """Tests for PUT /api/v1/projects/{project_id}/profiles/{profile_id}."""
 
-    def test_update_profile_success(self, client):
+    def test_update_profile_success(self, app, client):
         """Updating an existing profile returns 200 with updated data."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         updated_profile = _make_profile_orm(description="Updated description")
         mock_repo = MagicMock()
         mock_repo.update.return_value = updated_profile
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.put(
                 _url("test-project-001", "default"),
                 json={"description": "Updated description"},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["description"] == "Updated description"
 
-    def test_update_profile_not_found(self, client):
+    def test_update_profile_not_found(self, app, client):
         """Updating a non-existent profile returns 404."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         mock_repo = MagicMock()
         mock_repo.update.return_value = None
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.put(
                 _url("test-project-001", "ghost-profile"),
                 json={"description": "This does not exist"},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_update_profile_with_platform_change(self, client):
+    def test_update_profile_with_platform_change(self, app, client):
         """Updating the platform field is accepted and forwarded to repository."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         updated_profile = _make_profile_orm(platform="cursor")
         mock_repo = MagicMock()
         mock_repo.update.return_value = updated_profile
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.put(
                 _url("test-project-001", "default"),
                 json={"platform": "cursor"},
             )
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_200_OK
         # Verify platform was forwarded to update call
@@ -397,45 +388,41 @@ class TestUpdateProfile:
 class TestDeleteProfile:
     """Tests for DELETE /api/v1/projects/{project_id}/profiles/{profile_id}."""
 
-    def test_delete_profile_success(self, client):
+    def test_delete_profile_success(self, app, client):
         """Deleting an existing profile returns 204 with no content."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         mock_repo = MagicMock()
         mock_repo.delete.return_value = True
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.delete(_url("test-project-001", "default"))
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    def test_delete_profile_not_found(self, client):
+    def test_delete_profile_not_found(self, app, client):
         """Deleting a non-existent profile returns 404."""
+        from skillmeat.api.dependencies import get_deployment_profile_repository
+        from skillmeat.cache.session import get_db_session
+
         mock_repo = MagicMock()
         mock_repo.delete.return_value = False
+        mock_session = _make_mock_session()
 
-        mock_project = MagicMock()
-        mock_project.id = "project-db-id-001"
-        mock_session = MagicMock()
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_project
-
-        with patch(
-            "skillmeat.api.routers.deployment_profiles.DeploymentProfileRepository",
-            return_value=mock_repo,
-        ), patch(
-            "skillmeat.api.routers.deployment_profiles.get_session",
-            return_value=mock_session,
-        ):
+        app.dependency_overrides[get_deployment_profile_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
             response = client.delete(_url("test-project-001", "ghost-profile"))
+        finally:
+            app.dependency_overrides.pop(get_deployment_profile_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "ghost-profile" in response.json()["detail"]
