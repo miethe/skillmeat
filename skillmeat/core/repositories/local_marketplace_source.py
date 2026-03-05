@@ -812,3 +812,227 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
             return result
         finally:
             session.close()
+
+    # ------------------------------------------------------------------
+    # Catalog entry mutations (encapsulate direct session access)
+    # ------------------------------------------------------------------
+
+    def get_catalog_entry_raw(
+        self,
+        entry_id: str,
+        source_id: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> Optional[Any]:
+        """Return the raw ORM ``MarketplaceCatalogEntry`` object.
+
+        Delegates to :meth:`MarketplaceCatalogRepository.get_with_path_segments`
+        when *source_id* is provided (validates ownership), or falls back to
+        :meth:`MarketplaceCatalogRepository.get_by_id`.
+
+        Args:
+            entry_id: Catalog entry primary key.
+            source_id: When provided, verifies the entry belongs to this source.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The ORM entry object when found, ``None`` otherwise.
+        """
+        catalog = self._catalog_repo()
+        if source_id is not None:
+            return catalog.get_with_path_segments(entry_id, source_id)
+        return catalog.get_by_id(entry_id)
+
+    def update_catalog_entry_exclusion(
+        self,
+        entry_id: str,
+        source_id: str,
+        excluded: bool,
+        reason: Optional[str] = None,
+        ctx: Optional[RequestContext] = None,
+    ) -> Any:
+        """Toggle exclusion status on a catalog entry.
+
+        Delegates to :meth:`MarketplaceCatalogRepository.set_exclusion`.
+
+        Args:
+            entry_id: Catalog entry primary key.
+            source_id: Source the entry must belong to.
+            excluded: ``True`` to exclude, ``False`` to restore.
+            reason: Optional reason text (only used when *excluded* is ``True``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated ORM ``MarketplaceCatalogEntry`` object.
+
+        Raises:
+            KeyError: If *entry_id* not found.
+            ValueError: If the entry does not belong to *source_id*.
+        """
+        catalog = self._catalog_repo()
+        entry = catalog.set_exclusion(entry_id, source_id, excluded, reason)
+        if entry is None:
+            raise KeyError(f"Catalog entry '{entry_id}' not found")
+        return entry
+
+    def update_catalog_entry_path_tags(
+        self,
+        entry_id: str,
+        source_id: str,
+        path_segments_json: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> Any:
+        """Persist updated ``path_segments`` JSON for a catalog entry.
+
+        Delegates to :meth:`MarketplaceCatalogRepository.update_path_segments`.
+
+        Args:
+            entry_id: Catalog entry primary key.
+            source_id: Source the entry must belong to.
+            path_segments_json: Serialised JSON string.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The updated ORM ``MarketplaceCatalogEntry`` object.
+
+        Raises:
+            KeyError: If *entry_id* not found or does not belong to *source_id*.
+        """
+        catalog = self._catalog_repo()
+        entry = catalog.update_path_segments(entry_id, source_id, path_segments_json)
+        if entry is None:
+            raise KeyError(
+                f"Catalog entry '{entry_id}' not found in source '{source_id}'"
+            )
+        return entry
+
+    def get_artifact_row(
+        self,
+        artifact_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> Optional[Any]:
+        """Return the raw ORM ``Artifact`` row for the given ``type:name`` id.
+
+        Args:
+            artifact_id: Artifact primary key in ``"type:name"`` format.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The ORM ``Artifact`` object (expunged) when found, ``None`` otherwise.
+        """
+        if not _db_available or _get_db_session is None:
+            raise RuntimeError("skillmeat.cache unavailable")
+        session = _get_db_session()
+        try:
+            artifact = (
+                session.query(_DBArtifact)
+                .filter(_DBArtifact.id == artifact_id)
+                .first()
+            )
+            if artifact is None:
+                return None
+            session.expunge(artifact)
+            return artifact
+        finally:
+            session.close()
+
+    def upsert_composite_memberships(
+        self,
+        composite_id: str,
+        child_artifact_ids: List[str],
+        collection_id: str,
+        ctx: Optional[RequestContext] = None,
+    ) -> int:
+        """Create or update ``CompositeMembership`` rows.
+
+        For each child artifact ID the method resolves the ``Artifact.uuid``
+        and inserts a ``CompositeMembership`` row when one does not exist.
+        Existing rows are updated to reflect the current position.
+
+        Args:
+            composite_id: Primary key of the composite (``"composite:<name>"``).
+            child_artifact_ids: Ordered list of child ``type:name`` IDs.
+            collection_id: Collection the composite belongs to.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Number of new membership rows created.
+        """
+        if not _db_available or _get_db_session is None:
+            raise RuntimeError("skillmeat.cache unavailable")
+        session = _get_db_session()
+        membership_count = 0
+        try:
+            for idx, child_artifact_id in enumerate(child_artifact_ids):
+                artifact_row = (
+                    session.query(_DBArtifact)
+                    .filter(_DBArtifact.id == child_artifact_id)
+                    .first()
+                )
+                if artifact_row is None:
+                    logger.debug(
+                        "upsert_composite_memberships: artifact row not found for '%s', skipping",
+                        child_artifact_id,
+                    )
+                    continue
+
+                existing = (
+                    session.query(_DBCompositeMembership)
+                    .filter(
+                        _DBCompositeMembership.collection_id == collection_id,
+                        _DBCompositeMembership.composite_id == composite_id,
+                        _DBCompositeMembership.child_artifact_uuid == artifact_row.uuid,
+                    )
+                    .first()
+                )
+                if existing is None:
+                    membership = _DBCompositeMembership(
+                        collection_id=collection_id,
+                        composite_id=composite_id,
+                        child_artifact_uuid=artifact_row.uuid,
+                        relationship_type="contains",
+                        pinned_version_hash=None,
+                        position=idx,
+                    )
+                    session.add(membership)
+                    membership_count += 1
+                else:
+                    existing.position = idx
+
+            session.commit()
+            logger.info(
+                "upsert_composite_memberships: created %d row(s) for composite '%s' "
+                "(%d child target(s))",
+                membership_count,
+                composite_id,
+                len(child_artifact_ids),
+            )
+            return membership_count
+        except Exception as err:
+            session.rollback()
+            logger.warning(
+                "upsert_composite_memberships: failed for '%s': %s", composite_id, err
+            )
+            raise
+        finally:
+            session.close()
+
+    def commit_source_session(
+        self,
+        ctx: Optional[RequestContext] = None,
+    ) -> None:
+        """Flush pending changes on the underlying source repository session.
+
+        Opens a fresh session via the source repository and commits it.
+        Intended for workflows that mutate ORM objects obtained from
+        ``_source_repo()`` directly (e.g. setting ``auto_tags``).
+
+        Args:
+            ctx: Optional per-request metadata.
+        """
+        if not _db_available or _get_db_session is None:
+            raise RuntimeError("skillmeat.cache unavailable")
+        session = _get_db_session()
+        try:
+            session.commit()
+        finally:
+            session.close()
