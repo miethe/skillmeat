@@ -20,6 +20,8 @@ from skillmeat.core.interfaces.repositories import (
     IArtifactRepository,
     ICollectionRepository,
     IContextEntityRepository,
+    IDbCollectionArtifactRepository,
+    IDbUserCollectionRepository,
     IDeploymentRepository,
     IGroupRepository,
     IMarketplaceSourceRepository,
@@ -29,6 +31,8 @@ from skillmeat.core.interfaces.repositories import (
     ITagRepository,
 )
 from skillmeat.cache.repositories import (
+    DbCollectionArtifactRepository,
+    DbUserCollectionRepository,
     DeploymentProfileRepository,
     DeploymentSetRepository,
     DuplicatePairRepository,
@@ -672,6 +676,32 @@ def get_marketplace_transaction_handler() -> MarketplaceTransactionHandler:
     return MarketplaceTransactionHandler()
 
 
+def get_db_user_collection_repository() -> IDbUserCollectionRepository:
+    """Get DbUserCollectionRepository dependency.
+
+    Returns a new ``DbUserCollectionRepository`` instance.  The repository
+    manages its own session lifecycle internally, so no state injection is
+    required.
+
+    Returns:
+        IDbUserCollectionRepository implementation backed by the SQLite cache.
+    """
+    return DbUserCollectionRepository()
+
+
+def get_db_collection_artifact_repository() -> IDbCollectionArtifactRepository:
+    """Get DbCollectionArtifactRepository dependency.
+
+    Returns a new ``DbCollectionArtifactRepository`` instance.  The repository
+    manages its own session lifecycle internally, so no state injection is
+    required.
+
+    Returns:
+        IDbCollectionArtifactRepository implementation backed by the SQLite cache.
+    """
+    return DbCollectionArtifactRepository()
+
+
 def get_duplicate_pair_repository() -> DuplicatePairRepository:
     """Get DuplicatePairRepository dependency.
 
@@ -712,7 +742,9 @@ MarketplaceSourceRepoDep = Annotated[
 ProjectTemplateRepoDep = Annotated[
     IProjectTemplateRepository, Depends(get_project_template_repository)
 ]
-DeploymentSetRepoDep = Annotated[DeploymentSetRepository, Depends(get_deployment_set_repository)]
+DeploymentSetRepoDep = Annotated[
+    DeploymentSetRepository, Depends(get_deployment_set_repository)
+]
 DeploymentProfileRepoDep = Annotated[
     DeploymentProfileRepository, Depends(get_deployment_profile_repository)
 ]
