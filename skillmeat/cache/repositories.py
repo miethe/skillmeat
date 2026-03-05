@@ -725,6 +725,42 @@ class ScanUpdateContext:
         )
         return updated_count
 
+    def update_source_counts(
+        self,
+        counts_by_type: dict,
+        clone_target: Optional[Any] = None,
+    ) -> None:
+        """Update counts_by_type and optionally clone_target on the source row.
+
+        Called after a scan completes to persist artifact-type distribution and
+        clone metadata without requiring a separate session query in routers.
+
+        Args:
+            counts_by_type: Dict mapping artifact type strings to integer counts.
+            clone_target: Optional clone target to persist on the source row.
+                When ``None`` the field is left unchanged.
+
+        Example:
+            >>> with handler.scan_update_transaction(source_id) as ctx:
+            ...     ctx.update_source_status("success", artifact_count=5)
+            ...     ctx.update_source_counts({"skill": 3, "command": 2})
+        """
+        source = (
+            self.session.query(MarketplaceSource).filter_by(id=self.source_id).first()
+        )
+        if source is None:
+            logger.warning(
+                "update_source_counts: source %s not found, skipping", self.source_id
+            )
+            return
+
+        source.set_counts_by_type_dict(counts_by_type)
+        if clone_target is not None:
+            source.clone_target = clone_target
+        logger.debug(
+            "update_source_counts: updated counts for source %s", self.source_id
+        )
+
 
 class ImportContext:
     """Context for import operations within a transaction.
@@ -847,6 +883,139 @@ class ImportContext:
 
         logger.warning(f"Marked {updated_count} entries as failed import: {error}")
         return updated_count
+
+    def upsert_composite_memberships(
+        self,
+        composite_id: str,
+        child_artifact_ids: List[str],
+        collection_id: str,
+    ) -> int:
+        """Create or update ``CompositeMembership`` rows within this session.
+
+        For each child artifact ID, looks up the ``Artifact`` row within this
+        transaction session and inserts a ``CompositeMembership`` row if one
+        does not already exist.  Existing rows are updated to reflect position.
+
+        This method operates within the existing transaction — the caller owns
+        commit/rollback.
+
+        Args:
+            composite_id: Primary key of the composite
+                (``"composite:<name>"``).
+            child_artifact_ids: Ordered list of child ``type:name`` IDs.
+            collection_id: Collection the composite belongs to.
+
+        Returns:
+            Number of new membership rows created.
+
+        Example:
+            >>> with handler.import_transaction(source_id) as ctx:
+            ...     ctx.upsert_composite_memberships(
+            ...         "composite:plugin-x", ["skill:child-one"], "default"
+            ...     )
+        """
+        membership_count = 0
+        for idx, child_artifact_id in enumerate(child_artifact_ids):
+            artifact_row = (
+                self.session.query(Artifact)
+                .filter(Artifact.id == child_artifact_id)
+                .first()
+            )
+            if artifact_row is None:
+                logger.debug(
+                    "upsert_composite_memberships: artifact row not found for '%s', skipping",
+                    child_artifact_id,
+                )
+                continue
+
+            from skillmeat.cache.models import CompositeMembership as _CM
+
+            existing = (
+                self.session.query(_CM)
+                .filter(
+                    _CM.collection_id == collection_id,
+                    _CM.composite_id == composite_id,
+                    _CM.child_artifact_uuid == artifact_row.uuid,
+                )
+                .first()
+            )
+            if existing is None:
+                membership = _CM(
+                    collection_id=collection_id,
+                    composite_id=composite_id,
+                    child_artifact_uuid=artifact_row.uuid,
+                    relationship_type="contains",
+                    pinned_version_hash=None,
+                    position=idx,
+                )
+                self.session.add(membership)
+                membership_count += 1
+            else:
+                existing.position = idx
+
+        logger.debug(
+            "upsert_composite_memberships: created %d row(s) for composite '%s'",
+            membership_count,
+            composite_id,
+        )
+        return membership_count
+
+    def get_artifact_in_session(self, artifact_id: str) -> Optional[Any]:
+        """Return an ``Artifact`` ORM row within this transaction session.
+
+        Used by composite-wiring logic that needs the ORM object to be
+        attached to the current session (e.g. for
+        ``CompositeService.create_skill_composite_with_session``).
+
+        Args:
+            artifact_id: Artifact primary key in ``"type:name"`` format.
+
+        Returns:
+            The ``Artifact`` ORM object attached to this session, or ``None``
+            if not found.
+
+        Example:
+            >>> with handler.import_transaction(source_id) as ctx:
+            ...     artifact = ctx.get_artifact_in_session("skill:my-skill")
+            ...     if artifact:
+            ...         svc.create_skill_composite_with_session(ctx.session, artifact, ...)
+        """
+        return (
+            self.session.query(Artifact)
+            .filter(Artifact.id == artifact_id)
+            .first()
+        )
+
+    def ensure_default_collection(self, collection_id: str, name: str) -> None:
+        """Ensure a default collection row exists within this transaction session.
+
+        Idempotent — a no-op if the row already exists.  Called from import
+        workflows that need the collection row to be present before inserting
+        ``CollectionArtifact`` rows.
+
+        Args:
+            collection_id: Primary key of the default collection.
+            name: Human-readable name for the collection when creating it.
+
+        Example:
+            >>> with handler.import_transaction(source_id) as ctx:
+            ...     ctx.ensure_default_collection("default", "Default Collection")
+            ...     ctx.mark_imported(entry_ids, import_id)
+        """
+        from skillmeat.cache.models import Collection
+
+        existing = self.session.query(Collection).filter_by(id=collection_id).first()
+        if not existing:
+            now = datetime.utcnow()
+            default_collection = Collection(
+                id=collection_id,
+                name=name,
+                description="Default collection for all artifacts.",
+                created_at=now,
+                updated_at=now,
+            )
+            self.session.add(default_collection)
+            logger.info("ensure_default_collection: created collection %r", collection_id)
 
 
 # =============================================================================

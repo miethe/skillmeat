@@ -38,14 +38,26 @@ import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
+
+if TYPE_CHECKING:
+    from skillmeat.cache.repositories import (
+        ImportContext,
+        MarketplaceCatalogRepository,
+        MarketplaceSourceRepository,
+        MarketplaceTransactionHandler,
+        MergeResult,
+    )
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
     CollectionManagerDep,
+    MarketplaceCatalogRepoDep,
+    MarketplaceSourceConcreteRepoDep,
     MarketplaceSourceRepoDep,
+    MarketplaceTransactionHandlerDep,
 )
 # ORM model imports — used for CONSTRUCTION of new objects in the scan pipeline,
 # not for direct session queries (all session access is via repository methods).
@@ -99,14 +111,12 @@ from skillmeat.api.utils.github_cache import (
     build_tree_key,
     get_github_file_cache,
 )
-from skillmeat.cache.repositories import (
-    ImportContext,
-    MarketplaceCatalogRepository,
-    MarketplaceSourceRepository,
-    MarketplaceTransactionHandler,
-    MergeResult,
-    NotFoundError,
-)
+# NotFoundError is a domain exception — kept as a direct runtime import.
+# ImportContext and MergeResult are data-class helpers used only as type hints
+# (string annotations), so they live in the TYPE_CHECKING block above.
+# MarketplaceCatalogRepository, MarketplaceSourceRepository, and
+# MarketplaceTransactionHandler are injected via DI aliases above.
+from skillmeat.cache.repositories import NotFoundError
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.manifest_extractors import extract_deep_search_text
 from skillmeat.core.github_client import GitHubClientError
@@ -473,7 +483,7 @@ async def _validate_manual_map_paths(
         ) from e
 
 
-def get_composite_aggregates() -> Dict[str, Any]:
+def get_composite_aggregates(catalog_repo: "MarketplaceCatalogRepository") -> Dict[str, Any]:
     """Compute aggregate composite member data from the local DB cache.
 
     Returns member count and child artifact types by issuing a single SQL query
@@ -483,6 +493,9 @@ def get_composite_aggregates() -> Dict[str, Any]:
     The result is scoped globally (across all collections) because marketplace
     sources are GitHub repos and there is no direct FK between them and local
     composite artifacts.  Callers should cache this result per request.
+
+    Args:
+        catalog_repo: Injected MarketplaceCatalogRepository instance.
 
     Returns:
         Dictionary with two keys:
@@ -497,7 +510,7 @@ def get_composite_aggregates() -> Dict[str, Any]:
         Returns ``{"member_count": 0, "child_types": []}`` on any DB error
         so that failures are non-fatal and never block source listing.
     """
-    return MarketplaceCatalogRepository().get_composite_aggregates()
+    return catalog_repo.get_composite_aggregates()
 
 
 def source_to_response(
@@ -1430,9 +1443,9 @@ def _extract_frontmatter_batch(
 
 async def _perform_scan(
     source: MarketplaceSource,
-    source_repo: MarketplaceSourceRepository,
-    catalog_repo: MarketplaceCatalogRepository,
-    transaction_handler: MarketplaceTransactionHandler,
+    source_repo: "MarketplaceSourceRepository",
+    catalog_repo: "MarketplaceCatalogRepository",
+    transaction_handler: "MarketplaceTransactionHandler",
 ) -> ScanResultDTO:
     """Perform repository scan and update source + catalog atomically.
 
@@ -2041,7 +2054,12 @@ async def infer_github_url(request: InferUrlRequest) -> InferUrlResponse:
         500: {"description": "Internal server error"},
     },
 )
-async def create_source(request: CreateSourceRequest) -> SourceResponse:
+async def create_source(
+    request: CreateSourceRequest,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
+    transaction_handler: MarketplaceTransactionHandlerDep,
+) -> SourceResponse:
     """Create a new GitHub repository source.
 
     Args:
@@ -2064,9 +2082,6 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         ) from e
-
-    # Initialize repository
-    source_repo = MarketplaceSourceRepository()
 
     # Check if source already exists
     existing = source_repo.get_by_repo_url(request.repo_url)
@@ -2198,8 +2213,6 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
 
         # Trigger initial scan
         logger.info(f"Triggering initial scan for source: {created.id}")
-        catalog_repo = MarketplaceCatalogRepository()
-        transaction_handler = MarketplaceTransactionHandler()
 
         scan_result = await _perform_scan(
             source=created,
@@ -2246,6 +2259,8 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
     """,
 )
 async def list_sources(
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
     limit: int = Query(50, ge=1, le=100, description="Maximum items per page"),
     cursor: Optional[str] = Query(None, description="Cursor for next page"),
     artifact_type: Optional[str] = Query(
@@ -2281,17 +2296,15 @@ async def list_sources(
     Raises:
         HTTPException 500: If database operation fails
     """
-    source_repo = MarketplaceSourceRepository()
     source_manager = SourceManager()
 
     try:
         # Pre-fetch composite aggregates once per request (avoid N+1).
         # This single query covers all composites across the local DB.
-        composite_aggs = get_composite_aggregates()
+        composite_aggs = get_composite_aggregates(catalog_repo)
 
         # Pre-fetch catalog status counts for all sources in one query (avoid N+1).
         # Result: {source_id: {status: count}}
-        catalog_repo = MarketplaceCatalogRepository()
         status_counts_bulk = catalog_repo.count_by_status_bulk()
 
         # Check if any filters are provided
@@ -2454,11 +2467,17 @@ async def list_sources(
         500: {"description": "Internal server error"},
     },
 )
-async def get_source(source_id: str) -> SourceResponse:
+async def get_source(
+    source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
+) -> SourceResponse:
     """Get a marketplace source by ID.
 
     Args:
         source_id: Unique source identifier
+        source_repo: Injected MarketplaceSourceRepository dependency.
+        catalog_repo: Injected MarketplaceCatalogRepository dependency.
 
     Returns:
         Source details
@@ -2467,8 +2486,6 @@ async def get_source(source_id: str) -> SourceResponse:
         HTTPException 404: If source not found
         HTTPException 500: If database operation fails
     """
-    source_repo = MarketplaceSourceRepository()
-
     try:
         source = source_repo.get_by_id(source_id)
         if not source:
@@ -2478,7 +2495,6 @@ async def get_source(source_id: str) -> SourceResponse:
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        catalog_repo = MarketplaceCatalogRepository()
         status_counts = catalog_repo.count_by_status(source_id)
         return source_to_response(source, counts_by_status=status_counts)
     except HTTPException:
@@ -2550,6 +2566,7 @@ async def get_source(source_id: str) -> SourceResponse:
 async def update_source(
     source_id: str,
     request: UpdateSourceRequest,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> SourceResponse:
     """Update a marketplace source.
 
@@ -2608,8 +2625,6 @@ async def update_source(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one update parameter must be provided",
         )
-
-    source_repo = MarketplaceSourceRepository()
 
     try:
         # Fetch existing source
@@ -2806,18 +2821,20 @@ async def update_source(
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
 )
-async def delete_source(source_id: str) -> None:
+async def delete_source(
+    source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+) -> None:
     """Delete a marketplace source.
 
     Args:
         source_id: Unique source identifier
+        source_repo: Injected MarketplaceSourceRepository dependency.
 
     Raises:
         HTTPException 404: If source not found
         HTTPException 500: If database operation fails
     """
-    source_repo = MarketplaceSourceRepository()
-
     try:
         deleted = source_repo.delete(source_id)
         if not deleted:
@@ -2902,11 +2919,20 @@ async def delete_source(source_id: str) -> None:
         500: {"description": "Scan failed - check error message in response"},
     },
 )
-async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResultDTO:
+async def rescan_source(
+    source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
+    transaction_handler: MarketplaceTransactionHandlerDep,
+    request: ScanRequest = None,
+) -> ScanResultDTO:
     """Trigger a rescan of a marketplace source.
 
     Args:
         source_id: Unique source identifier
+        source_repo: Injected MarketplaceSourceRepository dependency.
+        catalog_repo: Injected MarketplaceCatalogRepository dependency.
+        transaction_handler: Injected MarketplaceTransactionHandler dependency.
         request: Optional scan configuration (force rescan, etc.)
 
     Returns:
@@ -2918,10 +2944,6 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
     """
     if request is None:
         request = ScanRequest()
-
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
-    transaction_handler = MarketplaceTransactionHandler()
 
     try:
         # Fetch source
@@ -2994,6 +3016,8 @@ async def sync_imported_artifacts(
     request: BulkSyncRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
 ) -> BulkSyncResponse:
     """Sync imported artifacts from a marketplace source with upstream.
 
@@ -3014,9 +3038,6 @@ async def sync_imported_artifacts(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="artifact_ids cannot be empty",
         )
-
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
 
     try:
         # Verify source exists
@@ -3312,6 +3333,8 @@ async def sync_imported_artifacts(
 )
 async def list_artifacts(
     source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
     artifact_type: Optional[str] = Query(
         None, description="Filter by artifact type (skill, command, agent, etc.)"
     ),
@@ -3389,9 +3412,6 @@ async def list_artifacts(
         >>> # Count by status shows excluded entries
         >>> assert response.counts_by_status.get("excluded", 0) >= 0
     """
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
-
     try:
         # Verify source exists
         source = source_repo.get_by_id(source_id)
@@ -3574,11 +3594,11 @@ async def update_catalog_entry_name(
     source_id: str,
     entry_id: str,
     request: UpdateCatalogEntryNameRequest,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
     collection_mgr: CollectionManagerDep = None,
 ) -> CatalogEntryResponse:
     """Update the name for a catalog entry."""
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
     collection_keys = (
         get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
     )
@@ -3990,6 +4010,9 @@ async def import_artifacts(
     request: ImportRequest,
     collection_mgr: CollectionManagerDep,
     artifact_mgr: ArtifactManagerDep,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
+    transaction_handler: MarketplaceTransactionHandlerDep,
 ) -> ImportResultDTO:
     """Import catalog entries to local collection.
 
@@ -4010,10 +4033,6 @@ async def import_artifacts(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one of entry_ids or artifact_paths must be provided",
         )
-
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
-    transaction_handler = MarketplaceTransactionHandler()
 
     try:
         # Verify source exists
@@ -4420,6 +4439,9 @@ async def reimport_catalog_entry(
     request: ReimportRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
+    transaction_handler: MarketplaceTransactionHandlerDep,
 ) -> ReimportResponse:
     """Force re-import a catalog entry from upstream.
 
@@ -4442,10 +4464,6 @@ async def reimport_catalog_entry(
         HTTPException 404: If source or entry not found
         HTTPException 500: If re-import operation fails
     """
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
-    transaction_handler = MarketplaceTransactionHandler()
-
     try:
         # Verify source exists
         source = source_repo.get_by_id(source_id)
@@ -5321,6 +5339,7 @@ def _map_tree_entry_type(entry_type: str) -> str:
 async def get_artifact_file_tree(
     source_id: str,
     artifact_path: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> FileTreeResponse:
     """Get file tree for a marketplace artifact.
 
@@ -5345,8 +5364,6 @@ async def get_artifact_file_tree(
     # but empty string is the canonical representation for API operations
     if artifact_path == ".":
         artifact_path = ""
-
-    source_repo = MarketplaceSourceRepository()
 
     try:
         # Get marketplace source
@@ -5542,6 +5559,7 @@ async def get_artifact_file_content(
     source_id: str,
     artifact_path: str,
     file_path: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> FileContentResponse:
     """Get content of a file within a marketplace artifact.
 
@@ -5568,8 +5586,6 @@ async def get_artifact_file_content(
     # but empty string is the canonical representation for API operations
     if artifact_path == ".":
         artifact_path = ""
-
-    source_repo = MarketplaceSourceRepository()
 
     try:
         # Get marketplace source
@@ -5753,11 +5769,13 @@ async def get_artifact_file_content(
 )
 async def get_source_auto_tags(
     source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> AutoTagsResponse:
     """Get auto-tag suggestions for a marketplace source.
 
     Args:
         source_id: Unique source identifier
+        source_repo: Injected MarketplaceSourceRepository dependency.
 
     Returns:
         AutoTagsResponse with all auto-tags and their status
@@ -5765,8 +5783,6 @@ async def get_source_auto_tags(
     Raises:
         HTTPException 404: If source not found
     """
-    source_repo = MarketplaceSourceRepository()
-
     try:
         source = source_repo.get_by_id(source_id)
         if not source:
@@ -5835,12 +5851,16 @@ async def update_source_auto_tag(
     source_id: str,
     request: UpdateAutoTagRequest,
     source_repo: MarketplaceSourceRepoDep,
+    concrete_source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> UpdateAutoTagResponse:
     """Update approval status of an auto-tag.
 
     Args:
         source_id: Unique source identifier
         request: Request body with tag value and new status
+        source_repo: IMarketplaceSourceRepository DI dependency.
+        concrete_source_repo: Concrete MarketplaceSourceRepository for ORM-level
+            auto_tags mutations not exposed by the interface.
 
     Returns:
         UpdateAutoTagResponse with updated tag and any tags added
@@ -5849,13 +5869,8 @@ async def update_source_auto_tag(
         HTTPException 404: If source or auto-tag not found
         HTTPException 500: If update fails
     """
-    # Obtain the underlying concrete repo for ORM-level mutations (auto_tags).
-    # source_repo (DI interface) doesn't expose auto_tags directly; we use the
-    # raw ORM repo via the existing legacy pattern but avoid session.commit().
-    _raw_source_repo = MarketplaceSourceRepository()
-
     try:
-        source = _raw_source_repo.get_by_id(source_id)
+        source = concrete_source_repo.get_by_id(source_id)
         if not source:
             logger.warning(f"Source not found for auto-tag update: {source_id}")
             raise HTTPException(
@@ -5922,7 +5937,7 @@ async def update_source_auto_tag(
                 logger.warning(f"Failed to add approved tag to source {source_id}: {e}")
 
         # Persist mutations on the source ORM object via repository update.
-        _raw_source_repo.update(source)
+        concrete_source_repo.update(source)
 
         logger.info(
             f"Updated auto-tag '{request.value}' to status '{request.status}' "
@@ -5950,7 +5965,7 @@ async def update_source_auto_tag(
 
 def _refresh_auto_tags_for_source(
     source: MarketplaceSource,
-    source_repo: MarketplaceSourceRepository,
+    source_repo: "MarketplaceSourceRepository",
 ) -> tuple[int, int, int, List[AutoTagSegment]]:
     """Refresh auto-tags for a single source by fetching GitHub topics.
 
@@ -6036,6 +6051,7 @@ def _refresh_auto_tags_for_source(
 )
 async def refresh_source_auto_tags(
     source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> AutoTagRefreshResponse:
     """Refresh auto-tags by fetching GitHub topics for the source.
 
@@ -6055,8 +6071,6 @@ async def refresh_source_auto_tags(
         GitHubNotFoundError,
         GitHubRateLimitError,
     )
-
-    source_repo = MarketplaceSourceRepository()
 
     try:
         source = source_repo.get_by_id(source_id)
@@ -6134,11 +6148,13 @@ async def refresh_source_auto_tags(
 )
 async def bulk_refresh_auto_tags(
     request: BulkAutoTagRefreshRequest,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> BulkAutoTagRefreshResponse:
     """Refresh auto-tags for multiple sources.
 
     Args:
         request: BulkAutoTagRefreshRequest with list of source IDs
+        source_repo: Injected MarketplaceSourceRepository dependency.
 
     Returns:
         BulkAutoTagRefreshResponse with individual results and summary
@@ -6147,8 +6163,6 @@ async def bulk_refresh_auto_tags(
         GitHubClientError,
         GitHubRateLimitError,
     )
-
-    source_repo = MarketplaceSourceRepository()
     results: List[BulkAutoTagRefreshItemResult] = []
     total_succeeded = 0
     total_failed = 0

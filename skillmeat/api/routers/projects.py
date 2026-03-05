@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import (
+    DeploymentProfileRepoDep,
     ProjectRepoDep,
     get_app_state,
     get_collection_manager,
@@ -255,11 +256,16 @@ def build_project_summary(project_path: Path) -> ProjectSummary:
     )
 
 
-def build_project_detail(project_path: Path, db_session: Optional[Session] = None) -> ProjectDetail:
+def build_project_detail(
+    project_path: Path,
+    profile_repo: object,
+    db_session: Optional[Session] = None,
+) -> ProjectDetail:
     """Build a ProjectDetail from a project path.
 
     Args:
         project_path: Absolute path to project directory
+        profile_repo: DeploymentProfileRepository instance (injected via DI).
         db_session: Optional database session for collection lookups
 
     Returns:
@@ -267,7 +273,6 @@ def build_project_detail(project_path: Path, db_session: Optional[Session] = Non
     """
     from skillmeat.api.services import CollectionService
     from skillmeat.cache.models import Project, get_session
-    from skillmeat.cache.repositories import DeploymentProfileRepository
 
     deployments = DeploymentTracker.read_deployments(project_path)
 
@@ -290,7 +295,6 @@ def build_project_detail(project_path: Path, db_session: Optional[Session] = Non
             .first()
         )
         if project_row:
-            profile_repo = DeploymentProfileRepository()
             deployment_profiles = [
                 {
                     "profile_id": profile.profile_id,
@@ -797,6 +801,7 @@ async def get_project(
     project_id: str,
     token: TokenDep,
     project_repo: ProjectRepoDep,
+    profile_repo: DeploymentProfileRepoDep,
     cache_manager: CacheManagerDep,
     response: Response,
 ) -> ProjectDetail:
@@ -866,7 +871,7 @@ async def get_project(
             )
 
         # Build project detail from filesystem (always read fresh for detail view)
-        project_detail = build_project_detail(project_path)
+        project_detail = build_project_detail(project_path, profile_repo=profile_repo)
 
         # Set cache miss header if not hit
         if not cache_hit:
@@ -910,6 +915,7 @@ async def update_project(
     request: ProjectUpdateRequest,
     token: TokenDep,
     project_repo: ProjectRepoDep,
+    profile_repo: DeploymentProfileRepoDep,
 ) -> ProjectDetail:
     """Update project metadata.
 
@@ -1001,7 +1007,7 @@ async def update_project(
         await registry.refresh_entry(project_path)
 
         # Build and return updated project detail
-        project_detail = build_project_detail(project_path)
+        project_detail = build_project_detail(project_path, profile_repo=profile_repo)
         return project_detail
 
     except HTTPException:

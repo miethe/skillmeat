@@ -36,6 +36,8 @@ from skillmeat.api.dependencies import (
     CollectionManagerDep,
     ConfigManagerDep,
     DbSessionDep,
+    DuplicatePairRepoDep,
+    MarketplaceCatalogRepoDep,
     SettingsDep,
     SyncManagerDep,
     TagRepoDep,
@@ -145,7 +147,6 @@ from skillmeat.cache.models import (
     MarketplaceCatalogEntry,
     get_session,
 )
-from skillmeat.cache.repositories import MarketplaceCatalogRepository
 from skillmeat.observability.timing import PerfTimer
 
 logger = logging.getLogger(__name__)
@@ -3171,6 +3172,7 @@ async def delete_artifact(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     db_session: DbSessionDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
     token: TokenDep,
     collection: Optional[str] = Query(
         default=None,
@@ -3260,7 +3262,6 @@ async def delete_artifact(
         # Reset any linked marketplace catalog entry status to allow re-import
         # This enables re-importing artifacts that were previously imported then deleted
         try:
-            catalog_repo = MarketplaceCatalogRepository()
             catalog_entry = catalog_repo.find_by_artifact_name_and_type(
                 name=artifact_name,
                 artifact_type=artifact_type_str,
@@ -8808,6 +8809,7 @@ async def get_consolidation_clusters(
 )
 async def ignore_duplicate_pair(
     pair_id: str,
+    pair_repo: DuplicatePairRepoDep,
     token: TokenDep,
 ) -> dict:
     """Mark a DuplicatePair as ignored (consolidation skip action).
@@ -8829,10 +8831,7 @@ async def ignore_duplicate_pair(
     try:
         logger.info("Marking duplicate pair %r as ignored", pair_id)
 
-        from skillmeat.cache.repositories import DuplicatePairRepository
-
-        repo = DuplicatePairRepository()
-        found = repo.mark_pair_ignored(pair_id)
+        found = pair_repo.mark_pair_ignored(pair_id)
 
         if not found:
             logger.info("Duplicate pair not found: %r", pair_id)
@@ -8876,6 +8875,7 @@ async def ignore_duplicate_pair(
 )
 async def unignore_duplicate_pair(
     pair_id: str,
+    pair_repo: DuplicatePairRepoDep,
     token: TokenDep,
 ) -> dict:
     """Clear the ignored flag on a DuplicatePair (undo consolidation skip).
@@ -8897,10 +8897,7 @@ async def unignore_duplicate_pair(
     try:
         logger.info("Clearing ignored flag on duplicate pair %r", pair_id)
 
-        from skillmeat.cache.repositories import DuplicatePairRepository
-
-        repo = DuplicatePairRepository()
-        found = repo.unmark_pair_ignored(pair_id)
+        found = pair_repo.unmark_pair_ignored(pair_id)
 
         if not found:
             logger.info("Duplicate pair not found: %r", pair_id)
@@ -9365,6 +9362,7 @@ async def merge_consolidation_cluster(
     request: ConsolidationActionRequest,
     artifact_mgr: ArtifactManagerDep,
     db_session: DbSessionDep,
+    pair_repo: DuplicatePairRepoDep,
     token: TokenDep,
 ) -> ConsolidationActionResponse:
     """Merge secondary artifacts into the primary for a consolidation cluster.
@@ -9417,7 +9415,6 @@ async def merge_consolidation_cluster(
     # --- Step 2: Resolve cluster members ---
     try:
         from skillmeat.cache.models import DuplicatePair
-        from skillmeat.cache.repositories import DuplicatePairRepository
 
         primary_uuid = request.primary_artifact_uuid
 
@@ -9509,10 +9506,9 @@ async def merge_consolidation_cluster(
                 )
 
         # --- Step 4: Mark pairs as resolved (ignored) ---
-        repo = DuplicatePairRepository()
         pairs_resolved = 0
         for pid in pair_ids:
-            if repo.mark_pair_ignored(pid):
+            if pair_repo.mark_pair_ignored(pid):
                 pairs_resolved += 1
 
         logger.info(
@@ -9569,6 +9565,7 @@ async def replace_consolidation_cluster(
     request: ConsolidationActionRequest,
     artifact_mgr: ArtifactManagerDep,
     db_session: DbSessionDep,
+    pair_repo: DuplicatePairRepoDep,
     token: TokenDep,
 ) -> ConsolidationActionResponse:
     """Keep the primary artifact and discard all secondaries in the cluster.
@@ -9624,7 +9621,6 @@ async def replace_consolidation_cluster(
     # --- Step 2: Resolve cluster members ---
     try:
         from skillmeat.cache.models import DuplicatePair
-        from skillmeat.cache.repositories import DuplicatePairRepository
 
         primary_uuid = request.primary_artifact_uuid
 
@@ -9716,10 +9712,9 @@ async def replace_consolidation_cluster(
                     )
 
         # --- Step 4: Mark pairs as resolved (ignored) ---
-        repo = DuplicatePairRepository()
         pairs_resolved = 0
         for pid in pair_ids:
-            if repo.mark_pair_ignored(pid):
+            if pair_repo.mark_pair_ignored(pid):
                 pairs_resolved += 1
 
         logger.info(

@@ -31,6 +31,10 @@ from skillmeat.core.interfaces.repositories import (
 from skillmeat.cache.repositories import (
     DeploymentProfileRepository,
     DeploymentSetRepository,
+    DuplicatePairRepository,
+    MarketplaceCatalogRepository,
+    MarketplaceSourceRepository,
+    MarketplaceTransactionHandler,
 )
 from skillmeat.cache.session import get_db_session
 from skillmeat.core.path_resolver import ProjectPathResolver
@@ -630,6 +634,56 @@ def get_deployment_profile_repository() -> DeploymentProfileRepository:
     return DeploymentProfileRepository()
 
 
+def get_marketplace_source_repository_concrete() -> MarketplaceSourceRepository:
+    """Get concrete MarketplaceSourceRepository dependency.
+
+    Returns the concrete ``MarketplaceSourceRepository`` instance when the full
+    set of repository methods (beyond the ``IMarketplaceSourceRepository``
+    interface) is required — e.g. in the marketplace-sources router which uses
+    ORM-level helpers not exposed by the interface.
+
+    Returns:
+        MarketplaceSourceRepository instance.
+    """
+    return MarketplaceSourceRepository()
+
+
+def get_marketplace_catalog_repository() -> MarketplaceCatalogRepository:
+    """Get MarketplaceCatalogRepository dependency.
+
+    Returns a new ``MarketplaceCatalogRepository`` instance.  The repository
+    manages its own session lifecycle internally.
+
+    Returns:
+        MarketplaceCatalogRepository instance.
+    """
+    return MarketplaceCatalogRepository()
+
+
+def get_marketplace_transaction_handler() -> MarketplaceTransactionHandler:
+    """Get MarketplaceTransactionHandler dependency.
+
+    Returns a new ``MarketplaceTransactionHandler`` instance for coordinating
+    atomic cross-table marketplace operations.
+
+    Returns:
+        MarketplaceTransactionHandler instance.
+    """
+    return MarketplaceTransactionHandler()
+
+
+def get_duplicate_pair_repository() -> DuplicatePairRepository:
+    """Get DuplicatePairRepository dependency.
+
+    Returns a new ``DuplicatePairRepository`` instance.  The repository
+    manages its own session lifecycle internally.
+
+    Returns:
+        DuplicatePairRepository instance.
+    """
+    return DuplicatePairRepository()
+
+
 # Type aliases for cleaner dependency injection
 ConfigManagerDep = Annotated[ConfigManager, Depends(get_config_manager)]
 CollectionManagerDep = Annotated[CollectionManager, Depends(get_collection_manager)]
@@ -661,6 +715,20 @@ ProjectTemplateRepoDep = Annotated[
 DeploymentSetRepoDep = Annotated[DeploymentSetRepository, Depends(get_deployment_set_repository)]
 DeploymentProfileRepoDep = Annotated[
     DeploymentProfileRepository, Depends(get_deployment_profile_repository)
+]
+MarketplaceCatalogRepoDep = Annotated[
+    MarketplaceCatalogRepository, Depends(get_marketplace_catalog_repository)
+]
+DuplicatePairRepoDep = Annotated[
+    DuplicatePairRepository, Depends(get_duplicate_pair_repository)
+]
+# Concrete MarketplaceSourceRepository (vs IMarketplaceSourceRepository interface).
+# Use this in marketplace_sources router which requires methods beyond the interface.
+MarketplaceSourceConcreteRepoDep = Annotated[
+    MarketplaceSourceRepository, Depends(get_marketplace_source_repository_concrete)
+]
+MarketplaceTransactionHandlerDep = Annotated[
+    MarketplaceTransactionHandler, Depends(get_marketplace_transaction_handler)
 ]
 
 # Per-request SQLAlchemy session (hexagonal architecture)

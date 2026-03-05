@@ -30,7 +30,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 
 from skillmeat.api.config import APISettings, get_settings
-from skillmeat.api.dependencies import ContextEntityRepoDep
+from skillmeat.api.dependencies import ContextEntityRepoDep, DeploymentProfileRepoDep
 from skillmeat.api.schemas.context_entity import (
     ContextEntityCreateRequest,
     ContextEntityDeployRequest,
@@ -41,7 +41,6 @@ from skillmeat.api.schemas.context_entity import (
     ContextEntityUpdateRequest,
 )
 from skillmeat.api.schemas.common import PageInfo
-from skillmeat.cache.repositories import DeploymentProfileRepository
 from skillmeat.core.content_assembly import assemble_content
 from skillmeat.core.interfaces.dtos import ContextEntityDTO
 from skillmeat.core.path_resolver import default_project_config_filenames
@@ -104,14 +103,14 @@ def _resolve_deploy_profiles(
     project_path: Path,
     deployment_profile_id: Optional[str],
     all_profiles: bool,
+    profile_repo: object,
 ) -> List[object]:
     if not all_profiles:
         return [resolve_project_profile(project_path, deployment_profile_id)]
 
-    repo = DeploymentProfileRepository()
-    project_id = repo.get_project_id_by_path(str(project_path))
+    project_id = profile_repo.get_project_id_by_path(str(project_path))
     if project_id:
-        profiles = repo.list_all_profiles(project_id)
+        profiles = profile_repo.list_all_profiles(project_id)
         if profiles:
             # Deduplicate by profile_id in case repository data includes stale duplicates.
             seen: set[str] = set()
@@ -747,6 +746,7 @@ async def deploy_context_entity(
     entity_id: str,
     request: ContextEntityDeployRequest,
     repo: ContextEntityRepoDep,
+    profile_repo: DeploymentProfileRepoDep,
     settings: SettingsDep,
 ) -> ContextEntityDeployResponse:
     if request.all_profiles and request.deployment_profile_id:
@@ -779,6 +779,7 @@ async def deploy_context_entity(
             project_path=project_path,
             deployment_profile_id=request.deployment_profile_id,
             all_profiles=request.all_profiles,
+            profile_repo=profile_repo,
         )
 
         target_platforms = _as_target_platforms(dto.target_platforms) if dto.target_platforms else None

@@ -10,17 +10,16 @@ API Endpoints:
 
 import json
 import logging
-from typing import Annotated, List, Optional
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Query, status
 
+from skillmeat.api.dependencies import MarketplaceCatalogRepoDep
 from skillmeat.api.schemas.marketplace import (
     CatalogSearchResponse,
     CatalogSearchResult,
 )
-from skillmeat.cache.models import MarketplaceCatalogEntry, get_session
-from skillmeat.cache.repositories import MarketplaceCatalogRepository
+from skillmeat.cache.models import MarketplaceCatalogEntry
 
 logger = logging.getLogger(__name__)
 
@@ -28,22 +27,6 @@ router = APIRouter(
     prefix="/marketplace/catalog",
     tags=["marketplace-catalog"],
 )
-
-
-def get_db_session():
-    """Dependency that provides a database session.
-
-    Yields:
-        Session: SQLAlchemy database session
-    """
-    session = get_session()
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-DbSessionDep = Annotated[Session, Depends(get_db_session)]
 
 
 def entry_to_search_result(
@@ -137,6 +120,7 @@ The `cursor` value from a previous response can be used to fetch the next page.
     },
 )
 async def search_catalog(
+    catalog_repo: MarketplaceCatalogRepoDep,
     q: Optional[str] = Query(
         None,
         description="Search query for full-text matching on name, title, description, tags, and deep-indexed content",
@@ -186,6 +170,7 @@ async def search_catalog(
     excluded from results.
 
     Args:
+        catalog_repo: Injected MarketplaceCatalogRepository dependency.
         q: Optional search query for text matching
         type: Optional artifact type filter
         source_id: Optional source ID to limit search scope
@@ -200,7 +185,6 @@ async def search_catalog(
     Raises:
         HTTPException 500: If database operation fails
     """
-    catalog_repo = MarketplaceCatalogRepository()
 
     try:
         # Parse tags if provided
