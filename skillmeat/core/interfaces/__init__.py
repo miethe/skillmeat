@@ -27,6 +27,7 @@ from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
     CatalogItemDTO,
     CategoryDTO,
+    CollectionArtifactDTO,
     CollectionDTO,
     CollectionMembershipDTO,
     ContextEntityDTO,
@@ -40,6 +41,7 @@ from skillmeat.core.interfaces.dtos import (
     SettingsDTO,
     TagDTO,
     TemplateEntityDTO,
+    UserCollectionDTO,
 )
 from skillmeat.core.interfaces.repositories import (
     IArtifactRepository,
@@ -61,6 +63,7 @@ __all__: list[str] = [
     "ArtifactDTO",
     "CatalogItemDTO",
     "CategoryDTO",
+    "CollectionArtifactDTO",
     "CollectionDTO",
     "CollectionMembershipDTO",
     "ContextEntityDTO",
@@ -74,6 +77,7 @@ __all__: list[str] = [
     "SettingsDTO",
     "TagDTO",
     "TemplateEntityDTO",
+    "UserCollectionDTO",
     # Repository interfaces
     "IArtifactRepository",
     "ICollectionRepository",

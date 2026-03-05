@@ -62,6 +62,9 @@ __all__ = [
     # Project templates
     "ProjectTemplateDTO",
     "TemplateEntityDTO",
+    # User collections (DB-backed)
+    "UserCollectionDTO",
+    "CollectionArtifactDTO",
 ]
 
 
@@ -1067,6 +1070,184 @@ class ProjectTemplateDTO:
             entity_count=int(data.get("entity_count") or len(entities)),
             created_at=_to_iso(data.get("created_at")),
             updated_at=_to_iso(data.get("updated_at")),
+        )
+
+
+# =============================================================================
+# UserCollectionDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class UserCollectionDTO:
+    """Lightweight representation of a DB-backed user collection.
+
+    Maps from the ``Collection`` ORM model in ``skillmeat.cache.models``.
+    Unlike the filesystem-oriented :class:`CollectionDTO`, this DTO is keyed
+    by the database UUID primary key and carries the full set of metadata
+    columns used by the web API.
+
+    Attributes:
+        id: UUID hex primary key (e.g. ``"a1b2c3d4..."``).
+        name: Human-readable collection name (1-255 characters).
+        description: Optional detailed description.
+        created_by: User identifier for future multi-user support.
+        collection_type: Optional collection type (e.g. ``"context"``
+            or ``"artifacts"``).
+        context_category: Optional sub-category for context collections
+            (e.g. ``"rules"`` or ``"specs"``).
+        created_at: ISO-8601 creation timestamp.
+        updated_at: ISO-8601 last-update timestamp.
+        artifact_count: Number of artifacts currently in the collection
+            (derived, not a stored column).
+    """
+
+    id: str
+    name: str
+    description: str | None = None
+    created_by: str | None = None
+    collection_type: str | None = None
+    context_category: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    artifact_count: int = 0
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a UserCollectionDTO from a plain dictionary.
+
+        Unknown keys are silently ignored so callers can pass raw ORM
+        ``to_dict()`` output or query-result rows without pre-filtering.
+
+        Args:
+            data: Mapping that contains at minimum ``id`` and ``name``.
+
+        Returns:
+            A fully populated :class:`UserCollectionDTO`.
+        """
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            description=data.get("description"),
+            created_by=data.get("created_by"),
+            collection_type=data.get("collection_type"),
+            context_category=data.get("context_category"),
+            created_at=_to_iso(data.get("created_at")),
+            updated_at=_to_iso(data.get("updated_at")),
+            artifact_count=int(data.get("artifact_count") or 0),
+        )
+
+
+# =============================================================================
+# CollectionArtifactDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class CollectionArtifactDTO:
+    """Lightweight representation of a collection–artifact association row.
+
+    Maps from the ``CollectionArtifact`` ORM model (the rich join table in
+    ``skillmeat.cache.models``).  Carries both the join keys and the cached
+    metadata columns that allow the web API to serve collection pages without
+    re-reading every artifact from the filesystem.
+
+    Attributes:
+        collection_id: UUID hex FK to ``collections.id``.
+        artifact_uuid: Stable ADR-007 UUID FK to ``artifacts.uuid``.
+        added_at: ISO-8601 timestamp when the artifact was added to the
+            collection.
+        description: Cached artifact description.
+        author: Cached artifact author string.
+        license: Cached SPDX license identifier (e.g. ``"MIT"``).
+        tags: Cached tag name strings (deserialised from ``tags_json``).
+        tools: Cached tool name strings (deserialised from ``tools_json``).
+        deployments: Cached deployment path strings (from ``deployments_json``).
+        artifact_content_hash: SHA-256 hash of artifact file contents.
+        artifact_structure_hash: Hash of the artifact directory structure.
+        artifact_file_count: Number of files in the artifact.
+        artifact_total_size: Total byte size of all artifact files.
+        source: Upstream source spec string.
+        origin: Origin URL or identifier.
+        resolved_sha: Resolved VCS commit SHA.
+        resolved_version: Resolved version string.
+        synced_at: ISO-8601 timestamp of the most-recent metadata sync.
+    """
+
+    collection_id: str
+    artifact_uuid: str
+    added_at: str | None = None
+    description: str | None = None
+    author: str | None = None
+    license: str | None = None
+    tags: List[str] = field(default_factory=list)
+    tools: List[str] = field(default_factory=list)
+    deployments: List[str] = field(default_factory=list)
+    artifact_content_hash: str | None = None
+    artifact_structure_hash: str | None = None
+    artifact_file_count: int | None = None
+    artifact_total_size: int | None = None
+    source: str | None = None
+    origin: str | None = None
+    resolved_sha: str | None = None
+    resolved_version: str | None = None
+    synced_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a CollectionArtifactDTO from a plain dictionary.
+
+        Handles JSON-serialised list columns (``tags_json``, ``tools_json``,
+        ``deployments_json``) transparently — pass the raw ORM ``__dict__``
+        or a pre-deserialised mapping; both are accepted.
+
+        Args:
+            data: Mapping that contains at minimum ``collection_id`` and
+                ``artifact_uuid``.
+
+        Returns:
+            A fully populated :class:`CollectionArtifactDTO`.
+        """
+        import json as _json
+
+        def _parse_json_list(raw: Any) -> List[str]:
+            """Return a list from a JSON string, a list, or None/empty."""
+            if raw is None:
+                return []
+            if isinstance(raw, list):
+                return list(raw)
+            if isinstance(raw, str):
+                try:
+                    parsed = _json.loads(raw)
+                    return list(parsed) if isinstance(parsed, list) else []
+                except (_json.JSONDecodeError, TypeError):
+                    return []
+            return []
+
+        file_count = data.get("artifact_file_count")
+        total_size = data.get("artifact_total_size")
+
+        return cls(
+            collection_id=data["collection_id"],
+            artifact_uuid=data["artifact_uuid"],
+            added_at=_to_iso(data.get("added_at")),
+            description=data.get("description"),
+            author=data.get("author"),
+            license=data.get("license"),
+            tags=_parse_json_list(data.get("tags") or data.get("tags_json")),
+            tools=_parse_json_list(data.get("tools") or data.get("tools_json")),
+            deployments=_parse_json_list(
+                data.get("deployments") or data.get("deployments_json")
+            ),
+            artifact_content_hash=data.get("artifact_content_hash"),
+            artifact_structure_hash=data.get("artifact_structure_hash"),
+            artifact_file_count=int(file_count) if file_count is not None else None,
+            artifact_total_size=int(total_size) if total_size is not None else None,
+            source=data.get("source"),
+            origin=data.get("origin"),
+            resolved_sha=data.get("resolved_sha"),
+            resolved_version=data.get("resolved_version"),
+            synced_at=_to_iso(data.get("synced_at")),
         )
 
 
