@@ -343,6 +343,7 @@ def migrate_artifacts_to_default_collection(
     session: Session,
     artifact_mgr,
     collection_mgr,
+    collection_repo: Optional[IDbUserCollectionRepository] = None,
 ) -> dict:
     """Migrate all existing artifacts to the default collection.
 
@@ -355,20 +356,26 @@ def migrate_artifacts_to_default_collection(
         session: Database session
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
+        collection_repo: Optional injected IDbUserCollectionRepository.
+            When provided (e.g. from an endpoint's DI), used directly.
+            Falls back to constructing DbUserCollectionRepository() if None.
 
     Returns:
         dict with migration stats: migrated_count, already_present_count,
         total_artifacts, and metadata_cache stats
 
-    TODO: This function requires a DB-backed repository for both
-    IDbUserCollectionRepository (ensure_default, migrate_artifacts) and
-    IDbCollectionArtifactRepository (check existing associations, batch create).
-    The direct ORM access is intentional pending those implementations.
+    TODO(Phase-6): Replace direct session.query(Artifact/CollectionArtifact)
+    calls with IArtifactRepository.list_ids()/create_batch() and
+    IDbCollectionArtifactRepository.check_existing()/add_artifacts() once
+    those methods are defined on their respective interfaces.
     """
-    # 1. Ensure default collection exists first (repo-based helper)
-    from skillmeat.cache.repositories import DbUserCollectionRepository as _CollRepo
+    # 1. Ensure default collection exists first (prefer injected repo)
+    if collection_repo is None:
+        from skillmeat.cache.repositories import DbUserCollectionRepository as _CollRepo
 
-    ensure_default_collection(_CollRepo())
+        collection_repo = _CollRepo()
+
+    ensure_default_collection(collection_repo)
 
     # 2. Ensure every filesystem artifact has an Artifact ORM row.
     # populate_collection_artifact_metadata() and the migration loop both
@@ -446,8 +453,15 @@ def migrate_artifacts_to_default_collection(
         session.commit()
         logger.info(f"Migrated {migrated_count} artifacts to default collection")
 
-    # 8. Sync tags from CollectionArtifact cache to Tag ORM tables
-    tag_sync_count = _sync_all_tags_to_orm(session)
+    # 8. Sync tags from CollectionArtifact cache to Tag ORM tables.
+    # Construct an artifact_repo to allow _sync_all_tags_to_orm to use
+    # list_with_tags() instead of a raw session query.
+    from skillmeat.cache.repositories import (
+        DbCollectionArtifactRepository as _ArtifactRepo,
+    )
+
+    _artifact_repo = _ArtifactRepo()
+    tag_sync_count = _sync_all_tags_to_orm(session, artifact_repo=_artifact_repo)
 
     # 9. FS → DB Recovery: restore tag definitions and groups from collection.toml
     # This runs AFTER artifacts are populated so that group member resolution works.
@@ -464,19 +478,29 @@ def migrate_artifacts_to_default_collection(
     }
 
 
-def _sync_all_tags_to_orm(session: Session) -> int:
+def _sync_all_tags_to_orm(
+    session: Session,
+    artifact_repo: Optional[IDbCollectionArtifactRepository] = None,
+) -> int:
     """Sync all CollectionArtifact tags to the Tag ORM tables.
 
     Iterates all CollectionArtifact rows with tags_json and calls
     TagService.sync_artifact_tags() for each. Tag sync failure does
     NOT block the caller.
 
+    Args:
+        session: Database session (used for fallback when artifact_repo is None)
+        artifact_repo: Optional injected IDbCollectionArtifactRepository.
+            When provided, uses list_with_tags() to retrieve tagged artifacts.
+            Falls back to direct session.query(CollectionArtifact) if None.
+
     Returns:
         Number of artifacts successfully synced.
 
-    TODO: Need IDbCollectionArtifactRepository.list_with_tags() and
-    ITagRepository.sync_artifact_tags() methods to replace the direct
-    session.query(CollectionArtifact) usage here.
+    TODO(Phase-6): Replace session.query(CollectionArtifact) fallback with
+    a mandatory artifact_repo parameter once all callers pass a repo.
+    Also needs ITagRepository.sync_artifact_tags() to remove direct TagService
+    instantiation.
     """
     try:
         from skillmeat.core.services import TagService
@@ -486,23 +510,53 @@ def _sync_all_tags_to_orm(session: Session) -> int:
         logger.warning(f"Failed to initialize TagService for bulk tag sync: {e}")
         return 0
 
-    all_cas = (
-        session.query(CollectionArtifact)
-        .filter(CollectionArtifact.tags_json.isnot(None))
-        .all()
-    )
+    # Use repo list_with_tags() when available; fall back to raw session query.
+    if artifact_repo is not None:
+        try:
+            all_cas = artifact_repo.list_with_tags(
+                collection_id=DEFAULT_COLLECTION_ID,
+            )
+        except Exception as e:
+            logger.warning(
+                f"_sync_all_tags_to_orm: list_with_tags() failed ({e}), "
+                "falling back to session query"
+            )
+            artifact_repo = None
+
+    if artifact_repo is None:
+        # TODO(Phase-6): Remove this branch once list_with_tags() is reliable.
+        all_cas = (
+            session.query(CollectionArtifact)
+            .filter(CollectionArtifact.tags_json.isnot(None))
+            .all()
+        )
 
     synced = 0
     for ca in all_cas:
         try:
-            tags = json.loads(ca.tags_json)
+            artifact_uuid = getattr(ca, "artifact_uuid", None)
+            if not artifact_uuid:
+                continue
+
+            # DTOs (from list_with_tags) expose a pre-parsed ``tags`` list.
+            # ORM rows (from session.query fallback) expose ``tags_json`` string.
+            tags: list
+            if hasattr(ca, "tags") and isinstance(getattr(ca, "tags"), list):
+                tags = ca.tags
+            else:
+                tags_json_val = getattr(ca, "tags_json", None)
+                if not tags_json_val:
+                    continue
+                tags = json.loads(tags_json_val)
+
             if tags:
-                tag_service.sync_artifact_tags(ca.artifact_uuid, tags)
+                tag_service.sync_artifact_tags(artifact_uuid, tags)
                 synced += 1
         except Exception as e:
-            logger.warning(f"Tag ORM sync failed for {ca.artifact_uuid}: {e}")
+            artifact_uuid_str = getattr(ca, "artifact_uuid", "<unknown>")
+            logger.warning(f"Tag ORM sync failed for {artifact_uuid_str}: {e}")
 
-    logger.info(f"Synced tags for {synced}/{len(all_cas)} artifacts to Tag ORM")
+    logger.info(f"Synced tags for {synced} artifacts to Tag ORM")
     return synced
 
 
@@ -565,6 +619,7 @@ def populate_collection_artifact_metadata(
     session: Session,
     artifact_mgr,
     collection_mgr,
+    collection_repo: Optional[IDbUserCollectionRepository] = None,
 ) -> dict:
     """Populate CollectionArtifact metadata cache from file-based artifacts.
 
@@ -576,14 +631,15 @@ def populate_collection_artifact_metadata(
         session: Database session
         artifact_mgr: ArtifactManager for listing and reading artifacts
         collection_mgr: CollectionManager for collection access
+        collection_repo: Optional injected IDbUserCollectionRepository.
+            Falls back to constructing DbUserCollectionRepository() if None.
 
     Returns:
         dict with stats: created_count, updated_count, skipped_count, errors
 
-    TODO: Requires IDbCollectionArtifactRepository.upsert_metadata() for the
-    CollectionArtifact create/update operations, and
-    IArtifactRepository.get_by_type_name() for UUID resolution.  The direct
-    ORM access here is intentional pending those implementations.
+    TODO(Phase-6): Replace direct session.query(Artifact/CollectionArtifact)
+    with IDbCollectionArtifactRepository.upsert_metadata() and
+    IArtifactRepository.get_by_type_name() once those methods are defined.
     """
     import json
     import time
@@ -596,10 +652,13 @@ def populate_collection_artifact_metadata(
     skipped_count = 0
     errors = []
 
-    # Ensure default collection exists (repo-based helper)
-    from skillmeat.cache.repositories import DbUserCollectionRepository as _CollRepo
+    # Ensure default collection exists (prefer injected repo)
+    if collection_repo is None:
+        from skillmeat.cache.repositories import DbUserCollectionRepository as _CollRepo
 
-    ensure_default_collection(_CollRepo())
+        collection_repo = _CollRepo()
+
+    ensure_default_collection(collection_repo)
 
     # Iterate all file-based collections
     for coll_name in collection_mgr.list_collections():
@@ -860,6 +919,7 @@ async def migrate_to_default_collection(
     session: DbSessionDep,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
 ) -> dict:
     """Migrate all artifacts to the default collection.
@@ -872,6 +932,7 @@ async def migrate_to_default_collection(
         session: Database session
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
 
     Returns:
@@ -886,6 +947,7 @@ async def migrate_to_default_collection(
             session=session,
             artifact_mgr=artifact_mgr,
             collection_mgr=collection_mgr,
+            collection_repo=collection_repo,
         )
 
         logger.info(
@@ -933,10 +995,10 @@ def _refresh_single_collection_cache(
             - skipped: int (artifacts skipped/unchanged)
             - errors: list of error strings
 
-    TODO: Requires IDbCollectionArtifactRepository.list_for_collection(),
+    TODO(Phase-6): Replace direct ORM operations with
+    IDbCollectionArtifactRepository.list_for_collection(),
     IArtifactRepository.batch_get_by_uuid(), and
-    IDbCollectionArtifactRepository.update_metadata() to replace all direct
-    ORM operations here.
+    IDbCollectionArtifactRepository.update_metadata().
     """
     updated = 0
     skipped = 0
@@ -1093,6 +1155,7 @@ async def refresh_all_collections_cache(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
 ) -> dict:
     """Refresh CollectionArtifact metadata cache across all DB collections.
@@ -1103,7 +1166,8 @@ async def refresh_all_collections_cache(
     Args:
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
-        session: Database session
+        session: Database session (still needed for _refresh_single_collection_cache)
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
 
     Returns:
@@ -1122,12 +1186,12 @@ async def refresh_all_collections_cache(
     logger.info("Starting batch cache refresh for all collections")
 
     try:
-        # Query all Collection rows from database
-        all_collections = session.query(Collection).all()
-        logger.info(f"Found {len(all_collections)} collections to refresh")
+        # List all collections via repository DI instead of direct session query.
+        all_collection_dtos = collection_repo.list(limit=10_000, offset=0)
+        logger.info(f"Found {len(all_collection_dtos)} collections to refresh")
 
         # Handle empty database gracefully
-        if not all_collections:
+        if not all_collection_dtos:
             logger.info("No collections found in database, cache refresh skipped")
             return {
                 "success": True,
@@ -1137,6 +1201,15 @@ async def refresh_all_collections_cache(
                 "errors": [],
                 "duration_seconds": 0.0,
             }
+
+        # Resolve DTOs to ORM Collection rows for _refresh_single_collection_cache
+        # which requires an ORM instance.  Batch query by id.
+        # TODO(Phase-6): refactor _refresh_single_collection_cache to accept
+        # only collection_id so we can remove this ORM lookup.
+        collection_ids = [dto.id for dto in all_collection_dtos]
+        all_collections = (
+            session.query(Collection).filter(Collection.id.in_(collection_ids)).all()
+        )
 
         collections_refreshed = 0
         total_updated = 0
@@ -2674,6 +2747,7 @@ async def refresh_collection_cache(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     db_session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
 ) -> dict:
     """Refresh CollectionArtifact metadata cache for a specific DB collection.
@@ -2688,7 +2762,8 @@ async def refresh_collection_cache(
         collection_id: UUID or name of the collection
         artifact_mgr: Artifact manager for reading file-based metadata
         collection_mgr: Collection manager for file-based collection access
-        db_session: Database session
+        db_session: Database session (still needed for ORM write-back)
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
 
     Returns:
@@ -2703,9 +2778,9 @@ async def refresh_collection_cache(
     logger.info(f"Starting DB cache refresh for collection '{collection_id}'")
     start_time = time.time()
 
-    # 1. Validate collection exists in database (Collection table)
-    collection = db_session.query(Collection).filter_by(id=collection_id).first()
-    if not collection:
+    # 1. Validate collection exists via repository DI.
+    collection_dto = collection_repo.get_by_id(collection_id)
+    if not collection_dto:
         logger.error(f"Collection not found in database: {collection_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -2716,7 +2791,10 @@ async def refresh_collection_cache(
             },
         )
 
-    # 2. Query all CollectionArtifact rows for this collection_id
+    # 2. Query all CollectionArtifact rows for this collection_id.
+    # TODO(Phase-6): Replace with IDbCollectionArtifactRepository.list_by_collection()
+    # once that method returns mutable ORM rows (or an update_metadata() method is added
+    # to avoid direct ORM mutation here).
     collection_artifacts = (
         db_session.query(CollectionArtifact)
         .filter_by(collection_id=collection_id)
@@ -3098,6 +3176,11 @@ async def get_cache_stats(
             "oldest_sync_age_seconds": 1234,
             "ttl_seconds": 1800
         }
+
+    Note:
+        TODO(Phase-6): Replace db_session with IDbCollectionArtifactRepository
+        once get_staleness_stats() and _get_filtered_staleness_stats() are
+        absorbed into a repository method (e.g. get_cache_stats()).
     """
     from skillmeat.api.services.artifact_cache_service import (
         DEFAULT_METADATA_TTL_SECONDS,
@@ -3148,6 +3231,10 @@ def _get_filtered_staleness_stats(
 
     Returns:
         Dictionary with staleness statistics for the collection
+
+    TODO(Phase-6): Move aggregate queries (count, min synced_at) into
+    IDbCollectionArtifactRepository.get_staleness_stats(collection_id, ttl)
+    to eliminate direct session.query(CollectionArtifact) calls.
     """
     from datetime import timedelta
 
