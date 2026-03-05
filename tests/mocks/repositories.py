@@ -302,6 +302,13 @@ class MockArtifactRepository(IArtifactRepository):
     ) -> str | None:
         return None
 
+    def get_ids_by_uuids(
+        self,
+        uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> dict[str, str]:
+        return {}
+
     def batch_resolve_uuids(
         self,
         artifacts: list[tuple[str, str]],

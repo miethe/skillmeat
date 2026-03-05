@@ -369,6 +369,28 @@ class IArtifactRepository(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def get_ids_by_uuids(
+        self,
+        uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> dict[str, str]:
+        """Batch-map artifact UUIDs to their ``type:name`` ID strings.
+
+        Executes a single round-trip against the DB cache and returns a
+        mapping of every UUID that has a matching artifact row.  UUIDs with
+        no corresponding row are absent from the returned dict.
+
+        Args:
+            uuids: List of 32-char hex UUID strings to look up.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Dict mapping each UUID to its ``"type:name"`` artifact ID string.
+            Unresolvable UUIDs are omitted.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def batch_resolve_uuids(
         self,
         artifacts: list[tuple[str, str]],
@@ -1843,6 +1865,51 @@ class IGroupRepository(abc.ABC):
         Raises:
             KeyError: If *group_id* does not exist.
             ValueError: If *ordered_uuids* does not cover all current members.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def list_group_artifacts(
+        self,
+        group_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[GroupArtifactDTO]:
+        """Return the ordered list of artifact membership records for a group.
+
+        Args:
+            group_id: Group primary key string.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.GroupArtifactDTO`
+            objects ordered by ``position`` ascending.  Returns an empty list
+            when the group does not exist or has no members.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def add_artifacts_at_position(
+        self,
+        group_id: str,
+        artifact_uuids: list[str],
+        position: int,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Insert artifacts at a specific position within a group.
+
+        Existing artifacts at or after *position* are shifted down to
+        accommodate the new insertions.  Artifacts already in the group
+        are silently skipped (deduplicated).
+
+        Args:
+            group_id: Group primary key string.
+            artifact_uuids: Ordered list of artifact UUIDs to insert.
+            position: Zero-based target position for the first inserted artifact.
+            ctx: Optional per-request metadata.
+
+        Raises:
+            KeyError: If *group_id* does not exist.
+            RuntimeError: On unexpected database errors.
         """
         raise NotImplementedError
 

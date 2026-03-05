@@ -77,6 +77,16 @@ def _group_to_dto(group: Any, artifact_count: int = 0) -> GroupDTO:
     """
     created = group.created_at
     updated = group.updated_at
+    # Parse tags_json safely
+    tags_raw = getattr(group, "tags_json", None)
+    if tags_raw:
+        try:
+            parsed = json.loads(tags_raw)
+            tags = [t for t in parsed if isinstance(t, str)] if isinstance(parsed, list) else []
+        except (json.JSONDecodeError, TypeError):
+            tags = []
+    else:
+        tags = []
     return GroupDTO(
         id=str(group.id),
         name=group.name,
@@ -84,6 +94,9 @@ def _group_to_dto(group: Any, artifact_count: int = 0) -> GroupDTO:
         description=group.description,
         position=int(group.position or 0),
         artifact_count=artifact_count,
+        tags=tags,
+        color=getattr(group, "color", None) or "slate",
+        icon=getattr(group, "icon", None) or "layers",
         created_at=created.isoformat() if created and hasattr(created, "isoformat") else (created if isinstance(created, str) else None),
         updated_at=updated.isoformat() if updated and hasattr(updated, "isoformat") else (updated if isinstance(updated, str) else None),
     )
@@ -1000,5 +1013,135 @@ class LocalGroupRepository(IGroupRepository):
             session.rollback()
             logger.error("reorder_artifacts in group %s failed: %s", group_id, exc, exc_info=True)
             raise RuntimeError(f"Failed to reorder artifacts in group {group_id}") from exc
+        finally:
+            session.close()
+
+    def list_group_artifacts(
+        self,
+        group_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[GroupArtifactDTO]:
+        """Return the ordered list of artifact membership records for a group.
+
+        Args:
+            group_id: Group primary key string.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            List of :class:`GroupArtifactDTO` ordered by ``position`` ascending.
+            Returns an empty list when the group does not exist or has no members.
+        """
+        if not _db_available:
+            logger.warning("DB not available — list_group_artifacts returning []")
+            return []
+
+        session = _get_db_session()
+        try:
+            rows = (
+                session.query(_DBGroupArtifact)
+                .filter_by(group_id=str(group_id))
+                .order_by(_DBGroupArtifact.position)
+                .all()
+            )
+            return [_group_artifact_to_dto(ga) for ga in rows]
+        except Exception as exc:
+            logger.error(
+                "list_group_artifacts failed for group %s: %s", group_id, exc, exc_info=True
+            )
+            raise RuntimeError(f"Failed to list artifacts for group {group_id}") from exc
+        finally:
+            session.close()
+
+    def add_artifacts_at_position(
+        self,
+        group_id: str,
+        artifact_uuids: list[str],
+        position: int,
+        ctx: RequestContext | None = None,
+    ) -> None:
+        """Insert artifacts at a specific position within a group.
+
+        Existing artifacts at or after *position* are shifted down to
+        accommodate the new insertions.  Artifacts already in the group
+        are silently skipped.
+
+        Args:
+            group_id: Group primary key string.
+            artifact_uuids: Ordered list of artifact UUIDs to insert.
+            position: Zero-based target position for the first inserted artifact.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Raises:
+            KeyError: If *group_id* does not exist.
+            RuntimeError: On unexpected database errors.
+        """
+        if not _db_available:
+            raise RuntimeError("DB not available")
+
+        if not artifact_uuids:
+            return
+
+        session = _get_db_session()
+        try:
+            group = session.query(_DBGroup).filter_by(id=str(group_id)).first()
+            if not group:
+                raise KeyError(f"Group '{group_id}' not found")
+
+            # Determine which UUIDs are genuinely new (not already in the group)
+            existing_uuids: set[str] = {
+                ga.artifact_uuid
+                for ga in session.query(_DBGroupArtifact).filter_by(group_id=str(group_id)).all()
+            }
+            insert_uuids = [u for u in artifact_uuids if u not in existing_uuids]
+
+            if not insert_uuids:
+                logger.debug(
+                    "add_artifacts_at_position: all %d UUIDs already in group %s — no-op",
+                    len(artifact_uuids),
+                    group_id,
+                )
+                return
+
+            # Shift existing artifacts at and after the target position
+            session.query(_DBGroupArtifact).filter(
+                _DBGroupArtifact.group_id == str(group_id),
+                _DBGroupArtifact.position >= position,
+            ).update(
+                {_DBGroupArtifact.position: _DBGroupArtifact.position + len(insert_uuids)}
+            )
+
+            # Insert new artifacts starting at the target position
+            for i, art_uuid in enumerate(insert_uuids):
+                session.add(
+                    _DBGroupArtifact(
+                        group_id=str(group_id),
+                        artifact_uuid=art_uuid,
+                        position=position + i,
+                    )
+                )
+
+            session.commit()
+            logger.info(
+                "add_artifacts_at_position: inserted %d artifacts at position %d in group %s",
+                len(insert_uuids),
+                position,
+                group_id,
+            )
+            _sync_groups_manifest(session, group.collection_id)
+
+        except KeyError:
+            session.rollback()
+            raise
+        except Exception as exc:
+            session.rollback()
+            logger.error(
+                "add_artifacts_at_position failed for group %s: %s",
+                group_id,
+                exc,
+                exc_info=True,
+            )
+            raise RuntimeError(
+                f"Failed to add artifacts at position in group {group_id}"
+            ) from exc
         finally:
             session.close()

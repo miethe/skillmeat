@@ -626,6 +626,9 @@ class GroupDTO:
         description: Optional group description.
         position: Zero-based display order within the collection.
         artifact_count: Number of artifacts currently in this group.
+        tags: List of tag strings attached to the group.
+        color: Display colour slug (e.g. ``"slate"``).  Defaults to ``"slate"``.
+        icon: Display icon slug (e.g. ``"layers"``).  Defaults to ``"layers"``.
         created_at: ISO-8601 creation timestamp.
         updated_at: ISO-8601 last-update timestamp.
     """
@@ -636,6 +639,9 @@ class GroupDTO:
     description: str | None = None
     position: int = 0
     artifact_count: int = 0
+    tags: List[str] = field(default_factory=list)
+    color: str = "slate"
+    icon: str = "layers"
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -657,6 +663,9 @@ class GroupDTO:
             description=data.get("description"),
             position=int(data.get("position") or 0),
             artifact_count=int(data.get("artifact_count") or 0),
+            tags=list(data.get("tags") or []),
+            color=data.get("color") or "slate",
+            icon=data.get("icon") or "layers",
             created_at=_to_iso(data.get("created_at")),
             updated_at=_to_iso(data.get("updated_at")),
         )

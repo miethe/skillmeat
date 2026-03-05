@@ -1005,6 +1005,48 @@ class LocalArtifactRepository(IArtifactRepository):
     # UUID resolution
     # ------------------------------------------------------------------
 
+    def get_ids_by_uuids(
+        self,
+        uuids: List[str],
+        ctx: Optional[RequestContext] = None,
+    ) -> dict[str, str]:
+        """Batch-map artifact UUIDs to their ``type:name`` ID strings.
+
+        Opens a single DB session and queries ``(uuid, id)`` pairs for all
+        requested UUIDs in one round-trip.  UUIDs with no matching row are
+        absent from the returned dict.
+
+        Args:
+            uuids: List of 32-char hex UUID strings to look up.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            Dict mapping each UUID to its ``"type:name"`` artifact ID string.
+        """
+        if not _db_available or not uuids or _get_db_session is None or _DBArtifact is None:
+            return {}
+        # Local refs for Pyright type narrowing
+        get_session = _get_db_session
+        DBArtifact = _DBArtifact
+        try:
+            session = get_session()
+            try:
+                rows = (
+                    session.query(DBArtifact.uuid, DBArtifact.id)
+                    .filter(DBArtifact.uuid.in_(uuids))
+                    .all()
+                )
+                return {row[0]: row[1] for row in rows if row[1] is not None}
+            finally:
+                session.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(
+                "DB UUID→ID batch lookup failed (%d uuids): %s",
+                len(uuids),
+                exc,
+            )
+            return {}
+
     def resolve_uuid_by_type_name(
         self,
         artifact_type: str,

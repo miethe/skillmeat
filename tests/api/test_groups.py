@@ -107,11 +107,15 @@ def client(app, test_session_factory):
     # Mock verify_token to bypass authentication
     app.dependency_overrides[verify_token] = lambda: "mock-token"
 
-    # Create a closure to return a new session for each call
+    # Create a closure to return a new session for each call.
+    # Patch at the repository level since the router no longer imports get_session
+    # directly — all DB access is now via LocalGroupRepository and
+    # LocalArtifactRepository which hold their own references to _get_db_session.
     def get_test_session():
         return test_session_factory()
 
-    with patch("skillmeat.api.routers.groups.get_session", get_test_session):
+    with patch("skillmeat.core.repositories.local_group._get_db_session", get_test_session), \
+         patch("skillmeat.core.repositories.local_artifact._get_db_session", get_test_session):
         with TestClient(app) as test_client:
             yield test_client
 
@@ -572,7 +576,8 @@ class TestCopyGroupTransactionRollback:
 
             return mock_session
 
-        with patch("skillmeat.api.routers.groups.get_session", get_error_session):
+        # Patch at repository level — router no longer imports get_session directly
+        with patch("skillmeat.core.repositories.local_group._get_db_session", get_error_session):
             with TestClient(app) as test_client:
                 response = test_client.post(
                     f"/api/v1/groups/{source_group.id}/copy",
