@@ -909,9 +909,9 @@ async def migrate_to_default_collection(
 
 
 def _refresh_single_collection_cache(
-    session: Session,
-    collection: Collection,
+    collection_id: str,
     artifact_mgr,
+    artifact_repo_ca: IDbCollectionArtifactRepository,
 ) -> dict:
     """Refresh CollectionArtifact metadata cache for a single DB collection.
 
@@ -919,9 +919,10 @@ def _refresh_single_collection_cache(
     and batch refresh endpoints.
 
     Args:
-        session: Database session
-        collection: Collection ORM instance to refresh
-        artifact_mgr: ArtifactManager for reading file-based artifacts
+        collection_id: ID of the collection to refresh.
+        artifact_mgr: ArtifactManager for reading file-based artifacts.
+        artifact_repo_ca: DB collection artifact repository for reads and
+            bulk metadata updates.
 
     Returns:
         dict with stats:
@@ -943,37 +944,29 @@ def _refresh_single_collection_cache(
         logger.warning(f"Failed to initialize TagService for tag sync: {e}")
         tag_service = None
 
-    logger.debug(f"Refreshing cache for collection '{collection.id}'")
+    logger.debug(f"Refreshing cache for collection '{collection_id}'")
 
-    # Get all CollectionArtifact rows for this collection
-    collection_artifacts = (
-        session.execute(
-            select(CollectionArtifact).filter_by(collection_id=collection.id)
-        )
-        .scalars()
-        .all()
-    )
+    # Get all CollectionArtifact DTOs for this collection via repository DI.
+    ca_dtos = artifact_repo_ca.list_by_collection(collection_id, limit=100_000)
 
-    if not collection_artifacts:
-        logger.debug(f"Collection '{collection.id}' has no artifacts to refresh")
+    if not ca_dtos:
+        logger.debug(f"Collection '{collection_id}' has no artifacts to refresh")
         return {
-            "collection_id": collection.id,
+            "collection_id": collection_id,
             "updated": 0,
             "skipped": 0,
             "errors": [],
         }
 
-    # Batch-resolve artifact_uuid → type:name id to avoid N+1 lazy loads.
-    ca_uuids = [ca.artifact_uuid for ca in collection_artifacts]
-    ca_uuid_to_id: dict[str, str] = {}
-    if ca_uuids:
-        id_rows = session.execute(
-            select(Artifact.uuid, Artifact.id).filter(Artifact.uuid.in_(ca_uuids))
-        ).all()
-        ca_uuid_to_id = {r[0]: r[1] for r in id_rows}
+    # Batch-resolve artifact_uuid → type:name id via repository DI.
+    ca_uuids = [ca.artifact_uuid for ca in ca_dtos]
+    ca_uuid_to_id = artifact_repo_ca.resolve_uuid_to_id_batch(ca_uuids)
 
-    # Process each CollectionArtifact
-    for ca in collection_artifacts:
+    # Build bulk-update list — collect updates then commit in one call.
+    bulk_updates: list[dict] = []
+
+    # Process each CollectionArtifact DTO
+    for ca in ca_dtos:
         try:
             ca_artifact_id = ca_uuid_to_id.get(ca.artifact_uuid, "")
             # Parse artifact_id (format: "type:name")
@@ -998,7 +991,7 @@ def _refresh_single_collection_cache(
                 file_artifact = artifact_mgr.show(
                     artifact_name=artifact_name,
                     artifact_type=artifact_type_enum,
-                    collection_name=collection.id,
+                    collection_name=collection_id,
                 )
             except Exception as e:
                 logger.debug(f"File-based lookup failed for {ca_artifact_id}: {e}")
@@ -1031,19 +1024,24 @@ def _refresh_single_collection_cache(
             resolved_sha = getattr(file_artifact, "resolved_sha", None)
             resolved_version = getattr(file_artifact, "resolved_version", None)
 
-            # Update CollectionArtifact row
-            ca.description = description
-            ca.author = author
-            ca.license = license_val
-            ca.tags_json = tags_json
-            ca.tools_json = tools_json
-            ca.version = version
-            ca.source = source
-            ca.origin = origin
-            ca.origin_source = origin_source
-            ca.resolved_sha = resolved_sha
-            ca.resolved_version = resolved_version
-            ca.synced_at = datetime.utcnow()
+            # Stage update for bulk commit via repository DI
+            bulk_updates.append(
+                {
+                    "artifact_uuid": ca.artifact_uuid,
+                    "description": description,
+                    "author": author,
+                    "license": license_val,
+                    "tags_json": tags_json,
+                    "tools_json": tools_json,
+                    "version": version,
+                    "source": source,
+                    "origin": origin,
+                    "origin_source": origin_source,
+                    "resolved_sha": resolved_sha,
+                    "resolved_version": resolved_version,
+                    "synced_at": datetime.utcnow(),
+                }
+            )
             updated += 1
 
             # Sync tags to ORM
@@ -1059,8 +1057,12 @@ def _refresh_single_collection_cache(
             errors.append(error_msg)
             skipped += 1
 
+    # Commit all metadata updates in a single repository call
+    if bulk_updates:
+        artifact_repo_ca.bulk_update_metadata(bulk_updates)
+
     return {
-        "collection_id": collection.id,
+        "collection_id": collection_id,
         "updated": updated,
         "skipped": skipped,
         "errors": errors,
@@ -1087,8 +1089,8 @@ def _refresh_single_collection_cache(
 async def refresh_all_collections_cache(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
-    session: DbSessionDep,
     collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     token: TokenDep,
 ) -> dict:
     """Refresh CollectionArtifact metadata cache across all DB collections.
@@ -1099,8 +1101,8 @@ async def refresh_all_collections_cache(
     Args:
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
-        session: Database session (still needed for _refresh_single_collection_cache)
         collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
         token: Authentication token
 
     Returns:
@@ -1119,7 +1121,7 @@ async def refresh_all_collections_cache(
     logger.info("Starting batch cache refresh for all collections")
 
     try:
-        # List all collections via repository DI instead of direct session query.
+        # List all collections via repository DI.
         all_collection_dtos = collection_repo.list(limit=10_000, offset=0)
         logger.info(f"Found {len(all_collection_dtos)} collections to refresh")
 
@@ -1135,29 +1137,18 @@ async def refresh_all_collections_cache(
                 "duration_seconds": 0.0,
             }
 
-        # Resolve DTOs to ORM Collection rows for _refresh_single_collection_cache
-        # which requires an ORM instance.  Batch query by id.
-        collection_ids = [dto.id for dto in all_collection_dtos]
-        all_collections = (
-            session.execute(
-                select(Collection).filter(Collection.id.in_(collection_ids))
-            )
-            .scalars()
-            .all()
-        )
-
         collections_refreshed = 0
         total_updated = 0
         total_skipped = 0
         errors = []
 
-        # Process each collection
-        for collection in all_collections:
+        # Process each collection using repository DI throughout.
+        for dto in all_collection_dtos:
             try:
                 result = _refresh_single_collection_cache(
-                    session=session,
-                    collection=collection,
+                    collection_id=dto.id,
                     artifact_mgr=artifact_mgr,
+                    artifact_repo_ca=artifact_repo_ca,
                 )
 
                 collections_refreshed += 1
@@ -1167,28 +1158,25 @@ async def refresh_all_collections_cache(
                 if result["errors"]:
                     errors.append(
                         {
-                            "collection_id": collection.id,
+                            "collection_id": dto.id,
                             "errors": result["errors"],
                         }
                     )
 
                 logger.debug(
-                    f"Collection '{collection.id}': updated={result['updated']}, "
+                    f"Collection '{dto.id}': updated={result['updated']}, "
                     f"skipped={result['skipped']}"
                 )
 
             except Exception as e:
-                error_msg = f"Failed to refresh collection '{collection.id}': {e}"
+                error_msg = f"Failed to refresh collection '{dto.id}': {e}"
                 logger.warning(error_msg)
                 errors.append(
                     {
-                        "collection_id": collection.id,
+                        "collection_id": dto.id,
                         "errors": [str(e)],
                     }
                 )
-
-        # Flush all pending writes — the DI session commits on clean return.
-        session.flush()
 
         duration = time.time() - start_time
         logger.info(
