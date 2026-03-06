@@ -393,3 +393,66 @@ def create_test_events(
 
 # Export helper
 pytest.create_test_events = create_test_events
+
+
+# =============================================================================
+# Enterprise PostgreSQL fixtures (ENT-1.10)
+# Used by: ENT-1.11 (schema integration tests), ENT-1.12 (rollback tests)
+# =============================================================================
+
+import os
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from skillmeat.cache.models_enterprise import EnterpriseBase
+
+_ENTERPRISE_TEST_DB_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://skillmeat_test:skillmeat_test@localhost:5433/skillmeat_test",
+)
+
+
+@pytest.fixture(scope="session")
+def pg_engine():
+    """PostgreSQL engine for enterprise integration tests.
+
+    Skips the entire session if PostgreSQL is not reachable so that the suite
+    remains green in environments where only SQLite is available (e.g. the
+    cross-platform unit-test matrix).  Set DATABASE_URL or start
+    docker-compose.test.yml to enable these tests.
+    """
+    try:
+        engine = create_engine(_ENTERPRISE_TEST_DB_URL, pool_pre_ping=True)
+        with engine.connect():
+            pass
+        return engine
+    except Exception as exc:
+        pytest.skip(
+            f"PostgreSQL not available ({exc}) — set DATABASE_URL or run "
+            "`docker compose -f docker-compose.test.yml up -d postgres`"
+        )
+
+
+@pytest.fixture(scope="session")
+def enterprise_tables(pg_engine):
+    """Create all enterprise ORM tables once per test session, drop on exit."""
+    EnterpriseBase.metadata.create_all(pg_engine)
+    yield
+    EnterpriseBase.metadata.drop_all(pg_engine)
+
+
+@pytest.fixture
+def pg_session(pg_engine, enterprise_tables):
+    """Yield a fresh SQLAlchemy session per test, always rolled back on exit.
+
+    Rolling back instead of committing keeps each test fully isolated without
+    requiring table truncation between runs.
+    """
+    Session = sessionmaker(bind=pg_engine)
+    session = Session()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
