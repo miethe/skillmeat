@@ -2432,6 +2432,7 @@ async def remove_entity_from_collection(
 async def list_collection_entities(
     collection_id: str,
     collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     session: DbSessionDep,
     token: TokenDep,
     limit: int = Query(default=20, ge=1, le=100),
@@ -2442,8 +2443,8 @@ async def list_collection_entities(
     Args:
         collection_id: Collection identifier
         collection_repo: DB user collection repository (injected)
-        session: Database session (used for complex join queries pending
-            IDbCollectionArtifactRepository.list_paged() implementation)
+        artifact_repo_ca: DB collection artifact repository (injected)
+        session: Database session (passed to get_artifact_metadata service)
         token: Authentication token
         limit: Number of items per page
         after: Cursor for next page
@@ -2469,29 +2470,12 @@ async def list_collection_entities(
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        # Build query for collection artifacts.
-        # Join Artifact for ordering by the stable type:name id (Artifact.id).
-        all_associations = (
-            session.execute(
-                select(CollectionArtifact)
-                .join(Artifact, Artifact.uuid == CollectionArtifact.artifact_uuid)
-                .filter(CollectionArtifact.collection_id == collection_id)
-                .order_by(Artifact.id)
-            )
-            .scalars()
-            .all()
-        )
+        # Fetch all memberships ordered by artifact type:name ID via repository DI.
+        all_associations = artifact_repo_ca.list_all_ordered(collection_id)
 
-        # Resolve all artifact UUIDs → type:name ids in a single query.
+        # Batch-resolve artifact_uuid → type:name ids via repository DI.
         ent_all_uuids = [a.artifact_uuid for a in all_associations]
-        ent_uuid_to_id: dict[str, str] = {}
-        if ent_all_uuids:
-            ent_id_rows = session.execute(
-                select(Artifact.uuid, Artifact.id).filter(
-                    Artifact.uuid.in_(ent_all_uuids)
-                )
-            ).all()
-            ent_uuid_to_id = {r[0]: r[1] for r in ent_id_rows}
+        ent_uuid_to_id = artifact_repo_ca.resolve_uuid_to_id_batch(ent_all_uuids)
 
         # Decode cursor if provided
         start_idx = 0
@@ -2590,8 +2574,8 @@ async def refresh_collection_cache(
     collection_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
-    db_session: DbSessionDep,
     collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     token: TokenDep,
 ) -> dict:
     """Refresh CollectionArtifact metadata cache for a specific DB collection.
@@ -2606,8 +2590,8 @@ async def refresh_collection_cache(
         collection_id: UUID or name of the collection
         artifact_mgr: Artifact manager for reading file-based metadata
         collection_mgr: Collection manager for file-based collection access
-        db_session: Database session (still needed for ORM write-back)
         collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
         token: Authentication token
 
     Returns:
@@ -2616,7 +2600,6 @@ async def refresh_collection_cache(
     Raises:
         HTTPException: If collection not found in database
     """
-    import json
     import time
 
     logger.info(f"Starting DB cache refresh for collection '{collection_id}'")
@@ -2635,146 +2618,26 @@ async def refresh_collection_cache(
             },
         )
 
-    # 2. Query all CollectionArtifact rows for this collection_id.
-    # Using DbSessionDep for direct ORM mutation (update metadata fields).
-    collection_artifacts = (
-        db_session.execute(
-            select(CollectionArtifact).filter_by(collection_id=collection_id)
-        )
-        .scalars()
-        .all()
+    # 2. Delegate to the refactored helper which uses repository DI throughout.
+    result = _refresh_single_collection_cache(
+        collection_id=collection_id,
+        artifact_mgr=artifact_mgr,
+        artifact_repo_ca=artifact_repo_ca,
     )
 
-    logger.debug(
-        f"Found {len(collection_artifacts)} artifacts in collection '{collection_id}'"
+    duration = time.time() - start_time
+    logger.info(
+        f"DB cache refresh for collection '{collection_id}' completed: "
+        f"updated={result['updated']}, skipped={result['skipped']}, "
+        f"errors={len(result['errors'])}, duration={duration:.2f}s"
     )
 
-    updated_count = 0
-    skipped_count = 0
-    errors: list[str] = []
-
-    # 3. Batch-resolve artifact_uuid → type:name id to avoid N+1 lazy loads.
-    refresh_ca_uuids = [ca.artifact_uuid for ca in collection_artifacts]
-    refresh_uuid_to_id: dict[str, str] = {}
-    if refresh_ca_uuids:
-        id_rows = db_session.execute(
-            select(Artifact.uuid, Artifact.id).filter(
-                Artifact.uuid.in_(refresh_ca_uuids)
-            )
-        ).all()
-        refresh_uuid_to_id = {r[0]: r[1] for r in id_rows}
-
-    # For each artifact: Read file-based metadata via ArtifactManager, update cache
-    for ca in collection_artifacts:
-        try:
-            ca_artifact_id = refresh_uuid_to_id.get(ca.artifact_uuid, "")
-            # Parse artifact_id (format: "type:name")
-            if ":" in ca_artifact_id:
-                type_str, artifact_name = ca_artifact_id.split(":", 1)
-            else:
-                type_str, artifact_name = "unknown", ca_artifact_id
-
-            # Try to get artifact from file-based manager
-            artifact_type_enum = None
-            try:
-                artifact_type_enum = CoreArtifactType(type_str)
-            except ValueError:
-                pass
-
-            file_artifact = None
-            try:
-                file_artifact = artifact_mgr.show(
-                    artifact_name=artifact_name,
-                    artifact_type=artifact_type_enum,
-                    collection_name=collection_id,
-                )
-            except Exception as e:
-                logger.debug(f"File-based lookup failed for {ca_artifact_id}: {e}")
-                skipped_count += 1
-                continue
-
-            if file_artifact is None:
-                # Artifact no longer exists in file system
-                logger.debug(
-                    f"Artifact '{ca_artifact_id}' not found in file system, skipping"
-                )
-                skipped_count += 1
-                continue
-
-            # Extract metadata fields from artifact
-            metadata = file_artifact.metadata
-            description = metadata.description if metadata else None
-            author = metadata.author if metadata else None
-            license_val = metadata.license if metadata else None
-            version = metadata.version if metadata else None
-
-            # Convert tags list to JSON string
-            tags_json = json.dumps(file_artifact.tags) if file_artifact.tags else None
-
-            # Convert tools list to JSON string
-            tools_json = None
-            if metadata and metadata.tools:
-                tools_json = json.dumps(metadata.tools)
-
-            # Source and origin fields
-            source = file_artifact.upstream
-            origin = file_artifact.origin
-            origin_source = file_artifact.origin_source
-            resolved_sha = getattr(file_artifact, "resolved_sha", None)
-            resolved_version = getattr(file_artifact, "resolved_version", None)
-
-            # Update cache fields
-            ca.description = description
-            ca.author = author
-            ca.license = license_val
-            ca.tags_json = tags_json
-            ca.tools_json = tools_json
-            ca.version = version
-            ca.source = source
-            ca.origin = origin
-            ca.origin_source = origin_source
-            ca.resolved_sha = resolved_sha
-            ca.resolved_version = resolved_version
-            ca.synced_at = datetime.utcnow()
-
-            updated_count += 1
-            logger.debug(f"Updated cache for artifact '{ca_artifact_id}'")
-
-        except Exception as e:
-            error_msg = f"Failed to refresh cache for artifact '{refresh_uuid_to_id.get(ca.artifact_uuid, ca.artifact_uuid)}': {e}"
-            logger.warning(error_msg)
-            errors.append(error_msg)
-            skipped_count += 1
-            continue
-
-    # 4. Flush all pending ORM writes — the DI session commits on clean return.
-    try:
-        db_session.flush()
-        duration = time.time() - start_time
-        logger.info(
-            f"DB cache refresh for collection '{collection_id}' completed: "
-            f"updated={updated_count}, skipped={skipped_count}, errors={len(errors)}, "
-            f"duration={duration:.2f}s"
-        )
-    except Exception as e:
-        logger.error(
-            f"Failed to flush cache updates for collection '{collection_id}': {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "cache_flush_failed",
-                "collection_id": collection_id,
-                "message": f"Failed to flush cache updates: {str(e)}",
-            },
-        )
-
-    # 5. Return stats
+    # 3. Return stats
     return {
         "collection_id": collection_id,
-        "updated_count": updated_count,
-        "skipped_count": skipped_count,
-        "errors": errors,
+        "updated_count": result["updated"],
+        "skipped_count": result["skipped"],
+        "errors": result["errors"],
     }
 
 
@@ -2982,6 +2845,7 @@ async def refresh_collection(
 )
 async def get_cache_stats(
     db_session: DbSessionDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     ttl_seconds: int = Query(
         default=None,
         description="Custom TTL in seconds for staleness calculation. "
@@ -3019,11 +2883,6 @@ async def get_cache_stats(
             "oldest_sync_age_seconds": 1234,
             "ttl_seconds": 1800
         }
-
-    Note:
-        TODO(Phase-6): Replace db_session with IDbCollectionArtifactRepository
-        once get_staleness_stats() and _get_filtered_staleness_stats() are
-        absorbed into a repository method (e.g. get_cache_stats()).
     """
     from skillmeat.api.services.artifact_cache_service import (
         DEFAULT_METADATA_TTL_SECONDS,
@@ -3036,14 +2895,12 @@ async def get_cache_stats(
     )
 
     try:
-        stats = get_staleness_stats(db_session, effective_ttl)
-
-        # Add collection_id filter if provided
         if collection_id:
-            # Re-query with collection filter
-            stats = _get_filtered_staleness_stats(
-                db_session, effective_ttl, collection_id
-            )
+            # Per-collection stats via repository DI (no raw session needed).
+            stats = artifact_repo_ca.get_staleness_stats(collection_id, effective_ttl)
+        else:
+            # Global stats delegated to service (uses db_session internally).
+            stats = get_staleness_stats(db_session, effective_ttl)
 
         logger.debug(
             f"Cache stats requested: total={stats['total_artifacts']}, "
@@ -3058,78 +2915,3 @@ async def get_cache_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get cache statistics: {str(e)}",
         )
-
-
-def _get_filtered_staleness_stats(
-    session: Session,
-    ttl_seconds: int,
-    collection_id: str,
-) -> dict:
-    """Get staleness stats filtered to a specific collection.
-
-    Args:
-        session: Database session
-        ttl_seconds: TTL for staleness calculation
-        collection_id: Collection ID to filter by
-
-    Returns:
-        Dictionary with staleness statistics for the collection
-
-    """
-    from datetime import timedelta
-    from sqlalchemy import func
-
-    cutoff_time = datetime.utcnow() - timedelta(seconds=ttl_seconds)
-
-    # Filter to specific collection
-    total = session.execute(
-        select(func.count())
-        .select_from(CollectionArtifact)
-        .filter(CollectionArtifact.collection_id == collection_id)
-    ).scalar_one()
-
-    if total == 0:
-        return {
-            "total_artifacts": 0,
-            "stale_count": 0,
-            "fresh_count": 0,
-            "oldest_sync_age_seconds": 0,
-            "percentage_stale": 0.0,
-            "ttl_seconds": ttl_seconds,
-            "collection_id": collection_id,
-        }
-
-    # Count stale artifacts in this collection
-    stale_count = session.execute(
-        select(func.count())
-        .select_from(CollectionArtifact)
-        .filter(
-            CollectionArtifact.collection_id == collection_id,
-            (CollectionArtifact.synced_at.is_(None))
-            | (CollectionArtifact.synced_at < cutoff_time),
-        )
-    ).scalar_one()
-
-    # Find oldest sync time in this collection
-    oldest = session.execute(
-        select(CollectionArtifact.synced_at)
-        .filter(
-            CollectionArtifact.collection_id == collection_id,
-            CollectionArtifact.synced_at.isnot(None),
-        )
-        .order_by(CollectionArtifact.synced_at.asc())
-    ).first()
-
-    oldest_age = 0
-    if oldest and oldest[0]:
-        oldest_age = (datetime.utcnow() - oldest[0]).total_seconds()
-
-    return {
-        "total_artifacts": total,
-        "stale_count": stale_count,
-        "fresh_count": total - stale_count,
-        "oldest_sync_age_seconds": oldest_age,
-        "percentage_stale": round((stale_count / total * 100), 1) if total > 0 else 0.0,
-        "ttl_seconds": ttl_seconds,
-        "collection_id": collection_id,
-    }
