@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 7
-completed_tasks: 3
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -56,7 +56,7 @@ tasks:
 - id: DB-004
   description: Create Alembic migration for SQLite schema (users, teams, team_members,
     column adds)
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -65,7 +65,7 @@ tasks:
   priority: high
 - id: DB-005
   description: Create Alembic migration for PostgreSQL enterprise schema
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -135,7 +135,7 @@ files_modified:
 - skillmeat/cache/constants.py
 - skillmeat/cache/migrations/versions/*.py
 updated: '2026-03-06'
-progress: 42
+progress: 71
 ---
 
 # aaa-rbac-foundation - Phase 1: Database Layer - Authentication Schema & Tenancy Fields
