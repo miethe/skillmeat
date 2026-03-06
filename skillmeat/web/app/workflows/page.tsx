@@ -7,7 +7,7 @@
  * search/filter toolbar, loading skeletons, empty states, and card actions.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { GitBranch, Plus, SearchX, Trash2, Play, Tag, Copy, Download, CheckSquare } from 'lucide-react';
@@ -52,7 +52,8 @@ export default function WorkflowsPage() {
 
   // ── Data ─────────────────────────────────────────────────────────────────
   const { data, isLoading, isError } = useWorkflows(filters);
-  const workflows = data?.items ?? [];
+  // useMemo prevents infinite re-render: useMultiSelect depends on items reference
+  const workflows = useMemo(() => data?.items ?? [], [data?.items]);
 
   // ── Multi-select ──────────────────────────────────────────────────────────
   const {

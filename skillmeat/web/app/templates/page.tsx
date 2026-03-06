@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Package, Loader2, Search, CheckSquare, Trash2, Rocket, Copy, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,7 +97,8 @@ export default function TemplatesPage() {
   } = useTemplates({ ...filters, search: searchQuery || undefined, after: paginationCursor });
 
   // Multi-select (works on currently visible items only)
-  const visibleTemplates = data?.items ?? [];
+  // useMemo prevents infinite re-render: useMultiSelect depends on items reference
+  const visibleTemplates = useMemo(() => data?.items ?? [], [data?.items]);
   const {
     isSelected,
     toggleSelection,

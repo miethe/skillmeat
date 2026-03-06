@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Plus,
   FileText,
@@ -27,7 +27,6 @@ import type { BulkAction } from '@/components/shared';
 // Import hooks
 import {
   useContextEntities,
-  useCreateContextEntity,
   useDeleteContextEntity,
   useMultiSelect,
   useToast,
@@ -100,7 +99,9 @@ export default function ContextEntitiesPage() {
   });
 
   // Multi-select (scoped to currently visible items)
-  const visibleItems = data?.items ?? [];
+  // useMemo prevents infinite re-render loop: useMultiSelect's useEffect depends on
+  // items reference, and `[]` creates a new array each render when data is undefined
+  const visibleItems = useMemo(() => data?.items ?? [], [data?.items]);
   const {
     isSelected,
     toggleSelection,
@@ -113,7 +114,6 @@ export default function ContextEntitiesPage() {
   } = useMultiSelect<ContextEntity>(visibleItems);
 
   // Mutations
-  const createEntity = useCreateContextEntity();
   const deleteEntity = useDeleteContextEntity();
 
   // Event handlers
