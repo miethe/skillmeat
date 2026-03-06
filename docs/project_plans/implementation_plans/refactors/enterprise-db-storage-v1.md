@@ -2,7 +2,7 @@
 title: 'Implementation Plan: Enterprise Database Storage'
 schema_version: 2
 doc_type: implementation_plan
-status: draft
+status: in-progress
 created: 2026-03-06
 updated: '2026-03-06'
 feature_slug: enterprise-db-storage
