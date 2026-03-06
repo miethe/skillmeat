@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Play, Pencil, MoreHorizontal, GitBranch, Clock, CalendarDays, Copy, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -85,6 +86,12 @@ export interface WorkflowCardProps {
   onClick?: () => void;
   /** Optional className override for the outer card. */
   className?: string;
+  /** When true, shows the selection checkbox overlay. */
+  selectionMode?: boolean;
+  /** Whether this card is currently selected. */
+  isSelected?: boolean;
+  /** Called when the user clicks the selection checkbox. */
+  onToggleSelect?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +131,9 @@ export function WorkflowCard({
   onDelete,
   onClick,
   className,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: WorkflowCardProps) {
   const { id, name, status, stages, tags, updatedAt } = workflow;
 
@@ -143,9 +153,27 @@ export function WorkflowCard({
       className={cn(
         'group relative rounded-xl border bg-card shadow-sm',
         'transition-shadow duration-200 hover:shadow-md',
+        selectionMode && isSelected && 'ring-2 ring-primary border-primary',
         className
       )}
     >
+      {/* Selection checkbox — only visible in selection mode */}
+      {selectionMode && (
+        <div
+          className="absolute left-3 top-3 z-10"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect?.();
+          }}
+        >
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect?.()}
+            aria-label={`Select workflow: ${name}`}
+            className="h-4 w-4 bg-background shadow-sm"
+          />
+        </div>
+      )}
       {/* Card body — navigation target or onClick handler */}
       {onClick ? (
         <div

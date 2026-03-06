@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,6 +91,12 @@ export interface WorkflowListItemProps {
   onClick?: () => void;
   /** Optional className override for the row container. */
   className?: string;
+  /** When true, shows the selection checkbox at the start of the row. */
+  selectionMode?: boolean;
+  /** Whether this row is currently selected. */
+  isSelected?: boolean;
+  /** Called when the user clicks the selection checkbox. */
+  onToggleSelect?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +147,9 @@ export function WorkflowListItem({
   onDelete,
   onClick,
   className,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: WorkflowListItemProps) {
   const { id, name, status, stages, tags, updatedAt } = workflow;
 
@@ -172,10 +182,31 @@ export function WorkflowListItem({
       className={cn(
         'group flex items-center gap-4 border-b px-4 py-3 last:border-b-0',
         'transition-colors duration-150 hover:bg-muted/50',
+        isSelected && 'bg-muted/25',
         onClick && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
         className
       )}
     >
+      {/* ------------------------------------------------------------------ */}
+      {/* Selection checkbox — only visible in selection mode                 */}
+      {/* ------------------------------------------------------------------ */}
+      {selectionMode && (
+        <div
+          className="flex-shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect?.();
+          }}
+        >
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect?.()}
+            aria-label={`Select workflow: ${name}`}
+            className="h-4 w-4"
+          />
+        </div>
+      )}
+
       {/* ------------------------------------------------------------------ */}
       {/* Column 1: Icon + Name + Status badge                                */}
       {/* ------------------------------------------------------------------ */}

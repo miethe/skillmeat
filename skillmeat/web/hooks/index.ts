@@ -823,6 +823,12 @@ export {
   type UseExecutionSelectionReturn,
 } from './use-execution-selection';
 
+// Generic multi-select hook for any list of items
+export {
+  useMultiSelect,
+  type UseMultiSelectReturn,
+} from './use-multi-select';
+
 // ============================================================================
 // WORKFLOW BUILDER (1 hook)
 // ============================================================================

@@ -8,6 +8,7 @@
  */
 
 export { ArtifactPicker, type ArtifactPickerProps } from './artifact-picker';
+export { BulkActionBar, type BulkActionBarProps, type BulkAction } from './bulk-action-bar';
 export { ColorSelector, type ColorSelectorProps } from './color-selector';
 export { ContextModulePicker, type ContextModulePickerProps } from './context-module-picker';
 export { IconPicker, type IconPickerProps } from './icon-picker';

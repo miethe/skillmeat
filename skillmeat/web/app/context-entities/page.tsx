@@ -1,7 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, FileText, Loader2 } from 'lucide-react';
+import {
+  Plus,
+  FileText,
+  Loader2,
+  CheckSquare,
+  Trash2,
+  Rocket,
+  ToggleLeft,
+  FolderEdit,
+  Download,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -11,12 +21,15 @@ import { ContextEntityFilters } from '@/components/context/context-entity-filter
 import { ContextEntityDetail } from '@/components/context/context-entity-detail';
 import { ContextEntityEditor } from '@/components/context/context-entity-editor';
 import { DeployToProjectDialog } from '@/components/context/deploy-to-project-dialog';
+import { BulkActionBar } from '@/components/shared';
+import type { BulkAction } from '@/components/shared';
 
 // Import hooks
 import {
   useContextEntities,
   useCreateContextEntity,
   useDeleteContextEntity,
+  useMultiSelect,
   useToast,
 } from '@/hooks';
 
@@ -24,7 +37,6 @@ import {
 import type {
   ContextEntity,
   ContextEntityFilters as FilterType,
-  CreateContextEntityRequest,
 } from '@/types/context-entity';
 
 function EmptyState({ hasFilters }: { hasFilters: boolean }) {
@@ -70,6 +82,9 @@ export default function ContextEntitiesPage() {
   // Filter state
   const [filters, setFilters] = useState<FilterType>({});
 
+  // Selection mode state
+  const [selectionMode, setSelectionMode] = useState(false);
+
   // Modal state
   const [selectedEntity, setSelectedEntity] = useState<ContextEntity | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -83,6 +98,19 @@ export default function ContextEntitiesPage() {
     ...filters,
     after: paginationCursor,
   });
+
+  // Multi-select (scoped to currently visible items)
+  const visibleItems = data?.items ?? [];
+  const {
+    isSelected,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    hasSelection,
+    selectedCount,
+    selectedItems,
+    isAllSelected,
+  } = useMultiSelect<ContextEntity>(visibleItems);
 
   // Mutations
   const createEntity = useCreateContextEntity();
@@ -163,6 +191,114 @@ export default function ContextEntitiesPage() {
     }
   };
 
+  // Selection mode handlers
+  const handleToggleSelectionMode = () => {
+    if (selectionMode) {
+      clearSelection();
+    }
+    setSelectionMode((prev) => !prev);
+  };
+
+  // Bulk action handlers
+  const handleBulkDelete = async () => {
+    if (selectedItems.length === 0) return;
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedItems.length} ${selectedItems.length === 1 ? 'entity' : 'entities'}?`
+      )
+    ) {
+      return;
+    }
+    let successCount = 0;
+    let failCount = 0;
+    for (const entity of selectedItems) {
+      try {
+        await deleteEntity.mutateAsync(entity.id);
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+    clearSelection();
+    refetch();
+    if (failCount === 0) {
+      toast({
+        title: `${successCount} ${successCount === 1 ? 'entity' : 'entities'} deleted`,
+        description: 'Successfully deleted selected context entities.',
+      });
+    } else {
+      toast({
+        title: 'Partial deletion',
+        description: `${successCount} deleted, ${failCount} failed.`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleBulkDeploy = () => {
+    toast({ title: 'Coming soon', description: 'Bulk deploy will be available in a future update.' });
+  };
+
+  const handleBulkToggleAutoLoad = () => {
+    toast({
+      title: 'Coming soon',
+      description: 'Bulk toggle auto-load will be available in a future update.',
+    });
+  };
+
+  const handleBulkEditCategory = () => {
+    toast({
+      title: 'Coming soon',
+      description: 'Bulk category editing will be available in a future update.',
+    });
+  };
+
+  const handleBulkExport = () => {
+    toast({
+      title: 'Coming soon',
+      description: 'Bulk export will be available in a future update.',
+    });
+  };
+
+  // Bulk action definitions
+  const bulkActions: BulkAction[] = [
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: <Trash2 className="h-3.5 w-3.5" />,
+      variant: 'destructive',
+      onClick: handleBulkDelete,
+    },
+    {
+      id: 'deploy',
+      label: 'Deploy',
+      icon: <Rocket className="h-3.5 w-3.5" />,
+      variant: 'default',
+      onClick: handleBulkDeploy,
+    },
+    {
+      id: 'toggle-auto-load',
+      label: 'Toggle Auto-load',
+      icon: <ToggleLeft className="h-3.5 w-3.5" />,
+      variant: 'outline',
+      onClick: handleBulkToggleAutoLoad,
+    },
+    {
+      id: 'edit-category',
+      label: 'Edit Category',
+      icon: <FolderEdit className="h-3.5 w-3.5" />,
+      variant: 'outline',
+      onClick: handleBulkEditCategory,
+    },
+    {
+      id: 'export',
+      label: 'Export',
+      icon: <Download className="h-3.5 w-3.5" />,
+      variant: 'outline',
+      onClick: handleBulkExport,
+    },
+  ];
+
   // Determine if filters are active
   const hasActiveFilters = Object.keys(filters).some(
     (key) => filters[key as keyof FilterType] !== undefined && key !== 'limit' && key !== 'after'
@@ -187,10 +323,21 @@ export default function ContextEntitiesPage() {
             templates.
           </p>
         </div>
-        <Button onClick={handleCreateNew} aria-label="Add new context entity">
-          <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-          Add Entity
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={selectionMode ? 'secondary' : 'outline'}
+            onClick={handleToggleSelectionMode}
+            aria-pressed={selectionMode}
+            aria-label={selectionMode ? 'Exit selection mode' : 'Enter selection mode'}
+          >
+            <CheckSquare className="mr-2 h-4 w-4" aria-hidden="true" />
+            {selectionMode ? 'Cancel' : 'Select'}
+          </Button>
+          <Button onClick={handleCreateNew} aria-label="Add new context entity">
+            <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+            Add Entity
+          </Button>
+        </div>
       </div>
 
       {/* Main Layout: Filters + Content */}
@@ -215,9 +362,36 @@ export default function ContextEntitiesPage() {
               ) : (
                 <>
                   {data?.items.length || 0} {data?.items.length === 1 ? 'Entity' : 'Entities'}
+                  {selectionMode && selectedCount > 0 && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      ({selectedCount} selected)
+                    </span>
+                  )}
                 </>
               )}
             </h2>
+            {selectionMode && !isLoading && !error && visibleItems.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={selectAll}
+                  disabled={isAllSelected}
+                  aria-label="Select all visible entities"
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSelection}
+                  disabled={!hasSelection}
+                  aria-label="Clear selection"
+                >
+                  Select None
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Error State */}
@@ -253,10 +427,13 @@ export default function ContextEntitiesPage() {
                   <ContextEntityCard
                     key={entity.id}
                     entity={entity}
-                    onPreview={handlePreview}
-                    onDeploy={handleDeploy}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
+                    onPreview={selectionMode ? undefined : handlePreview}
+                    onDeploy={selectionMode ? undefined : handleDeploy}
+                    onEdit={selectionMode ? undefined : handleEdit}
+                    onDelete={selectionMode ? undefined : handleDelete}
+                    selectionMode={selectionMode}
+                    isSelected={isSelected(entity.id)}
+                    onToggleSelect={() => toggleSelection(entity.id)}
                   />
                 ))}
               </div>
@@ -311,7 +488,7 @@ export default function ContextEntitiesPage() {
 
       {/* Editor Dialog (Create/Edit) */}
       <ContextEntityEditor
-        entity={editingEntity}
+        entity={editingEntity ?? undefined}
         open={isEditorOpen}
         onClose={handleEditorClose}
         onSuccess={handleEditorSuccess}
@@ -332,6 +509,14 @@ export default function ContextEntitiesPage() {
           }}
         />
       )}
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedCount}
+        hasSelection={selectionMode && hasSelection}
+        actions={bulkActions}
+        onClearSelection={clearSelection}
+      />
     </div>
   );
 }

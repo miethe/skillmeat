@@ -28,6 +28,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -162,6 +163,12 @@ export interface ContextEntityCardProps {
   tokenCount?: number;
   /** Callback when auto-load toggle is changed */
   onAutoLoadToggle?: (enabled: boolean) => void;
+  /** When true, the card renders in selection mode with a checkbox */
+  selectionMode?: boolean;
+  /** Whether this card is currently selected */
+  isSelected?: boolean;
+  /** Called when the selection checkbox is toggled */
+  onToggleSelect?: () => void;
 }
 
 /**
@@ -197,6 +204,9 @@ export function ContextEntityCard({
   showTokenCount = false,
   tokenCount,
   onAutoLoadToggle,
+  selectionMode = false,
+  isSelected = false,
+  onToggleSelect,
 }: ContextEntityCardProps) {
   // Look up display config from the central map (handles null/casing internally).
   const config = getEntityTypeConfig(entity.entity_type);
@@ -226,6 +236,11 @@ export function ContextEntityCard({
     onAutoLoadToggle?.(checked);
   };
 
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleSelect?.();
+  };
+
   // Truncate path pattern if too long
   const truncatedPath =
     entity.path_pattern.length > 40 ? `...${entity.path_pattern.slice(-37)}` : entity.path_pattern;
@@ -236,7 +251,8 @@ export function ContextEntityCard({
         'group relative flex min-h-[220px] cursor-pointer flex-col border-l-4',
         !colorStyles && config.borderClass,
         !colorStyles && config.cardBgClass,
-        'transition-shadow duration-200 hover:shadow-md hover:ring-1 hover:ring-border'
+        'transition-shadow duration-200 hover:shadow-md hover:ring-1 hover:ring-border',
+        isSelected && 'ring-2 ring-primary'
       )}
       style={
         colorStyles
@@ -244,16 +260,30 @@ export function ContextEntityCard({
           : undefined
       }
       role="article"
-      aria-label={`Context entity: ${entity.name}. Click to preview.`}
-      onClick={() => onPreview?.(entity)}
+      aria-label={`Context entity: ${entity.name}.${selectionMode ? (isSelected ? ' Selected.' : ' Not selected.') : ' Click to preview.'}`}
+      onClick={() => (selectionMode ? onToggleSelect?.() : onPreview?.(entity))}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onPreview?.(entity);
+          selectionMode ? onToggleSelect?.() : onPreview?.(entity);
         }
       }}
     >
+      {/* Selection checkbox — only visible in selection mode */}
+      {selectionMode && (
+        <div
+          className="absolute left-2 top-2 z-10"
+          onClick={handleCheckboxClick}
+        >
+          <Checkbox
+            checked={isSelected}
+            aria-label={`Select ${entity.name}`}
+            className="h-4 w-4 border-2 bg-background shadow-sm"
+          />
+        </div>
+      )}
+
       {/* Card content */}
       <div className="flex-1 space-y-3 p-4">
         {/* Header: Name + Type Badge + Auto-load */}

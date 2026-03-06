@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Package, Loader2, Search } from 'lucide-react';
+import { Plus, Package, Loader2, Search, CheckSquare, Trash2, Rocket, Copy, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,7 +12,10 @@ import { TemplateDetail } from '@/components/templates/template-detail';
 import { TemplateDeployWizard } from '@/components/templates/template-deploy-wizard';
 
 // Import hooks
-import { useTemplates, useToast } from '@/hooks';
+import { useTemplates, useDeleteTemplate, useMultiSelect, useToast } from '@/hooks';
+
+// Import shared components
+import { BulkActionBar, type BulkAction } from '@/components/shared';
 
 // Import types
 import type { ProjectTemplate, TemplateFilters } from '@/types/template';
@@ -81,6 +84,9 @@ export default function TemplatesPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isDeployOpen, setIsDeployOpen] = useState(false);
 
+  // Selection mode state
+  const [selectionMode, setSelectionMode] = useState(false);
+
   // Data fetching with cursor-based pagination
   const [paginationCursor, setPaginationCursor] = useState<string | undefined>(undefined);
   const {
@@ -89,6 +95,22 @@ export default function TemplatesPage() {
     error,
     // refetch available for pull-to-refresh if needed
   } = useTemplates({ ...filters, search: searchQuery || undefined, after: paginationCursor });
+
+  // Multi-select (works on currently visible items only)
+  const visibleTemplates = data?.items ?? [];
+  const {
+    isSelected,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    hasSelection,
+    selectedCount,
+    selectedItems,
+    isAllSelected,
+  } = useMultiSelect<ProjectTemplate>(visibleTemplates);
+
+  // Delete mutation for bulk delete
+  const { mutateAsync: deleteTemplate } = useDeleteTemplate();
 
   // Event handlers
   const handlePreview = (template: ProjectTemplate) => {
@@ -125,6 +147,68 @@ export default function TemplatesPage() {
     setPaginationCursor(undefined); // Reset pagination when search changes
   };
 
+  const handleToggleSelectionMode = () => {
+    if (selectionMode) {
+      clearSelection();
+    }
+    setSelectionMode((prev) => !prev);
+  };
+
+  // Bulk action handlers
+  const handleBulkDelete = async () => {
+    const ids = selectedItems.map((t) => t.id);
+    const count = ids.length;
+    await Promise.all(ids.map((id) => deleteTemplate(id)));
+    clearSelection();
+    setSelectionMode(false);
+    toast({
+      title: `${count} ${count === 1 ? 'template' : 'templates'} deleted`,
+    });
+  };
+
+  const handleBulkDeploy = () => {
+    toast({ title: 'Coming soon', description: 'Bulk deploy will be available in a future update.' });
+  };
+
+  const handleBulkDuplicate = () => {
+    toast({ title: 'Coming soon', description: 'Bulk duplicate will be available in a future update.' });
+  };
+
+  const handleBulkExport = () => {
+    toast({ title: 'Coming soon', description: 'Bulk export will be available in a future update.' });
+  };
+
+  const bulkActions: BulkAction[] = [
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: <Trash2 className="h-3.5 w-3.5" />,
+      variant: 'destructive',
+      onClick: handleBulkDelete,
+    },
+    {
+      id: 'deploy',
+      label: 'Deploy',
+      icon: <Rocket className="h-3.5 w-3.5" />,
+      variant: 'default',
+      onClick: handleBulkDeploy,
+    },
+    {
+      id: 'duplicate',
+      label: 'Duplicate',
+      icon: <Copy className="h-3.5 w-3.5" />,
+      variant: 'outline',
+      onClick: handleBulkDuplicate,
+    },
+    {
+      id: 'export',
+      label: 'Export',
+      icon: <Download className="h-3.5 w-3.5" />,
+      variant: 'outline',
+      onClick: handleBulkExport,
+    },
+  ];
+
   // Determine if filters are active
   const hasActiveFilters = !!searchQuery;
 
@@ -138,10 +222,22 @@ export default function TemplatesPage() {
             Start new projects quickly with pre-configured context entities
           </p>
         </div>
-        <Button disabled>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Template
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={selectionMode ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={handleToggleSelectionMode}
+            aria-pressed={selectionMode}
+            aria-label={selectionMode ? 'Exit selection mode' : 'Enter selection mode'}
+          >
+            <CheckSquare className="mr-2 h-4 w-4" />
+            {selectionMode ? 'Cancel' : 'Select'}
+          </Button>
+          <Button disabled>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Template
+          </Button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -172,6 +268,18 @@ export default function TemplatesPage() {
               </>
             )}
           </h2>
+
+          {/* Select All / Select None — only visible in selection mode */}
+          {selectionMode && !isLoading && !error && (data?.items?.length ?? 0) > 0 && (
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={selectAll} disabled={isAllSelected}>
+                Select All
+              </Button>
+              <Button variant="ghost" size="sm" onClick={clearSelection} disabled={!hasSelection}>
+                Select None
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Error State */}
@@ -202,8 +310,11 @@ export default function TemplatesPage() {
                 <TemplateCard
                   key={template.id}
                   template={template}
-                  onPreview={() => handlePreview(template)}
-                  onDeploy={() => handleDeploy(template)}
+                  onPreview={selectionMode ? undefined : () => handlePreview(template)}
+                  onDeploy={selectionMode ? undefined : () => handleDeploy(template)}
+                  selectionMode={selectionMode}
+                  isSelected={isSelected(template.id)}
+                  onToggleSelect={() => toggleSelection(template.id)}
                 />
               ))}
             </div>
@@ -249,6 +360,17 @@ export default function TemplatesPage() {
           onSuccess={handleDeploySuccess}
         />
       )}
+
+      {/* Bulk Action Bar — fixed at bottom, visible when items are selected in selection mode */}
+      <BulkActionBar
+        selectedCount={selectedCount}
+        hasSelection={selectionMode && hasSelection}
+        actions={bulkActions}
+        onClearSelection={() => {
+          clearSelection();
+          setSelectionMode(false);
+        }}
+      />
     </div>
   );
 }
