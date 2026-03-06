@@ -40,7 +40,12 @@ from skillmeat.api.schemas.context_entity import (
     ContextEntityType,
     ContextEntityUpdateRequest,
 )
-from skillmeat.api.schemas.common import PageInfo
+from skillmeat.api.schemas.common import (
+    BatchDeleteRequest,
+    BatchDeleteResponse,
+    BatchDeleteResult,
+    PageInfo,
+)
 from skillmeat.core.content_assembly import assemble_content
 from skillmeat.core.interfaces.dtos import ContextEntityDTO
 from skillmeat.core.path_resolver import default_project_config_filenames
@@ -460,6 +465,51 @@ async def create_context_entity(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create context entity",
         ) from e
+
+
+@router.post(
+    "/batch/delete",
+    summary="Batch delete context entities",
+    description=(
+        "Delete multiple context entities in a single request. "
+        "Returns per-item success/failure results rather than failing the whole "
+        "request on partial errors."
+    ),
+    response_model=BatchDeleteResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def batch_delete_context_entities(
+    request: BatchDeleteRequest,
+    repo: ContextEntityRepoDep,
+) -> BatchDeleteResponse:
+    """Batch delete context entities by ID.
+
+    Args:
+        request: Batch delete request with list of entity IDs
+        repo: Context entity repository (injected)
+
+    Returns:
+        BatchDeleteResponse with per-item results and aggregate counts
+    """
+    results: List[BatchDeleteResult] = []
+    succeeded = 0
+    failed = 0
+
+    for item_id in request.ids:
+        try:
+            repo.delete(item_id)
+            results.append(BatchDeleteResult(id=item_id, success=True))
+            succeeded += 1
+        except KeyError:
+            results.append(BatchDeleteResult(id=item_id, success=False, error="Not found"))
+            failed += 1
+        except Exception:
+            logger.exception("Failed to delete context entity %s", item_id)
+            results.append(BatchDeleteResult(id=item_id, success=False, error="Unexpected error"))
+            failed += 1
+
+    logger.info("Batch deleted context entities: %d succeeded, %d failed", succeeded, failed)
+    return BatchDeleteResponse(results=results, succeeded=succeeded, failed=failed)
 
 
 @router.get(

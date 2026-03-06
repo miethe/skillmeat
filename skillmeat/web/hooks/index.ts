@@ -426,7 +426,7 @@ export {
 } from './use-tags';
 
 // ============================================================================
-// TEMPLATES (7 hooks)
+// TEMPLATES (8 hooks)
 // ============================================================================
 // Template CRUD and deployment operations
 export {
@@ -436,6 +436,7 @@ export {
   useCreateTemplate,
   useUpdateTemplate,
   useDeleteTemplate,
+  useBatchDeleteTemplates,
   useDeployTemplate,
 } from './use-templates';
 
@@ -464,7 +465,7 @@ export {
 } from './use-conflict-check';
 
 // ============================================================================
-// CONTEXT ENTITIES (6 hooks)
+// CONTEXT ENTITIES (7 hooks)
 // ============================================================================
 // Context-bound entity CRUD operations
 export {
@@ -475,6 +476,7 @@ export {
   useCreateContextEntity,
   useUpdateContextEntity,
   useDeleteContextEntity,
+  useBatchDeleteContextEntities,
   useDeployContextEntity,
 } from './use-context-entities';
 
@@ -780,7 +782,7 @@ export {
 } from './use-dnd-animations';
 
 // ============================================================================
-// WORKFLOWS (9 hooks)
+// WORKFLOWS (10 hooks)
 // ============================================================================
 // Workflow definition CRUD, validation, and execution plan generation
 export {
@@ -790,6 +792,7 @@ export {
   useCreateWorkflow,
   useUpdateWorkflow,
   useDeleteWorkflow,
+  useBatchDeleteWorkflows,
   useDuplicateWorkflow,
   useValidateWorkflow,
   usePlanWorkflow,

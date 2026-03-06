@@ -18,7 +18,9 @@ import {
   updateTemplate,
   deleteTemplate,
   deployTemplate,
+  batchDeleteTemplates,
 } from '@/lib/api/templates';
+import type { BatchDeleteResponse } from '@/types/common';
 
 // =============================================================================
 // Query Key Factory
@@ -113,6 +115,29 @@ export function useDeleteTemplate() {
       // Invalidate specific template detail
       queryClient.invalidateQueries({ queryKey: templateKeys.detail(id) });
       // Invalidate all template lists
+      queryClient.invalidateQueries({ queryKey: templateKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Batch delete multiple templates in a single request
+ *
+ * @returns Mutation with `mutateAsync(ids: string[]) => BatchDeleteResponse`
+ *
+ * @example
+ * ```tsx
+ * const batchDelete = useBatchDeleteTemplates();
+ * const result = await batchDelete.mutateAsync(['id-1', 'id-2']);
+ * console.log(`${result.succeeded} deleted, ${result.failed} failed`);
+ * ```
+ */
+export function useBatchDeleteTemplates() {
+  const queryClient = useQueryClient();
+
+  return useMutation<BatchDeleteResponse, Error, string[]>({
+    mutationFn: (ids) => batchDeleteTemplates(ids),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: templateKeys.lists() });
     },
   });

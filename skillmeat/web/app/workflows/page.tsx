@@ -19,7 +19,7 @@ import { WorkflowToolbar } from '@/components/workflow/workflow-toolbar';
 import { WorkflowDetailModal } from '@/components/workflow/workflow-detail-modal';
 import { ExecutionDetailModal } from '@/components/workflow/execution-detail-modal';
 import { Button } from '@/components/ui/button';
-import { useWorkflows, useDeleteWorkflow, useDuplicateWorkflow, useMultiSelect } from '@/hooks';
+import { useWorkflows, useDeleteWorkflow, useBatchDeleteWorkflows, useDuplicateWorkflow, useMultiSelect, useToast } from '@/hooks';
 import type { WorkflowFilters } from '@/types/workflow';
 
 // ---------------------------------------------------------------------------
@@ -39,6 +39,7 @@ const SKELETON_COUNT = 6;
 
 export default function WorkflowsPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   // ── State ────────────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<WorkflowFilters>(DEFAULT_FILTERS);
@@ -67,6 +68,7 @@ export default function WorkflowsPage() {
   } = useMultiSelect(workflows);
 
   const deleteWorkflow = useDeleteWorkflow();
+  const batchDeleteWorkflows = useBatchDeleteWorkflows();
   const duplicateWorkflow = useDuplicateWorkflow();
 
   // ── Derived state ─────────────────────────────────────────────────────────
@@ -153,22 +155,37 @@ export default function WorkflowsPage() {
 
   const handleBulkDelete = useCallback(async () => {
     const selectedWorkflows = workflows.filter((wf) => isSelected(wf.id));
+    if (selectedWorkflows.length === 0) return;
     const names = selectedWorkflows.map((wf) => wf.name).join(', ');
     const confirmed = window.confirm(
       `Delete ${selectedCount} workflow${selectedCount === 1 ? '' : 's'} (${names})?\n\nThis action cannot be undone.`
     );
     if (!confirmed) return;
 
-    for (const wf of selectedWorkflows) {
-      try {
-        await deleteWorkflow.mutateAsync(wf.id);
-      } catch (err) {
-        console.error('[WorkflowsPage] Bulk delete failed for:', wf.id, err);
+    try {
+      const result = await batchDeleteWorkflows.mutateAsync(selectedWorkflows.map((wf) => wf.id));
+      clearSelection();
+      setSelectionMode(false);
+      if (result.failed === 0) {
+        toast({
+          title: `${result.succeeded} ${result.succeeded === 1 ? 'workflow' : 'workflows'} deleted`,
+          description: 'Successfully deleted selected workflows.',
+        });
+      } else {
+        toast({
+          title: 'Partial deletion',
+          description: `${result.succeeded} deleted, ${result.failed} failed.`,
+          variant: 'destructive',
+        });
       }
+    } catch (err) {
+      toast({
+        title: 'Batch delete failed',
+        description: err instanceof Error ? err.message : 'Could not delete workflows',
+        variant: 'destructive',
+      });
     }
-    clearSelection();
-    setSelectionMode(false);
-  }, [workflows, isSelected, selectedCount, deleteWorkflow, clearSelection]);
+  }, [workflows, isSelected, selectedCount, batchDeleteWorkflows, clearSelection, toast]);
 
   const handleBulkRun = useCallback(() => {
     const selectedWorkflows = workflows.filter((wf) => isSelected(wf.id));

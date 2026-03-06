@@ -78,3 +78,6 @@ export * from './similarity';
 
 // Workflow orchestration types
 export * from './workflow';
+
+// Shared common types (BatchDeleteResponse, etc.)
+export * from './common';

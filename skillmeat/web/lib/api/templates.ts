@@ -10,6 +10,7 @@ import type {
   DeployTemplateResponse,
   TemplateFilters,
 } from '@/types/template';
+import type { BatchDeleteResponse } from '@/types/common';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
@@ -108,6 +109,22 @@ export async function deleteTemplate(id: string): Promise<void> {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(errorBody.detail || `Failed to delete template: ${response.statusText}`);
   }
+}
+
+/**
+ * Batch delete multiple templates in a single request
+ */
+export async function batchDeleteTemplates(ids: string[]): Promise<BatchDeleteResponse> {
+  const response = await fetch(buildUrl('/project-templates/batch/delete'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Batch delete failed: ${response.statusText}`);
+  }
+  return response.json();
 }
 
 /**

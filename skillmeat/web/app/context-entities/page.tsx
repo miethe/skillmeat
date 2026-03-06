@@ -28,6 +28,7 @@ import type { BulkAction } from '@/components/shared';
 import {
   useContextEntities,
   useDeleteContextEntity,
+  useBatchDeleteContextEntities,
   useMultiSelect,
   useToast,
 } from '@/hooks';
@@ -115,6 +116,7 @@ export default function ContextEntitiesPage() {
 
   // Mutations
   const deleteEntity = useDeleteContextEntity();
+  const batchDelete = useBatchDeleteContextEntities();
 
   // Event handlers
   const handlePreview = (entity: ContextEntity) => {
@@ -209,27 +211,27 @@ export default function ContextEntitiesPage() {
     ) {
       return;
     }
-    let successCount = 0;
-    let failCount = 0;
-    for (const entity of selectedItems) {
-      try {
-        await deleteEntity.mutateAsync(entity.id);
-        successCount++;
-      } catch {
-        failCount++;
+
+    try {
+      const result = await batchDelete.mutateAsync(selectedItems.map((e) => e.id));
+      clearSelection();
+      refetch();
+      if (result.failed === 0) {
+        toast({
+          title: `${result.succeeded} ${result.succeeded === 1 ? 'entity' : 'entities'} deleted`,
+          description: 'Successfully deleted selected context entities.',
+        });
+      } else {
+        toast({
+          title: 'Partial deletion',
+          description: `${result.succeeded} deleted, ${result.failed} failed.`,
+          variant: 'destructive',
+        });
       }
-    }
-    clearSelection();
-    refetch();
-    if (failCount === 0) {
+    } catch (err) {
       toast({
-        title: `${successCount} ${successCount === 1 ? 'entity' : 'entities'} deleted`,
-        description: 'Successfully deleted selected context entities.',
-      });
-    } else {
-      toast({
-        title: 'Partial deletion',
-        description: `${successCount} deleted, ${failCount} failed.`,
+        title: 'Batch delete failed',
+        description: err instanceof Error ? err.message : 'Could not delete entities',
         variant: 'destructive',
       });
     }

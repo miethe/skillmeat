@@ -13,6 +13,7 @@ import type {
   EntityTypeConfigCreate,
   EntityTypeConfigUpdate,
 } from '@/types/context-entity';
+import type { BatchDeleteResponse } from '@/types/common';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
@@ -167,6 +168,22 @@ export async function fetchContextEntityContent(id: string): Promise<string> {
 
   // Content endpoint returns plain text (markdown), not JSON
   return response.text();
+}
+
+/**
+ * Batch delete multiple context entities in a single request
+ */
+export async function batchDeleteContextEntities(ids: string[]): Promise<BatchDeleteResponse> {
+  const response = await fetch(buildUrl('/context-entities/batch/delete'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Batch delete failed: ${response.statusText}`);
+  }
+  return response.json();
 }
 
 /**

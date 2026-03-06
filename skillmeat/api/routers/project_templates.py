@@ -20,7 +20,12 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Query, status
 
 from skillmeat.api.dependencies import DbSessionDep, ProjectTemplateRepoDep
-from skillmeat.api.schemas.common import PageInfo
+from skillmeat.api.schemas.common import (
+    BatchDeleteRequest,
+    BatchDeleteResponse,
+    BatchDeleteResult,
+    PageInfo,
+)
 from skillmeat.api.schemas.project_template import (
     DeployTemplateRequest,
     DeployTemplateResponse,
@@ -142,6 +147,51 @@ async def list_templates(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list templates: {str(e)}",
         )
+
+
+@router.post(
+    "/batch/delete",
+    summary="Batch delete project templates",
+    description=(
+        "Delete multiple project templates in a single request. "
+        "Returns per-item success/failure results rather than failing the whole "
+        "request on partial errors."
+    ),
+    response_model=BatchDeleteResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def batch_delete_templates(
+    request: BatchDeleteRequest,
+    repo: ProjectTemplateRepoDep,
+) -> BatchDeleteResponse:
+    """Batch delete project templates by ID.
+
+    Args:
+        request: Batch delete request with list of template IDs
+        repo: Project template repository (injected)
+
+    Returns:
+        BatchDeleteResponse with per-item results and aggregate counts
+    """
+    results: List[BatchDeleteResult] = []
+    succeeded = 0
+    failed = 0
+
+    for item_id in request.ids:
+        try:
+            repo.delete(item_id)
+            results.append(BatchDeleteResult(id=item_id, success=True))
+            succeeded += 1
+        except KeyError:
+            results.append(BatchDeleteResult(id=item_id, success=False, error="Not found"))
+            failed += 1
+        except Exception:
+            logger.exception("Failed to delete project template %s", item_id)
+            results.append(BatchDeleteResult(id=item_id, success=False, error="Unexpected error"))
+            failed += 1
+
+    logger.info("Batch deleted project templates: %d succeeded, %d failed", succeeded, failed)
+    return BatchDeleteResponse(results=results, succeeded=succeeded, failed=failed)
 
 
 @router.get(

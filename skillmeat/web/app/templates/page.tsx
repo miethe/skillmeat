@@ -12,7 +12,7 @@ import { TemplateDetail } from '@/components/templates/template-detail';
 import { TemplateDeployWizard } from '@/components/templates/template-deploy-wizard';
 
 // Import hooks
-import { useTemplates, useDeleteTemplate, useMultiSelect, useToast } from '@/hooks';
+import { useTemplates, useBatchDeleteTemplates, useMultiSelect, useToast } from '@/hooks';
 
 // Import shared components
 import { BulkActionBar, type BulkAction } from '@/components/shared';
@@ -110,8 +110,8 @@ export default function TemplatesPage() {
     isAllSelected,
   } = useMultiSelect<ProjectTemplate>(visibleTemplates);
 
-  // Delete mutation for bulk delete
-  const { mutateAsync: deleteTemplate } = useDeleteTemplate();
+  // Batch delete mutation for bulk delete
+  const batchDelete = useBatchDeleteTemplates();
 
   // Event handlers
   const handlePreview = (template: ProjectTemplate) => {
@@ -157,14 +157,38 @@ export default function TemplatesPage() {
 
   // Bulk action handlers
   const handleBulkDelete = async () => {
-    const ids = selectedItems.map((t) => t.id);
-    const count = ids.length;
-    await Promise.all(ids.map((id) => deleteTemplate(id)));
-    clearSelection();
-    setSelectionMode(false);
-    toast({
-      title: `${count} ${count === 1 ? 'template' : 'templates'} deleted`,
-    });
+    if (selectedItems.length === 0) return;
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedItems.length} ${selectedItems.length === 1 ? 'template' : 'templates'}?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const result = await batchDelete.mutateAsync(selectedItems.map((t) => t.id));
+      clearSelection();
+      setSelectionMode(false);
+      if (result.failed === 0) {
+        toast({
+          title: `${result.succeeded} ${result.succeeded === 1 ? 'template' : 'templates'} deleted`,
+          description: 'Successfully deleted selected templates.',
+        });
+      } else {
+        toast({
+          title: 'Partial deletion',
+          description: `${result.succeeded} deleted, ${result.failed} failed.`,
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      toast({
+        title: 'Batch delete failed',
+        description: err instanceof Error ? err.message : 'Could not delete templates',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleBulkDeploy = () => {

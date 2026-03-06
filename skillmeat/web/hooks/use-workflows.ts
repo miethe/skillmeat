@@ -31,7 +31,9 @@ import {
   duplicateWorkflow,
   validateWorkflow,
   planWorkflow,
+  batchDeleteWorkflows,
 } from '@/lib/api/workflows';
+import type { BatchDeleteResponse } from '@/types/common';
 
 // ============================================================================
 // Query key factory
@@ -232,6 +234,32 @@ export function useDuplicateWorkflow() {
     mutationFn: ({ id, data }) => duplicateWorkflow(id, data),
     onSuccess: () => {
       // Invalidate all list queries — the duplicate must appear in list views
+      queryClient.invalidateQueries({ queryKey: workflowKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Batch delete multiple workflow definitions in a single request.
+ *
+ * On success invalidates all workflow list queries so any list views
+ * refresh automatically.
+ *
+ * @returns Mutation with `mutateAsync(ids: string[]) => BatchDeleteResponse`
+ *
+ * @example
+ * ```tsx
+ * const batchDelete = useBatchDeleteWorkflows();
+ * const result = await batchDelete.mutateAsync(['id-1', 'id-2']);
+ * console.log(`${result.succeeded} deleted, ${result.failed} failed`);
+ * ```
+ */
+export function useBatchDeleteWorkflows() {
+  const queryClient = useQueryClient();
+
+  return useMutation<BatchDeleteResponse, Error, string[]>({
+    mutationFn: (ids) => batchDeleteWorkflows(ids),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workflowKeys.lists() });
     },
   });
