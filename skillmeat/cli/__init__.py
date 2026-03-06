@@ -24,6 +24,12 @@ from rich.status import Status
 
 from skillmeat import __version__
 from skillmeat.config import ConfigManager
+from skillmeat.core.enterprise_config import (
+    get_enterprise_config,
+    is_enterprise_mode,
+    set_session_pat,
+    store_pat,
+)
 from skillmeat.core.collection import CollectionManager
 from skillmeat.core.refresher import CollectionRefresher, RefreshMode, RefreshResult
 from skillmeat.core.artifact import ArtifactManager, ArtifactType, UpdateStrategy
@@ -59,8 +65,17 @@ config_mgr = ConfigManager()
     hidden=True,
     help="Enable smart defaults mode (used by claudectl wrapper)",
 )
+@click.option(
+    "--token",
+    default=None,
+    metavar="PAT",
+    help=(
+        "Personal Access Token for enterprise API authentication. "
+        "Stored in ~/.skillmeat/enterprise.toml and active for this session."
+    ),
+)
 @click.pass_context
-def main(ctx, smart_defaults):
+def main(ctx, smart_defaults, token):
     """SkillMeat: Personal collection manager for Claude Code artifacts.
 
     Manage Skills, Commands, Agents, and more across multiple projects.
@@ -74,6 +89,21 @@ def main(ctx, smart_defaults):
     """
     ctx.ensure_object(dict)
     ctx.obj["smart_defaults"] = smart_defaults
+
+    # Handle --token: persist to config file and activate for this session.
+    if token:
+        store_pat(token)
+        set_session_pat(token)
+        console.print("[bold cyan][enterprise][/bold cyan] Token stored.")
+
+    # Log active edition once at startup (enterprise only — community is silent).
+    ent_cfg = get_enterprise_config()
+    if ent_cfg.is_enterprise():
+        api_display = ent_cfg.api_url or "(no API URL set)"
+        console.print(
+            f"[bold cyan][enterprise][/bold cyan] SkillMeat Enterprise mode active"
+            f" — API: {api_display}"
+        )
 
 
 # ====================
@@ -1541,6 +1571,29 @@ def deploy(
       skillmeat deploy my-skill --project /path/to/proj
       skillmeat deploy my-skill --overwrite   # Skip overwrite prompt
     """
+    if is_enterprise_mode():
+        from skillmeat.core.enterprise_deploy import EnterpriseDeployer
+
+        resolved_target = project or Path.cwd()
+        target_dir = resolved_target / ".claude"
+        deployer = EnterpriseDeployer()
+        for name in names:
+            with console.status(f"[cyan]Deploying '{name}' via enterprise API…"):
+                result = deployer.deploy(name, target_dir=target_dir)
+            if result.success:
+                console.print(
+                    f"[green][enterprise][/green] Deployed [bold]{result.artifact_name}[/bold]"
+                    f" ({result.artifact_type} v{result.version})"
+                    f" -> {result.target_path}"
+                )
+                for fp in result.files_written:
+                    console.print(f"  [dim]{fp}[/dim]")
+            else:
+                console.print(
+                    f"[red][enterprise] Deploy failed for '{name}':[/red] {result.error}"
+                )
+        return
+
     from skillmeat.defaults import SmartDefaults
 
     try:
@@ -6133,6 +6186,99 @@ def sync_check_cmd(ctx, project_path, collection, output_format, output_json):
         skillmeat sync-check /path/to/project --format json
         claudectl sync-check /path/to/project --format table
     """
+    if is_enterprise_mode():
+        from pathlib import Path as _Path
+
+        from rich.console import Console as _Console
+        from rich.table import Table as _Table
+
+        from skillmeat.core.enterprise_sync import EnterpriseSyncer
+
+        _console = _Console()
+
+        # Resolve target dir from project_path argument (defaults to cwd/.claude).
+        _target_dir = _Path(project_path) / ".claude" if project_path else _Path(".claude")
+
+        syncer = EnterpriseSyncer()
+
+        # When no specific artifact is requested we report on all tracked artifacts.
+        _state_path = _target_dir / ".skillmeat-enterprise-sync.toml"
+
+        artifact_names: list[str] = []
+        if _state_path.exists():
+            import sys as _sys
+
+            if _sys.version_info >= (3, 11):
+                import tomllib as _tomllib
+            else:
+                import tomli as _tomllib  # type: ignore[no-reuse-stubs]
+
+            with open(_state_path, "rb") as _fh:
+                _sync_state = _tomllib.load(_fh)
+            artifact_names = list(_sync_state.get("artifacts", {}).keys())
+
+        if not artifact_names:
+            _console.print(
+                "[yellow][enterprise] No synced artifacts found in"
+                f" {_target_dir}. Run sync-pull first.[/yellow]"
+            )
+            return
+
+        results = [syncer.check(name, target_dir=_target_dir) for name in artifact_names]
+
+        # Determine output format.
+        from skillmeat.defaults import SmartDefaults as _SD
+
+        _params = {"format": output_format}
+        if ctx.obj and ctx.obj.get("smart_defaults"):
+            _params = _SD.apply_defaults(ctx, _params)
+        _fmt = _params.get("format") or _SD.detect_output_format()
+        if output_json:
+            _fmt = "json"
+
+        if _fmt == "json":
+            import json as _json
+
+            _console.print(
+                _json.dumps(
+                    [
+                        {
+                            "artifact": r.artifact_name,
+                            "up_to_date": r.up_to_date,
+                            "local_hash": r.old_hash,
+                            "remote_hash": r.new_hash,
+                            "error": r.error,
+                        }
+                        for r in results
+                    ],
+                    indent=2,
+                )
+            )
+        else:
+            tbl = _Table(title="Enterprise Sync Status")
+            tbl.add_column("Artifact")
+            tbl.add_column("Status")
+            tbl.add_column("Local hash", no_wrap=True)
+            tbl.add_column("Remote hash", no_wrap=True)
+            for r in results:
+                if r.error:
+                    status = f"[red]error: {r.error}[/red]"
+                elif r.up_to_date:
+                    status = "[green]up-to-date[/green]"
+                else:
+                    status = "[yellow]outdated[/yellow]"
+                tbl.add_row(
+                    r.artifact_name,
+                    status,
+                    r.old_hash[:12] if r.old_hash else "-",
+                    r.new_hash[:12] if r.new_hash else "-",
+                )
+            _console.print(tbl)
+
+        has_drift = any(not r.up_to_date for r in results)
+        sys.exit(1 if has_drift else 0)
+        return
+
     from pathlib import Path
     from skillmeat.core.collection import CollectionManager
     from skillmeat.core.sync import SyncManager
@@ -6350,6 +6496,146 @@ def sync_pull_cmd(
         skillmeat sync-pull /path/to/project --format json
         claudectl sync-pull /path/to/project --format table
     """
+    if is_enterprise_mode():
+        from pathlib import Path as _Path
+
+        from rich.console import Console as _Console
+        from rich.progress import Progress as _Progress
+
+        from skillmeat.core.enterprise_sync import EnterpriseSyncer
+        from skillmeat.defaults import SmartDefaults as _SD
+
+        _console = _Console()
+
+        # Resolve target dir from project_path argument.
+        _target_dir = _Path(project_path) / ".claude" if project_path else _Path(".claude")
+
+        # Determine output format.
+        _params = {"format": output_format}
+        if ctx.obj and ctx.obj.get("smart_defaults"):
+            _params = _SD.apply_defaults(ctx, _params)
+        _fmt = _params.get("format") or _SD.detect_output_format()
+        if output_json:
+            _fmt = "json"
+
+        # Resolve artifact list: explicit --artifacts flag or all tracked.
+        artifact_list_ent: list[str] = []
+        if artifacts:
+            artifact_list_ent = [a.strip() for a in artifacts.split(",")]
+        else:
+            _state_path = _target_dir / ".skillmeat-enterprise-sync.toml"
+            if _state_path.exists():
+                import sys as _sys
+
+                if _sys.version_info >= (3, 11):
+                    import tomllib as _tomllib
+                else:
+                    import tomli as _tomllib  # type: ignore[no-reuse-stubs]
+
+                with open(_state_path, "rb") as _fh:
+                    _sync_state = _tomllib.load(_fh)
+                artifact_list_ent = list(_sync_state.get("artifacts", {}).keys())
+
+        if not artifact_list_ent:
+            _console.print(
+                "[yellow][enterprise] No artifacts to sync. Specify artifact"
+                " names via --artifacts or run sync-pull with an artifact name.[/yellow]"
+            )
+            return
+
+        syncer = EnterpriseSyncer()
+        results = []
+
+        if dry_run:
+            # Dry-run: check only, no file writes.
+            with _Progress(console=_console, transient=True) as _prog:
+                _task = _prog.add_task(
+                    "[cyan]Checking enterprise artifacts…", total=len(artifact_list_ent)
+                )
+                for name in artifact_list_ent:
+                    results.append(syncer.check(name, target_dir=_target_dir))
+                    _prog.advance(_task)
+        else:
+            with _Progress(console=_console, transient=True) as _prog:
+                _task = _prog.add_task(
+                    "[cyan]Syncing enterprise artifacts…", total=len(artifact_list_ent)
+                )
+                for name in artifact_list_ent:
+                    results.append(syncer.sync(name, target_dir=_target_dir))
+                    _prog.advance(_task)
+
+        if _fmt == "json":
+            import json as _json
+
+            _console.print(
+                _json.dumps(
+                    {
+                        "dry_run": dry_run,
+                        "results": [
+                            {
+                                "artifact": r.artifact_name,
+                                "up_to_date": r.up_to_date,
+                                "updated": r.updated,
+                                "files_updated": r.files_updated,
+                                "old_hash": r.old_hash,
+                                "new_hash": r.new_hash,
+                                "error": r.error,
+                            }
+                            for r in results
+                        ],
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            total_updated = sum(r.files_updated for r in results)
+            updated_artifacts = [r for r in results if r.updated]
+            up_to_date = [r for r in results if r.up_to_date]
+            errors = [r for r in results if r.error]
+
+            if dry_run:
+                _console.print(
+                    f"\n[bold]Enterprise sync preview[/bold] (dry-run,"
+                    f" target: {_target_dir})"
+                )
+                needs_update = [r for r in results if not r.up_to_date and not r.error]
+                if needs_update:
+                    _console.print(
+                        f"  [yellow]{len(needs_update)} artifact(s) would be updated:[/yellow]"
+                    )
+                    for r in needs_update:
+                        _console.print(f"    • {r.artifact_name}")
+                else:
+                    _console.print("  [green]All artifacts are up-to-date.[/green]")
+            else:
+                _console.print(
+                    f"\n[bold]Enterprise sync complete[/bold] (target: {_target_dir})"
+                )
+                if updated_artifacts:
+                    _console.print(
+                        f"  [green]Updated {len(updated_artifacts)} artifact(s),"
+                        f" {total_updated} file(s) written.[/green]"
+                    )
+                    for r in updated_artifacts:
+                        _console.print(
+                            f"    • {r.artifact_name}"
+                            f" ({r.files_updated} file(s),"
+                            f" {r.old_hash[:8] or 'new'} → {r.new_hash[:8]})"
+                        )
+                if up_to_date:
+                    _console.print(
+                        f"  [dim]{len(up_to_date)} artifact(s) already up-to-date.[/dim]"
+                    )
+
+            if errors:
+                _console.print(f"  [red]{len(errors)} error(s):[/red]")
+                for r in errors:
+                    _console.print(f"    • {r.artifact_name}: {r.error}")
+
+        has_errors = any(r.error for r in results)
+        sys.exit(1 if has_errors else 0)
+        return
+
     from pathlib import Path
     from skillmeat.core.collection import CollectionManager
     from skillmeat.core.sync import SyncManager
@@ -14656,6 +14942,16 @@ def _uninstall_shell_completion(shell: str) -> Optional[str]:
 from skillmeat.cli.workflow import workflow_cli  # noqa: E402
 
 main.add_command(workflow_cli, name="workflow")
+
+
+# ====================
+# Enterprise Command Group
+# ====================
+
+
+from skillmeat.cli.enterprise_commands import enterprise_cli  # noqa: E402
+
+main.add_command(enterprise_cli, name="enterprise")
 
 
 # ====================

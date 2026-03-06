@@ -6,12 +6,15 @@ from .burst_detection import (
     SlidingWindowTracker,
     create_fingerprint,
 )
+from .enterprise_auth import EnterprisePATDep, verify_enterprise_pat
 from .observability import ObservabilityMiddleware
 from .rate_limit import RateLimitMiddleware
 
 __all__ = [
     "AuthMiddleware",
     "get_token_manager",
+    "EnterprisePATDep",
+    "verify_enterprise_pat",
     "RateLimitMiddleware",
     "RequestFingerprint",
     "SlidingWindowTracker",

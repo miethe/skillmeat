@@ -9208,6 +9208,49 @@
         }
       }
     },
+    "/api/v1/context-entities/batch/delete": {
+      "post": {
+        "tags": [
+          "context-entities",
+          "context-entities"
+        ],
+        "summary": "Batch delete context entities",
+        "description": "Delete multiple context entities in a single request. Returns per-item success/failure results rather than failing the whole request on partial errors.",
+        "operationId": "batch_delete_context_entities_api_v1_context_entities_batch_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/context-entities/{entity_id}": {
       "get": {
         "tags": [
@@ -18074,6 +18117,49 @@
         }
       }
     },
+    "/api/v1/project-templates/batch/delete": {
+      "post": {
+        "tags": [
+          "project-templates",
+          "project-templates"
+        ],
+        "summary": "Batch delete project templates",
+        "description": "Delete multiple project templates in a single request. Returns per-item success/failure results rather than failing the whole request on partial errors.",
+        "operationId": "batch_delete_templates_api_v1_project_templates_batch_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/project-templates/{template_id}": {
       "get": {
         "tags": [
@@ -20424,23 +20510,23 @@
         }
       }
     },
-    "/api/v1/settings/entity-categories/{category_id}": {
+    "/api/v1/settings/entity-categories/{category_slug}": {
       "put": {
         "tags": [
           "settings",
           "settings"
         ],
         "summary": "Update an entity category",
-        "description": "Update one or more fields on an existing ``ContextEntityCategory``.\n\n    Only supplied (non-``null``) fields are updated; others remain unchanged.\n\n    Returns 409 Conflict if the new slug collides with an existing row.",
-        "operationId": "update_entity_category_api_v1_settings_entity_categories__category_id__put",
+        "description": "Update one or more fields on an existing ``ContextEntityCategory``.\n\n    Only supplied (non-``null``) fields are updated; others remain unchanged.\n\n    Returns 404 if no category with the given slug exists.\n    Returns 409 Conflict if the new slug collides with an existing row.",
+        "operationId": "update_entity_category_api_v1_settings_entity_categories__category_slug__put",
         "parameters": [
           {
-            "name": "category_id",
+            "name": "category_slug",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "title": "Category Id"
+              "type": "string",
+              "title": "Category Slug"
             }
           }
         ],
@@ -20483,16 +20569,16 @@
           "settings"
         ],
         "summary": "Delete an entity category",
-        "description": "Delete an entity category by integer ID.\n\n    Returns 409 Conflict if the category has one or more artifact\n    associations (i.e. artifacts are still tagged with this category).\n    Disassociate all artifacts first, then retry.",
-        "operationId": "delete_entity_category_api_v1_settings_entity_categories__category_id__delete",
+        "description": "Delete an entity category by slug.\n\n    Returns 404 if no category with the given slug exists.\n    Returns 409 Conflict if the category has one or more artifact\n    associations (i.e. artifacts are still tagged with this category).\n    Disassociate all artifacts first, then retry.",
+        "operationId": "delete_entity_category_api_v1_settings_entity_categories__category_slug__delete",
         "parameters": [
           {
-            "name": "category_id",
+            "name": "category_slug",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "title": "Category Id"
+              "type": "string",
+              "title": "Category Slug"
             }
           }
         ],
@@ -22020,6 +22106,49 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Create Workflow Api V1 Workflows Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/batch/delete": {
+      "post": {
+        "tags": [
+          "workflows",
+          "workflows"
+        ],
+        "summary": "Batch delete workflows",
+        "description": "Delete multiple workflows in a single request. Returns per-item success/failure results rather than failing the whole request on partial errors.",
+        "operationId": "batch_delete_workflows_api_v1_workflows_batch_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDeleteResponse"
                 }
               }
             }
@@ -26056,6 +26185,82 @@
           ],
           "source_id": "src_anthropics_skills"
         }
+      },
+      "BatchDeleteRequest": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "BatchDeleteRequest",
+        "description": "Request body for a batch delete operation."
+      },
+      "BatchDeleteResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/BatchDeleteResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "succeeded": {
+            "type": "integer",
+            "title": "Succeeded"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "succeeded",
+          "failed"
+        ],
+        "title": "BatchDeleteResponse",
+        "description": "Response body for a batch delete operation."
+      },
+      "BatchDeleteResult": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "success"
+        ],
+        "title": "BatchDeleteResult",
+        "description": "Per-item result within a batch delete response."
       },
       "BatchDeployRequest": {
         "properties": {

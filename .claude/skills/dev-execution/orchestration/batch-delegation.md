@@ -65,6 +65,39 @@ Update status via artifact-tracker:
 Task("artifact-tracker", "Update ${PRD_NAME} phase ${phase_num}: Mark TASK-1.1 completed with commit abc1234")
 ```
 
+## File Contention Rules
+
+When multiple agents edit files in parallel, file ownership conflicts cause merge failures or subtle bugs.
+
+**Rule: Group batch tasks by file ownership, not by semantic meaning.**
+
+| Pattern | Risk | Recommendation |
+|---------|------|----------------|
+| 2+ agents editing same file, different sections | Medium — git may merge cleanly, but ordering is fragile | Assign all edits for one file to a single agent |
+| 2+ agents editing same file, same class | High — near-certain conflict | Never do this; combine into one task |
+| 1 agent per file | Safe | Preferred pattern |
+| Agent creates a new file | Safe | Ideal for factories, new modules |
+
+**When planning batches:**
+1. Map each task to its target file(s)
+2. Group tasks that touch the same file into one agent delegation
+3. If a batch has 9 tasks across 3 files, use 3 agents (one per file), not 9 agents
+4. Foundation classes (base classes, shared types) should always be in a prior batch — never in parallel with their consumers
+
+**Example — wrong vs right grouping:**
+
+```text
+# WRONG: grouped by semantic meaning (3 agents touch enterprise_repositories.py)
+Agent A: lookups (get, get_by_uuid)        → enterprise_repositories.py
+Agent B: writes (create, update, delete)   → enterprise_repositories.py
+Agent C: audit logging                     → enterprise_repositories.py
+
+# RIGHT: grouped by file ownership (1 agent per file)
+Agent A: all ArtifactRepository methods    → enterprise_repositories.py
+Agent B: all CollectionRepository methods  → enterprise_repositories.py (new class at end)
+Agent C: RepositoryFactory                 → repository_factory.py (new file)
+```
+
 ## Token-Efficient Delegation
 
 ### DO

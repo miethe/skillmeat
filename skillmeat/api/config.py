@@ -159,6 +159,17 @@ class APISettings(BaseSettings):
         description="Require bearer token authentication for API routes",
     )
 
+    # Enterprise PAT authentication (ENT-3.4)
+    enterprise_pat_secret: Optional[str] = Field(
+        default=None,
+        description=(
+            "Shared secret used to authenticate enterprise clients via "
+            "``Authorization: Bearer <token>``.  Must be set before the "
+            "enterprise download endpoint will accept requests.  "
+            "Configurable via the SKILLMEAT_ENTERPRISE_PAT_SECRET env var."
+        ),
+    )
+
     # Rate limiting
     rate_limit_enabled: bool = Field(
         default=False,

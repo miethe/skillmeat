@@ -4630,6 +4630,83 @@ def create_db_engine(db_path: Optional[str | Path] = None) -> Engine:
     return engine
 
 
+# ---------------------------------------------------------------------------
+# Environment-based engine factory (ENT-1.9)
+# ---------------------------------------------------------------------------
+
+import logging as _logging
+import os as _os
+import re as _re
+
+_engine_singleton: Optional[Engine] = None
+
+
+def _redact_db_url(url: str) -> str:
+    """Return *url* with the password component replaced by '***'."""
+    return _re.sub(r"(:)[^:@]+(@)", r"\1***\2", url)
+
+
+def get_engine(db_path: Optional[str | Path] = None) -> Engine:
+    """Return a module-level singleton engine, creating it on first call.
+
+    Selection priority (highest → lowest):
+
+    1. ``DATABASE_URL`` environment variable
+    2. ``SKILLMEAT_DATABASE_URL`` environment variable
+    3. Existing SQLite path logic (``db_path`` arg or default
+       ``~/.skillmeat/cache/cache.db``)
+
+    When a PostgreSQL URL is detected (scheme ``postgresql://`` or
+    ``postgresql+psycopg2://``) the engine is created with a connection
+    pool suitable for server workloads.  For all other URLs (SQLite) the
+    existing ``create_db_engine`` path is used unchanged.
+
+    The function is idempotent: subsequent calls return the same engine
+    instance regardless of arguments.
+
+    Args:
+        db_path: Forwarded to ``create_db_engine`` when the SQLite
+                 fallback is used.  Ignored when an env-var URL is set.
+
+    Returns:
+        SQLAlchemy :class:`~sqlalchemy.engine.Engine` instance.
+
+    Example::
+
+        from skillmeat.cache.models import get_engine
+        engine = get_engine()
+    """
+    global _engine_singleton
+    if _engine_singleton is not None:
+        return _engine_singleton
+
+    logger = _logging.getLogger(__name__)
+
+    database_url: Optional[str] = (
+        _os.environ.get("DATABASE_URL")
+        or _os.environ.get("SKILLMEAT_DATABASE_URL")
+    )
+
+    if database_url and (
+        database_url.startswith("postgresql://")
+        or database_url.startswith("postgresql+psycopg2://")
+    ):
+        logger.info("Using PostgreSQL database: %s", _redact_db_url(database_url))
+        _engine_singleton = create_engine(
+            database_url,
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True,
+            connect_args={},
+        )
+    else:
+        # Fall back to the existing SQLite path — behaviour is identical to
+        # before ENT-1.9; no changes to SQLite configuration.
+        _engine_singleton = create_db_engine(db_path)
+
+    return _engine_singleton
+
+
 # Session factory (to be initialized with engine)
 SessionLocal = None
 
@@ -4637,18 +4714,21 @@ SessionLocal = None
 def init_session_factory(db_path: Optional[str | Path] = None) -> None:
     """Initialize the session factory with the given database path.
 
-    This should be called once at application startup to configure
-    the session factory for use throughout the application.
+    When ``DATABASE_URL`` or ``SKILLMEAT_DATABASE_URL`` is set in the
+    environment, the factory is bound to that engine (PostgreSQL or
+    otherwise) instead of the SQLite path.  In all other cases the
+    existing SQLite behaviour is preserved.
 
     Args:
-        db_path: Path to database file. If None, uses default location
+        db_path: Path to database file. Forwarded to ``get_engine`` and
+                 only used when the SQLite fallback is active.
 
     Example:
         >>> from skillmeat.cache.models import init_session_factory
         >>> init_session_factory()  # Initialize with default path
     """
     global SessionLocal
-    engine = create_db_engine(db_path)
+    engine = get_engine(db_path)
     SessionLocal = sessionmaker(
         autocommit=False,
         autoflush=False,

@@ -196,3 +196,11 @@ See `repository-patterns.md` for full detail. Short version:
 - Fix: `_get_db_uuid(id)` / `_get_db_uuid_batch(ids)` methods query `Artifact.uuid` from DB
 - `_artifact_to_dto()` now accepts `db_uuid=` kwarg — DB UUID wins over any FS attribute
 - `get()` → single lookup; `list()`/`search()` → batch lookup; `get_by_uuid()` → DB-first
+
+### SQLAlchemy ORM Comparator Type Cache (test isolation gotcha)
+- Mutating `column.type` on a SQLAlchemy Table column object does NOT update `InstrumentedAttribute.comparator.__dict__['type']`
+- The comparator's `type` is frozen when `configure_mappers()` runs (triggered by first ORM class instantiation)
+- If test module A triggers `configure_mappers()` with `UUID(as_uuid=True)`, then test module B patches `column.type = _UUIDString()`, the comparator still uses `UUID.bind_processor` for WHERE clauses
+- `UUID(as_uuid=True).bind_processor` for SQLite strips hyphens → stored `'uuid-with-hyphens'` vs bound `'uuidnohyphens'` → zero rows returned
+- Fix: after patching table columns, also update `comparator.__dict__['type'] = mapped_col.type` for all ORM model classes
+- File: `skillmeat/cache/tests/test_enterprise_collection_repository.py` → `_patch_enterprise_metadata_for_sqlite()`
