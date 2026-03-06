@@ -1024,6 +1024,11 @@ function CollectionPageContent() {
       if (artifact) {
         setSelectedArtifact(artifact);
         setIsDetailOpen(true);
+      } else {
+        // Artifact not in current page — close modal so URL-based auto-open
+        // can resolve it as infinite scroll loads additional pages.
+        setIsDetailOpen(false);
+        setTimeout(() => setSelectedArtifact(null), 300);
       }
       // Always update URL for deep-link consistency. If artifact wasn't found in the
       // filtered list the auto-open effect will resolve it once data is loaded.
