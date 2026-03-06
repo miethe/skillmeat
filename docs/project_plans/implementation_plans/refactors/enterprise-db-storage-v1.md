@@ -65,9 +65,11 @@ This plan orchestrates the migration of SkillMeat from a filesystem-centric pers
   - Provides abstract repository interfaces (IArtifactRepository, ICollectionRepository, etc.)
   - Provides DI container setup for repository swapping
   - Provides RequestContext with tenant_id field
-- **PRD 2 (AAA & RBAC Foundation)** MUST be complete before Phase 4
-  - Provides AuthContext with tenant_id
-  - Provides multi-tenant scoping mechanisms
+- **PRD 2 (AAA & RBAC Foundation)** required for multi-tenant and CLI auth (Phases 4-5)
+  - Phases 1-3 use single-tenant bootstrap mode (DEFAULT_TENANT_ID from config/env)
+  - Provides real AuthContext with tenant_id for multi-tenant scoping
+  - Provides PAT-based authentication for CLI enterprise mode
+  - NOT a blocker for web app usage in single-tenant enterprise mode
 
 **Layered Sequence (MP Architecture):**
 1. **Database Layer** (Phase 1): PostgreSQL schema with enterprise tables and tenant scoping
@@ -98,8 +100,8 @@ This plan orchestrates the migration of SkillMeat from a filesystem-centric pers
 | 1 | Enterprise Schema & Database Foundation | PRD 1 complete | 2-3 weeks | 18-22 pts | data-layer-expert, backend-architect |
 | 2 | Enterprise Repository Implementation | Phase 1 complete | 2 weeks | 16-20 pts | python-backend-engineer, data-layer-expert |
 | 3 | API Content Delivery Endpoints | Phase 2 complete | 1.5 weeks | 10-12 pts | python-backend-engineer, backend-architect |
-| 4 | CLI Enterprise Mode | Phase 2 complete | 1.5 weeks | 8-10 pts | python-backend-engineer |
-| 5 | Cloud Migration Tooling | Phase 2, 3, 4 | 1.5 weeks | 12-14 pts | python-backend-engineer |
+| 4 | CLI Enterprise Mode | Phase 2 complete, PRD 2 complete | 1.5 weeks | 8-10 pts | python-backend-engineer |
+| 5 | Cloud Migration Tooling | Phase 2, 3, 4, PRD 2 complete | 1.5 weeks | 12-14 pts | python-backend-engineer |
 | 6 | Testing & Validation | Phases 1-5 | 2 weeks | 14-16 pts | python-backend-engineer, data-layer-expert |
 | 7 | Documentation & Deployment | Phases 1-6 | 1 week | 8-10 pts | documentation-writer, api-documenter |
 
@@ -174,6 +176,8 @@ For detailed task breakdowns, acceptance criteria, and subagent assignments, see
 - Content streaming properly chunks large files ✓
 - Version-aware downloads work (with ?version query param) ✓
 - 100% API test coverage with docker-compose PostgreSQL ✓
+- Single-tenant enterprise web app deployable without PRD 2 ✓
+- DEFAULT_TENANT_ID properly configured via env/config ✓
 
 **Phase 4 Complete When:**
 - `skillmeat deploy --enterprise` calls API instead of copying files ✓
@@ -380,6 +384,21 @@ skillmeat/
 - Checksum validation prevents data corruption
 - Rollback capability (create backup manifest) provides safety
 - Preserves local vault for recovery
+
+### AD-6: Single-Tenant Bootstrap Strategy
+
+**Decision**: Phases 1-3 use a `DEFAULT_TENANT_ID` constant (UUID from config/env var) instead of requiring PRD 2's AuthContext. Repositories accept `tenant_id` as a parameter with this default.
+
+**Rationale**: Decouples enterprise DB storage from RBAC timeline. A single-tenant enterprise deployment (web app backed by PostgreSQL) is fully functional after Phase 3. When PRD 2 lands, the constant is swapped for real AuthContext via DI — zero repository code changes needed.
+
+**Trade-offs**:
+- (+) Enterprise web app usable 4-6 weeks earlier
+- (+) Repositories are tenant-aware from day one (future-proof)
+- (+) Clean DI swap when AuthContext arrives
+- (-) Single-tenant mode has no access control — acceptable for initial deployment
+- (-) Must ensure DEFAULT_TENANT_ID is consistent across all services
+
+**Milestone**: After Phase 3 completion, single-tenant enterprise web app is deployable.
 
 ---
 

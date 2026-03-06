@@ -53,7 +53,7 @@ tasks:
     priority: "high"
 
   - id: "ENT-3.4"
-    description: "Implement enterprise authentication middleware validating PAT or Clerk JWT before artifact access (401/403 responses)"
+    description: "Implement enterprise authentication middleware validating PAT or Clerk JWT before artifact access (401/403 responses). Phase 3 bootstrap mode: PAT validation only (no Clerk JWT / AuthContext). Full Clerk JWT support requires PRD 2 (AuthContext)."
     status: "pending"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["ENT-3.2"]
@@ -102,7 +102,7 @@ tasks:
     priority: "high"
 
   - id: "ENT-4.5"
-    description: "Implement --token flag and env var for PAT-based headless auth; store PAT in secure config and send in Authorization header"
+    description: "Implement --token flag and env var for PAT-based headless auth; store PAT in secure config and send in Authorization header. NOTE: Full API authentication (Clerk JWT, RBAC) requires PRD 2 (AuthContext). Phase 4 scope is PAT only."
     status: "pending"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["ENT-4.1"]
@@ -198,7 +198,13 @@ parallelization:
     - "ENT-5.4"
   estimated_total_time: "~4-5 weeks (parallel), ~7-8 weeks (sequential)"
 
-blockers: []
+blockers:
+  - id: "BLOCKER-001"
+    title: "PRD 2 (AuthContext/RBAC) required for full authentication in Phases 3-5"
+    severity: "high"
+    blocking: ["ENT-3.4", "ENT-4.5"]
+    resolution: "Phases 1-3 proceed independently using DEFAULT_TENANT_ID bootstrap and PAT-only auth. Full Clerk JWT / RBAC support in ENT-3.4 and ENT-4.5 gates on PRD 2 completion."
+    created: "2026-03-06"
 
 success_criteria:
   - id: "SC-3.1"

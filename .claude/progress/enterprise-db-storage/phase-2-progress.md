@@ -92,7 +92,7 @@ tasks:
     priority: "high"
 
   - id: "ENT-2.9"
-    description: "Create RepositoryFactory returning Local or Enterprise repo based on config/edition; wire into FastAPI DI"
+    description: "Create RepositoryFactory returning Local or Enterprise repo based on config/edition; wire into FastAPI DI. Uses DEFAULT_TENANT_ID in bootstrap/single-tenant mode; will switch to AuthContext-derived tenant when PRD 2 is available."
     status: "pending"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["ENT-2.1"]

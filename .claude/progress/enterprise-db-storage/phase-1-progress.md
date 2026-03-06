@@ -36,7 +36,7 @@ tasks:
     priority: "critical"
 
   - id: "ENT-1.6"
-    description: "Design tenant scoping strategy: WHERE tenant_id = ? filtering pattern, context propagation, RLS migration path"
+    description: "Design tenant scoping strategy: WHERE tenant_id = ? filtering pattern, context propagation, RLS migration path. Bootstrap strategy uses DEFAULT_TENANT_ID constant (single-tenant mode); no AuthContext dependency in Phase 1."
     status: "pending"
     assigned_to: ["backend-architect"]
     dependencies: ["ENT-1.1"]

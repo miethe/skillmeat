@@ -44,7 +44,7 @@ Phase 2 implements the repository layer for the enterprise edition, fulfilling t
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Assigned To | Dependencies |
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
-| ENT-2.1 | Enterprise repository base class | Create EnterpriseRepositoryBase extending BaseRepository with automatic tenant_id filtering mixin | Base class filters all queries with tenant_id, RequestContext properly threaded, type-safe DDL helpers | 3 | data-layer-expert | Phase 1 complete |
+| ENT-2.1 | Enterprise repository base class | Create EnterpriseRepositoryBase extending BaseRepository with automatic tenant_id filtering; accepts `tenant_id` constructor param defaulting to `DEFAULT_TENANT_ID` | Base class filters all queries with tenant_id; works with DEFAULT_TENANT_ID when AuthContext absent; works with AuthContext.tenant_id when PRD 2 available; type-safe DDL helpers | 3 | data-layer-expert | Phase 1 complete |
 | ENT-2.2 | EnterpriseArtifactRepository: get/get_by_uuid | Implement artifact lookup methods with tenant scoping | get() and get_by_uuid() return ArtifactDTO with automatic WHERE tenant_id filtering, null returns for non-existent | 2 | python-backend-engineer | ENT-2.1 |
 | ENT-2.3 | EnterpriseArtifactRepository: list/search | Implement list() and search_by_tags() with pagination and filtering | list() supports filters dict, offset/limit, sort_by, search_by_tags() uses JSONB operators | 3 | python-backend-engineer | ENT-2.1 |
 | ENT-2.4 | EnterpriseArtifactRepository: create/update | Implement artifact creation and updates with version tracking | create() inserts artifact + initial version, update() creates new version with content_hash | 3 | python-backend-engineer | ENT-2.1 |
@@ -52,7 +52,7 @@ Phase 2 implements the repository layer for the enterprise edition, fulfilling t
 | ENT-2.6 | EnterpriseArtifactRepository: content operations | Implement get_content() and list_versions() for version history | get_content(artifact_id, version_hash?) returns markdown_payload, list_versions() returns all ArtifactVersionDTO | 2 | python-backend-engineer | ENT-2.1 |
 | ENT-2.7 | EnterpriseCollectionRepository: CRUD operations | Implement collection create, read, update, delete with tenant scoping | All methods apply tenant_id filtering, create() handles is_default logic, update() modifies metadata | 3 | python-backend-engineer | ENT-2.1 |
 | ENT-2.8 | EnterpriseCollectionRepository: membership operations | Implement add_artifact(), remove_artifact(), list_artifacts() for collection contents | add_artifact() maintains order_index, remove_artifact() cleans up junction table, list_artifacts() respects order | 2 | python-backend-engineer | ENT-2.1 |
-| ENT-2.9 | Repository DI factory and wiring | Create RepositoryFactory that returns Local or Enterprise repo based on config/edition | Factory checks DATABASE_URL/edition, returns correct implementation, wired in dependencies.py for FastAPI | 3 | python-backend-engineer | ENT-2.1, Phase 1 complete |
+| ENT-2.9 | Repository DI factory and wiring | Create RepositoryFactory that returns Local or Enterprise repo based on config/edition; wires DEFAULT_TENANT_ID in bootstrap mode, swaps to AuthContext.tenant_id when PRD 2 available | Factory checks DATABASE_URL/edition; enterprise repos receive DEFAULT_TENANT_ID in bootstrap mode; switching to multi-tenant is a DI-level change only; wired in dependencies.py for FastAPI | 3 | python-backend-engineer | ENT-2.1, Phase 1 complete |
 | ENT-2.10 | Tenant filtering audit layer | Implement request-scoped logging that logs all queries with tenant_id context | Every repository call logs: operation, table, tenant_id, execution time, used for debugging/auditing | 2 | data-layer-expert | ENT-2.1 |
 | ENT-2.11 | Unit tests: artifact repository | Write unit tests covering all ArtifactRepository methods with mocking | Tests verify: get(), list(), create(), update(), delete(), search() all apply tenant_id filtering, no cross-tenant leakage | 3 | python-backend-engineer | ENT-2.1, ENT-2.2 through ENT-2.6 |
 | ENT-2.12 | Unit tests: collection repository | Write unit tests for CollectionRepository operations | Tests cover: CRUD operations, membership management, order preservation, multi-tenant isolation | 2 | python-backend-engineer | ENT-2.1, ENT-2.7, ENT-2.8 |
@@ -69,52 +69,51 @@ Phase 2 implements the repository layer for the enterprise edition, fulfilling t
 
 **Description:**
 
-Create the base class that all enterprise repositories inherit from, providing automatic tenant_id filtering and RequestContext threading.
+Create the base class that all enterprise repositories inherit from, providing automatic tenant_id filtering. In Phase 2 (single-tenant bootstrap mode), the base class accepts `tenant_id` as a constructor parameter defaulting to `DEFAULT_TENANT_ID`. When PRD 2 lands, the DI container swaps this to `AuthContext.tenant_id` — no changes to the base class or repository implementations are required.
 
 **File:** `skillmeat/cache/repositories/enterprise_base.py`
 
 **Key Features:**
 ```python
+from skillmeat.cache.config import DEFAULT_TENANT_ID
+
 class EnterpriseRepositoryBase(BaseRepository[T]):
     """Base class for enterprise repositories with automatic tenant filtering.
 
-    All queries automatically apply WHERE tenant_id = ctx.tenant_id.
-    This is the security boundary for multi-tenant isolation.
+    All queries automatically apply WHERE tenant_id = self._tenant_id.
+    In single-tenant bootstrap mode, tenant_id defaults to DEFAULT_TENANT_ID.
+    When PRD 2 is available, DI wires AuthContext.tenant_id instead.
     """
 
-    def _apply_tenant_filter(self, query: Select, ctx: RequestContext) -> Select:
-        """Apply tenant_id filter to any query.
+    def __init__(self, session: Session, tenant_id: str = DEFAULT_TENANT_ID):
+        super().__init__(session)
+        self._tenant_id = tenant_id
 
-        Args:
-            query: SQLAlchemy select() statement
-            ctx: RequestContext with tenant_id
+    def _apply_tenant_filter(self, query: Select) -> Select:
+        """Apply tenant_id filter to any query."""
+        return query.where(self.model_class.tenant_id == self._tenant_id)
 
-        Returns:
-            Query with added WHERE tenant_id = ctx.tenant_id clause
-        """
-        if ctx is None or ctx.tenant_id is None:
-            raise ValueError("Enterprise repos require RequestContext with tenant_id")
-        return query.where(self.model_class.tenant_id == ctx.tenant_id)
-
-    def get(self, id: str, ctx: RequestContext) -> DTO | None:
+    def get(self, id: str) -> DTO | None:
         """Get single entity with automatic tenant filtering."""
         query = select(self.model_class).where(self.model_class.id == id)
-        query = self._apply_tenant_filter(query, ctx)
+        query = self._apply_tenant_filter(query)
         return self._execute_query(query)
 ```
 
 **Acceptance Criteria:**
-- Base class properly filters all queries with tenant_id
-- RequestContext is mandatory (raises ValueError if None or missing tenant_id)
-- Tenant filter applied in reverse order: build query, then add tenant filter
+- Base class accepts `tenant_id` as constructor parameter with `DEFAULT_TENANT_ID` as default
+- All queries apply tenant filter automatically via `_apply_tenant_filter()`
+- Works with `DEFAULT_TENANT_ID` when no AuthContext is configured (single-tenant bootstrap)
+- Works with `AuthContext.tenant_id` when PRD 2 is available and DI is updated
+- Tenant filter applied after main WHERE clauses (allows query optimizer to use indexes)
 - Type-safe DDL helpers (ORM-compatible, no raw SQL)
-- Proper error handling for multi-tenant violations
 - Inherits from BaseRepository to reuse session management
+- Logging at repository level tracks all tenant filtering
 
 **Design Notes:**
-- Tenant filter is applied AFTER main WHERE clauses (allows query optimizer to use indexes effectively)
-- RequestContext is not optional for enterprise repos (enforces security boundary)
-- Logging at repository level tracks all tenant filtering
+- `tenant_id` constructor param enables DI-level swapping without changing repo code
+- Single-tenant bootstrap: `DEFAULT_TENANT_ID` is wired at factory level (ENT-2.9)
+- Multi-tenant upgrade path: DI factory reads `AuthContext.tenant_id` and passes to constructor
 
 ---
 
@@ -478,28 +477,40 @@ def reorder_artifacts(
 
 **Description:**
 
-Create a factory that returns the correct repository implementation (Local or Enterprise) based on configuration.
+Create a factory that returns the correct repository implementation (Local or Enterprise) based on configuration. In single-tenant bootstrap mode (Phases 1-3), the factory wires `DEFAULT_TENANT_ID` into all enterprise repositories. When PRD 2 is available, the factory is updated to read `AuthContext.tenant_id` from the request context — this is a config-level change only; no changes to repository implementations are required.
 
 **File:** `skillmeat/cache/repositories/enterprise_factory.py`
 
 **Key Features:**
 ```python
+from skillmeat.cache.config import DEFAULT_TENANT_ID
+
 class RepositoryFactory:
     """Factory for repository implementations.
 
     Returns Local or Enterprise repositories based on edition/database configuration.
+
+    Bootstrap mode (Phases 1-3): Enterprise repos receive DEFAULT_TENANT_ID.
+    Multi-tenant mode (Phase 4+ / PRD 2): Enterprise repos receive AuthContext.tenant_id.
+    Switching between modes is a DI-level change only.
     """
 
     @staticmethod
-    def create_artifact_repository(config: ConfigManager) -> IArtifactRepository:
+    def create_artifact_repository(
+        config: ConfigManager,
+        tenant_id: str = DEFAULT_TENANT_ID,  # Overridden by PRD 2 AuthContext
+    ) -> IArtifactRepository:
         """Return appropriate artifact repository.
 
-        If DATABASE_URL set → EnterpriseArtifactRepository
+        If DATABASE_URL set → EnterpriseArtifactRepository(tenant_id=tenant_id)
         Otherwise → LocalFileSystemRepository
         """
 
     @staticmethod
-    def create_collection_repository(config: ConfigManager) -> ICollectionRepository:
+    def create_collection_repository(
+        config: ConfigManager,
+        tenant_id: str = DEFAULT_TENANT_ID,
+    ) -> ICollectionRepository:
         """Return appropriate collection repository."""
 ```
 
@@ -514,9 +525,10 @@ def get_repository_factory(config: ConfigManager = Depends(get_config)) -> Repos
 ArtifactRepositoryDep = Annotated[
     IArtifactRepository,
     Depends(lambda factory: factory.create_artifact_repository())
+    # Phase 4 / PRD 2: pass tenant_id=auth_context.tenant_id here
 ]
 
-# Usage in routers:
+# Usage in routers (unchanged between bootstrap and multi-tenant modes):
 @router.get("/artifacts/{id}")
 async def get_artifact(
     id: str,
@@ -527,10 +539,12 @@ async def get_artifact(
 
 **Acceptance Criteria:**
 - Factory returns LocalFileSystemRepository by default
-- Returns EnterpriseArtifactRepository when DATABASE_URL set
-- DI wiring allows seamless backend swapping
-- No changes to router code needed for backend switching
-- Logging indicates which backend is active at startup
+- Returns EnterpriseArtifactRepository (with `DEFAULT_TENANT_ID`) when DATABASE_URL set
+- Repository works with `DEFAULT_TENANT_ID` when AuthContext is not configured (bootstrap mode)
+- Repository works with `AuthContext.tenant_id` when PRD 2 is available (pass via `tenant_id` param)
+- DI wiring allows seamless backend swapping with no router code changes
+- Switching from bootstrap → multi-tenant is a DI-level change only (no repo changes)
+- Logging indicates which backend and tenant mode is active at startup
 
 ---
 
@@ -781,6 +795,8 @@ def test_multitenancy_overhead(benchmark):
 - Phase 1 schema migrations tested and merged
 - PRD 1 repository interfaces finalized
 - Python-backend-engineer and data-layer-expert available
+
+**Note: PRD 2 (AuthContext / Multi-Tenancy) is NOT required for Phase 2.** Repositories use `DEFAULT_TENANT_ID` in constructor injection. PRD 2 only affects the DI wiring layer when real per-user tenancy is needed.
 
 **Blocking on:**
 - Phase 1 completion (schema must exist before repos)

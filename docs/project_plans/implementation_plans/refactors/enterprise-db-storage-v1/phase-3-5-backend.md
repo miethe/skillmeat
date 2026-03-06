@@ -14,6 +14,7 @@ entry_criteria:
   - "Phase 2 (Repositories) 100% complete"
   - "All repository implementations tested and reviewed"
   - "Python-backend-engineer available for all three phases"
+  - "**Phase 4 and 5 additionally require PRD 2 (AuthContext/RBAC) to be approved and in-progress**"
 exit_criteria:
   - "API content delivery endpoint complete and tested"
   - "CLI enterprise mode fully functional"
@@ -35,6 +36,8 @@ This consolidated phase document covers the three parallel backend implementatio
 
 Phase 3 implements the API endpoints that serve artifact content to CLI users in enterprise mode. The core endpoint `GET /api/v1/artifacts/{id}/download` returns a JSON payload with file tree and content.
 
+> **Single-Tenant Bootstrap Mode**: Phase 3 does NOT require PRD 2 (AuthContext/RBAC). All API endpoints operate using `DEFAULT_TENANT_ID` in bootstrap mode — no authentication middleware is required because single-tenant deployments are trusted-network deployments. After Phase 3 completes, the web app is fully functional with the enterprise DB backend. Authentication middleware (ENT-3.4) is scaffolded in Phase 3 but only enforced once PRD 2 provides the auth infrastructure.
+
 **Duration:** 1.5 weeks | **Effort:** 10-12 story points
 
 ### Task Breakdown
@@ -44,7 +47,7 @@ Phase 3 implements the API endpoints that serve artifact content to CLI users in
 | ENT-3.1 | Content delivery service | Create enterprise_content.py service for streaming artifact payloads | Service builds file tree + contents JSON, handles versioning, gzip compression | 3 | Phase 2 |
 | ENT-3.2 | GET /api/v1/artifacts/{id}/download endpoint | Implement content download router | Returns JSON: {artifact_id, files[], metadata} | 3 | ENT-3.1 |
 | ENT-3.3 | Version-aware download (?version query param) | Support pinning to specific content_hash or version_label | ?version=sha256:abc or ?version=v1.0 | 2 | ENT-3.2 |
-| ENT-3.4 | Enterprise authentication middleware | Validate PAT or Clerk JWT before artifact access | 401 for invalid auth, 403 for wrong tenant | 2 | Phase 2 |
+| ENT-3.4 | Enterprise authentication middleware (scaffold) | Scaffold auth middleware stub; uses DEFAULT_TENANT_ID in bootstrap mode | Stub passes all requests in single-tenant mode; enforces PAT/Clerk JWT when PRD 2 AuthContext is available | 2 | Phase 2 |
 | ENT-3.5 | Content delivery tests | Unit + integration tests for download endpoint | Tests verify: file tree structure, versioning, tenant isolation | 2 | ENT-3.1 through ENT-3.4 |
 
 **Total: 10-12 story points**
@@ -105,6 +108,7 @@ Phase 3 implements the API endpoints that serve artifact content to CLI users in
 - [ ] Tenant isolation enforced (403 for wrong tenant)
 - [ ] Performance: <200ms response time for typical artifacts
 - [ ] Tests pass with docker-compose PostgreSQL
+- [ ] **Web app fully functional in single-tenant enterprise mode after Phase 3** (no PRD 2 required)
 
 ---
 
@@ -114,6 +118,8 @@ Phase 3 implements the API endpoints that serve artifact content to CLI users in
 
 Phase 4 updates the SkillMeat CLI to work in enterprise mode, using the API for deployment and sync instead of local filesystem operations.
 
+> **Requires PRD 2 (AuthContext/RBAC)**: Phase 4 depends on PAT-based authentication infrastructure that PRD 2 provides. Tasks ENT-4.3 through ENT-4.5 (enterprise deploy, sync, and PAT auth) are blocked until PRD 2 is approved and its auth infrastructure is available. ENT-4.1 and ENT-4.2 (config/env detection) can proceed independently.
+
 **Duration:** 1.5 weeks | **Effort:** 8-10 story points
 
 ### Task Breakdown
@@ -122,9 +128,9 @@ Phase 4 updates the SkillMeat CLI to work in enterprise mode, using the API for 
 |---------|-----------|-------------|-------------------|----------|---|
 | ENT-4.1 | Enterprise config and env detection | Add SKILLMEAT_EDITION, SKILLMEAT_API_URL, SKILLMEAT_PAT env vars | Config loads from env, logs edition (local or enterprise) at startup | 2 | Phase 2 |
 | ENT-4.2 | Enterprise mode CLI detection | Update CLI to detect enterprise mode and route commands appropriately | `skillmeat deploy` uses LocalFileSystemRepository in local mode, API in enterprise | 2 | ENT-4.1 |
-| ENT-4.3 | skillmeat deploy --enterprise | Implement API-based deployment (calls GET /api/v1/artifacts/{id}/download) | Deploy pulls artifact from API, materializes to ./.claude/, updates deployed.toml | 3 | ENT-3.2, ENT-4.1 |
-| ENT-4.4 | skillmeat sync --enterprise | Implement API-based sync (polls API for latest content) | Sync checks for updates via API, compares content_hash, updates if changed | 2 | ENT-3.2, ENT-4.1 |
-| ENT-4.5 | PAT-based authentication | Implement --token flag and env var for headless auth | CLI stores PAT in secure config, sends in Authorization header | 1 | ENT-4.1 |
+| ENT-4.3 | skillmeat deploy --enterprise | Implement API-based deployment (calls GET /api/v1/artifacts/{id}/download) | Deploy pulls artifact from API, materializes to ./.claude/, updates deployed.toml | 3 | ENT-3.2, ENT-4.1, **PRD 2** |
+| ENT-4.4 | skillmeat sync --enterprise | Implement API-based sync (polls API for latest content) | Sync checks for updates via API, compares content_hash, updates if changed | 2 | ENT-3.2, ENT-4.1, **PRD 2** |
+| ENT-4.5 | PAT-based authentication | Implement --token flag and env var for headless auth — **Blocked until PRD 2 provides authentication infrastructure** | CLI stores PAT in secure config, sends in Authorization header | 1 | ENT-4.1, **PRD 2** |
 | ENT-4.6 | Enterprise mode CLI tests | Unit + E2E tests for enterprise deploy/sync | Tests verify: API calls made, files materialized, deployed.toml updated | 2 | ENT-4.3, ENT-4.4 |
 
 **Total: 8-10 story points**
@@ -174,13 +180,15 @@ SKILLMEAT_GITHUB_TOKEN=ghp_xxxxx...   # Still used for GitHub API
 
 Phase 5 implements the `skillmeat enterprise migrate` command for users to upload their local filesystem vault to the cloud database.
 
+> **PRD 2 dependency**: Migration via the API (`POST /api/v1/artifacts/{id}/upload`) requires authenticated endpoints that PRD 2 provides. If PRD 2 is delayed, migration can alternatively be performed via direct DB connection (bypassing API auth entirely, writing to PostgreSQL directly through `EnterpriseDBRepository`). This direct-DB path is viable as a temporary fallback but is **not recommended for production** — it bypasses tenant validation and audit logging. The default implementation targets API-based migration assuming PRD 2 is available.
+
 **Duration:** 1.5 weeks | **Effort:** 12-14 story points
 
 ### Task Breakdown
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Dependencies |
 |---------|-----------|-------------|-------------------|----------|---|
-| ENT-5.1 | Migration service | Create service to read from LocalFileSystemRepository and write to API | Service iterates local artifacts, computes checksums, posts to API | 3 | Phase 2, Phase 3 |
+| ENT-5.1 | Migration service | Create service to read from LocalFileSystemRepository and write to API — requires authenticated upload endpoint (**PRD 2**); direct-DB fallback available if PRD 2 delayed (not for production) | Service iterates local artifacts, computes checksums, posts to API | 3 | Phase 2, Phase 3, **PRD 2** |
 | ENT-5.2 | skillmeat enterprise migrate command | Implement CLI command with --dry-run and --force | Shows what would migrate, asks confirmation, executes migration | 3 | ENT-5.1 |
 | ENT-5.3 | Migration checksum validation | Verify uploaded artifacts match local originals (SHA256 comparison) | Migration aborts if checksum mismatch, detailed error reporting | 2 | ENT-5.1 |
 | ENT-5.4 | Migration rollback support | Create backup manifest and rollback command | Migration creates .skillmeat-migration-backup.toml, rollback restores it | 3 | ENT-5.2 |

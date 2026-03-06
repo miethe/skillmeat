@@ -252,19 +252,25 @@ CREATE TABLE enterprise_collection_artifacts (
 
 Document the application-enforced multi-tenant filtering strategy. This is critical for security and serves as implementation guidance for Phase 2 repositories.
 
+**Single-Tenant Bootstrap**: In Phases 1-3, all `tenant_id` columns are populated from `DEFAULT_TENANT_ID` — a UUID constant read from the `SKILLMEAT_DEFAULT_TENANT_ID` env var (or a hardcoded fallback in config). The schema is designed for multi-tenancy but operates in single-tenant mode until PRD 2's AuthContext is available. This means Phase 1 can be implemented and tested without PRD 2.
+
 **Key Sections:**
 1. Filtering Pattern: WHERE tenant_id = ? in all queries
-2. RequestContext Threading: How tenant_id flows from API → repository methods
-3. Repository Enforcement: Automatic filtering in all CRUD operations
-4. Query Construction: Examples of tenant-safe queries
-5. Testing Strategy: How to test multi-tenant isolation (negative tests)
-6. Future RLS: Migration path if we adopt PostgreSQL RLS later
+2. Bootstrap Mode: DEFAULT_TENANT_ID used when AuthContext is absent (Phases 1-3)
+3. RequestContext Threading: How tenant_id flows from API → repository methods (Phase 4+, PRD 2)
+4. Repository Enforcement: Automatic filtering in all CRUD operations
+5. Query Construction: Examples of tenant-safe queries
+6. Testing Strategy: How to test multi-tenant isolation (negative tests)
+7. Future RLS: Migration path if we adopt PostgreSQL RLS later
 
 **Acceptance Criteria:**
 - Strategy document written and approved by backend-architect
+- `DEFAULT_TENANT_ID` constant defined in config, readable from `SKILLMEAT_DEFAULT_TENANT_ID` env var
+- `DEFAULT_TENANT_ID` populates all `tenant_id` columns when AuthContext is absent
 - Includes code examples for correct and incorrect query patterns
 - Documents why application-enforced (vs database RLS) for this phase
 - Includes migration path to RLS for future phases
+- Documents upgrade path: single-tenant (DEFAULT_TENANT_ID) → multi-tenant (AuthContext.tenant_id) when PRD 2 lands
 - Embedded as comments in ENT-1.7 migration
 
 **Example Query Pattern:**
@@ -588,12 +594,20 @@ Verify that all Alembic migrations can be safely reversed without data loss or c
 - PostgreSQL development instance available
 - Data-layer-expert and backend-architect available full-time
 
+**Note: PRD 2 (AuthContext / Multi-Tenancy) is NOT required for Phase 1.** Phase 1 operates in single-tenant bootstrap mode using `DEFAULT_TENANT_ID`. PRD 2 is only needed when real per-user tenant isolation is introduced (Phase 4+).
+
 **Blocking on:**
 - PRD 1 completion (repository interfaces that Phase 2 will implement)
 
 **Exit Blockers for Phase 2:**
 - If any migration fails, Phase 2 cannot begin
 - If tenant isolation tests fail, Phase 2 must restart design
+
+---
+
+## Architectural Notes
+
+**Single-Tenant Bootstrap**: All `tenant_id` columns default to `DEFAULT_TENANT_ID` (configured via `SKILLMEAT_DEFAULT_TENANT_ID` env var or config). This enables the full enterprise schema to be implemented, tested, and deployed without requiring PRD 2's AuthContext. When PRD 2 lands, the DI layer substitutes `AuthContext.tenant_id` for `DEFAULT_TENANT_ID` — no schema changes required.
 
 ---
 
