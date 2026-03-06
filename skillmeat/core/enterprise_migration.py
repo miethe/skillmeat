@@ -27,7 +27,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional, Set
 
 import requests
 
@@ -38,6 +38,8 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "ArtifactMigrationResult",
+    "BackupArtifactEntry",
+    "BackupManifest",
     "ChecksumMismatch",
     "ChecksumValidationResult",
     "MigrationResult",
@@ -119,6 +121,42 @@ class MigrationResult:
     results: List[ArtifactMigrationResult]
 
 
+@dataclass
+class BackupArtifactEntry:
+    """Record of a single artifact captured in the pre-migration backup.
+
+    Attributes:
+        name: Artifact name (directory name under ``artifacts/``).
+        artifact_type: Inferred artifact type string (e.g. ``"skill"``).
+        path: Relative POSIX path of the artifact directory from the
+            collection root (e.g. ``"artifacts/my-skill"``).
+        files: Sorted list of relative POSIX file paths within the artifact.
+        content_hashes: Mapping of relative path → SHA-256 hex digest for
+            every file in the artifact at backup time.
+    """
+
+    name: str
+    artifact_type: str
+    path: str
+    files: List[str]
+    content_hashes: Dict[str, str]
+
+
+@dataclass
+class BackupManifest:
+    """Pre-migration backup manifest.
+
+    Attributes:
+        created_at: ISO-8601 UTC timestamp when the backup was created.
+        collection_dir: Absolute path to the collection directory.
+        artifacts: One entry per artifact captured in the backup.
+    """
+
+    created_at: str
+    collection_dir: str
+    artifacts: List[BackupArtifactEntry]
+
+
 # ---------------------------------------------------------------------------
 # Upload endpoint
 # ---------------------------------------------------------------------------
@@ -136,6 +174,9 @@ _MAX_RETRIES: int = 3
 
 # State file name written inside the collection dir.
 _STATE_FILENAME = ".skillmeat-migration-state.toml"
+
+# Backup manifest file name written inside the collection dir before migration.
+_BACKUP_FILENAME = ".skillmeat-migration-backup.toml"
 
 # Error log file name written inside the collection dir on failures.
 _ERROR_LOG_FILENAME = "migration-errors.log"
@@ -392,6 +433,98 @@ def _append_artifact_done(state_path: Path, name: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Backup helpers
+# ---------------------------------------------------------------------------
+
+
+def _write_backup_manifest(backup_path: Path, manifest: "BackupManifest") -> None:
+    """Serialise *manifest* to a TOML file at *backup_path*.
+
+    Produces the following structure::
+
+        [backup]
+        created_at = "2026-03-06T..."
+        collection_dir = "/absolute/path"
+
+        [[artifacts]]
+        name = "my-skill"
+        type = "skill"
+        path = "artifacts/my-skill"
+        files = ["SKILL.md", "README.md"]
+
+        [artifacts.content_hashes]
+        "SKILL.md" = "abc123..."
+        "README.md" = "def456..."
+
+    Args:
+        backup_path: Destination path for the backup manifest.
+        manifest: Populated :class:`BackupManifest` to write.
+    """
+    lines: List[str] = [
+        "[backup]",
+        f'created_at = "{manifest.created_at}"',
+        f'collection_dir = "{manifest.collection_dir}"',
+    ]
+    for entry in manifest.artifacts:
+        lines.append("")
+        lines.append("[[artifacts]]")
+        lines.append(f'name = "{entry.name}"')
+        lines.append(f'type = "{entry.artifact_type}"')
+        lines.append(f'path = "{entry.path}"')
+        # Inline array of quoted file names.
+        files_inline = ", ".join(f'"{f}"' for f in entry.files)
+        lines.append(f"files = [{files_inline}]")
+        lines.append("[artifacts.content_hashes]")
+        for rel_path, digest in sorted(entry.content_hashes.items()):
+            lines.append(f'"{rel_path}" = "{digest}"')
+    backup_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _read_backup_manifest(backup_path: Path) -> Optional["BackupManifest"]:
+    """Parse the backup manifest at *backup_path*.
+
+    Returns ``None`` when the file does not exist or cannot be parsed.
+
+    Args:
+        backup_path: Path to ``.skillmeat-migration-backup.toml``.
+
+    Returns:
+        :class:`BackupManifest` on success, ``None`` on failure.
+    """
+    if not backup_path.exists():
+        return None
+    try:
+        import sys
+        if sys.version_info >= (3, 11):
+            import tomllib
+        else:
+            import tomli as tomllib  # type: ignore[no-redef]
+        data = tomllib.loads(backup_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.debug("Could not parse backup manifest %s: %s", backup_path, exc)
+        return None
+
+    backup_section = data.get("backup", {})
+    raw_artifacts = data.get("artifacts", [])
+    entries: List[BackupArtifactEntry] = []
+    for item in raw_artifacts:
+        entries.append(
+            BackupArtifactEntry(
+                name=item.get("name", ""),
+                artifact_type=item.get("type", "unknown"),
+                path=item.get("path", ""),
+                files=list(item.get("files", [])),
+                content_hashes=dict(item.get("content_hashes", {})),
+            )
+        )
+    return BackupManifest(
+        created_at=backup_section.get("created_at", ""),
+        collection_dir=backup_section.get("collection_dir", ""),
+        artifacts=entries,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Error log helpers
 # ---------------------------------------------------------------------------
 
@@ -522,11 +655,92 @@ class EnterpriseMigrationService:
         result = svc.migrate_all(collection_dir, dry_run=False)
     """
 
+    def create_backup(self, collection_dir: Path) -> Path:
+        """Create a pre-migration backup manifest and return its path.
+
+        Walks every artifact directory under ``collection_dir/artifacts/``,
+        computes a SHA-256 hash for each file, and writes the results to
+        ``{collection_dir}/.skillmeat-migration-backup.toml``.
+
+        The backup records the pre-migration state so that
+        ``skillmeat enterprise rollback`` can verify that local files have not
+        drifted after a migration.
+
+        Args:
+            collection_dir: Absolute path to the root of the local SkillMeat
+                collection (the directory that contains ``manifest.toml`` and
+                ``artifacts/``).
+
+        Returns:
+            Path to the written backup manifest file.
+
+        Raises:
+            OSError: If the backup manifest cannot be written.
+        """
+        backup_path = collection_dir / _BACKUP_FILENAME
+        artifacts_dir = collection_dir / "artifacts"
+
+        entries: List[BackupArtifactEntry] = []
+
+        if artifacts_dir.is_dir():
+            for artifact_path in sorted(
+                p for p in artifacts_dir.iterdir() if p.is_dir()
+            ):
+                rel_artifact = artifact_path.relative_to(collection_dir).as_posix()
+                artifact_type = _infer_artifact_type(artifact_path)
+                content_hashes: Dict[str, str] = {}
+
+                for dirpath, dirnames, filenames in os.walk(
+                    artifact_path, followlinks=True
+                ):
+                    dirnames[:] = sorted(d for d in dirnames if not _is_excluded(d))
+                    for filename in sorted(filenames):
+                        if _is_excluded(filename):
+                            continue
+                        full_path = Path(dirpath) / filename
+                        try:
+                            if not full_path.is_file():
+                                continue
+                            rel_file = full_path.relative_to(artifact_path).as_posix()
+                            content_hashes[rel_file] = _sha256_file(full_path)
+                        except (OSError, PermissionError) as exc:
+                            logger.warning(
+                                "Skipping unreadable file %s during backup: %s",
+                                full_path,
+                                exc,
+                            )
+
+                entries.append(
+                    BackupArtifactEntry(
+                        name=artifact_path.name,
+                        artifact_type=artifact_type,
+                        path=rel_artifact,
+                        files=sorted(content_hashes.keys()),
+                        content_hashes=content_hashes,
+                    )
+                )
+
+        manifest = BackupManifest(
+            created_at=_now_iso(),
+            collection_dir=str(collection_dir.resolve()),
+            artifacts=entries,
+        )
+        _write_backup_manifest(backup_path, manifest)
+        logger.info(
+            "Backup manifest written to %s (%d artifact(s))",
+            backup_path,
+            len(entries),
+        )
+        return backup_path
+
     def migrate_all(
         self,
         collection_dir: Path,
         dry_run: bool = False,
         resume: bool = False,
+        progress_callback: Optional[
+            Callable[["ArtifactMigrationResult", int, int], None]
+        ] = None,
     ) -> MigrationResult:
         """Migrate every artifact found under *collection_dir/artifacts/*.
 
@@ -558,6 +772,11 @@ class EnterpriseMigrationService:
                 and previews what would be uploaded.
             resume: When True and a previous in-progress state file exists,
                 skip artifacts already marked as done.
+            progress_callback: Optional callable invoked after each artifact
+                completes (whether success, failure, or skip).  Receives
+                ``(artifact_result, completed_count, total_count)`` where
+                *completed_count* is the 1-based index of the artifact just
+                processed.
 
         Returns:
             :class:`MigrationResult` with counts and per-artifact details.
@@ -618,6 +837,17 @@ class EnterpriseMigrationService:
             except Exception as exc:
                 logger.warning("Could not write migration state file: %s", exc)
 
+        # --- Create backup manifest (before any uploads) ----------------------
+        if not dry_run:
+            try:
+                backup_path = self.create_backup(collection_dir)
+                logger.info("Pre-migration backup created at %s", backup_path)
+            except Exception as exc:
+                logger.warning(
+                    "Could not create pre-migration backup: %s — continuing anyway.",
+                    exc,
+                )
+
         logger.info(
             "Starting migration of %d artifact(s) from %s (dry_run=%s, resume=%s)",
             len(artifact_dirs),
@@ -640,15 +870,16 @@ class EnterpriseMigrationService:
             if artifact_name in already_done:
                 skipped += 1
                 logger.debug("Skipping already-completed artifact: %s", artifact_name)
-                results.append(
-                    ArtifactMigrationResult(
-                        name=artifact_name,
-                        success=True,
-                        dry_run=dry_run,
-                        files_count=0,
-                        total_bytes=0,
-                    )
+                skipped_result = ArtifactMigrationResult(
+                    name=artifact_name,
+                    success=True,
+                    dry_run=dry_run,
+                    files_count=0,
+                    total_bytes=0,
                 )
+                results.append(skipped_result)
+                if progress_callback is not None:
+                    progress_callback(skipped_result, len(results), total)
                 continue
 
             result = self.migrate_one(artifact_path, dry_run=dry_run)
@@ -672,6 +903,9 @@ class EnterpriseMigrationService:
                     _append_error_log(
                         error_log_path, artifact_name, result.error or "unknown error"
                     )
+
+            if progress_callback is not None:
+                progress_callback(result, len(results), total)
 
         # --- Update final state -----------------------------------------------
         final_status = "completed" if failed == 0 else "partial_failure"

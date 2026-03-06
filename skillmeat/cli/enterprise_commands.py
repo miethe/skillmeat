@@ -23,16 +23,22 @@ from typing import Dict, List, Optional
 
 import click
 from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 from rich.prompt import Confirm
 from rich.table import Table
 
 from skillmeat.core.enterprise_config import is_enterprise_mode
 from skillmeat.core.enterprise_migration import (
     ArtifactMigrationResult,
+    BackupArtifactEntry,
+    BackupManifest,
     ChecksumMismatch,
     ChecksumValidationResult,
     EnterpriseMigrationService,
     MigrationResult,
+    _BACKUP_FILENAME,
+    _read_backup_manifest,
+    _sha256_file,
 )
 from skillmeat.core.hashing import _is_excluded
 
@@ -245,15 +251,52 @@ def migrate(
             sys.exit(0)
 
     # ------------------------------------------------------------------
-    # 5. Run migration
+    # 5. Run migration with progress bar
     # ------------------------------------------------------------------
     svc = EnterpriseMigrationService()
 
-    with console.status(
-        "[bold green]Migrating artifacts…[/bold green]",
-        spinner="dots",
-    ):
-        result: MigrationResult = svc.migrate_all(resolved_dir, dry_run=dry_run)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TextColumn("{task.completed}/{task.total}"),
+        console=console,
+        transient=False,
+    ) as progress:
+        task_id = progress.add_task(
+            "Migrating artifacts...",
+            total=artifact_count or 1,
+        )
+
+        def _on_artifact_done(
+            r: ArtifactMigrationResult,
+            completed: int,
+            total_count: int,
+        ) -> None:
+            """Update progress bar and print a one-liner result after each artifact."""
+            progress.update(
+                task_id,
+                completed=completed,
+                total=total_count,
+                description=f"Migrating [bold]{r.name}[/bold]...",
+            )
+            status_str = _status_cell(r)
+            size_str = _format_bytes(r.total_bytes) if r.total_bytes else "-"
+            err_suffix = f"  [red]{r.error}[/red]" if r.error else ""
+            progress.console.print(
+                f"  {status_str} [dim]{r.name}[/dim]"
+                f" ({r.files_count} file(s), {size_str})"
+                f"{err_suffix}"
+            )
+
+        result: MigrationResult = svc.migrate_all(
+            resolved_dir,
+            dry_run=dry_run,
+            progress_callback=_on_artifact_done,
+        )
+
+        progress.update(task_id, description="Migration complete")
 
     # ------------------------------------------------------------------
     # 6. Print results table
@@ -511,3 +554,177 @@ def verify(
             f"'{artifact_name}'[/red]"
         )
         sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# rollback sub-command
+# ---------------------------------------------------------------------------
+
+
+def _check_artifact_against_backup(
+    collection_dir: Path,
+    entry: BackupArtifactEntry,
+) -> List[str]:
+    """Compare current local files for *entry* against the backup hashes.
+
+    Args:
+        collection_dir: Root of the local SkillMeat collection.
+        entry: Backup record for a single artifact.
+
+    Returns:
+        List of human-readable mismatch strings (empty when all files match).
+    """
+    artifact_path = collection_dir / entry.path
+    mismatches: List[str] = []
+
+    if not artifact_path.is_dir():
+        mismatches.append(
+            f"  [red]MISSING[/red] artifact directory: {artifact_path}"
+        )
+        return mismatches
+
+    for rel_file, expected_hash in sorted(entry.content_hashes.items()):
+        full_path = artifact_path / rel_file
+        if not full_path.exists():
+            mismatches.append(f"  [red]MISSING[/red]  {rel_file}")
+            continue
+        try:
+            actual_hash = _sha256_file(full_path)
+        except (OSError, PermissionError) as exc:
+            mismatches.append(f"  [red]UNREADABLE[/red] {rel_file}: {exc}")
+            continue
+        if actual_hash != expected_hash:
+            mismatches.append(
+                f"  [red]CHANGED[/red]   {rel_file}\n"
+                f"             expected: {expected_hash[:16]}...\n"
+                f"             current:  {actual_hash[:16]}..."
+            )
+
+    return mismatches
+
+
+@enterprise_cli.command("rollback")
+@click.option(
+    "--collection-dir",
+    "collection_dir",
+    default=None,
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    metavar="PATH",
+    help=(
+        "Root of the local SkillMeat collection "
+        "(default: ~/.skillmeat/collection/)."
+    ),
+)
+@click.option(
+    "--artifact",
+    "artifact_name",
+    default=None,
+    metavar="NAME",
+    help="Restore only the named artifact; default is to check all artifacts.",
+)
+def rollback(
+    collection_dir: Optional[Path],
+    artifact_name: Optional[str],
+) -> None:
+    """Verify local files match the pre-migration backup state.
+
+    Reads the backup manifest created automatically before the last migration
+    and compares each artifact's file hashes against the current local files.
+    Because migration is upload-only (local files are never deleted or
+    modified), this should always succeed.
+
+    If any file has changed since the backup was taken the command prints a
+    diff summary and exits with code 1.  When all files match, the backup
+    manifest is removed to signal that the rollback check is complete.
+
+    Examples:
+
+      skillmeat enterprise rollback
+
+      skillmeat enterprise rollback --artifact my-skill
+
+      skillmeat enterprise rollback --collection-dir /path/to/collection
+    """
+    # ------------------------------------------------------------------
+    # 1. Resolve collection directory
+    # ------------------------------------------------------------------
+    resolved_dir: Path = (collection_dir or _default_collection_dir()).expanduser().resolve()
+
+    if not resolved_dir.exists():
+        console.print(
+            f"[bold red]Error:[/bold red] Collection directory not found: "
+            f"[bold]{resolved_dir}[/bold]"
+        )
+        sys.exit(1)
+
+    # ------------------------------------------------------------------
+    # 2. Load backup manifest
+    # ------------------------------------------------------------------
+    backup_path = resolved_dir / _BACKUP_FILENAME
+    manifest = _read_backup_manifest(backup_path)
+
+    if manifest is None:
+        console.print(
+            f"[bold red]Error:[/bold red] No backup manifest found at "
+            f"[bold]{backup_path}[/bold]. "
+            "Run [bold]skillmeat enterprise migrate[/bold] first to create one."
+        )
+        sys.exit(1)
+
+    console.print(
+        f"[bold]Backup created at:[/bold] {manifest.created_at}  "
+        f"[dim]({len(manifest.artifacts)} artifact(s))[/dim]"
+    )
+
+    # ------------------------------------------------------------------
+    # 3. Filter to requested artifact (if any)
+    # ------------------------------------------------------------------
+    entries_to_check = manifest.artifacts
+    if artifact_name is not None:
+        entries_to_check = [e for e in manifest.artifacts if e.name == artifact_name]
+        if not entries_to_check:
+            console.print(
+                f"[bold red]Error:[/bold red] Artifact [bold]{artifact_name}[/bold] "
+                "not found in backup manifest."
+            )
+            sys.exit(1)
+
+    # ------------------------------------------------------------------
+    # 4. Validate each artifact
+    # ------------------------------------------------------------------
+    total_mismatches: List[str] = []
+
+    for entry in entries_to_check:
+        artifact_mismatches = _check_artifact_against_backup(resolved_dir, entry)
+        if artifact_mismatches:
+            console.print(f"\n[bold red]✗[/bold red] {entry.name}")
+            for line in artifact_mismatches:
+                console.print(line)
+            total_mismatches.extend(artifact_mismatches)
+        else:
+            console.print(f"[green]✓[/green] {entry.name}")
+
+    # ------------------------------------------------------------------
+    # 5. Report outcome
+    # ------------------------------------------------------------------
+    if total_mismatches:
+        console.print(
+            f"\n[bold red]{len(total_mismatches)} file(s) changed since backup "
+            "— local collection does NOT match pre-migration state.[/bold red]"
+        )
+        console.print(
+            "[dim]The backup manifest has been preserved "
+            f"at {backup_path}[/dim]"
+        )
+        sys.exit(1)
+
+    # All files match — clean up the backup manifest.
+    try:
+        backup_path.unlink()
+    except OSError as exc:
+        logger.warning("Could not remove backup manifest %s: %s", backup_path, exc)
+
+    console.print(
+        "\n[bold green]Rollback complete — local collection matches "
+        "pre-migration state.[/bold green]"
+    )
