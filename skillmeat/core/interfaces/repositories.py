@@ -37,6 +37,8 @@ from typing import Any
 from skillmeat.core.interfaces.context import RequestContext
 from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
+    ArtifactVersionDTO,
+    CacheArtifactSummaryDTO,
     CatalogItemDTO,
     CategoryDTO,
     CollectionArtifactDTO,
@@ -68,6 +70,7 @@ __all__ = [
     "IMarketplaceSourceRepository",
     "IProjectTemplateRepository",
     "IDbCollectionArtifactRepository",
+    "IDbArtifactHistoryRepository",
 ]
 
 
@@ -3252,6 +3255,189 @@ class IDbCollectionArtifactRepository(abc.ABC):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def resolve_uuid_to_id_batch(
+        self,
+        uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> dict[str, str]:
+        """Batch-resolve artifact UUIDs to ``type:name`` ID strings.
+
+        Executes a single query against the ``artifacts`` table and returns a
+        mapping from 32-char hex UUID to the corresponding ``type:name`` ID
+        string for every UUID in *uuids* that exists in the database.
+
+        Args:
+            uuids: List of 32-char hex UUID strings to resolve.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            Dict mapping ``artifact_uuid`` → ``type:name`` ID.  UUIDs not
+            found in the database are omitted from the result.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def list_all_ordered(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        """Return all memberships for a collection ordered by artifact ``type:name`` ID.
+
+        Joins through the ``artifacts`` table to order results by the stable
+        ``Artifact.id`` string (``type:name``), enabling stable cursor-based
+        pagination at the endpoint layer.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            All :class:`~skillmeat.core.interfaces.dtos.CollectionArtifactDTO`
+            records for the collection, ordered by artifact ID.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_group_artifact_uuids(
+        self,
+        group_id: str,
+        ctx: RequestContext | None = None,
+    ) -> set[str]:
+        """Return the set of artifact UUIDs belonging to a group.
+
+        Args:
+            group_id: Unique identifier of the group.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            Set of 32-char hex UUID strings.  Empty set when the group has no
+            members or does not exist.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_source_for_uuids(
+        self,
+        artifact_uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> dict[str, str]:
+        """Return a mapping from ``type:name`` ID to source value for a batch.
+
+        Joins ``artifacts`` to ``collection_artifacts`` and returns the
+        ``source`` column for each UUID in *artifact_uuids* that has a
+        non-null source.
+
+        Args:
+            artifact_uuids: List of 32-char hex UUID strings to look up.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            Dict mapping ``type:name`` artifact ID → source string.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_group_memberships_batch(
+        self,
+        artifact_uuids: list[str],
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[dict]:
+        """Return group-membership rows for a batch of artifact UUIDs.
+
+        Args:
+            artifact_uuids: List of 32-char hex UUID strings.
+            collection_id: Scope results to groups belonging to this
+                collection.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            List of dicts, each with keys:
+            - ``artifact_id``: ``"type:name"`` identifier of the artifact
+            - ``group_id``: Unique identifier of the group
+            - ``group_name``: Display name of the group
+            - ``position``: Integer position of the artifact within the group
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_staleness_stats(
+        self,
+        collection_id: str,
+        ttl_seconds: int,
+        ctx: RequestContext | None = None,
+    ) -> dict:
+        """Return staleness statistics for a collection.
+
+        Computes counts of fresh vs stale memberships based on
+        ``CollectionArtifact.synced_at`` relative to *ttl_seconds*.
+
+        Args:
+            collection_id: Unique identifier of the collection to analyse.
+            ttl_seconds: Age in seconds after which a membership is
+                considered stale.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            Dict with keys: ``total_artifacts``, ``stale_count``,
+            ``fresh_count``, ``oldest_sync_age_seconds``,
+            ``percentage_stale``, ``ttl_seconds``, ``collection_id``.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update_deployments_by_name(
+        self,
+        collection_id: str,
+        artifact_name: str,
+        deployments_json: str,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Update ``deployments_json`` on all memberships matching *artifact_name*.
+
+        Finds all ``Artifact`` rows whose ``name`` column equals *artifact_name*
+        and updates the corresponding ``CollectionArtifact.deployments_json``
+        column within the specified collection.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_name: Short artifact name (without the ``type:`` prefix).
+            deployments_json: Serialised JSON string to store in
+                ``deployments_json``.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            Number of rows updated.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def bulk_update_metadata(
+        self,
+        updates: list[dict],
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Apply metadata field updates to multiple membership rows.
+
+        Each element of *updates* must contain an ``artifact_uuid`` key that
+        identifies the row to update plus any combination of the recognised
+        metadata fields (``description``, ``author``, ``license``, ``version``,
+        ``tags_json``, ``tools_json``, ``source``, ``origin``,
+        ``origin_source``, ``resolved_sha``, ``resolved_version``,
+        ``synced_at``).  Unknown keys are silently ignored.
+
+        Args:
+            updates: List of dicts, each with ``artifact_uuid`` and the fields
+                to write.
+            ctx: Optional per-request metadata (unused by this backend).
+
+        Returns:
+            Number of rows successfully updated.
+        """
+        raise NotImplementedError
+
 
 # =============================================================================
 # IDbUserCollectionRepository
@@ -3589,5 +3775,91 @@ class IDbUserCollectionRepository(abc.ABC):
 
         This method is idempotent: if the sentinel row already exists the
         call is a no-op.
+        """
+        raise NotImplementedError
+
+
+# =============================================================================
+# IDbArtifactHistoryRepository
+# =============================================================================
+
+
+class IDbArtifactHistoryRepository(abc.ABC):
+    """Repository ABC for artifact history queries.
+
+    Encapsulates the two cache-model lookups and the version-lineage query
+    used by the ``/api/v1/artifacts/{id}/history`` endpoint so that the
+    router holds no raw SQLAlchemy session references.
+
+    All methods are read-only; the history endpoint does not mutate state.
+    """
+
+    # ------------------------------------------------------------------
+    # Artifact lookups
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_cache_artifact_by_uuid(
+        self,
+        uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> CacheArtifactSummaryDTO | None:
+        """Return a summary of the ``artifacts`` row identified by UUID.
+
+        Args:
+            uuid: Stable 32-char hex UUID (ADR-007 identity).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A :class:`~skillmeat.core.interfaces.dtos.CacheArtifactSummaryDTO`
+            when the artifact exists, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def list_cache_artifacts_by_name_type(
+        self,
+        name: str,
+        artifact_type: str,
+        ctx: RequestContext | None = None,
+    ) -> list[CacheArtifactSummaryDTO]:
+        """Return all ``artifacts`` rows matching *name* and *artifact_type*.
+
+        Multiple rows can exist for the same logical artifact because each
+        deployed project has its own row.
+
+        Args:
+            name: Artifact name (normalised, without file extension).
+            artifact_type: Artifact type string (e.g. ``"skill"``).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.core.interfaces.dtos.CacheArtifactSummaryDTO`.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Version lineage
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list_versions_for_artifacts(
+        self,
+        artifact_ids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> list[ArtifactVersionDTO]:
+        """Return version lineage records for a set of artifact primary keys.
+
+        Args:
+            artifact_ids: List of ``artifacts.id`` values (``type:name``
+                strings).  The query is skipped and an empty list returned
+                when *artifact_ids* is empty.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.core.interfaces.dtos.ArtifactVersionDTO`
+            ordered by ``created_at`` descending.
         """
         raise NotImplementedError

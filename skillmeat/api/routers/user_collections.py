@@ -22,12 +22,14 @@ from skillmeat.api.dependencies import (
     DbSessionDep,
     DbUserCollectionRepoDep,
     GroupRepoDep,
+    ProjectRepoDep,
 )
 from skillmeat.core.interfaces.dtos import UserCollectionDTO
 from skillmeat.core.interfaces.repositories import (
     IDbCollectionArtifactRepository,
     IDbUserCollectionRepository,
     IGroupRepository,
+    IProjectRepository,
 )
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.collections import (
@@ -303,11 +305,12 @@ def _ensure_artifacts_in_cache(
 
 
 def migrate_artifacts_to_default_collection(
-    session: Session,
     artifact_mgr,
     collection_mgr,
     collection_repo: Optional[IDbUserCollectionRepository] = None,
     artifact_repo_ca: Optional[IDbCollectionArtifactRepository] = None,
+    project_repo: Optional[IProjectRepository] = None,
+    session=None,
 ) -> dict:
     """Migrate all existing artifacts to the default collection.
 
@@ -317,9 +320,6 @@ def migrate_artifacts_to_default_collection(
     the metadata cache for efficient artifact card rendering.
 
     Args:
-        session: Database session (used by populate_collection_artifact_metadata
-            and _recover_default_collection_metadata which have not yet been
-            migrated to repository DI)
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
         collection_repo: Optional injected IDbUserCollectionRepository.
@@ -328,6 +328,13 @@ def migrate_artifacts_to_default_collection(
         artifact_repo_ca: Optional injected IDbCollectionArtifactRepository.
             When provided, used for batch artifact adds.
             Falls back to constructing DbCollectionArtifactRepository() if None.
+        project_repo: Optional injected IProjectRepository for listing project
+            paths during deployment scanning.  Falls back to
+            constructing LocalProjectRepository() if None.
+        session: Optional SQLAlchemy Session forwarded to
+            ``_recover_default_collection_metadata``, which delegates to
+            ``recover_collection_metadata`` in the service layer.  When None
+            a fresh session is obtained internally.
 
     Returns:
         dict with migration stats: migrated_count, already_present_count,
@@ -363,7 +370,11 @@ def migrate_artifacts_to_default_collection(
     # This creates/updates CollectionArtifact rows with full metadata
     # enabling the /collection page to render without N file reads
     metadata_stats = populate_collection_artifact_metadata(
-        session, artifact_mgr, collection_mgr
+        artifact_mgr,
+        collection_mgr,
+        collection_repo=collection_repo,
+        artifact_repo_ca=artifact_repo_ca,
+        project_repo=project_repo,
     )
 
     # 5. Get all artifacts from all file-system collections
@@ -507,7 +518,7 @@ def _sync_all_tags_to_orm(
 
 
 def _recover_default_collection_metadata(
-    session: Session,
+    session,
     collection_mgr,
 ) -> dict:
     """Trigger FS → DB recovery for the default (active) collection.
@@ -518,7 +529,9 @@ def _recover_default_collection_metadata(
     Non-fatal: any errors are logged and an empty stats dict returned.
 
     Args:
-        session: Active SQLAlchemy session.
+        session: Active SQLAlchemy session (may be None; a fresh session is
+            obtained internally in that case via
+            ``skillmeat.cache.models.get_session``).
         collection_mgr: CollectionManager used to resolve the collection path.
 
     Returns:
@@ -528,6 +541,12 @@ def _recover_default_collection_metadata(
         from skillmeat.api.services.artifact_cache_service import (
             recover_collection_metadata,
         )
+
+        # Lazily obtain a session when the caller does not supply one
+        if session is None:
+            from skillmeat.cache.models import get_session as _get_session
+
+            session = _get_session()
 
         active_name = collection_mgr.get_active_collection_name()
         collection_path = collection_mgr.config.get_collection_path(active_name)
@@ -562,11 +581,11 @@ def _recover_default_collection_metadata(
 
 
 def populate_collection_artifact_metadata(
-    session: Session,
     artifact_mgr,
     collection_mgr,
     collection_repo: Optional[IDbUserCollectionRepository] = None,
     artifact_repo_ca: Optional[IDbCollectionArtifactRepository] = None,
+    project_repo: Optional[IProjectRepository] = None,
 ) -> dict:
     """Populate CollectionArtifact metadata cache from file-based artifacts.
 
@@ -575,7 +594,6 @@ def populate_collection_artifact_metadata(
     /collection page to render artifact cards without N file reads.
 
     Args:
-        session: Database session
         artifact_mgr: ArtifactManager for listing and reading artifacts
         collection_mgr: CollectionManager for collection access
         collection_repo: Optional injected IDbUserCollectionRepository.
@@ -583,6 +601,9 @@ def populate_collection_artifact_metadata(
         artifact_repo_ca: Optional injected IDbCollectionArtifactRepository.
             When provided, used for upsert_metadata() calls.
             Falls back to constructing DbCollectionArtifactRepository() if None.
+        project_repo: Optional injected IProjectRepository used to list
+            project paths for deployment scanning.  Falls back to
+            constructing DbProjectRepository() if None.
 
     Returns:
         dict with stats: created_count, updated_count, skipped_count, errors
@@ -655,28 +676,22 @@ def populate_collection_artifact_metadata(
                 resolved_sha = getattr(artifact, "resolved_sha", None)
                 resolved_version = getattr(artifact, "resolved_version", None)
 
-                # Resolve artifact_id → artifact_uuid via the Artifact table.
+                # Resolve artifact_id → artifact_uuid via the repository.
                 # CollectionArtifact PK is (collection_id, artifact_uuid) since
                 # the CAI-P5-01 migration; filter_by(artifact_id=) is no longer valid.
-                artifact_uuid_row = session.execute(
-                    select(Artifact.uuid).filter(Artifact.id == artifact_id)
-                ).first()
-                if not artifact_uuid_row:
+                artifact_uuid_val = artifact_repo_ca.resolve_uuid_by_id(artifact_id)
+                if not artifact_uuid_val:
                     # Artifact not yet in the DB cache — skip for now
                     logger.debug(
                         f"Skipping metadata populate for '{artifact_id}': "
                         "not yet in artifacts cache"
                     )
                     continue
-                artifact_uuid_val = artifact_uuid_row[0]
 
                 # Determine if this is a create or update for stats tracking.
-                existing = session.execute(
-                    select(CollectionArtifact).filter_by(
-                        collection_id=DEFAULT_COLLECTION_ID,
-                        artifact_uuid=artifact_uuid_val,
-                    )
-                ).scalar_one_or_none()
+                existing = artifact_repo_ca.get_by_pk(
+                    DEFAULT_COLLECTION_ID, artifact_uuid_val
+                )
 
                 # Upsert via repository (handles both create and update internally).
                 artifact_repo_ca.upsert_metadata(
@@ -712,21 +727,26 @@ def populate_collection_artifact_metadata(
     try:
         import os
         from pathlib import Path
-        from sqlalchemy import update, and_
         from skillmeat.core.deployment import DeploymentManager
 
         deployment_mgr = DeploymentManager()
 
-        # Get all known projects from DB cache
-        all_projects = session.execute(select(Project)).scalars().all()
+        # Ensure project_repo is available for listing known projects
+        if project_repo is None:
+            from skillmeat.core.repositories import LocalProjectRepository as _ProjRepo
+
+            project_repo = _ProjRepo()
+
+        # Get all known projects from DB cache via repository DI
+        all_project_dtos = project_repo.list()
         project_paths = []
-        for proj in all_projects:
-            proj_path = Path(proj.path)
+        for proj_dto in all_project_dtos:
+            proj_path = Path(proj_dto.path)
             if proj_path.exists():
-                project_paths.append((proj.name, proj_path))
+                project_paths.append((proj_dto.name, proj_path))
             else:
                 logger.debug(
-                    f"Skipping project '{proj.name}' — path does not exist: {proj.path}"
+                    f"Skipping project '{proj_dto.name}' — path does not exist: {proj_dto.path}"
                 )
 
         # Fallback: if no projects in DB, at least scan cwd
@@ -773,28 +793,15 @@ def populate_collection_artifact_metadata(
                     }
                 )
 
-        # Update cache entries with deployment data.
-        # CollectionArtifact now uses artifact_uuid FK; resolve via Artifact.name
-        # (suffix of the type:name id, e.g. "skill:canvas" → name="canvas").
+        # Update cache entries with deployment data via repository DI.
         deployment_update_count = 0
         for artifact_name, deployments_list in deployments_by_artifact.items():
-            # Find artifact UUIDs whose name matches (may cover multiple types)
-            matching_uuids = session.execute(
-                select(Artifact.uuid).filter(Artifact.name == artifact_name)
-            ).all()
-            for (artifact_uuid,) in matching_uuids:
-                stmt = (
-                    update(CollectionArtifact)
-                    .where(
-                        and_(
-                            CollectionArtifact.collection_id == DEFAULT_COLLECTION_ID,
-                            CollectionArtifact.artifact_uuid == artifact_uuid,
-                        )
-                    )
-                    .values(deployments_json=json.dumps(deployments_list))
-                )
-                result = session.execute(stmt)
-                deployment_update_count += result.rowcount
+            updated = artifact_repo_ca.update_deployments_by_name(
+                DEFAULT_COLLECTION_ID,
+                artifact_name,
+                json.dumps(deployments_list),
+            )
+            deployment_update_count += updated
 
         if deployment_update_count > 0:
             logger.info(
@@ -806,21 +813,13 @@ def populate_collection_artifact_metadata(
         logger.warning(f"Failed to populate deployment data: {e}")
         # Non-fatal: cache still works without deployment data
 
-    # Flush all pending ORM writes so they are visible within the current
-    # transaction.  The DI session (get_db_session) commits on clean return
-    # and rolls back on exception — explicit commit/rollback here is not needed.
-    try:
-        session.flush()
-        duration = time.time() - start_time
-        logger.info(
-            f"CollectionArtifact metadata cache: created={created_count}, "
-            f"updated={updated_count}, skipped={skipped_count}, errors={len(errors)}"
-        )
-        logger.info(f"Metadata cache population completed in {duration:.2f}s")
-    except Exception as e:
-        error_msg = f"Failed to flush metadata updates: {e}"
-        logger.error(error_msg)
-        errors.append(error_msg)
+    # All writes were committed by the repository methods; no explicit flush needed.
+    duration = time.time() - start_time
+    logger.info(
+        f"CollectionArtifact metadata cache: created={created_count}, "
+        f"updated={updated_count}, skipped={skipped_count}, errors={len(errors)}"
+    )
+    logger.info(f"Metadata cache population completed in {duration:.2f}s")
 
     return {
         "created_count": created_count,
@@ -849,11 +848,11 @@ def populate_collection_artifact_metadata(
     },
 )
 async def migrate_to_default_collection(
-    session: DbSessionDep,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     collection_repo: DbUserCollectionRepoDep,
     artifact_repo_ca: DbCollectionArtifactRepoDep,
+    project_repo: ProjectRepoDep,
     token: TokenDep,
 ) -> dict:
     """Migrate all artifacts to the default collection.
@@ -863,11 +862,11 @@ async def migrate_to_default_collection(
     Groups and other collection features.
 
     Args:
-        session: Database session
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
         collection_repo: DB user collection repository (injected)
         artifact_repo_ca: DB collection artifact repository (injected)
+        project_repo: Project repository for deployment scanning (injected)
         token: Authentication token
 
     Returns:
@@ -879,11 +878,11 @@ async def migrate_to_default_collection(
     """
     try:
         result = migrate_artifacts_to_default_collection(
-            session=session,
             artifact_mgr=artifact_mgr,
             collection_mgr=collection_mgr,
             collection_repo=collection_repo,
             artifact_repo_ca=artifact_repo_ca,
+            project_repo=project_repo,
         )
 
         logger.info(

@@ -68,13 +68,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Generator, Generic, List, Optional, Type, TypeVar
 
-from sqlalchemy import and_, func, or_, text
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, joinedload
 
 from skillmeat.cache.models import (
     Artifact,
     ArtifactTag,
+    ArtifactVersion,
     Base,
     Collection,
     CollectionArtifact,
@@ -84,6 +85,7 @@ from skillmeat.cache.models import (
     DeploymentSetMember,
     DeploymentSetTag,
     Group,
+    GroupArtifact,
     MarketplaceCatalogEntry,
     MarketplaceSource,
     Tag,
@@ -92,8 +94,14 @@ from skillmeat.cache.models import (
 )
 from skillmeat.core.enums import Platform
 from skillmeat.core.interfaces.context import RequestContext
-from skillmeat.core.interfaces.dtos import CollectionArtifactDTO, UserCollectionDTO
+from skillmeat.core.interfaces.dtos import (
+    ArtifactVersionDTO,
+    CacheArtifactSummaryDTO,
+    CollectionArtifactDTO,
+    UserCollectionDTO,
+)
 from skillmeat.core.interfaces.repositories import (
+    IDbArtifactHistoryRepository,
     IDbCollectionArtifactRepository,
     IDbUserCollectionRepository,
 )
@@ -7048,5 +7056,530 @@ class DbCollectionArtifactRepository(IDbCollectionArtifactRepository):
                 .all()
             )
             return [_collection_artifact_to_dto(row) for row in rows]
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Batch / bulk helpers (Phase-2 repository DI migration)
+    # ------------------------------------------------------------------
+
+    def resolve_uuid_to_id_batch(
+        self,
+        uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> dict[str, str]:
+        """Batch-resolve artifact UUIDs to ``type:name`` ID strings.
+
+        Args:
+            uuids: List of 32-char hex UUID strings to resolve.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            Dict mapping artifact_uuid → type:name ID.
+        """
+        if not uuids:
+            return {}
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(Artifact.uuid, Artifact.id)
+                .filter(Artifact.uuid.in_(uuids))
+                .all()
+            )
+            return {r[0]: r[1] for r in rows}
+        finally:
+            session.close()
+
+    def list_all_ordered(
+        self,
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[CollectionArtifactDTO]:
+        """Return all memberships for a collection ordered by artifact ID.
+
+        Joins through ``artifacts`` to order by ``Artifact.id`` (type:name),
+        enabling stable cursor-based pagination at the endpoint layer.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            All CollectionArtifactDTO records for the collection, ordered by
+            artifact ID.
+        """
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(CollectionArtifact)
+                .join(Artifact, Artifact.uuid == CollectionArtifact.artifact_uuid)
+                .filter(CollectionArtifact.collection_id == collection_id)
+                .order_by(Artifact.id)
+                .all()
+            )
+            return [_collection_artifact_to_dto(row) for row in rows]
+        finally:
+            session.close()
+
+    def get_group_artifact_uuids(
+        self,
+        group_id: str,
+        ctx: RequestContext | None = None,
+    ) -> set[str]:
+        """Return the set of artifact UUIDs belonging to a group.
+
+        Args:
+            group_id: Unique identifier of the group.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            Set of 32-char hex UUID strings.  Empty when group has no members.
+        """
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(GroupArtifact.artifact_uuid)
+                .filter(GroupArtifact.group_id == group_id)
+                .all()
+            )
+            return {r[0] for r in rows}
+        finally:
+            session.close()
+
+    def get_source_for_uuids(
+        self,
+        artifact_uuids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> dict[str, str]:
+        """Return a mapping from type:name ID to source value for a batch.
+
+        Args:
+            artifact_uuids: List of 32-char hex UUID strings.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            Dict mapping type:name artifact ID → source string (non-null only).
+        """
+        if not artifact_uuids:
+            return {}
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(Artifact.id, CollectionArtifact.source)
+                .join(
+                    CollectionArtifact,
+                    CollectionArtifact.artifact_uuid == Artifact.uuid,
+                )
+                .filter(
+                    CollectionArtifact.artifact_uuid.in_(artifact_uuids),
+                    CollectionArtifact.source.isnot(None),
+                )
+                .all()
+            )
+            return {r[0]: r[1] for r in rows}
+        finally:
+            session.close()
+
+    def get_group_memberships_batch(
+        self,
+        artifact_uuids: list[str],
+        collection_id: str,
+        ctx: RequestContext | None = None,
+    ) -> list[dict]:
+        """Return group-membership rows for a batch of artifact UUIDs.
+
+        Args:
+            artifact_uuids: List of 32-char hex UUID strings.
+            collection_id: Scope results to groups belonging to this collection.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            List of dicts with keys: artifact_id, group_id, group_name,
+            position.
+        """
+        if not artifact_uuids:
+            return []
+        session = self._get_session()
+        try:
+            # First get group IDs for this collection
+            group_ids = [
+                r[0]
+                for r in session.query(Group.id)
+                .filter(Group.collection_id == collection_id)
+                .all()
+            ]
+            if not group_ids:
+                return []
+            rows = (
+                session.query(GroupArtifact, Group, Artifact)
+                .join(Group, GroupArtifact.group_id == Group.id)
+                .join(Artifact, Artifact.uuid == GroupArtifact.artifact_uuid)
+                .filter(
+                    GroupArtifact.artifact_uuid.in_(artifact_uuids),
+                    GroupArtifact.group_id.in_(group_ids),
+                )
+                .all()
+            )
+            return [
+                {
+                    "artifact_id": artifact.id,
+                    "group_id": group.id,
+                    "group_name": group.name,
+                    "position": ga.position,
+                }
+                for ga, group, artifact in rows
+            ]
+        finally:
+            session.close()
+
+    def get_staleness_stats(
+        self,
+        collection_id: str,
+        ttl_seconds: int,
+        ctx: RequestContext | None = None,
+    ) -> dict:
+        """Return staleness statistics for a collection.
+
+        Args:
+            collection_id: Unique identifier of the collection to analyse.
+            ttl_seconds: Age in seconds after which a membership is stale.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            Dict with total_artifacts, stale_count, fresh_count,
+            oldest_sync_age_seconds, percentage_stale, ttl_seconds,
+            collection_id.
+        """
+        session = self._get_session()
+        try:
+            cutoff_time = datetime.utcnow() - timedelta(seconds=ttl_seconds)
+
+            total = (
+                session.query(func.count())
+                .select_from(CollectionArtifact)
+                .filter(CollectionArtifact.collection_id == collection_id)
+                .scalar()
+            ) or 0
+
+            if total == 0:
+                return {
+                    "total_artifacts": 0,
+                    "stale_count": 0,
+                    "fresh_count": 0,
+                    "oldest_sync_age_seconds": 0,
+                    "percentage_stale": 0.0,
+                    "ttl_seconds": ttl_seconds,
+                    "collection_id": collection_id,
+                }
+
+            stale_count = (
+                session.query(func.count())
+                .select_from(CollectionArtifact)
+                .filter(
+                    CollectionArtifact.collection_id == collection_id,
+                    or_(
+                        CollectionArtifact.synced_at.is_(None),
+                        CollectionArtifact.synced_at < cutoff_time,
+                    ),
+                )
+                .scalar()
+            ) or 0
+
+            oldest_row = (
+                session.query(CollectionArtifact.synced_at)
+                .filter(
+                    CollectionArtifact.collection_id == collection_id,
+                    CollectionArtifact.synced_at.isnot(None),
+                )
+                .order_by(CollectionArtifact.synced_at.asc())
+                .first()
+            )
+
+            oldest_age = 0
+            if oldest_row and oldest_row[0]:
+                oldest_age = (datetime.utcnow() - oldest_row[0]).total_seconds()
+
+            return {
+                "total_artifacts": total,
+                "stale_count": stale_count,
+                "fresh_count": total - stale_count,
+                "oldest_sync_age_seconds": oldest_age,
+                "percentage_stale": (
+                    round((stale_count / total * 100), 1) if total > 0 else 0.0
+                ),
+                "ttl_seconds": ttl_seconds,
+                "collection_id": collection_id,
+            }
+        finally:
+            session.close()
+
+    def update_deployments_by_name(
+        self,
+        collection_id: str,
+        artifact_name: str,
+        deployments_json: str,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Update ``deployments_json`` on memberships matching *artifact_name*.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+            artifact_name: Short artifact name (without the type: prefix).
+            deployments_json: Serialised JSON string to store.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            Number of rows updated.
+        """
+        session = self._get_session()
+        try:
+            # Resolve name → UUIDs (may span multiple artifact types)
+            uuid_rows = (
+                session.query(Artifact.uuid)
+                .filter(Artifact.name == artifact_name)
+                .all()
+            )
+            if not uuid_rows:
+                return 0
+
+            updated = 0
+            for (artifact_uuid,) in uuid_rows:
+                result = session.execute(
+                    update(CollectionArtifact)
+                    .where(
+                        and_(
+                            CollectionArtifact.collection_id == collection_id,
+                            CollectionArtifact.artifact_uuid == artifact_uuid,
+                        )
+                    )
+                    .values(deployments_json=deployments_json)
+                )
+                updated += result.rowcount
+
+            if updated:
+                session.commit()
+            logger.debug(
+                "DbCollectionArtifactRepository.update_deployments_by_name: "
+                "collection=%s name=%s updated=%d",
+                collection_id,
+                artifact_name,
+                updated,
+            )
+            return updated
+
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(
+                f"Failed to update deployments for '{artifact_name}' in "
+                f"collection '{collection_id}': {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def bulk_update_metadata(
+        self,
+        updates: list[dict],
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Apply metadata field updates to multiple membership rows.
+
+        Each element of *updates* must contain ``artifact_uuid`` plus the
+        fields to write.  Unknown keys are silently ignored.
+
+        Args:
+            updates: List of dicts with artifact_uuid and metadata fields.
+            ctx: Optional per-request metadata (unused).
+
+        Returns:
+            Number of rows successfully updated.
+        """
+        if not updates:
+            return 0
+
+        _ALLOWED = {
+            "description",
+            "author",
+            "license",
+            "version",
+            "tags_json",
+            "tools_json",
+            "source",
+            "origin",
+            "origin_source",
+            "resolved_sha",
+            "resolved_version",
+            "synced_at",
+        }
+
+        session = self._get_session()
+        try:
+            updated = 0
+            for item in updates:
+                artifact_uuid = item.get("artifact_uuid")
+                if not artifact_uuid:
+                    continue
+                fields = {k: v for k, v in item.items() if k in _ALLOWED}
+                if not fields:
+                    continue
+                row = (
+                    session.query(CollectionArtifact)
+                    .filter_by(artifact_uuid=artifact_uuid)
+                    .first()
+                )
+                if row is None:
+                    continue
+                for key, value in fields.items():
+                    setattr(row, key, value)
+                updated += 1
+
+            if updated:
+                session.commit()
+
+            logger.debug(
+                "DbCollectionArtifactRepository.bulk_update_metadata: "
+                "updated %d rows",
+                updated,
+            )
+            return updated
+
+        except Exception as exc:
+            session.rollback()
+            raise RuntimeError(f"bulk_update_metadata failed: {exc}") from exc
+        finally:
+            session.close()
+
+
+# =============================================================================
+# DbArtifactHistoryRepository
+# =============================================================================
+
+
+def _cache_artifact_to_summary_dto(artifact: Artifact) -> CacheArtifactSummaryDTO:
+    """Convert a :class:`~skillmeat.cache.models.Artifact` ORM row to a DTO."""
+    project_path: Optional[str] = None
+    try:
+        if artifact.project is not None:
+            project_path = artifact.project.path
+    except Exception:
+        pass
+    return CacheArtifactSummaryDTO(
+        id=artifact.id,
+        uuid=artifact.uuid,
+        name=artifact.name,
+        type=artifact.type,
+        project_path=project_path,
+    )
+
+
+def _artifact_version_to_dto(version: ArtifactVersion) -> ArtifactVersionDTO:
+    """Convert a :class:`~skillmeat.cache.models.ArtifactVersion` ORM row to a DTO."""
+    created_at_iso: Optional[str] = None
+    if version.created_at is not None:
+        if hasattr(version.created_at, "isoformat"):
+            created_at_iso = version.created_at.isoformat()
+        else:
+            created_at_iso = str(version.created_at)
+
+    return ArtifactVersionDTO(
+        id=version.id,
+        artifact_id=version.artifact_id,
+        content_hash=version.content_hash,
+        change_origin=version.change_origin,
+        created_at=created_at_iso,
+        parent_hash=version.parent_hash,
+        version_lineage=version.version_lineage,
+        metadata_json=version.metadata_json,
+    )
+
+
+class DbArtifactHistoryRepository(IDbArtifactHistoryRepository):
+    """DB-backed implementation of :class:`IDbArtifactHistoryRepository`.
+
+    Performs the read-only ``artifacts`` and ``artifact_versions`` queries
+    used by the artifact history timeline endpoint.
+
+    Session lifecycle follows the canonical pattern used throughout this
+    module: each public method obtains its own session, wraps the query in a
+    ``try/finally`` block, and closes the session on all exit paths.
+
+    Args:
+        get_session: Zero-argument callable that returns a SQLAlchemy
+            :class:`~sqlalchemy.orm.Session`.  Defaults to the module-level
+            ``get_session`` singleton from :mod:`skillmeat.cache.models`.
+    """
+
+    def __init__(self, get_session: Any = None) -> None:
+        from skillmeat.cache.models import get_session as _default_get_session
+
+        self._get_session = (
+            get_session if get_session is not None else _default_get_session
+        )
+
+    def get_cache_artifact_by_uuid(
+        self,
+        uuid: str,
+        ctx: RequestContext | None = None,
+    ) -> CacheArtifactSummaryDTO | None:
+        """Return a summary of the ``artifacts`` row identified by *uuid*.
+
+        Returns:
+            :class:`~skillmeat.core.interfaces.dtos.CacheArtifactSummaryDTO`
+            when found, ``None`` otherwise.
+        """
+        session = self._get_session()
+        try:
+            row = session.query(Artifact).filter(Artifact.uuid == uuid).first()
+            return _cache_artifact_to_summary_dto(row) if row is not None else None
+        finally:
+            session.close()
+
+    def list_cache_artifacts_by_name_type(
+        self,
+        name: str,
+        artifact_type: str,
+        ctx: RequestContext | None = None,
+    ) -> list[CacheArtifactSummaryDTO]:
+        """Return all ``artifacts`` rows matching *name* and *artifact_type*.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.core.interfaces.dtos.CacheArtifactSummaryDTO`.
+        """
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(Artifact)
+                .filter(Artifact.name == name, Artifact.type == artifact_type)
+                .all()
+            )
+            return [_cache_artifact_to_summary_dto(row) for row in rows]
+        finally:
+            session.close()
+
+    def list_versions_for_artifacts(
+        self,
+        artifact_ids: list[str],
+        ctx: RequestContext | None = None,
+    ) -> list[ArtifactVersionDTO]:
+        """Return version lineage records for *artifact_ids* ordered newest-first.
+
+        Returns an empty list immediately when *artifact_ids* is empty.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.core.interfaces.dtos.ArtifactVersionDTO`
+            ordered by ``created_at`` descending.
+        """
+        if not artifact_ids:
+            return []
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(ArtifactVersion)
+                .filter(ArtifactVersion.artifact_id.in_(artifact_ids))
+                .order_by(ArtifactVersion.created_at.desc())
+                .all()
+            )
+            return [_artifact_version_to_dto(row) for row in rows]
         finally:
             session.close()
