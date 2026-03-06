@@ -14945,6 +14945,16 @@ main.add_command(workflow_cli, name="workflow")
 
 
 # ====================
+# Enterprise Command Group
+# ====================
+
+
+from skillmeat.cli.enterprise_commands import enterprise_cli  # noqa: E402
+
+main.add_command(enterprise_cli, name="enterprise")
+
+
+# ====================
 # Entry Point
 # ====================
 
