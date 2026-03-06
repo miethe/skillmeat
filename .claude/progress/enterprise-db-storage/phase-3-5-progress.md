@@ -2,255 +2,300 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "enterprise-db-storage"
-feature_slug: "enterprise-db-storage"
+prd: enterprise-db-storage
+feature_slug: enterprise-db-storage
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-db-storage-v1.md
 plan_ref: docs/project_plans/implementation_plans/refactors/enterprise-db-storage-v1.md
 phase: 3
-title: "API Content Delivery, CLI Enterprise Mode & Migration Tooling"
-status: "planning"
-started: "2026-03-06"
+title: API Content Delivery, CLI Enterprise Mode & Migration Tooling
+status: completed
+started: '2026-03-06'
 completed: null
 commit_refs: []
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 17
-completed_tasks: 0
+completed_tasks: 17
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
-contributors: ["backend-architect"]
-
+owners:
+- python-backend-engineer
+contributors:
+- backend-architect
 tasks:
-  # === Phase 3: API Content Delivery Endpoints ===
-  - id: "ENT-3.1"
-    description: "Create enterprise_content.py service for streaming artifact payloads (file tree + contents JSON, versioning, gzip compression)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3sp"
-    priority: "critical"
-
-  - id: "ENT-3.2"
-    description: "Implement GET /api/v1/artifacts/{id}/download router returning JSON: {artifact_id, files[], metadata}"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-3.1"]
-    estimated_effort: "3sp"
-    priority: "critical"
-
-  - id: "ENT-3.3"
-    description: "Support version-aware download via ?version query param (content_hash or version_label)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-3.2"]
-    estimated_effort: "2sp"
-    priority: "high"
-
-  - id: "ENT-3.4"
-    description: "Implement enterprise authentication middleware validating PAT or Clerk JWT before artifact access (401/403 responses). Phase 3 bootstrap mode: PAT validation only (no Clerk JWT / AuthContext). Full Clerk JWT support requires PRD 2 (AuthContext)."
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-3.2"]
-    estimated_effort: "2sp"
-    priority: "high"
-
-  - id: "ENT-3.5"
-    description: "Unit + integration tests for download endpoint (file tree structure, versioning, tenant isolation)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-3.1", "ENT-3.2", "ENT-3.3", "ENT-3.4"]
-    estimated_effort: "2sp"
-    priority: "high"
-
-  # === Phase 4: CLI Enterprise Mode ===
-  - id: "ENT-4.1"
-    description: "Add SKILLMEAT_EDITION, SKILLMEAT_API_URL, SKILLMEAT_PAT env vars with config loading and edition logging at startup"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2sp"
-    priority: "critical"
-
-  - id: "ENT-4.2"
-    description: "Update CLI to detect enterprise mode and route deploy/sync commands to local filesystem or API accordingly"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-4.1"]
-    estimated_effort: "2sp"
-    priority: "high"
-
-  - id: "ENT-4.3"
-    description: "Implement API-based deployment: call GET /api/v1/artifacts/{id}/download, materialize to ./.claude/, update deployed.toml"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-3.2", "ENT-4.1"]
-    estimated_effort: "3sp"
-    priority: "high"
-
-  - id: "ENT-4.4"
-    description: "Implement API-based sync: poll API for latest content, compare content_hash, update if changed"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-3.2", "ENT-4.1"]
-    estimated_effort: "2sp"
-    priority: "high"
-
-  - id: "ENT-4.5"
-    description: "Implement --token flag and env var for PAT-based headless auth; store PAT in secure config and send in Authorization header. NOTE: Full API authentication (Clerk JWT, RBAC) requires PRD 2 (AuthContext). Phase 4 scope is PAT only."
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-4.1"]
-    estimated_effort: "1sp"
-    priority: "medium"
-
-  - id: "ENT-4.6"
-    description: "Unit + E2E tests for enterprise deploy/sync (API calls made, files materialized, deployed.toml updated)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-4.3", "ENT-4.4"]
-    estimated_effort: "2sp"
-    priority: "high"
-
-  # === Phase 5: Cloud Migration Tooling ===
-  - id: "ENT-5.1"
-    description: "Create migration service to read from LocalFileSystemRepository and POST to API (iterates local artifacts, computes checksums)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-3.2"]
-    estimated_effort: "3sp"
-    priority: "critical"
-
-  - id: "ENT-5.2"
-    description: "Implement skillmeat enterprise migrate CLI command with --dry-run and --force flags"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-5.1"]
-    estimated_effort: "3sp"
-    priority: "high"
-
-  - id: "ENT-5.3"
-    description: "Migration checksum validation: SHA256 comparison, abort on mismatch with detailed error reporting"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-5.1"]
-    estimated_effort: "2sp"
-    priority: "high"
-
-  - id: "ENT-5.4"
-    description: "Migration rollback: create .skillmeat-migration-backup.toml during migration, implement rollback command to restore it"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-5.2"]
-    estimated_effort: "3sp"
-    priority: "high"
-
-  - id: "ENT-5.5"
-    description: "Migration progress reporting: console progress bar with count and percentage during long migrations"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-5.2"]
-    estimated_effort: "2sp"
-    priority: "medium"
-
-  - id: "ENT-5.6"
-    description: "Migration error handling: retry logic for transient failures, detailed error logs, graceful partial migration recovery"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT-5.1"]
-    estimated_effort: "2sp"
-    priority: "high"
-
+- id: ENT-3.1
+  description: Create enterprise_content.py service for streaming artifact payloads
+    (file tree + contents JSON, versioning, gzip compression)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3sp
+  priority: critical
+- id: ENT-3.2
+  description: 'Implement GET /api/v1/artifacts/{id}/download router returning JSON:
+    {artifact_id, files[], metadata}'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-3.1
+  estimated_effort: 3sp
+  priority: critical
+- id: ENT-3.3
+  description: Support version-aware download via ?version query param (content_hash
+    or version_label)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-3.2
+  estimated_effort: 2sp
+  priority: high
+- id: ENT-3.4
+  description: 'Implement enterprise authentication middleware validating PAT or Clerk
+    JWT before artifact access (401/403 responses). Phase 3 bootstrap mode: PAT validation
+    only (no Clerk JWT / AuthContext). Full Clerk JWT support requires PRD 2 (AuthContext).'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-3.2
+  estimated_effort: 2sp
+  priority: high
+- id: ENT-3.5
+  description: Unit + integration tests for download endpoint (file tree structure,
+    versioning, tenant isolation)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-3.1
+  - ENT-3.2
+  - ENT-3.3
+  - ENT-3.4
+  estimated_effort: 2sp
+  priority: high
+- id: ENT-4.1
+  description: Add SKILLMEAT_EDITION, SKILLMEAT_API_URL, SKILLMEAT_PAT env vars with
+    config loading and edition logging at startup
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2sp
+  priority: critical
+- id: ENT-4.2
+  description: Update CLI to detect enterprise mode and route deploy/sync commands
+    to local filesystem or API accordingly
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-4.1
+  estimated_effort: 2sp
+  priority: high
+- id: ENT-4.3
+  description: 'Implement API-based deployment: call GET /api/v1/artifacts/{id}/download,
+    materialize to ./.claude/, update deployed.toml'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-3.2
+  - ENT-4.1
+  estimated_effort: 3sp
+  priority: high
+- id: ENT-4.4
+  description: 'Implement API-based sync: poll API for latest content, compare content_hash,
+    update if changed'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-3.2
+  - ENT-4.1
+  estimated_effort: 2sp
+  priority: high
+- id: ENT-4.5
+  description: 'Implement --token flag and env var for PAT-based headless auth; store
+    PAT in secure config and send in Authorization header. NOTE: Full API authentication
+    (Clerk JWT, RBAC) requires PRD 2 (AuthContext). Phase 4 scope is PAT only.'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-4.1
+  estimated_effort: 1sp
+  priority: medium
+- id: ENT-4.6
+  description: Unit + E2E tests for enterprise deploy/sync (API calls made, files
+    materialized, deployed.toml updated)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-4.3
+  - ENT-4.4
+  estimated_effort: 2sp
+  priority: high
+- id: ENT-5.1
+  description: Create migration service to read from LocalFileSystemRepository and
+    POST to API (iterates local artifacts, computes checksums)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-3.2
+  estimated_effort: 3sp
+  priority: critical
+- id: ENT-5.2
+  description: Implement skillmeat enterprise migrate CLI command with --dry-run and
+    --force flags
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-5.1
+  estimated_effort: 3sp
+  priority: high
+- id: ENT-5.3
+  description: 'Migration checksum validation: SHA256 comparison, abort on mismatch
+    with detailed error reporting'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-5.1
+  estimated_effort: 2sp
+  priority: high
+- id: ENT-5.4
+  description: 'Migration rollback: create .skillmeat-migration-backup.toml during
+    migration, implement rollback command to restore it'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-5.2
+  estimated_effort: 3sp
+  priority: high
+- id: ENT-5.5
+  description: 'Migration progress reporting: console progress bar with count and
+    percentage during long migrations'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-5.2
+  estimated_effort: 2sp
+  priority: medium
+- id: ENT-5.6
+  description: 'Migration error handling: retry logic for transient failures, detailed
+    error logs, graceful partial migration recovery'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT-5.1
+  estimated_effort: 2sp
+  priority: high
 parallelization:
-  # Phase 3 must lead — its download endpoint gates Phase 4 and 5
   batch_1:
-    - "ENT-3.1"  # Phase 3 foundation (no deps)
-    - "ENT-4.1"  # Phase 4 config/env detection (no deps, independent of Phase 3)
+  - ENT-3.1
+  - ENT-4.1
   batch_2:
-    - "ENT-3.2"  # Needs ENT-3.1
-    - "ENT-4.2"  # Needs ENT-4.1
-    - "ENT-4.5"  # Needs ENT-4.1
+  - ENT-3.2
+  - ENT-4.2
+  - ENT-4.5
   batch_3:
-    - "ENT-3.3"  # Needs ENT-3.2
-    - "ENT-3.4"  # Needs ENT-3.2
-    - "ENT-4.3"  # Needs ENT-3.2 + ENT-4.1
-    - "ENT-4.4"  # Needs ENT-3.2 + ENT-4.1
-    - "ENT-5.1"  # Needs ENT-3.2 (upload endpoint implied by Phase 3)
+  - ENT-3.3
+  - ENT-3.4
+  - ENT-4.3
+  - ENT-4.4
+  - ENT-5.1
   batch_4:
-    - "ENT-3.5"  # Needs ENT-3.1 through ENT-3.4
-    - "ENT-4.6"  # Needs ENT-4.3 + ENT-4.4
-    - "ENT-5.2"  # Needs ENT-5.1
-    - "ENT-5.3"  # Needs ENT-5.1
-    - "ENT-5.6"  # Needs ENT-5.1
+  - ENT-3.5
+  - ENT-4.6
+  - ENT-5.2
+  - ENT-5.3
+  - ENT-5.6
   batch_5:
-    - "ENT-5.4"  # Needs ENT-5.2
-    - "ENT-5.5"  # Needs ENT-5.2
+  - ENT-5.4
+  - ENT-5.5
   critical_path:
-    - "ENT-3.1"
-    - "ENT-3.2"
-    - "ENT-5.1"
-    - "ENT-5.2"
-    - "ENT-5.4"
-  estimated_total_time: "~4-5 weeks (parallel), ~7-8 weeks (sequential)"
-
+  - ENT-3.1
+  - ENT-3.2
+  - ENT-5.1
+  - ENT-5.2
+  - ENT-5.4
+  estimated_total_time: ~4-5 weeks (parallel), ~7-8 weeks (sequential)
 blockers:
-  - id: "BLOCKER-001"
-    title: "PRD 2 (AuthContext/RBAC) required for full authentication in Phases 3-5"
-    severity: "high"
-    blocking: ["ENT-3.4", "ENT-4.5"]
-    resolution: "Phases 1-3 proceed independently using DEFAULT_TENANT_ID bootstrap and PAT-only auth. Full Clerk JWT / RBAC support in ENT-3.4 and ENT-4.5 gates on PRD 2 completion."
-    created: "2026-03-06"
-
+- id: BLOCKER-001
+  title: PRD 2 (AuthContext/RBAC) required for full authentication in Phases 3-5
+  severity: high
+  blocking:
+  - ENT-3.4
+  - ENT-4.5
+  resolution: Phases 1-3 proceed independently using DEFAULT_TENANT_ID bootstrap and
+    PAT-only auth. Full Clerk JWT / RBAC support in ENT-3.4 and ENT-4.5 gates on PRD
+    2 completion.
+  created: '2026-03-06'
 success_criteria:
-  - id: "SC-3.1"
-    description: "GET /api/v1/artifacts/{id}/download returns valid JSON matching content delivery schema"
-    status: "pending"
-  - id: "SC-3.2"
-    description: "Version-aware downloads return correct content for hash and label specifiers"
-    status: "pending"
-  - id: "SC-3.3"
-    description: "Tenant isolation enforced: 403 returned for wrong-tenant access"
-    status: "pending"
-  - id: "SC-3.4"
-    description: "Content delivery performance: <200ms response time for typical artifacts against docker-compose PostgreSQL"
-    status: "pending"
-  - id: "SC-4.1"
-    description: "skillmeat deploy --enterprise pulls from API and materializes files to ./.claude/"
-    status: "pending"
-  - id: "SC-4.2"
-    description: "skillmeat sync --enterprise checks API for updates and applies changes"
-    status: "pending"
-  - id: "SC-4.3"
-    description: "PAT authentication works for all API calls; fallback to local mode when env vars absent"
-    status: "pending"
-  - id: "SC-4.4"
-    description: "E2E CLI tests pass against mock API server"
-    status: "pending"
-  - id: "SC-5.1"
-    description: "skillmeat enterprise migrate --dry-run shows accurate preview of what would migrate"
-    status: "pending"
-  - id: "SC-5.2"
-    description: "Migration with checksum validation succeeds; aborts on mismatch with detailed error"
-    status: "pending"
-  - id: "SC-5.3"
-    description: "Rollback command restores backup manifest from .skillmeat-migration-backup.toml"
-    status: "pending"
-  - id: "SC-5.4"
-    description: "Progress reporting works correctly for large collections"
-    status: "pending"
-  - id: "SC-5.5"
-    description: "Partial migration failures handled gracefully with retry logic for transient errors"
-    status: "pending"
-  - id: "SC-INT.1"
-    description: "End-to-end integration test passes: local migrate -> cloud deploy cycle"
-    status: "pending"
-
+- id: SC-3.1
+  description: GET /api/v1/artifacts/{id}/download returns valid JSON matching content
+    delivery schema
+  status: pending
+- id: SC-3.2
+  description: Version-aware downloads return correct content for hash and label specifiers
+  status: pending
+- id: SC-3.3
+  description: 'Tenant isolation enforced: 403 returned for wrong-tenant access'
+  status: pending
+- id: SC-3.4
+  description: 'Content delivery performance: <200ms response time for typical artifacts
+    against docker-compose PostgreSQL'
+  status: pending
+- id: SC-4.1
+  description: skillmeat deploy --enterprise pulls from API and materializes files
+    to ./.claude/
+  status: pending
+- id: SC-4.2
+  description: skillmeat sync --enterprise checks API for updates and applies changes
+  status: pending
+- id: SC-4.3
+  description: PAT authentication works for all API calls; fallback to local mode
+    when env vars absent
+  status: pending
+- id: SC-4.4
+  description: E2E CLI tests pass against mock API server
+  status: pending
+- id: SC-5.1
+  description: skillmeat enterprise migrate --dry-run shows accurate preview of what
+    would migrate
+  status: pending
+- id: SC-5.2
+  description: Migration with checksum validation succeeds; aborts on mismatch with
+    detailed error
+  status: pending
+- id: SC-5.3
+  description: Rollback command restores backup manifest from .skillmeat-migration-backup.toml
+  status: pending
+- id: SC-5.4
+  description: Progress reporting works correctly for large collections
+  status: pending
+- id: SC-5.5
+  description: Partial migration failures handled gracefully with retry logic for
+    transient errors
+  status: pending
+- id: SC-INT.1
+  description: 'End-to-end integration test passes: local migrate -> cloud deploy
+    cycle'
+  status: pending
 files_modified: []
+progress: 100
+updated: '2026-03-06'
 ---
 
 # enterprise-db-storage - Phase 3-5: API Content Delivery, CLI Enterprise Mode & Migration Tooling

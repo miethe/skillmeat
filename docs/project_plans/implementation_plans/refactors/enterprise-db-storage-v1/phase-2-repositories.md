@@ -59,6 +59,28 @@ Phase 2 implements the repository layer for the enterprise edition, fulfilling t
 | ENT-2.13 | Integration tests: repositories with PostgreSQL | Write integration tests against real PostgreSQL (docker-compose) | Tests verify: tenant isolation (negative tests), concurrent writes, performance baselines, constraints enforcement | 3 | data-layer-expert | ENT-2.1 through ENT-2.10, Phase 1 complete |
 | ENT-2.14 | Performance benchmarks | Establish baseline performance metrics for all repository operations | Benchmarks: get() <1ms, list(1000 artifacts) <10ms, search() <5ms, multitenancy overhead <5% | 2 | data-layer-expert | ENT-2.13 |
 
+---
+
+## Implementation Errata (Phase 2 Retro)
+
+Deviations from the plan discovered during implementation. See `docs/project_plans/reports/enterprise-db-storage-ph2-retro.md` for full analysis.
+
+### Edition string is `"local"`, not `"community"`
+
+The plan references `"community"` edition in several places, but `APISettings.edition` in `skillmeat/api/config.py` uses `"local"` / `"enterprise"`. The `RepositoryFactory` (ENT-2.9) correctly uses `"local"` to match the existing codebase convention. Future phases should use `"local"` when referencing the non-enterprise edition.
+
+### Enterprise primary keys are UUIDs, not integers
+
+Task descriptions reference `artifact_id: int` parameters, but enterprise models use `UUID` primary keys (`uuid.UUID` in Python). All implemented method signatures use `uuid.UUID` for entity IDs. Future phases (especially Phase 3 API endpoints and Phase 4 CLI) must use UUID-based paths/parameters.
+
+### File structure differs from plan
+
+The plan specified separate files (`enterprise_base.py`, `enterprise_artifact.py`, `enterprise_collection.py`, `enterprise_factory.py`). Implementation consolidated into:
+- `enterprise_repositories.py` — base class + both repository implementations
+- `repository_factory.py` — factory + DI helpers
+
+This is simpler and avoids circular import risks. Future phases should reference the actual file paths.
+
 **Total: 35 hours / 16-20 story points**
 
 ---
