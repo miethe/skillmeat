@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from skillmeat.api.config import APISettings, Environment
 from skillmeat.api.schemas.artifacts import ArtifactHistoryEventResponse
 from skillmeat.api.server import create_app
+from skillmeat.core.interfaces.dtos import CacheArtifactSummaryDTO
 
 
 @pytest.fixture
@@ -42,15 +43,15 @@ def client(app):
         yield test_client
 
 
-def _make_cache_artifact(name="pdf-skill", art_type="skill"):
-    """Return a minimal CacheArtifact mock."""
-    art = MagicMock()
-    art.id = f"{art_type}:{name}"
-    art.name = name
-    art.type = art_type
-    art.uuid = "aaaabbbbccccdddd1234567890123456"
-    art.project = None
-    return art
+def _make_artifact_summary(name="pdf-skill", art_type="skill"):
+    """Return a minimal CacheArtifactSummaryDTO."""
+    return CacheArtifactSummaryDTO(
+        id=f"{art_type}:{name}",
+        uuid="aaaabbbbccccdddd1234567890123456",
+        name=name,
+        type=art_type,
+        project_path=None,
+    )
 
 
 def _make_history_event(
@@ -77,17 +78,25 @@ def _make_history_event(
     )
 
 
-def _setup_session_mock(artifact=None):
-    """Build a SQLAlchemy session mock that returns artifact from name+type query."""
-    session = MagicMock()
-    if artifact is None:
-        # Return empty list — artifact not found
-        session.query.return_value.filter.return_value.filter.return_value.all.return_value = []
+def _make_history_repo(summary=None, not_found_uuid=False):
+    """Build a mock IDbArtifactHistoryRepository.
+
+    Args:
+        summary: CacheArtifactSummaryDTO to return from list/get calls.
+            Pass None to simulate artifact-not-found.
+        not_found_uuid: When True, get_cache_artifact_by_uuid returns None.
+    """
+    repo = MagicMock()
+    if summary is None:
+        repo.list_cache_artifacts_by_name_type.return_value = []
+        repo.get_cache_artifact_by_uuid.return_value = None
     else:
-        session.query.return_value.filter.return_value.filter.return_value.all.return_value = [
-            artifact
-        ]
-    return session
+        repo.list_cache_artifacts_by_name_type.return_value = [summary]
+        repo.get_cache_artifact_by_uuid.return_value = (
+            None if not_found_uuid else summary
+        )
+    repo.list_versions_for_artifacts.return_value = []
+    return repo
 
 
 # ---------------------------------------------------------------------------
@@ -96,18 +105,19 @@ def _setup_session_mock(artifact=None):
 
 
 class TestGetArtifactHistoryByTypeName:
-    def test_get_history_success_type_name(self, client):
+    def test_get_history_success_type_name(self, app, client):
         """type:name artifact_id returns 200 with history timeline."""
-        artifact = _make_cache_artifact()
+        from skillmeat.api.dependencies import get_db_artifact_history_repository
+
+        summary = _make_artifact_summary()
         event = _make_history_event()
-        session = _setup_session_mock(artifact)
+        repo = _make_history_repo(summary)
         cfg_mgr = MagicMock()
         cfg_mgr.is_analytics_enabled.return_value = False
 
+        app.dependency_overrides[get_db_artifact_history_repository] = lambda: repo
+
         with patch(
-            "skillmeat.api.routers.artifact_history.get_session",
-            return_value=session,
-        ), patch(
             "skillmeat.api.routers.artifact_history._build_version_events",
             return_value=[event],
         ), patch(
@@ -122,6 +132,8 @@ class TestGetArtifactHistoryByTypeName:
             mock_state.config_manager = cfg_mgr
             response = client.get("/api/v1/artifacts/skill:pdf-skill/history")
 
+        app.dependency_overrides.pop(get_db_artifact_history_repository, None)
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["artifact_name"] == "pdf-skill"
@@ -130,31 +142,35 @@ class TestGetArtifactHistoryByTypeName:
         assert "statistics" in data
         assert len(data["timeline"]) == 1
 
-    def test_get_history_artifact_not_found_returns_404(self, client):
+    def test_get_history_artifact_not_found_returns_404(self, app, client):
         """No matching artifact rows → 404."""
-        session = _setup_session_mock(artifact=None)
+        from skillmeat.api.dependencies import get_db_artifact_history_repository
+
+        repo = _make_history_repo(summary=None)
         cfg_mgr = MagicMock()
 
-        with patch(
-            "skillmeat.api.routers.artifact_history.get_session",
-            return_value=session,
-        ), patch("skillmeat.api.dependencies.app_state") as mock_state:
+        app.dependency_overrides[get_db_artifact_history_repository] = lambda: repo
+
+        with patch("skillmeat.api.dependencies.app_state") as mock_state:
             mock_state.config_manager = cfg_mgr
             response = client.get("/api/v1/artifacts/skill:no-such-skill/history")
 
+        app.dependency_overrides.pop(get_db_artifact_history_repository, None)
+
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_get_history_empty_timeline(self, client):
+    def test_get_history_empty_timeline(self, app, client):
         """Artifact found but no events → empty timeline."""
-        artifact = _make_cache_artifact()
-        session = _setup_session_mock(artifact)
+        from skillmeat.api.dependencies import get_db_artifact_history_repository
+
+        summary = _make_artifact_summary()
+        repo = _make_history_repo(summary)
         cfg_mgr = MagicMock()
         cfg_mgr.is_analytics_enabled.return_value = False
 
+        app.dependency_overrides[get_db_artifact_history_repository] = lambda: repo
+
         with patch(
-            "skillmeat.api.routers.artifact_history.get_session",
-            return_value=session,
-        ), patch(
             "skillmeat.api.routers.artifact_history._build_version_events",
             return_value=[],
         ), patch(
@@ -169,19 +185,17 @@ class TestGetArtifactHistoryByTypeName:
             mock_state.config_manager = cfg_mgr
             response = client.get("/api/v1/artifacts/skill:pdf-skill/history")
 
+        app.dependency_overrides.pop(get_db_artifact_history_repository, None)
+
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["timeline"] == []
 
-    def test_get_history_multiple_event_types(self, client):
+    def test_get_history_multiple_event_types(self, app, client):
         """Timeline merges version, analytics, and deployment events."""
-        artifact = _make_cache_artifact()
+        from skillmeat.api.dependencies import get_db_artifact_history_repository
+
+        summary = _make_artifact_summary()
         version_evt = _make_history_event("version:1", "version")
-        analytics_evt = _make_history_event(
-            "analytics:1",
-            "analytics",
-            # analytics source must be "analytics_events"
-        )
-        # Rebuild with correct source
         analytics_evt = ArtifactHistoryEventResponse(
             id="analytics:1",
             timestamp=datetime.now(timezone.utc),
@@ -213,14 +227,13 @@ class TestGetArtifactHistoryByTypeName:
             metadata={},
         )
 
-        session = _setup_session_mock(artifact)
+        repo = _make_history_repo(summary)
         cfg_mgr = MagicMock()
         cfg_mgr.is_analytics_enabled.return_value = True
 
+        app.dependency_overrides[get_db_artifact_history_repository] = lambda: repo
+
         with patch(
-            "skillmeat.api.routers.artifact_history.get_session",
-            return_value=session,
-        ), patch(
             "skillmeat.api.routers.artifact_history._build_version_events",
             return_value=[version_evt],
         ), patch(
@@ -235,21 +248,24 @@ class TestGetArtifactHistoryByTypeName:
             mock_state.config_manager = cfg_mgr
             response = client.get("/api/v1/artifacts/skill:pdf-skill/history")
 
+        app.dependency_overrides.pop(get_db_artifact_history_repository, None)
+
         assert response.status_code == status.HTTP_200_OK
         assert len(response.json()["timeline"]) == 3
 
-    def test_get_history_statistics_populated(self, client):
+    def test_get_history_statistics_populated(self, app, client):
         """Response statistics reflect event counts."""
-        artifact = _make_cache_artifact()
+        from skillmeat.api.dependencies import get_db_artifact_history_repository
+
+        summary = _make_artifact_summary()
         event = _make_history_event()
-        session = _setup_session_mock(artifact)
+        repo = _make_history_repo(summary)
         cfg_mgr = MagicMock()
         cfg_mgr.is_analytics_enabled.return_value = False
 
+        app.dependency_overrides[get_db_artifact_history_repository] = lambda: repo
+
         with patch(
-            "skillmeat.api.routers.artifact_history.get_session",
-            return_value=session,
-        ), patch(
             "skillmeat.api.routers.artifact_history._build_version_events",
             return_value=[event],
         ), patch(
@@ -264,6 +280,8 @@ class TestGetArtifactHistoryByTypeName:
             mock_state.config_manager = cfg_mgr
             response = client.get("/api/v1/artifacts/skill:pdf-skill/history")
 
+        app.dependency_overrides.pop(get_db_artifact_history_repository, None)
+
         stats = response.json()["statistics"]
         assert stats["total_events"] == 1
         assert stats["version_events"] == 1
@@ -275,24 +293,22 @@ class TestGetArtifactHistoryByTypeName:
 
 
 class TestGetArtifactHistoryByUUID:
-    def test_get_history_uuid_not_found_returns_404(self, client):
+    def test_get_history_uuid_not_found_returns_404(self, app, client):
         """UUID with no matching artifact → 404."""
-        # UUID path: filter(uuid == ...).first() returns None
-        session = MagicMock()
-        uuid_mock = MagicMock()
-        uuid_mock.first.return_value = None
-        session.query.return_value.filter.return_value = uuid_mock
+        from skillmeat.api.dependencies import get_db_artifact_history_repository
 
+        repo = _make_history_repo(summary=None, not_found_uuid=True)
         cfg_mgr = MagicMock()
 
-        with patch(
-            "skillmeat.api.routers.artifact_history.get_session",
-            return_value=session,
-        ), patch("skillmeat.api.dependencies.app_state") as mock_state:
+        app.dependency_overrides[get_db_artifact_history_repository] = lambda: repo
+
+        with patch("skillmeat.api.dependencies.app_state") as mock_state:
             mock_state.config_manager = cfg_mgr
             response = client.get(
                 "/api/v1/artifacts/deadbeefdeadbeef1234567890123456/history"
             )
+
+        app.dependency_overrides.pop(get_db_artifact_history_repository, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -303,17 +319,18 @@ class TestGetArtifactHistoryByUUID:
 
 
 class TestGetArtifactHistoryQueryParams:
-    def _call_with_params(self, client, params: str, artifact=None):
-        if artifact is None:
-            artifact = _make_cache_artifact()
-        session = _setup_session_mock(artifact)
+    def _call_with_params(self, app, client, params: str, summary=None):
+        from skillmeat.api.dependencies import get_db_artifact_history_repository
+
+        if summary is None:
+            summary = _make_artifact_summary()
+        repo = _make_history_repo(summary)
         cfg_mgr = MagicMock()
         cfg_mgr.is_analytics_enabled.return_value = False
 
+        app.dependency_overrides[get_db_artifact_history_repository] = lambda: repo
+
         with patch(
-            "skillmeat.api.routers.artifact_history.get_session",
-            return_value=session,
-        ), patch(
             "skillmeat.api.routers.artifact_history._build_version_events",
             return_value=[],
         ), patch(
@@ -326,38 +343,41 @@ class TestGetArtifactHistoryQueryParams:
             "skillmeat.api.dependencies.app_state"
         ) as mock_state:
             mock_state.config_manager = cfg_mgr
-            return client.get(
+            result = client.get(
                 f"/api/v1/artifacts/skill:pdf-skill/history?{params}"
             )
 
-    def test_include_versions_false(self, client):
+        app.dependency_overrides.pop(get_db_artifact_history_repository, None)
+        return result
+
+    def test_include_versions_false(self, app, client):
         """include_versions=false is accepted and returns 200."""
-        response = self._call_with_params(client, "include_versions=false")
+        response = self._call_with_params(app, client, "include_versions=false")
         assert response.status_code == status.HTTP_200_OK
 
-    def test_include_analytics_false(self, client):
+    def test_include_analytics_false(self, app, client):
         """include_analytics=false is accepted and returns 200."""
-        response = self._call_with_params(client, "include_analytics=false")
+        response = self._call_with_params(app, client, "include_analytics=false")
         assert response.status_code == status.HTTP_200_OK
 
-    def test_include_deployments_false(self, client):
+    def test_include_deployments_false(self, app, client):
         """include_deployments=false is accepted and returns 200."""
-        response = self._call_with_params(client, "include_deployments=false")
+        response = self._call_with_params(app, client, "include_deployments=false")
         assert response.status_code == status.HTTP_200_OK
 
-    def test_limit_parameter_accepted(self, client):
+    def test_limit_parameter_accepted(self, app, client):
         """limit=50 query param is accepted and returns 200."""
-        response = self._call_with_params(client, "limit=50")
+        response = self._call_with_params(app, client, "limit=50")
         assert response.status_code == status.HTTP_200_OK
 
-    def test_limit_too_large_returns_422(self, client):
+    def test_limit_too_large_returns_422(self, app, client):
         """limit exceeding max (2000) → 422 Unprocessable Entity."""
-        response = self._call_with_params(client, "limit=9999")
+        response = self._call_with_params(app, client, "limit=9999")
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_limit_zero_returns_422(self, client):
+    def test_limit_zero_returns_422(self, app, client):
         """limit=0 is below minimum (1) → 422."""
-        response = self._call_with_params(client, "limit=0")
+        response = self._call_with_params(app, client, "limit=0")
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
@@ -367,18 +387,23 @@ class TestGetArtifactHistoryQueryParams:
 
 
 class TestGetArtifactHistoryErrors:
-    def test_get_history_session_exception_returns_500(self, client):
-        """Unexpected exception during DB session → 500."""
-        session = MagicMock()
-        session.query.side_effect = RuntimeError("database connection lost")
+    def test_get_history_repo_exception_returns_500(self, app, client):
+        """Unexpected exception from repository → 500."""
+        from skillmeat.api.dependencies import get_db_artifact_history_repository
+
+        repo = MagicMock()
+        repo.list_cache_artifacts_by_name_type.side_effect = RuntimeError(
+            "database connection lost"
+        )
         cfg_mgr = MagicMock()
 
-        with patch(
-            "skillmeat.api.routers.artifact_history.get_session",
-            return_value=session,
-        ), patch("skillmeat.api.dependencies.app_state") as mock_state:
+        app.dependency_overrides[get_db_artifact_history_repository] = lambda: repo
+
+        with patch("skillmeat.api.dependencies.app_state") as mock_state:
             mock_state.config_manager = cfg_mgr
             response = client.get("/api/v1/artifacts/skill:pdf-skill/history")
+
+        app.dependency_overrides.pop(get_db_artifact_history_repository, None)
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 

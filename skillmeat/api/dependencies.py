@@ -20,6 +20,7 @@ from skillmeat.core.interfaces.repositories import (
     IArtifactRepository,
     ICollectionRepository,
     IContextEntityRepository,
+    IDbArtifactHistoryRepository,
     IDbCollectionArtifactRepository,
     IDbUserCollectionRepository,
     IDeploymentRepository,
@@ -31,6 +32,7 @@ from skillmeat.core.interfaces.repositories import (
     ITagRepository,
 )
 from skillmeat.cache.repositories import (
+    DbArtifactHistoryRepository,
     DbCollectionArtifactRepository,
     DbUserCollectionRepository,
     DeploymentProfileRepository,
@@ -767,6 +769,23 @@ DbUserCollectionRepoDep = Annotated[
 ]
 DbCollectionArtifactRepoDep = Annotated[
     IDbCollectionArtifactRepository, Depends(get_db_collection_artifact_repository)
+]
+
+
+def get_db_artifact_history_repository() -> IDbArtifactHistoryRepository:
+    """Get DbArtifactHistoryRepository dependency.
+
+    Returns a new ``DbArtifactHistoryRepository`` instance.  The repository
+    manages its own session lifecycle per operation.
+
+    Returns:
+        IDbArtifactHistoryRepository implementation backed by the SQLite cache.
+    """
+    return DbArtifactHistoryRepository()
+
+
+DbArtifactHistoryRepoDep = Annotated[
+    IDbArtifactHistoryRepository, Depends(get_db_artifact_history_repository)
 ]
 
 # Per-request SQLAlchemy session (hexagonal architecture)

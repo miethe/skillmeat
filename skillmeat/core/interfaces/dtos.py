@@ -65,6 +65,9 @@ __all__ = [
     # User collections (DB-backed)
     "UserCollectionDTO",
     "CollectionArtifactDTO",
+    # Artifact history (DB-backed)
+    "CacheArtifactSummaryDTO",
+    "ArtifactVersionDTO",
 ]
 
 
@@ -1248,6 +1251,110 @@ class CollectionArtifactDTO:
             resolved_sha=data.get("resolved_sha"),
             resolved_version=data.get("resolved_version"),
             synced_at=_to_iso(data.get("synced_at")),
+        )
+
+
+# =============================================================================
+# CacheArtifactSummaryDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class CacheArtifactSummaryDTO:
+    """Lightweight summary of a cached artifact row (``artifacts`` table).
+
+    Used by the artifact history router to resolve artifact metadata without
+    leaking ORM objects across the layer boundary.
+
+    Attributes:
+        id: Artifact primary key in ``type:name`` format.
+        uuid: Stable 32-char hex UUID (ADR-007 identity).
+        name: Human-readable artifact name.
+        type: Artifact type string (e.g. ``"skill"``, ``"command"``).
+        project_path: Filesystem path of the owning project, or ``None`` when
+            the artifact is not tied to a specific project.
+    """
+
+    id: str
+    uuid: str
+    name: str
+    type: str
+    project_path: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct a :class:`CacheArtifactSummaryDTO` from a plain dict.
+
+        Args:
+            data: Mapping with at minimum ``id``, ``uuid``, ``name``,
+                and ``type`` keys.
+
+        Returns:
+            A fully populated :class:`CacheArtifactSummaryDTO`.
+        """
+        return cls(
+            id=data["id"],
+            uuid=data["uuid"],
+            name=data["name"],
+            type=data["type"],
+            project_path=data.get("project_path"),
+        )
+
+
+# =============================================================================
+# ArtifactVersionDTO
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class ArtifactVersionDTO:
+    """Lightweight representation of an ``artifact_versions`` row.
+
+    Used by the artifact history router to build version-lineage timeline
+    events without leaking ORM objects across the layer boundary.
+
+    Attributes:
+        id: Version primary key (UUID hex).
+        artifact_id: FK to ``artifacts.id`` (``type:name``).
+        content_hash: SHA-256 hash of artifact content.
+        parent_hash: Content hash of the parent version; ``None`` for roots.
+        change_origin: Origin tag (``"deployment"``, ``"sync"``,
+            ``"local_modification"``).
+        version_lineage: JSON-encoded list of ancestor content hashes, or
+            ``None`` when no lineage was recorded.
+        created_at: ISO-8601 timestamp when the version was created.
+        metadata_json: Raw JSON metadata string, or ``None``.
+    """
+
+    id: str
+    artifact_id: str
+    content_hash: str
+    change_origin: str
+    created_at: str | None = None
+    parent_hash: str | None = None
+    version_lineage: str | None = None
+    metadata_json: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
+        """Construct an :class:`ArtifactVersionDTO` from a plain dict.
+
+        Args:
+            data: Mapping with at minimum ``id``, ``artifact_id``,
+                ``content_hash``, and ``change_origin`` keys.
+
+        Returns:
+            A fully populated :class:`ArtifactVersionDTO`.
+        """
+        return cls(
+            id=data["id"],
+            artifact_id=data["artifact_id"],
+            content_hash=data["content_hash"],
+            change_origin=data["change_origin"],
+            created_at=_to_iso(data.get("created_at")),
+            parent_hash=data.get("parent_hash"),
+            version_lineage=data.get("version_lineage"),
+            metadata_json=data.get("metadata_json") or data.get("metadata"),
         )
 
 
