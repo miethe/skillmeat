@@ -82,7 +82,7 @@ function toArtifactType(raw: string): ArtifactType {
  */
 function similarToArtifact(item: SimilarArtifact): Artifact {
   return {
-    id: item.artifact_id,
+    id: `${item.artifact_type}:${item.name}`,
     uuid: item.artifact_id,
     name: item.name,
     type: toArtifactType(item.artifact_type),
@@ -457,7 +457,7 @@ function SimilarArtifactsTabContent({
             <div key={item.artifact_id} role="listitem">
               <MiniArtifactCard
                 artifact={artifact}
-                onClick={() => onArtifactClick?.(item.artifact_id)}
+                onClick={() => onArtifactClick?.(`${item.artifact_type}:${item.name}`)}
                 showScore
                 similarityScore={item.composite_score}
                 scoreBreakdown={item.breakdown}

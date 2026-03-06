@@ -23,6 +23,7 @@ import type {
   ValidateWorkflowRequest,
   PlanWorkflowRequest,
 } from '@/types/workflow';
+import type { BatchDeleteResponse } from '@/types/common';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
@@ -413,6 +414,27 @@ export async function validateWorkflow(
   }
   const raw: ValidationResultApiResponse = await response.json();
   return mapValidationResult(raw);
+}
+
+/**
+ * Batch delete multiple workflow definitions in a single request.
+ *
+ * POST /api/v1/workflows/batch/delete
+ *
+ * @param ids - Array of workflow UUID hex strings to delete
+ * @returns BatchDeleteResponse with per-id results and summary counts
+ */
+export async function batchDeleteWorkflows(ids: string[]): Promise<BatchDeleteResponse> {
+  const response = await fetch(buildUrl('/workflows/batch/delete'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+  if (!response.ok) {
+    const detail = await extractError(response, 'Batch delete failed');
+    throw new Error(detail);
+  }
+  return response.json();
 }
 
 /**

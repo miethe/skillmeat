@@ -7,18 +7,19 @@
  * search/filter toolbar, loading skeletons, empty states, and card actions.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { GitBranch, Plus, SearchX } from 'lucide-react';
+import { GitBranch, Plus, SearchX, Trash2, Play, Tag, Copy, Download, CheckSquare } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { BulkActionBar } from '@/components/shared';
 import { WorkflowCard, WorkflowCardSkeleton } from '@/components/workflow/workflow-card';
 import { WorkflowListItem, WorkflowListItemSkeleton } from '@/components/workflow/workflow-list-item';
 import { WorkflowToolbar } from '@/components/workflow/workflow-toolbar';
 import { WorkflowDetailModal } from '@/components/workflow/workflow-detail-modal';
 import { ExecutionDetailModal } from '@/components/workflow/execution-detail-modal';
 import { Button } from '@/components/ui/button';
-import { useWorkflows, useDeleteWorkflow, useDuplicateWorkflow } from '@/hooks';
+import { useWorkflows, useDeleteWorkflow, useBatchDeleteWorkflows, useDuplicateWorkflow, useMultiSelect, useToast } from '@/hooks';
 import type { WorkflowFilters } from '@/types/workflow';
 
 // ---------------------------------------------------------------------------
@@ -38,10 +39,12 @@ const SKELETON_COUNT = 6;
 
 export default function WorkflowsPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   // ── State ────────────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<WorkflowFilters>(DEFAULT_FILTERS);
   const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [selectionMode, setSelectionMode] = useState(false);
 
   // Modal state
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
@@ -50,9 +53,22 @@ export default function WorkflowsPage() {
 
   // ── Data ─────────────────────────────────────────────────────────────────
   const { data, isLoading, isError } = useWorkflows(filters);
-  const workflows = data?.items ?? [];
+  // useMemo prevents infinite re-render: useMultiSelect depends on items reference
+  const workflows = useMemo(() => data?.items ?? [], [data?.items]);
+
+  // ── Multi-select ──────────────────────────────────────────────────────────
+  const {
+    isSelected,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    hasSelection,
+    selectedCount,
+    isAllSelected,
+  } = useMultiSelect(workflows);
 
   const deleteWorkflow = useDeleteWorkflow();
+  const batchDeleteWorkflows = useBatchDeleteWorkflows();
   const duplicateWorkflow = useDuplicateWorkflow();
 
   // ── Derived state ─────────────────────────────────────────────────────────
@@ -130,6 +146,61 @@ export default function WorkflowsPage() {
     [deleteWorkflow]
   );
 
+  const handleToggleSelectionMode = useCallback(() => {
+    setSelectionMode((prev) => {
+      if (prev) clearSelection();
+      return !prev;
+    });
+  }, [clearSelection]);
+
+  const handleBulkDelete = useCallback(async () => {
+    const selectedWorkflows = workflows.filter((wf) => isSelected(wf.id));
+    if (selectedWorkflows.length === 0) return;
+    const names = selectedWorkflows.map((wf) => wf.name).join(', ');
+    const confirmed = window.confirm(
+      `Delete ${selectedCount} workflow${selectedCount === 1 ? '' : 's'} (${names})?\n\nThis action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const result = await batchDeleteWorkflows.mutateAsync(selectedWorkflows.map((wf) => wf.id));
+      clearSelection();
+      setSelectionMode(false);
+      if (result.failed === 0) {
+        toast({
+          title: `${result.succeeded} ${result.succeeded === 1 ? 'workflow' : 'workflows'} deleted`,
+          description: 'Successfully deleted selected workflows.',
+        });
+      } else {
+        toast({
+          title: 'Partial deletion',
+          description: `${result.succeeded} deleted, ${result.failed} failed.`,
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      toast({
+        title: 'Batch delete failed',
+        description: err instanceof Error ? err.message : 'Could not delete workflows',
+        variant: 'destructive',
+      });
+    }
+  }, [workflows, isSelected, selectedCount, batchDeleteWorkflows, clearSelection, toast]);
+
+  const handleBulkRun = useCallback(() => {
+    const selectedWorkflows = workflows.filter((wf) => isSelected(wf.id));
+    for (const wf of selectedWorkflows) {
+      handleRun(wf.id, wf.name);
+    }
+    clearSelection();
+    setSelectionMode(false);
+  }, [workflows, isSelected, handleRun, clearSelection]);
+
+  const handleBulkPlaceholder = useCallback((action: string) => {
+    // Placeholder for future bulk actions
+    console.log(`[WorkflowsPage] Bulk ${action} requested — coming soon`);
+  }, []);
+
   // ── Render helpers ────────────────────────────────────────────────────────
 
   function renderSkeletons() {
@@ -202,11 +273,14 @@ export default function WorkflowsPage() {
           <WorkflowCard
             key={workflow.id}
             workflow={workflow}
-            onClick={() => handleWorkflowClick(workflow.id)}
+            onClick={selectionMode ? undefined : () => handleWorkflowClick(workflow.id)}
             onRun={() => handleRun(workflow.id, workflow.name)}
             onEdit={() => handleEdit(workflow.id)}
             onDuplicate={() => handleDuplicate(workflow.id)}
             onDelete={() => handleDelete(workflow.id, workflow.name)}
+            selectionMode={selectionMode}
+            isSelected={isSelected(workflow.id)}
+            onToggleSelect={() => toggleSelection(workflow.id)}
           />
         ))}
       </div>
@@ -221,11 +295,14 @@ export default function WorkflowsPage() {
             <WorkflowListItem
               key={workflow.id}
               workflow={workflow}
-              onClick={() => handleWorkflowClick(workflow.id)}
+              onClick={selectionMode ? undefined : () => handleWorkflowClick(workflow.id)}
               onRun={() => handleRun(workflow.id, workflow.name)}
               onEdit={() => handleEdit(workflow.id)}
               onDuplicate={() => handleDuplicate(workflow.id)}
               onDelete={() => handleDelete(workflow.id, workflow.name)}
+              selectionMode={selectionMode}
+              isSelected={isSelected(workflow.id)}
+              onToggleSelect={() => toggleSelection(workflow.id)}
             />
           ))}
         </ul>
@@ -253,12 +330,54 @@ export default function WorkflowsPage() {
       />
 
       {/* Toolbar: search, status filter, sort, view toggle */}
-      <WorkflowToolbar
-        filters={filters}
-        onFiltersChange={setFilters}
-        view={view}
-        onViewChange={setView}
-      />
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <WorkflowToolbar
+            filters={filters}
+            onFiltersChange={setFilters}
+            view={view}
+            onViewChange={setView}
+          />
+        </div>
+        {/* Selection mode controls */}
+        {!isEmpty && !isLoading && !isError && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {selectionMode && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-sm"
+                  onClick={selectAll}
+                  disabled={isAllSelected}
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-sm"
+                  onClick={clearSelection}
+                  disabled={!hasSelection}
+                >
+                  Select None
+                </Button>
+              </>
+            )}
+            <Button
+              variant={selectionMode ? 'secondary' : 'outline'}
+              size="sm"
+              className="h-9 gap-1.5 text-sm"
+              onClick={handleToggleSelectionMode}
+              aria-pressed={selectionMode}
+              aria-label={selectionMode ? 'Exit selection mode' : 'Enter selection mode'}
+            >
+              <CheckSquare className="h-4 w-4" aria-hidden="true" />
+              {selectionMode ? 'Done' : 'Select'}
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Content area */}
       <main aria-label="Workflow list">
@@ -296,6 +415,50 @@ export default function WorkflowsPage() {
         open={selectedExecutionId !== null}
         onClose={handleCloseExecutionModal}
         onWorkflowClick={handleExecutionWorkflowClick}
+      />
+
+      {/* Bulk action bar — slides up when items are selected */}
+      <BulkActionBar
+        selectedCount={selectedCount}
+        hasSelection={selectionMode && hasSelection}
+        onClearSelection={clearSelection}
+        actions={[
+          {
+            id: 'delete',
+            label: 'Delete',
+            icon: <Trash2 className="h-3.5 w-3.5" />,
+            variant: 'destructive',
+            onClick: handleBulkDelete,
+          },
+          {
+            id: 'run',
+            label: 'Run',
+            icon: <Play className="h-3.5 w-3.5 fill-current" />,
+            variant: 'default',
+            onClick: handleBulkRun,
+          },
+          {
+            id: 'tag',
+            label: 'Add Tags',
+            icon: <Tag className="h-3.5 w-3.5" />,
+            variant: 'outline',
+            onClick: () => handleBulkPlaceholder('tag'),
+          },
+          {
+            id: 'duplicate',
+            label: 'Duplicate',
+            icon: <Copy className="h-3.5 w-3.5" />,
+            variant: 'outline',
+            onClick: () => handleBulkPlaceholder('duplicate'),
+          },
+          {
+            id: 'export',
+            label: 'Export',
+            icon: <Download className="h-3.5 w-3.5" />,
+            variant: 'outline',
+            onClick: () => handleBulkPlaceholder('export'),
+          },
+        ]}
       />
     </div>
   );

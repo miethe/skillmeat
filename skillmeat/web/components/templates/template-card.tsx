@@ -15,6 +15,7 @@ import { Eye, Rocket, Package } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -44,6 +45,12 @@ export interface TemplateCardProps {
   onPreview?: (template: Template) => void;
   /** Callback when deploy button is clicked */
   onDeploy?: (template: Template) => void;
+  /** When true, shows a selection checkbox in the top-left corner */
+  selectionMode?: boolean;
+  /** Whether this card is currently selected */
+  isSelected?: boolean;
+  /** Called when the selection checkbox is toggled */
+  onToggleSelect?: () => void;
 }
 
 // ============================================================================
@@ -81,7 +88,14 @@ export interface TemplateCardProps {
  * @param props - TemplateCardProps configuration
  * @returns Card component with template information and actions
  */
-export function TemplateCard({ template, onPreview, onDeploy }: TemplateCardProps) {
+export function TemplateCard({
+  template,
+  onPreview,
+  onDeploy,
+  selectionMode = false,
+  isSelected = false,
+  onToggleSelect,
+}: TemplateCardProps) {
   const handlePreview = (e: React.MouseEvent) => {
     e.stopPropagation();
     onPreview?.(template);
@@ -92,18 +106,39 @@ export function TemplateCard({ template, onPreview, onDeploy }: TemplateCardProp
     onDeploy?.(template);
   };
 
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleSelect?.();
+  };
+
   return (
     <Card
       className={cn(
         'group relative',
         'transition-all duration-200',
         'hover:scale-[1.02] hover:shadow-md',
-        'flex h-full flex-col'
+        'flex h-full flex-col',
+        isSelected && 'ring-2 ring-primary'
       )}
       role="article"
       aria-label={`Template: ${template.name}`}
     >
-      <CardHeader className="pb-3">
+      {/* Selection checkbox — only rendered in selection mode */}
+      {selectionMode && (
+        <div
+          className="absolute left-3 top-3 z-10"
+          onClick={handleCheckboxClick}
+          aria-label={isSelected ? `Deselect ${template.name}` : `Select ${template.name}`}
+        >
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect?.()}
+            aria-label={isSelected ? `Deselect ${template.name}` : `Select ${template.name}`}
+          />
+        </div>
+      )}
+
+      <CardHeader className={cn('pb-3', selectionMode && 'pl-10')}>
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-lg font-semibold leading-tight">{template.name}</h3>
           <Package className="h-5 w-5 flex-shrink-0 text-muted-foreground" />

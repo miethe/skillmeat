@@ -15,6 +15,7 @@ import {
   deleteContextEntity,
   fetchContextEntityContent,
   deployContextEntity,
+  batchDeleteContextEntities,
 } from '@/lib/api/context-entities';
 import type {
   ContextEntity,
@@ -25,6 +26,7 @@ import type {
   ContextEntityDeployRequest,
   ContextEntityDeployResponse,
 } from '@/types/context-entity';
+import type { BatchDeleteResponse } from '@/types/common';
 
 /**
  * Query keys factory for type-safe cache management
@@ -221,6 +223,29 @@ export function useDeleteContextEntity() {
     },
     onSuccess: () => {
       // Invalidate context entities list to remove deleted item
+      queryClient.invalidateQueries({ queryKey: contextEntityKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Batch delete multiple context entities mutation
+ *
+ * @returns Mutation with `mutateAsync(ids: string[]) => BatchDeleteResponse`
+ *
+ * @example
+ * ```tsx
+ * const batchDelete = useBatchDeleteContextEntities();
+ * const result = await batchDelete.mutateAsync(['id-1', 'id-2']);
+ * console.log(`${result.succeeded} deleted, ${result.failed} failed`);
+ * ```
+ */
+export function useBatchDeleteContextEntities() {
+  const queryClient = useQueryClient();
+
+  return useMutation<BatchDeleteResponse, Error, string[]>({
+    mutationFn: (ids) => batchDeleteContextEntities(ids),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: contextEntityKeys.lists() });
     },
   });

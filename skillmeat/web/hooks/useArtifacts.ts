@@ -319,7 +319,7 @@ async function fetchArtifactsFromApi(
   }
 }
 
-async function fetchArtifactFromApi(id: string): Promise<Artifact | null> {
+export async function fetchArtifactFromApi(id: string): Promise<Artifact | null> {
   try {
     const artifact = await apiRequest<ArtifactResponse>(`/artifacts/${encodeURIComponent(id)}`);
     return mapApiResponseToArtifact(artifact, 'collection');

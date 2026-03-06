@@ -123,3 +123,25 @@ class ErrorResponse(BaseModel):
                 ],
             }
         }
+
+
+class BatchDeleteRequest(BaseModel):
+    """Request body for a batch delete operation."""
+
+    ids: List[str] = Field(..., min_length=1, max_length=50)
+
+
+class BatchDeleteResult(BaseModel):
+    """Per-item result within a batch delete response."""
+
+    id: str
+    success: bool
+    error: Optional[str] = None
+
+
+class BatchDeleteResponse(BaseModel):
+    """Response body for a batch delete operation."""
+
+    results: List[BatchDeleteResult]
+    succeeded: int
+    failed: int

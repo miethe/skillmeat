@@ -41,6 +41,7 @@ from skillmeat.api.schemas.settings import (
     SimilarityThresholdsResponse,
     SimilarityThresholdsUpdateRequest,
 )
+from skillmeat.cache.models import ContextEntityCategory, get_session
 from skillmeat.core.validators.context_entity import invalidate_entity_type_cache
 from skillmeat.core.github_client import (
     GitHubAuthError,
@@ -1314,7 +1315,7 @@ async def create_entity_category(
 
 
 @router.put(
-    "/entity-categories/{category_id}",
+    "/entity-categories/{category_slug}",
     response_model=ContextEntityCategoryResponse,
     status_code=status.HTTP_200_OK,
     summary="Update an entity category",
@@ -1323,18 +1324,19 @@ async def create_entity_category(
 
     Only supplied (non-``null``) fields are updated; others remain unchanged.
 
+    Returns 404 if no category with the given slug exists.
     Returns 409 Conflict if the new slug collides with an existing row.
     """,
 )
 async def update_entity_category(
-    category_id: int,
+    category_slug: str,
     request: ContextEntityCategoryUpdateRequest,
     settings_repo: SettingsRepoDep,
 ) -> ContextEntityCategoryResponse:
     """Update an existing entity category.
 
     Args:
-        category_id: Integer primary key of the category to update.
+        category_slug: URL slug of the category to update.
         request: Partial update request; omitted fields are left unchanged.
         settings_repo: Settings repository dependency.
 
@@ -1342,15 +1344,27 @@ async def update_entity_category(
         The updated entity category row.
 
     Raises:
-        HTTPException 404: If no category with the given ID exists.
+        HTTPException 404: If no category with the given slug exists.
         HTTPException 409: If the requested new slug is already taken.
         HTTPException 500: If the repository write fails unexpectedly.
     """
+    with get_session() as session:
+        category = session.query(ContextEntityCategory).filter(
+            ContextEntityCategory.slug == category_slug
+        ).first()
+        if category is None:
+            logger.warning(f"update_entity_category: slug={category_slug!r} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Entity category with slug '{category_slug}' not found.",
+            )
+        category_id = category.id
+
     updates = request.model_dump(exclude_none=True)
     try:
         dto = settings_repo.update_category(category_id=category_id, updates=updates)
         logger.info(
-            f"update_entity_category: updated id={category_id!r} fields={list(updates)!r}"
+            f"update_entity_category: updated slug={category_slug!r} fields={list(updates)!r}"
         )
         return ContextEntityCategoryResponse(
             id=int(dto.id),
@@ -1369,7 +1383,7 @@ async def update_entity_category(
         logger.warning(f"update_entity_category: id={category_id!r} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Entity category with id '{category_id}' not found.",
+            detail=f"Entity category with slug '{category_slug}' not found.",
         ) from exc
     except ValueError as exc:
         slug_msg = str(exc)
@@ -1388,7 +1402,7 @@ async def update_entity_category(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception(f"Failed to update entity category {category_id!r}: {exc}")
+        logger.exception(f"Failed to update entity category {category_slug!r}: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update entity category.",
@@ -1396,46 +1410,59 @@ async def update_entity_category(
 
 
 @router.delete(
-    "/entity-categories/{category_id}",
+    "/entity-categories/{category_slug}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete an entity category",
     description="""
-    Delete an entity category by integer ID.
+    Delete an entity category by slug.
 
+    Returns 404 if no category with the given slug exists.
     Returns 409 Conflict if the category has one or more artifact
     associations (i.e. artifacts are still tagged with this category).
     Disassociate all artifacts first, then retry.
     """,
 )
 async def delete_entity_category(
-    category_id: int,
+    category_slug: str,
     settings_repo: SettingsRepoDep,
 ) -> None:
     """Delete an entity category.
 
     Args:
-        category_id: Integer primary key of the category to delete.
+        category_slug: URL slug of the category to delete.
         settings_repo: Settings repository dependency.
 
     Raises:
-        HTTPException 404: If no category with the given ID exists.
+        HTTPException 404: If no category with the given slug exists.
         HTTPException 409: If the category has artifact associations.
         HTTPException 500: If the repository write fails unexpectedly.
     """
+    with get_session() as session:
+        category = session.query(ContextEntityCategory).filter(
+            ContextEntityCategory.slug == category_slug
+        ).first()
+        if category is None:
+            logger.warning(f"delete_entity_category: slug={category_slug!r} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Entity category with slug '{category_slug}' not found.",
+            )
+        category_id = category.id
+
     try:
         settings_repo.delete_category(category_id=category_id)
-        logger.info(f"delete_entity_category: deleted id={category_id!r}")
+        logger.info(f"delete_entity_category: deleted slug={category_slug!r}")
     except KeyError as exc:
-        logger.warning(f"delete_entity_category: id={category_id!r} not found")
+        logger.warning(f"delete_entity_category: slug={category_slug!r} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Entity category with id '{category_id}' not found.",
+            detail=f"Entity category with slug '{category_slug}' not found.",
         ) from exc
     except ValueError as exc:
         # Association guard from repo layer
         assoc_msg = str(exc)
         logger.warning(
-            f"delete_entity_category: id={category_id!r} has associations; "
+            f"delete_entity_category: slug={category_slug!r} has associations; "
             "refusing deletion"
         )
         raise HTTPException(
@@ -1445,7 +1472,7 @@ async def delete_entity_category(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception(f"Failed to delete entity category {category_id!r}: {exc}")
+        logger.exception(f"Failed to delete entity category {category_slug!r}: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete entity category.",

@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from skillmeat.api.config import APISettings, get_settings
+from skillmeat.api.schemas.common import BatchDeleteRequest, BatchDeleteResponse, BatchDeleteResult
 from skillmeat.core.workflow.exceptions import (
     WorkflowNotFoundError,
     WorkflowParseError,
@@ -243,6 +244,50 @@ async def create_workflow(
         ) from exc
 
     return _dto_to_dict(dto)
+
+
+@router.post(
+    "/batch/delete",
+    summary="Batch delete workflows",
+    description=(
+        "Delete multiple workflows in a single request. "
+        "Returns per-item success/failure results rather than failing the whole "
+        "request on partial errors."
+    ),
+    response_model=BatchDeleteResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def batch_delete_workflows(
+    request: BatchDeleteRequest,
+) -> BatchDeleteResponse:
+    """Batch delete workflows by ID.
+
+    Args:
+        request: Batch delete request with list of workflow IDs
+
+    Returns:
+        BatchDeleteResponse with per-item results and aggregate counts
+    """
+    results: List[BatchDeleteResult] = []
+    succeeded = 0
+    failed = 0
+
+    for item_id in request.ids:
+        svc = _get_service()
+        try:
+            svc.delete(item_id)
+            results.append(BatchDeleteResult(id=item_id, success=True))
+            succeeded += 1
+        except WorkflowNotFoundError:
+            results.append(BatchDeleteResult(id=item_id, success=False, error="Not found"))
+            failed += 1
+        except Exception:
+            logger.exception("Failed to delete workflow %s", item_id)
+            results.append(BatchDeleteResult(id=item_id, success=False, error="Unexpected error"))
+            failed += 1
+
+    logger.info("Batch deleted workflows: %d succeeded, %d failed", succeeded, failed)
+    return BatchDeleteResponse(results=results, succeeded=succeeded, failed=failed)
 
 
 @router.get(

@@ -38,6 +38,7 @@ import { Button } from '@/components/ui/button';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
 import type { ArtifactParameters } from '@/types/discovery';
 import { mapApiResponseToArtifact, type ArtifactResponse } from '@/lib/api/mappers';
+import { fetchArtifactFromApi } from '@/hooks/useArtifacts';
 import { mapArtifactsToEntities } from '@/lib/api/entity-mapper';
 import type { FilterMode } from '@/components/collection/collection-toolbar';
 
@@ -1017,17 +1018,29 @@ function CollectionPageContent() {
   // Looks up the artifact from the currently loaded artifact pool and switches the modal to it
   // without a full page navigation, so the existing modal closes cleanly and the new one opens.
   const handleNavigateToArtifact = useCallback(
-    (artifactId: string) => {
+    async (artifactId: string) => {
+      // Fast path: artifact already loaded in the current page
       const artifact = filteredArtifacts.find(
         (a) => a.id === artifactId || a.name === artifactId
       );
       if (artifact) {
         setSelectedArtifact(artifact);
         setIsDetailOpen(true);
+        updateUrlParams({ artifact: artifactId, tab: null });
+        return;
       }
-      // Always update URL for deep-link consistency. If artifact wasn't found in the
-      // filtered list the auto-open effect will resolve it once data is loaded.
+
+      // Slow path: artifact not yet paginated — fetch it directly from the API
       updateUrlParams({ artifact: artifactId, tab: null });
+      try {
+        const fetched = await fetchArtifactFromApi(artifactId);
+        if (fetched) {
+          setSelectedArtifact(fetched);
+          setIsDetailOpen(true);
+        }
+      } catch {
+        // If fetch fails, the URL is already updated; user can retry via deep link
+      }
     },
     [filteredArtifacts, updateUrlParams]
   );
