@@ -652,6 +652,7 @@ class LocalSettingsRepository(ISettingsRepository):
                 )
 
             session.delete(category)
+            session.flush()
 
     # ------------------------------------------------------------------
     # Private helpers
