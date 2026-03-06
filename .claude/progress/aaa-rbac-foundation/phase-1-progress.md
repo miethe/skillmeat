@@ -2,110 +2,140 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "aaa-rbac-foundation"
-feature_slug: "aaa-rbac-foundation"
+prd: aaa-rbac-foundation
+feature_slug: aaa-rbac-foundation
 prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/aaa-rbac-foundation-v1.md
 phase: 1
-title: "Database Layer - Authentication Schema & Tenancy Fields"
-status: "planning"
-started: null
+title: Database Layer - Authentication Schema & Tenancy Fields
+status: pending
+started: '2026-03-06'
 completed: null
 commit_refs: []
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 7
-completed_tasks: 0
+completed_tasks: 1
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["data-layer-expert"]
-contributors: ["backend-architect"]
-
+owners:
+- data-layer-expert
+contributors:
+- backend-architect
 tasks:
-  - id: "DB-001"
-    description: "Design auth schema (users, teams, team_members, roles tables)"
-    status: "pending"
-    assigned_to: ["data-layer-expert", "backend-architect"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "DB-002"
-    description: "Add owner_id, owner_type, visibility columns to local models (Artifact, Collection, Project, Group)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-001"]
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "DB-003"
-    description: "Add owner_id, owner_type, visibility columns to enterprise models"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-001"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "DB-004"
-    description: "Create Alembic migration for SQLite schema (users, teams, team_members, column adds)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-002"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "DB-005"
-    description: "Create Alembic migration for PostgreSQL enterprise schema"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-003"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "DB-006"
-    description: "Add data migration to populate local_admin user and assign ownership to existing data"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-004"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "DB-007"
-    description: "Add indexes on owner_id, tenant_id; foreign key constraints for team_members"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-005"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
+- id: DB-001
+  description: Design auth schema (users, teams, team_members, roles tables)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  - backend-architect
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: high
+- id: DB-002
+  description: Add owner_id, owner_type, visibility columns to local models (Artifact,
+    Collection, Project, Group)
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-001
+  estimated_effort: 3 pts
+  priority: high
+- id: DB-003
+  description: Add owner_id, owner_type, visibility columns to enterprise models
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-001
+  estimated_effort: 2 pts
+  priority: high
+- id: DB-004
+  description: Create Alembic migration for SQLite schema (users, teams, team_members,
+    column adds)
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-002
+  estimated_effort: 2 pts
+  priority: high
+- id: DB-005
+  description: Create Alembic migration for PostgreSQL enterprise schema
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-003
+  estimated_effort: 2 pts
+  priority: high
+- id: DB-006
+  description: Add data migration to populate local_admin user and assign ownership
+    to existing data
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-004
+  estimated_effort: 1 pt
+  priority: medium
+- id: DB-007
+  description: Add indexes on owner_id, tenant_id; foreign key constraints for team_members
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-005
+  estimated_effort: 1 pt
+  priority: medium
 parallelization:
-  batch_1: ["DB-001"]
-  batch_2: ["DB-002", "DB-003"]
-  batch_3: ["DB-004", "DB-005"]
-  batch_4: ["DB-006", "DB-007"]
-  critical_path: ["DB-001", "DB-002", "DB-004", "DB-006"]
-  estimated_total_time: "5 days"
-
+  batch_1:
+  - DB-001
+  batch_2:
+  - DB-002
+  - DB-003
+  batch_3:
+  - DB-004
+  - DB-005
+  batch_4:
+  - DB-006
+  - DB-007
+  critical_path:
+  - DB-001
+  - DB-002
+  - DB-004
+  - DB-006
+  estimated_total_time: 5 days
 blockers: []
-
 success_criteria:
-  - { id: "SC-1", description: "Database schema validated (ERD doc reviewed)", status: "pending" }
-  - { id: "SC-2", description: "Local migration runs successfully on SQLite", status: "pending" }
-  - { id: "SC-3", description: "Enterprise migration runs successfully on PostgreSQL", status: "pending" }
-  - { id: "SC-4", description: "All constraints and indexes in place", status: "pending" }
-  - { id: "SC-5", description: "Existing data defaults to local_admin user", status: "pending" }
-  - { id: "SC-6", description: "Down migrations tested and work correctly", status: "pending" }
-
+- id: SC-1
+  description: Database schema validated (ERD doc reviewed)
+  status: pending
+- id: SC-2
+  description: Local migration runs successfully on SQLite
+  status: pending
+- id: SC-3
+  description: Enterprise migration runs successfully on PostgreSQL
+  status: pending
+- id: SC-4
+  description: All constraints and indexes in place
+  status: pending
+- id: SC-5
+  description: Existing data defaults to local_admin user
+  status: pending
+- id: SC-6
+  description: Down migrations tested and work correctly
+  status: pending
 files_modified:
-  - "skillmeat/cache/models.py"
-  - "skillmeat/cache/enterprise_models.py"
-  - "skillmeat/cache/constants.py"
-  - "skillmeat/cache/migrations/versions/*.py"
+- skillmeat/cache/models.py
+- skillmeat/cache/enterprise_models.py
+- skillmeat/cache/constants.py
+- skillmeat/cache/migrations/versions/*.py
+updated: '2026-03-06'
+progress: 14
 ---
 
 # aaa-rbac-foundation - Phase 1: Database Layer - Authentication Schema & Tenancy Fields

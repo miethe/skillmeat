@@ -1,26 +1,39 @@
 ---
-title: "Implementation Plan: AAA & RBAC Foundation (Individual & Team)"
+title: 'Implementation Plan: AAA & RBAC Foundation (Individual & Team)'
 schema_version: 2
 doc_type: implementation_plan
-status: draft
+status: in-progress
 created: 2026-03-06
-updated: 2026-03-06
+updated: '2026-03-06'
 feature_slug: aaa-rbac-foundation
 feature_version: v1
 prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 plan_ref: null
-scope: "Implement pluggable authentication (LocalAuthProvider/ClerkAuthProvider), centralized RBAC middleware, data tenancy with owner_id/visibility fields, and CLI auth flows (device code + PAT) while maintaining zero-auth local mode."
-effort_estimate: "47 story points"
-architecture_summary: "Database layer adds users/teams/team_members tables and owner/visibility columns. Repository layer gains TenantContext propagation. Service layer becomes auth-context-aware. API layer gains dependency-injected require_auth middleware. Frontend integrates Clerk SDK. CLI implements device code flow + PAT storage."
+scope: Implement pluggable authentication (LocalAuthProvider/ClerkAuthProvider), centralized
+  RBAC middleware, data tenancy with owner_id/visibility fields, and CLI auth flows
+  (device code + PAT) while maintaining zero-auth local mode.
+effort_estimate: 47 story points
+architecture_summary: Database layer adds users/teams/team_members tables and owner/visibility
+  columns. Repository layer gains TenantContext propagation. Service layer becomes
+  auth-context-aware. API layer gains dependency-injected require_auth middleware.
+  Frontend integrates Clerk SDK. CLI implements device code flow + PAT storage.
 priority: high
 risk_level: medium
 category: product-planning
-tags: [implementation, planning, phases, auth, rbac, tenancy, cli]
+tags:
+- implementation
+- planning
+- phases
+- auth
+- rbac
+- tenancy
+- cli
 related_documents:
-  - /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
-  - /.claude/context/key-context/tenant-scoping-strategy.md
-  - /docs/project_plans/architecture/enterprise-db-schema-v1.md
-request_log_ids: ["REQ-20260306-skillmeat"]
+- /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
+- /.claude/context/key-context/tenant-scoping-strategy.md
+- /docs/project_plans/architecture/enterprise-db-schema-v1.md
+request_log_ids:
+- REQ-20260306-skillmeat
 ---
 
 # Implementation Plan: AAA & RBAC Foundation (Individual & Team)
