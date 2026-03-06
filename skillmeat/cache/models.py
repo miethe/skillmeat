@@ -56,6 +56,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from skillmeat.core.clone_target import CloneTarget
 
+from skillmeat.cache.auth_types import OwnerType, Visibility
+
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -162,6 +164,15 @@ class Project(Base):
         server_default="active",
     )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Ownership and visibility
+    owner_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=OwnerType.user.value
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=Visibility.private.value
+    )
 
     # Relationships
     artifacts: Mapped[List["Artifact"]] = relationship(
@@ -311,6 +322,15 @@ class Artifact(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Ownership and visibility
+    owner_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=OwnerType.user.value
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=Visibility.private.value
     )
 
     # Relationships
@@ -821,6 +841,15 @@ class Collection(Base):
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
+    # Ownership and visibility
+    owner_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=OwnerType.user.value
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=Visibility.private.value
+    )
+
     # Relationships
     groups: Mapped[List["Group"]] = relationship(
         "Group",
@@ -950,6 +979,15 @@ class Group(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Ownership and visibility
+    owner_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=OwnerType.user.value
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=Visibility.private.value
     )
 
     # Relationships

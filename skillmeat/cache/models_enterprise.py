@@ -265,6 +265,28 @@ class EnterpriseArtifact(EnterpriseBase):
     )
 
     # -------------------------------------------------------------------------
+    # Ownership and visibility  (DB-003)
+    # -------------------------------------------------------------------------
+
+    owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        comment="UUID of the user who owns this artifact; NULL = system/unowned",
+    )
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        default="user",
+        comment="Owner type; stores OwnerType enum value, e.g. 'user' or 'team'",
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        default="private",
+        comment="Visibility level; stores Visibility enum value, e.g. 'private', 'internal', 'public'",
+    )
+
+    # -------------------------------------------------------------------------
     # Relationships
     # -------------------------------------------------------------------------
 
@@ -354,6 +376,11 @@ class EnterpriseArtifact(EnterpriseBase):
         #       postgresql_where="source_url IS NOT NULL",
         #       postgresql_concurrently=True,
         #   )
+        # B-tree: owner lookup — find all artifacts owned by a given user (DB-003)
+        Index(
+            "ix_enterprise_artifacts_owner_id",
+            "owner_id",
+        ),
     )
 
     def __repr__(self) -> str:
@@ -743,6 +770,28 @@ class EnterpriseCollection(EnterpriseBase):
     )
 
     # -------------------------------------------------------------------------
+    # Ownership and visibility  (DB-003)
+    # -------------------------------------------------------------------------
+
+    owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        comment="UUID of the user who owns this collection; NULL = system/unowned",
+    )
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        default="user",
+        comment="Owner type; stores OwnerType enum value, e.g. 'user' or 'team'",
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        default="private",
+        comment="Visibility level; stores Visibility enum value, e.g. 'private', 'internal', 'public'",
+    )
+
+    # -------------------------------------------------------------------------
     # Audit
     # -------------------------------------------------------------------------
 
@@ -812,6 +861,11 @@ class EnterpriseCollection(EnterpriseBase):
             "tenant_id",
             "is_default",
             postgresql_where=text("is_default = TRUE"),
+        ),
+        # B-tree: owner lookup — find all collections owned by a given user (DB-003)
+        Index(
+            "ix_enterprise_collections_owner_id",
+            "owner_id",
         ),
     )
 

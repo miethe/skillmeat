@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 7
-completed_tasks: 1
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -37,7 +37,7 @@ tasks:
 - id: DB-002
   description: Add owner_id, owner_type, visibility columns to local models (Artifact,
     Collection, Project, Group)
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -46,7 +46,7 @@ tasks:
   priority: high
 - id: DB-003
   description: Add owner_id, owner_type, visibility columns to enterprise models
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -135,7 +135,7 @@ files_modified:
 - skillmeat/cache/constants.py
 - skillmeat/cache/migrations/versions/*.py
 updated: '2026-03-06'
-progress: 14
+progress: 42
 ---
 
 # aaa-rbac-foundation - Phase 1: Database Layer - Authentication Schema & Tenancy Fields
