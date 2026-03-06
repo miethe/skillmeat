@@ -32,6 +32,12 @@ from skillmeat.core.services.custom_color_service import (
     CustomColorService,
     NotFoundError as CustomColorNotFoundError,
 )
+from skillmeat.core.services.enterprise_content import (
+    EnterpriseContentService,
+    ArtifactNotFoundError as EnterpriseArtifactNotFoundError,
+    ArtifactVersionNotFoundError,
+    ArtifactFilesystemError,
+)
 
 __all__ = [
     # Template service
@@ -63,4 +69,9 @@ __all__ = [
     # Custom color service
     "CustomColorService",
     "CustomColorNotFoundError",
+    # Enterprise content service
+    "EnterpriseContentService",
+    "EnterpriseArtifactNotFoundError",
+    "ArtifactVersionNotFoundError",
+    "ArtifactFilesystemError",
 ]

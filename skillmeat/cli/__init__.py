@@ -24,6 +24,7 @@ from rich.status import Status
 
 from skillmeat import __version__
 from skillmeat.config import ConfigManager
+from skillmeat.core.enterprise_config import get_enterprise_config
 from skillmeat.core.collection import CollectionManager
 from skillmeat.core.refresher import CollectionRefresher, RefreshMode, RefreshResult
 from skillmeat.core.artifact import ArtifactManager, ArtifactType, UpdateStrategy
@@ -74,6 +75,15 @@ def main(ctx, smart_defaults):
     """
     ctx.ensure_object(dict)
     ctx.obj["smart_defaults"] = smart_defaults
+
+    # Log active edition once at startup (enterprise only — community is silent).
+    ent_cfg = get_enterprise_config()
+    if ent_cfg.is_enterprise():
+        api_display = ent_cfg.api_url or "(no API URL set)"
+        console.print(
+            f"[bold cyan][enterprise][/bold cyan] SkillMeat Enterprise mode active"
+            f" — API: {api_display}"
+        )
 
 
 # ====================
