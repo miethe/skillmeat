@@ -7,12 +7,11 @@ Distinct from file-based collections in collections.py router.
 import base64
 import json
 import logging
-import uuid
 from datetime import datetime
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
-from sqlalchemy import insert, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import (
@@ -234,34 +233,27 @@ def ensure_default_collection(
     return dto
 
 
-def _ensure_collection_project_sentinel(session: Session) -> None:
+def _ensure_collection_project_sentinel(
+    collection_repo: IDbUserCollectionRepository,
+) -> None:
     """Ensure the sentinel Project row for collection artifacts exists.
 
     Artifact rows require a project_id FK. Collection-level (filesystem)
     artifacts are not tied to any real deployed project, so we use a
     sentinel project to satisfy the constraint.
+
+    Delegates to :meth:`IDbUserCollectionRepository.ensure_sentinel_project`
+    which manages its own session and transaction.
     """
-    existing = session.execute(
-        select(Project).filter_by(id=COLLECTION_ARTIFACTS_PROJECT_ID)
-    ).scalar_one_or_none()
-    if not existing:
-        session.execute(
-            insert(Project).values(
-                id=COLLECTION_ARTIFACTS_PROJECT_ID,
-                name="Collection Artifacts",
-                path="~/.skillmeat/collections",
-                description="Sentinel project for filesystem collection artifacts",
-                status="active",
-            )
-        )
-        session.flush()
-        logger.debug(f"Created sentinel project '{COLLECTION_ARTIFACTS_PROJECT_ID}'")
+    collection_repo.ensure_sentinel_project()
+    logger.debug(f"Ensured sentinel project '{COLLECTION_ARTIFACTS_PROJECT_ID}'")
 
 
 def _ensure_artifacts_in_cache(
-    session: Session,
     artifact_mgr,
     collection_mgr,
+    collection_repo: IDbUserCollectionRepository,
+    artifact_repo_ca: IDbCollectionArtifactRepository,
 ) -> int:
     """Ensure every filesystem artifact has a corresponding Artifact ORM row.
 
@@ -273,58 +265,36 @@ def _ensure_artifacts_in_cache(
     and migrate_artifacts_to_default_collection() process their artifacts.
 
     Args:
-        session: Database session
         artifact_mgr: ArtifactManager for listing filesystem artifacts
         collection_mgr: CollectionManager for enumerating collections
+        collection_repo: IDbUserCollectionRepository for sentinel project bootstrap
+        artifact_repo_ca: IDbCollectionArtifactRepository for artifact row creation
 
     Returns:
         Number of Artifact rows created
 
     """
-    _ensure_collection_project_sentinel(session)
+    _ensure_collection_project_sentinel(collection_repo)
 
-    # Gather existing artifact IDs to avoid unnecessary queries per-artifact
-    existing_ids = {row[0] for row in session.execute(select(Artifact.id)).all()}
-
-    created_count = 0
+    # Gather all filesystem artifacts across all collections
+    all_artifacts: list = []
     for coll_name in collection_mgr.list_collections():
         try:
             artifacts = artifact_mgr.list_artifacts(collection_name=coll_name)
+            all_artifacts.extend(artifacts)
         except Exception as e:
             logger.warning(
                 f"_ensure_artifacts_in_cache: failed to list '{coll_name}': {e}"
             )
             continue
 
-        for artifact in artifacts:
-            artifact_id = f"{artifact.type.value}:{artifact.name}"
-            if artifact_id in existing_ids:
-                continue
-
-            try:
-                version = artifact.metadata.version if artifact.metadata else None
-                session.execute(
-                    insert(Artifact).values(
-                        id=artifact_id,
-                        uuid=uuid.uuid4().hex,
-                        project_id=COLLECTION_ARTIFACTS_PROJECT_ID,
-                        name=artifact.name,
-                        type=artifact.type.value,
-                        source=artifact.upstream,
-                        deployed_version=version,
-                    )
-                )
-                existing_ids.add(artifact_id)
-                created_count += 1
-            except Exception as e:
-                logger.warning(
-                    f"_ensure_artifacts_in_cache: failed to create Artifact "
-                    f"row for '{artifact_id}': {e}"
-                )
-                continue
+    # Batch-insert missing artifact rows via the repository
+    created_count = artifact_repo_ca.ensure_artifact_rows(
+        all_artifacts,
+        project_id=COLLECTION_ARTIFACTS_PROJECT_ID,
+    )
 
     if created_count > 0:
-        session.flush()
         logger.info(
             f"_ensure_artifacts_in_cache: created {created_count} Artifact rows"
         )
@@ -347,7 +317,9 @@ def migrate_artifacts_to_default_collection(
     the metadata cache for efficient artifact card rendering.
 
     Args:
-        session: Database session
+        session: Database session (used by populate_collection_artifact_metadata
+            and _recover_default_collection_metadata which have not yet been
+            migrated to repository DI)
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
         collection_repo: Optional injected IDbUserCollectionRepository.
@@ -370,21 +342,31 @@ def migrate_artifacts_to_default_collection(
 
     ensure_default_collection(collection_repo)
 
-    # 2. Ensure every filesystem artifact has an Artifact ORM row.
+    # 2. Ensure artifact_repo_ca is initialised before _ensure_artifacts_in_cache.
+    if artifact_repo_ca is None:
+        from skillmeat.cache.repositories import (
+            DbCollectionArtifactRepository as _CaRepo,
+        )
+
+        artifact_repo_ca = _CaRepo()
+
+    # 3. Ensure every filesystem artifact has an Artifact ORM row.
     # populate_collection_artifact_metadata() and the migration loop both
     # skip artifacts that are not yet in the artifacts table, so this step
     # must come first.
-    ensure_count = _ensure_artifacts_in_cache(session, artifact_mgr, collection_mgr)
+    ensure_count = _ensure_artifacts_in_cache(
+        artifact_mgr, collection_mgr, collection_repo, artifact_repo_ca
+    )
     logger.info(f"Artifact cache bootstrap: {ensure_count} new Artifact rows created")
 
-    # 3. Populate metadata cache from file-based artifacts
+    # 4. Populate metadata cache from file-based artifacts
     # This creates/updates CollectionArtifact rows with full metadata
     # enabling the /collection page to render without N file reads
     metadata_stats = populate_collection_artifact_metadata(
         session, artifact_mgr, collection_mgr
     )
 
-    # 4. Get all artifacts from all file-system collections
+    # 5. Get all artifacts from all file-system collections
     all_artifact_ids = set()
     for coll_name in collection_mgr.list_collections():
         try:
@@ -402,40 +384,26 @@ def migrate_artifacts_to_default_collection(
         f"Found {len(all_artifact_ids)} unique artifacts across all collections"
     )
 
-    # 5. Get existing associations for the default collection.
-    # CollectionArtifact now uses artifact_uuid FK; join through Artifact to
-    # resolve the type:name string (Artifact.id) for the set membership check.
-    existing_associations = session.execute(
-        select(Artifact.id)
-        .join(CollectionArtifact, CollectionArtifact.artifact_uuid == Artifact.uuid)
-        .filter(CollectionArtifact.collection_id == DEFAULT_COLLECTION_ID)
-    ).all()
-    existing_artifact_ids = {row[0] for row in existing_associations}
+    # 6. Get existing associations for the default collection via the repository.
+    existing_artifact_ids = artifact_repo_ca.list_artifact_ids_in_collection(
+        DEFAULT_COLLECTION_ID
+    )
 
-    # 6. Find artifacts not yet in default collection
+    # 7. Find artifacts not yet in default collection
     missing_artifact_ids = all_artifact_ids - existing_artifact_ids
 
-    # 7. Add missing artifacts to default collection.
+    # 8. Add missing artifacts to default collection.
     # Resolve UUIDs for all missing artifact IDs, then batch-add via repo.
-    if artifact_repo_ca is None:
-        from skillmeat.cache.repositories import (
-            DbCollectionArtifactRepository as _CaRepo,
-        )
-
-        artifact_repo_ca = _CaRepo()
-
     uuids_to_migrate: list[str] = []
     for artifact_id in missing_artifact_ids:
         try:
-            artifact_row = session.execute(
-                select(Artifact.uuid).filter(Artifact.id == artifact_id)
-            ).first()
-            if not artifact_row:
+            artifact_uuid = artifact_repo_ca.resolve_uuid_by_id(artifact_id)
+            if not artifact_uuid:
                 logger.debug(
                     f"Skipping migration for '{artifact_id}': not yet in artifacts cache"
                 )
                 continue
-            uuids_to_migrate.append(artifact_row[0])
+            uuids_to_migrate.append(artifact_uuid)
         except Exception as e:
             logger.warning(f"Failed to resolve UUID for '{artifact_id}': {e}")
             continue
@@ -449,15 +417,14 @@ def migrate_artifacts_to_default_collection(
         except Exception as e:
             logger.warning(f"Failed to batch-add artifacts to default collection: {e}")
 
-    # 8. Sync tags from CollectionArtifact cache to Tag ORM tables.
-    _artifact_repo = artifact_repo_ca
-    tag_sync_count = _sync_all_tags_to_orm(session, artifact_repo=_artifact_repo)
+    # 9. Sync tags from CollectionArtifact cache to Tag ORM tables.
+    tag_sync_count = _sync_all_tags_to_orm(artifact_repo=artifact_repo_ca)
 
-    # 9. FS → DB Recovery: restore tag definitions and groups from collection.toml
+    # 10. FS → DB Recovery: restore tag definitions and groups from collection.toml
     # This runs AFTER artifacts are populated so that group member resolution works.
     recovery_stats = _recover_default_collection_metadata(session, collection_mgr)
 
-    # 10. Return combined stats including metadata cache results
+    # 11. Return combined stats including metadata cache results
     return {
         "migrated_count": migrated_count,
         "already_present_count": len(existing_artifact_ids),
@@ -469,7 +436,6 @@ def migrate_artifacts_to_default_collection(
 
 
 def _sync_all_tags_to_orm(
-    session: Session,
     artifact_repo: Optional[IDbCollectionArtifactRepository] = None,
 ) -> int:
     """Sync all CollectionArtifact tags to the Tag ORM tables.
@@ -479,10 +445,10 @@ def _sync_all_tags_to_orm(
     NOT block the caller.
 
     Args:
-        session: Database session (used for fallback when artifact_repo is None)
         artifact_repo: Optional injected IDbCollectionArtifactRepository.
-            When provided, uses list_with_tags() to retrieve tagged artifacts.
-            Falls back to direct SA 2.0 session query if None.
+            When provided, uses list_all_with_tags() to retrieve tagged
+            artifacts across all collections.  When None, a fresh
+            DbCollectionArtifactRepository is constructed internally.
 
     Returns:
         Number of artifacts successfully synced.
@@ -495,29 +461,22 @@ def _sync_all_tags_to_orm(
         logger.warning(f"Failed to initialize TagService for bulk tag sync: {e}")
         return 0
 
-    # Use repo list_with_tags() when available; fall back to raw session query.
-    if artifact_repo is not None:
-        try:
-            all_cas = artifact_repo.list_with_tags(
-                collection_id=DEFAULT_COLLECTION_ID,
-            )
-        except Exception as e:
-            logger.warning(
-                f"_sync_all_tags_to_orm: list_with_tags() failed ({e}), "
-                "falling back to session query"
-            )
-            artifact_repo = None
-
+    # Resolve repository; fall back to constructing one if not injected.
     if artifact_repo is None:
-        all_cas = (
-            session.execute(
-                select(CollectionArtifact).filter(
-                    CollectionArtifact.tags_json.isnot(None)
-                )
-            )
-            .scalars()
-            .all()
+        from skillmeat.cache.repositories import (
+            DbCollectionArtifactRepository as _CaRepo,
         )
+
+        artifact_repo = _CaRepo()
+
+    try:
+        all_cas = artifact_repo.list_all_with_tags()
+    except Exception as e:
+        logger.warning(
+            f"_sync_all_tags_to_orm: list_all_with_tags() failed ({e}); "
+            "skipping tag sync"
+        )
+        return 0
 
     synced = 0
     for ca in all_cas:
@@ -526,8 +485,7 @@ def _sync_all_tags_to_orm(
             if not artifact_uuid:
                 continue
 
-            # DTOs (from list_with_tags) expose a pre-parsed ``tags`` list.
-            # ORM rows (from SA 2.0 session fallback) expose ``tags_json`` string.
+            # DTOs expose a pre-parsed ``tags`` list.
             tags: list
             if hasattr(ca, "tags") and isinstance(getattr(ca, "tags"), list):
                 tags = ca.tags

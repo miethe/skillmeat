@@ -988,11 +988,7 @@ class ImportContext:
             ...     if artifact:
             ...         svc.create_skill_composite_with_session(ctx.session, artifact, ...)
         """
-        return (
-            self.session.query(Artifact)
-            .filter(Artifact.id == artifact_id)
-            .first()
-        )
+        return self.session.query(Artifact).filter(Artifact.id == artifact_id).first()
 
     def ensure_default_collection(self, collection_id: str, name: str) -> None:
         """Ensure a default collection row exists within this transaction session.
@@ -1023,7 +1019,9 @@ class ImportContext:
                 updated_at=now,
             )
             self.session.add(default_collection)
-            logger.info("ensure_default_collection: created collection %r", collection_id)
+            logger.info(
+                "ensure_default_collection: created collection %r", collection_id
+            )
 
 
 # =============================================================================
@@ -2682,14 +2680,18 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
         """
         session = self._get_session()
         try:
-            results = session.query(
-                MarketplaceCatalogEntry.source_id,
-                MarketplaceCatalogEntry.status,
-                func.count(MarketplaceCatalogEntry.id).label("count"),
-            ).group_by(
-                MarketplaceCatalogEntry.source_id,
-                MarketplaceCatalogEntry.status,
-            ).all()
+            results = (
+                session.query(
+                    MarketplaceCatalogEntry.source_id,
+                    MarketplaceCatalogEntry.status,
+                    func.count(MarketplaceCatalogEntry.id).label("count"),
+                )
+                .group_by(
+                    MarketplaceCatalogEntry.source_id,
+                    MarketplaceCatalogEntry.status,
+                )
+                .all()
+            )
 
             bulk: Dict[str, Dict[str, int]] = {}
             for source_id, status, count in results:
@@ -3418,9 +3420,7 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
 
             session.commit()
             session.refresh(entry)
-            logger.info(
-                "set_exclusion: entry %s excluded=%s", entry_id, excluded
-            )
+            logger.info("set_exclusion: entry %s excluded=%s", entry_id, excluded)
             return entry
         except Exception:
             session.rollback()
@@ -3627,11 +3627,7 @@ class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
 
         session = self._get_session()
         try:
-            row = (
-                session.query(_Project)
-                .filter(_Project.path == project_path)
-                .first()
-            )
+            row = session.query(_Project).filter(_Project.path == project_path).first()
             return row.id if row else None
         finally:
             session.close()
@@ -5119,11 +5115,7 @@ class CustomColorRepository(BaseRepository[CustomColor]):
         """
         session = self._get_session()
         try:
-            return (
-                session.query(CustomColor)
-                .order_by(CustomColor.created_at)
-                .all()
-            )
+            return session.query(CustomColor).order_by(CustomColor.created_at).all()
         finally:
             session.close()
 
@@ -5453,9 +5445,7 @@ class DuplicatePairRepository(BaseRepository["DuplicatePair"]):
         finally:
             session.close()
 
-    def list_pairs_for_artifact(
-        self, artifact_uuid: str
-    ) -> List["DuplicatePair"]:
+    def list_pairs_for_artifact(self, artifact_uuid: str) -> List["DuplicatePair"]:
         """Return all non-ignored ``DuplicatePair`` rows involving *artifact_uuid*.
 
         Returns pairs where ``artifact1_uuid`` or ``artifact2_uuid`` matches the
@@ -5583,9 +5573,7 @@ class DbUserCollectionRepository(
             if collection_type is not None:
                 query = query.filter(Collection.collection_type == collection_type)
             if context_category is not None:
-                query = query.filter(
-                    Collection.context_category == context_category
-                )
+                query = query.filter(Collection.context_category == context_category)
             rows = (
                 query.order_by(Collection.created_at.desc())
                 .limit(limit)
@@ -5695,9 +5683,7 @@ class DbUserCollectionRepository(
 
         session = self._get_session()
         try:
-            existing_query = session.query(Collection).filter(
-                Collection.name == name
-            )
+            existing_query = session.query(Collection).filter(Collection.name == name)
             if created_by is not None:
                 existing_query = existing_query.filter(
                     Collection.created_by == created_by
@@ -5733,9 +5719,7 @@ class DbUserCollectionRepository(
             raise
         except Exception as exc:
             session.rollback()
-            raise RuntimeError(
-                f"Failed to create collection {name!r}: {exc}"
-            ) from exc
+            raise RuntimeError(f"Failed to create collection {name!r}: {exc}") from exc
         finally:
             session.close()
 
@@ -5767,9 +5751,7 @@ class DbUserCollectionRepository(
         try:
             row = session.query(Collection).filter_by(id=collection_id).first()
             if row is None:
-                raise KeyError(
-                    f"Collection with id={collection_id!r} not found."
-                )
+                raise KeyError(f"Collection with id={collection_id!r} not found.")
 
             for field_name, value in kwargs.items():
                 if field_name in _UPDATABLE:
@@ -5910,9 +5892,7 @@ class DbUserCollectionRepository(
 
         except Exception as exc:
             session.rollback()
-            raise RuntimeError(
-                f"Failed to ensure default collection: {exc}"
-            ) from exc
+            raise RuntimeError(f"Failed to ensure default collection: {exc}") from exc
         finally:
             session.close()
 
@@ -5959,9 +5939,7 @@ class DbUserCollectionRepository(
 
             query = session.query(
                 Collection,
-                func.coalesce(count_subq.c.artifact_count, 0).label(
-                    "artifact_count"
-                ),
+                func.coalesce(count_subq.c.artifact_count, 0).label("artifact_count"),
             ).outerjoin(
                 count_subq,
                 Collection.id == count_subq.c.collection_id,
@@ -5978,8 +5956,7 @@ class DbUserCollectionRepository(
             )
 
             return [
-                _collection_to_dto(row, artifact_count=count)
-                for row, count in rows
+                _collection_to_dto(row, artifact_count=count) for row, count in rows
             ]
         finally:
             session.close()
@@ -6012,9 +5989,7 @@ class DbUserCollectionRepository(
         """
         session = self._get_session()
         try:
-            collection = (
-                session.query(Collection).filter_by(id=collection_id).first()
-            )
+            collection = session.query(Collection).filter_by(id=collection_id).first()
             if collection is None:
                 logger.debug(
                     "DbUserCollectionRepository.add_group: "
@@ -6026,8 +6001,7 @@ class DbUserCollectionRepository(
             group = session.query(Group).filter_by(id=group_id).first()
             if group is None:
                 logger.debug(
-                    "DbUserCollectionRepository.add_group: "
-                    "group id=%r not found.",
+                    "DbUserCollectionRepository.add_group: " "group id=%r not found.",
                     group_id,
                 )
                 return False
@@ -6173,6 +6147,50 @@ class DbUserCollectionRepository(
         finally:
             session.close()
 
+    # ------------------------------------------------------------------
+    # Sentinel project bootstrap
+    # ------------------------------------------------------------------
+
+    def ensure_sentinel_project(self) -> None:
+        """Ensure the sentinel Project row used by collection artifacts exists.
+
+        Artifact rows require a ``project_id`` foreign-key.  Collection-level
+        (filesystem) artifacts are not tied to any deployed project, so a
+        sentinel project satisfies the constraint.  This method is idempotent.
+        """
+        from skillmeat.cache.models import Project as _Project
+
+        _SENTINEL_ID = "collection_artifacts_global"
+
+        session = self._get_session()
+        try:
+            existing = session.query(_Project).filter_by(id=_SENTINEL_ID).first()
+            if existing:
+                return
+
+            sentinel = _Project(
+                id=_SENTINEL_ID,
+                name="Collection Artifacts",
+                path="~/.skillmeat/collections",
+                description="Sentinel project for filesystem collection artifacts",
+                status="active",
+            )
+            session.add(sentinel)
+            session.commit()
+            logger.debug(
+                "DbUserCollectionRepository.ensure_sentinel_project: "
+                "created sentinel project id=%r",
+                _SENTINEL_ID,
+            )
+        except Exception as exc:
+            session.rollback()
+            logger.warning(
+                "DbUserCollectionRepository.ensure_sentinel_project: failed: %s",
+                exc,
+            )
+        finally:
+            session.close()
+
 
 # =============================================================================
 # DbCollectionArtifactRepository
@@ -6270,7 +6288,9 @@ class DbCollectionArtifactRepository(IDbCollectionArtifactRepository):
     def __init__(self, get_session: Any = None) -> None:
         from skillmeat.cache.models import get_session as _default_get_session
 
-        self._get_session = get_session if get_session is not None else _default_get_session
+        self._get_session = (
+            get_session if get_session is not None else _default_get_session
+        )
 
     # ------------------------------------------------------------------
     # Queries
@@ -6423,9 +6443,7 @@ class DbCollectionArtifactRepository(IDbCollectionArtifactRepository):
             if tag:
                 # Substring match on the JSON column — cheap and sufficient for
                 # tags that don't contain special JSON characters.
-                query = query.filter(
-                    CollectionArtifact.tags_json.ilike(f'%"{tag}"%')
-                )
+                query = query.filter(CollectionArtifact.tags_json.ilike(f'%"{tag}"%'))
             rows = query.all()
             logger.debug(
                 "DbCollectionArtifactRepository.list_with_tags: "
@@ -6572,9 +6590,7 @@ class DbCollectionArtifactRepository(IDbCollectionArtifactRepository):
 
             # Validate all UUIDs exist
             existing_artifacts = (
-                session.query(Artifact)
-                .filter(Artifact.uuid.in_(artifact_uuids))
-                .all()
+                session.query(Artifact).filter(Artifact.uuid.in_(artifact_uuids)).all()
             )
             found_uuids = {a.uuid for a in existing_artifacts}
             missing = set(artifact_uuids) - found_uuids
@@ -6872,5 +6888,165 @@ class DbCollectionArtifactRepository(IDbCollectionArtifactRepository):
                 f"Failed to update source tracking for artifact '{artifact_uuid}' in "
                 f"collection '{collection_id}': {exc}"
             ) from exc
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Bootstrap / migration helpers
+    # ------------------------------------------------------------------
+
+    def get_existing_artifact_ids(self) -> set[str]:
+        """Return the set of all ``type:name`` Artifact IDs currently in the DB.
+
+        Returns:
+            Set of ``"type:name"`` strings.  Empty set when no rows exist.
+        """
+        session = self._get_session()
+        try:
+            rows = session.query(Artifact.id).all()
+            return {row[0] for row in rows}
+        finally:
+            session.close()
+
+    def ensure_artifact_rows(
+        self,
+        artifacts: list,
+        *,
+        project_id: str,
+    ) -> int:
+        """Ensure every filesystem artifact has a corresponding Artifact ORM row.
+
+        Idempotent: artifacts already present in the ``artifacts`` table are
+        skipped.  All inserts are committed in a single transaction.
+
+        Args:
+            artifacts: List of filesystem artifact objects with ``.type``,
+                ``.name``, ``.upstream``, and ``.metadata`` attributes.
+            project_id: Sentinel project ID used as ``project_id`` FK.
+
+        Returns:
+            Number of new Artifact rows inserted.
+        """
+        session = self._get_session()
+        try:
+            existing_ids = {row[0] for row in session.query(Artifact.id).all()}
+            created_count = 0
+
+            for artifact in artifacts:
+                artifact_id = f"{artifact.type.value}:{artifact.name}"
+                if artifact_id in existing_ids:
+                    continue
+                try:
+                    version = artifact.metadata.version if artifact.metadata else None
+                    row = Artifact(
+                        id=artifact_id,
+                        uuid=uuid.uuid4().hex,
+                        project_id=project_id,
+                        name=artifact.name,
+                        type=artifact.type.value,
+                        source=artifact.upstream,
+                        deployed_version=version,
+                    )
+                    session.add(row)
+                    existing_ids.add(artifact_id)
+                    created_count += 1
+                except Exception as e:
+                    logger.warning(
+                        "DbCollectionArtifactRepository.ensure_artifact_rows: "
+                        "failed to build row for '%s': %s",
+                        artifact_id,
+                        e,
+                    )
+                    continue
+
+            if created_count > 0:
+                session.commit()
+                logger.info(
+                    "DbCollectionArtifactRepository.ensure_artifact_rows: "
+                    "inserted %d new Artifact rows",
+                    created_count,
+                )
+
+            return created_count
+
+        except Exception as exc:
+            session.rollback()
+            logger.warning(
+                "DbCollectionArtifactRepository.ensure_artifact_rows: "
+                "transaction failed: %s",
+                exc,
+            )
+            return 0
+        finally:
+            session.close()
+
+    def list_artifact_ids_in_collection(
+        self,
+        collection_id: str,
+    ) -> set[str]:
+        """Return the set of ``type:name`` Artifact IDs present in a collection.
+
+        Resolves UUIDs to ``type:name`` strings via a JOIN through the
+        ``artifacts`` table.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+
+        Returns:
+            Set of ``"type:name"`` strings.  Empty set when no members exist.
+        """
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(Artifact.id)
+                .join(
+                    CollectionArtifact,
+                    CollectionArtifact.artifact_uuid == Artifact.uuid,
+                )
+                .filter(CollectionArtifact.collection_id == collection_id)
+                .all()
+            )
+            return {row[0] for row in rows}
+        finally:
+            session.close()
+
+    def resolve_uuid_by_id(
+        self,
+        artifact_id: str,
+    ) -> str | None:
+        """Resolve the stable UUID for an artifact by its ``type:name`` ID.
+
+        Args:
+            artifact_id: ``"type:name"`` artifact identifier string.
+
+        Returns:
+            32-char hex UUID string when found, ``None`` otherwise.
+        """
+        session = self._get_session()
+        try:
+            row = (
+                session.query(Artifact.uuid).filter(Artifact.id == artifact_id).first()
+            )
+            return row[0] if row else None
+        finally:
+            session.close()
+
+    def list_all_with_tags(self) -> list[CollectionArtifactDTO]:
+        """Return all CollectionArtifact rows that carry at least one tag.
+
+        Unlike :meth:`list_with_tags`, this method is not scoped to a single
+        collection and is intended for global tag-sync bootstrap operations.
+
+        Returns:
+            List of :class:`CollectionArtifactDTO` objects with tags.
+        """
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(CollectionArtifact)
+                .filter(CollectionArtifact.tags_json.isnot(None))
+                .all()
+            )
+            return [_collection_artifact_to_dto(row) for row in rows]
         finally:
             session.close()

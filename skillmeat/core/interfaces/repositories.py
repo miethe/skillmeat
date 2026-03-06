@@ -3162,6 +3162,96 @@ class IDbCollectionArtifactRepository(abc.ABC):
         """
         raise NotImplementedError
 
+    # ------------------------------------------------------------------
+    # Bootstrap / migration helpers
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_existing_artifact_ids(self) -> set[str]:
+        """Return the set of all ``type:name`` Artifact IDs currently in the DB.
+
+        Used during bootstrap to avoid redundant INSERT attempts for artifact
+        rows that already exist.
+
+        Returns:
+            Set of ``"type:name"`` strings (e.g. ``{"skill:canvas", ...}``).
+            Returns an empty set when no artifact rows exist.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ensure_artifact_rows(
+        self,
+        artifacts: list,
+        *,
+        project_id: str,
+    ) -> int:
+        """Ensure every filesystem artifact has a corresponding Artifact ORM row.
+
+        Idempotent: artifacts already present in the ``artifacts`` table are
+        skipped.  Inserts are committed as a single transaction.
+
+        Args:
+            artifacts: List of filesystem :class:`~skillmeat.core.artifact.Artifact`
+                objects whose ``type``, ``name``, ``upstream``, and ``metadata``
+                attributes are used to build the Artifact ORM row.
+            project_id: Sentinel project ID assigned as ``project_id`` FK on
+                every inserted row.
+
+        Returns:
+            Number of new Artifact rows inserted.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def list_artifact_ids_in_collection(
+        self,
+        collection_id: str,
+    ) -> set[str]:
+        """Return the set of ``type:name`` Artifact IDs present in a collection.
+
+        Resolves UUIDs back to ``type:name`` strings by joining through the
+        ``artifacts`` table so that callers can use set arithmetic against
+        filesystem artifact lists.
+
+        Args:
+            collection_id: Unique identifier of the user collection.
+
+        Returns:
+            Set of ``"type:name"`` strings for all artifacts in the collection.
+            Returns an empty set when the collection has no members.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def resolve_uuid_by_id(
+        self,
+        artifact_id: str,
+    ) -> str | None:
+        """Resolve the stable UUID for an artifact by its ``type:name`` ID.
+
+        Args:
+            artifact_id: ``"type:name"`` artifact identifier string.
+
+        Returns:
+            32-char hex UUID string when found, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def list_all_with_tags(self) -> list[CollectionArtifactDTO]:
+        """Return all CollectionArtifact rows that carry at least one tag.
+
+        Unlike :meth:`list_with_tags`, this method is not scoped to a single
+        collection and is intended for global tag-sync bootstrap operations.
+
+        Returns:
+            List of :class:`~skillmeat.core.interfaces.dtos.CollectionArtifactDTO`
+            objects with ``tags_json`` populated.  Returns an empty list when
+            no tagged rows exist.
+        """
+        raise NotImplementedError
+
 
 # =============================================================================
 # IDbUserCollectionRepository
@@ -3481,5 +3571,23 @@ class IDbUserCollectionRepository(abc.ABC):
         Returns:
             Non-negative integer artifact count.  Returns ``0`` when the
             collection does not exist.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Sentinel project bootstrap
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def ensure_sentinel_project(self) -> None:
+        """Ensure the sentinel Project row used by collection artifacts exists.
+
+        Artifact rows require a ``project_id`` foreign-key.  Collection-level
+        (filesystem) artifacts are not tied to any deployed project, so a
+        sentinel project row satisfies the constraint.  The sentinel ID is
+        the module-level constant ``COLLECTION_ARTIFACTS_PROJECT_ID``.
+
+        This method is idempotent: if the sentinel row already exists the
+        call is a no-op.
         """
         raise NotImplementedError
