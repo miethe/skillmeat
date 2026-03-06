@@ -30,6 +30,7 @@ from .routers import (
     artifact_history,
     artifacts,
     bundles,
+    enterprise_content,
     cache,
     collections,
     colors,
@@ -375,6 +376,9 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(artifacts.router, prefix=settings.api_prefix, tags=["artifacts"])
     app.include_router(
         artifact_history.router, prefix=settings.api_prefix, tags=["artifacts"]
+    )
+    app.include_router(
+        enterprise_content.router, prefix=settings.api_prefix, tags=["enterprise"]
     )
     app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
     app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])

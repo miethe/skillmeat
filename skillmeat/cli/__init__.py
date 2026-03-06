@@ -24,7 +24,12 @@ from rich.status import Status
 
 from skillmeat import __version__
 from skillmeat.config import ConfigManager
-from skillmeat.core.enterprise_config import get_enterprise_config
+from skillmeat.core.enterprise_config import (
+    get_enterprise_config,
+    is_enterprise_mode,
+    set_session_pat,
+    store_pat,
+)
 from skillmeat.core.collection import CollectionManager
 from skillmeat.core.refresher import CollectionRefresher, RefreshMode, RefreshResult
 from skillmeat.core.artifact import ArtifactManager, ArtifactType, UpdateStrategy
@@ -60,8 +65,17 @@ config_mgr = ConfigManager()
     hidden=True,
     help="Enable smart defaults mode (used by claudectl wrapper)",
 )
+@click.option(
+    "--token",
+    default=None,
+    metavar="PAT",
+    help=(
+        "Personal Access Token for enterprise API authentication. "
+        "Stored in ~/.skillmeat/enterprise.toml and active for this session."
+    ),
+)
 @click.pass_context
-def main(ctx, smart_defaults):
+def main(ctx, smart_defaults, token):
     """SkillMeat: Personal collection manager for Claude Code artifacts.
 
     Manage Skills, Commands, Agents, and more across multiple projects.
@@ -75,6 +89,12 @@ def main(ctx, smart_defaults):
     """
     ctx.ensure_object(dict)
     ctx.obj["smart_defaults"] = smart_defaults
+
+    # Handle --token: persist to config file and activate for this session.
+    if token:
+        store_pat(token)
+        set_session_pat(token)
+        console.print("[bold cyan][enterprise][/bold cyan] Token stored.")
 
     # Log active edition once at startup (enterprise only — community is silent).
     ent_cfg = get_enterprise_config()
@@ -1551,6 +1571,15 @@ def deploy(
       skillmeat deploy my-skill --project /path/to/proj
       skillmeat deploy my-skill --overwrite   # Skip overwrite prompt
     """
+    if is_enterprise_mode():
+        from rich.console import Console as _Console
+
+        _Console().print(
+            "[yellow][enterprise] API-based deploy not yet implemented"
+            " — see ENT-4.3[/yellow]"
+        )
+        return
+
     from skillmeat.defaults import SmartDefaults
 
     try:
@@ -6143,6 +6172,15 @@ def sync_check_cmd(ctx, project_path, collection, output_format, output_json):
         skillmeat sync-check /path/to/project --format json
         claudectl sync-check /path/to/project --format table
     """
+    if is_enterprise_mode():
+        from rich.console import Console as _Console
+
+        _Console().print(
+            "[yellow][enterprise] API-based sync not yet implemented"
+            " — see ENT-4.4[/yellow]"
+        )
+        return
+
     from pathlib import Path
     from skillmeat.core.collection import CollectionManager
     from skillmeat.core.sync import SyncManager
@@ -6360,6 +6398,15 @@ def sync_pull_cmd(
         skillmeat sync-pull /path/to/project --format json
         claudectl sync-pull /path/to/project --format table
     """
+    if is_enterprise_mode():
+        from rich.console import Console as _Console
+
+        _Console().print(
+            "[yellow][enterprise] API-based sync not yet implemented"
+            " — see ENT-4.4[/yellow]"
+        )
+        return
+
     from pathlib import Path
     from skillmeat.core.collection import CollectionManager
     from skillmeat.core.sync import SyncManager
