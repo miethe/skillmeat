@@ -2012,8 +2012,25 @@ deployed_at = "2026-03-03T10:19:06.426627"
 artifact_path = "agents/dev-team/platform-engineer.md"
 content_hash = "17ea9f3d0a8f91fb5d787c9291f6f69cd20abef3bb950f9a4c3573c857e20859"
 local_modifications = false
+version_lineage = [
+    "17ea9f3d0a8f91fb5d787c9291f6f69cd20abef3bb950f9a4c3573c857e20859",
+]
 merge_base_snapshot = "17ea9f3d0a8f91fb5d787c9291f6f69cd20abef3bb950f9a4c3573c857e20859"
 deployment_profile_id = "claude_code"
 platform = "claude_code"
 profile_root_dir = ".claude"
 collection_sha = "17ea9f3d0a8f91fb5d787c9291f6f69cd20abef3bb950f9a4c3573c857e20859"
+
+[[deployed]]
+artifact_name = "content-curator"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-03-04T14:34:19.375271"
+artifact_path = "agents/content-curator.md"
+content_hash = "71fcaa5a22397018d2db8f38d36248a308e1d16c5a202fb00be8ae7d402d2ba2"
+local_modifications = false
+merge_base_snapshot = "71fcaa5a22397018d2db8f38d36248a308e1d16c5a202fb00be8ae7d402d2ba2"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "71fcaa5a22397018d2db8f38d36248a308e1d16c5a202fb00be8ae7d402d2ba2"

@@ -38,18 +38,32 @@ import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Literal, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+if TYPE_CHECKING:
+    from skillmeat.cache.repositories import (
+        ImportContext,
+        MarketplaceCatalogRepository,
+        MarketplaceSourceRepository,
+        MarketplaceTransactionHandler,
+        MergeResult,
+    )
+
+from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
-
-from skillmeat.api.dependencies import ArtifactManagerDep, CollectionManagerDep
-from skillmeat.cache.models import (
-    DEFAULT_COLLECTION_ID,
-    CollectionArtifact,
-    get_session,
+from skillmeat.api.dependencies import (
+    ArtifactManagerDep,
+    CollectionManagerDep,
+    MarketplaceCatalogRepoDep,
+    MarketplaceSourceConcreteRepoDep,
+    MarketplaceSourceRepoDep,
+    MarketplaceTransactionHandlerDep,
 )
+# ORM model imports — used for CONSTRUCTION of new objects in the scan pipeline,
+# not for direct session queries (all session access is via repository methods).
+from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
+# Default collection identifier — kept in sync with skillmeat.cache.models.DEFAULT_COLLECTION_ID
+DEFAULT_COLLECTION_ID = "default"
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.schemas.discovery import (
     BulkSyncItemResult,
@@ -97,14 +111,12 @@ from skillmeat.api.utils.github_cache import (
     build_tree_key,
     get_github_file_cache,
 )
-from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
-from skillmeat.cache.repositories import (
-    MarketplaceCatalogRepository,
-    MarketplaceSourceRepository,
-    MarketplaceTransactionHandler,
-    MergeResult,
-    NotFoundError,
-)
+# NotFoundError is a domain exception — kept as a direct runtime import.
+# ImportContext and MergeResult are data-class helpers used only as type hints
+# (string annotations), so they live in the TYPE_CHECKING block above.
+# MarketplaceCatalogRepository, MarketplaceSourceRepository, and
+# MarketplaceTransactionHandler are injected via DI aliases above.
+from skillmeat.cache.repositories import NotFoundError
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.manifest_extractors import extract_deep_search_text
 from skillmeat.core.github_client import GitHubClientError
@@ -255,46 +267,6 @@ def is_git_available() -> bool:
     return _git_available if _git_available is not None else False
 
 
-# =============================================================================
-# Database Session Dependency
-# =============================================================================
-
-
-def get_db_session():
-    """Dependency that provides a database session.
-
-    Yields a SQLAlchemy session and ensures cleanup on exit.
-    """
-    session = get_session()
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-DbSessionDep = Annotated[Session, Depends(get_db_session)]
-
-
-def ensure_default_collection(session: Session) -> None:
-    """Ensure the default collection exists in the database.
-
-    Creates the default collection if it doesn't exist. This is a simplified
-    version that doesn't return the collection object (not needed here).
-    """
-    from skillmeat.cache.models import Collection, DEFAULT_COLLECTION_NAME
-
-    existing = session.query(Collection).filter_by(id=DEFAULT_COLLECTION_ID).first()
-    if not existing:
-        default_collection = Collection(
-            id=DEFAULT_COLLECTION_ID,
-            name=DEFAULT_COLLECTION_NAME,
-            description="Default collection for all artifacts.",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-        )
-        session.add(default_collection)
-        session.commit()
-        logger.info(f"Created default collection '{DEFAULT_COLLECTION_ID}'")
 
 
 router = APIRouter(
@@ -511,7 +483,7 @@ async def _validate_manual_map_paths(
         ) from e
 
 
-def get_composite_aggregates() -> Dict[str, Any]:
+def get_composite_aggregates(catalog_repo: "MarketplaceCatalogRepository") -> Dict[str, Any]:
     """Compute aggregate composite member data from the local DB cache.
 
     Returns member count and child artifact types by issuing a single SQL query
@@ -521,6 +493,9 @@ def get_composite_aggregates() -> Dict[str, Any]:
     The result is scoped globally (across all collections) because marketplace
     sources are GitHub repos and there is no direct FK between them and local
     composite artifacts.  Callers should cache this result per request.
+
+    Args:
+        catalog_repo: Injected MarketplaceCatalogRepository instance.
 
     Returns:
         Dictionary with two keys:
@@ -535,36 +510,7 @@ def get_composite_aggregates() -> Dict[str, Any]:
         Returns ``{"member_count": 0, "child_types": []}`` on any DB error
         so that failures are non-fatal and never block source listing.
     """
-    try:
-        import sqlalchemy as _sa
-        from skillmeat.cache.models import (
-            Artifact,
-            CompositeMembership,
-            get_session,
-        )
-
-        session = get_session()
-        try:
-            rows = (
-                session.query(Artifact.type)
-                .join(
-                    CompositeMembership,
-                    CompositeMembership.child_artifact_uuid == Artifact.uuid,
-                )
-                .distinct()
-                .all()
-            )
-            child_types = [row.type for row in rows if row.type]
-
-            member_count = (
-                session.query(CompositeMembership).count()
-            )
-            return {"member_count": member_count, "child_types": child_types}
-        finally:
-            session.close()
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("get_composite_aggregates: DB query failed — %s", exc)
-        return {"member_count": 0, "child_types": []}
+    return catalog_repo.get_composite_aggregates()
 
 
 def source_to_response(
@@ -1497,9 +1443,9 @@ def _extract_frontmatter_batch(
 
 async def _perform_scan(
     source: MarketplaceSource,
-    source_repo: MarketplaceSourceRepository,
-    catalog_repo: MarketplaceCatalogRepository,
-    transaction_handler: MarketplaceTransactionHandler,
+    source_repo: "MarketplaceSourceRepository",
+    catalog_repo: "MarketplaceCatalogRepository",
+    transaction_handler: "MarketplaceTransactionHandler",
 ) -> ScanResultDTO:
     """Perform repository scan and update source + catalog atomically.
 
@@ -1613,15 +1559,13 @@ async def _perform_scan(
         else:
             # Normal scanning path
             scan_strategy = "api_scan"  # Default, may be updated if clone is used
-            # Get database session for cross-source deduplication
-            session = catalog_repo._get_session()
-
+            # Cross-source deduplication session is optional; pass None to skip it.
             scan_result = scanner.scan_repository(
                 owner=source.owner,
                 repo=source.repo_name,
                 ref=source.ref,
                 root_hint=source.root_hint,
-                session=session,
+                session=None,
                 manual_mappings=manual_map,
             )
 
@@ -1755,15 +1699,11 @@ async def _perform_scan(
                     ref=scan_result.actual_ref,  # None when no fallback occurred
                 )
 
-                # Update counts_by_type and clone_target on source
-                source_in_session = (
-                    ctx.session.query(MarketplaceSource).filter_by(id=source_id).first()
+                # Update counts_by_type and clone_target on source via ctx method.
+                ctx.update_source_counts(
+                    counts_by_type,
+                    clone_target=source.clone_target if source.clone_target is not None else None,
                 )
-                if source_in_session:
-                    source_in_session.set_counts_by_type_dict(counts_by_type)
-                    # Persist clone_target if it was computed earlier
-                    if source.clone_target is not None:
-                        source_in_session.clone_target = source.clone_target
 
                 # Determine if frontmatter indexing is enabled for this source
                 # Get global indexing mode from config and compute effective state
@@ -2114,7 +2054,12 @@ async def infer_github_url(request: InferUrlRequest) -> InferUrlResponse:
         500: {"description": "Internal server error"},
     },
 )
-async def create_source(request: CreateSourceRequest) -> SourceResponse:
+async def create_source(
+    request: CreateSourceRequest,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
+    transaction_handler: MarketplaceTransactionHandlerDep,
+) -> SourceResponse:
     """Create a new GitHub repository source.
 
     Args:
@@ -2137,9 +2082,6 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         ) from e
-
-    # Initialize repository
-    source_repo = MarketplaceSourceRepository()
 
     # Check if source already exists
     existing = source_repo.get_by_repo_url(request.repo_url)
@@ -2271,8 +2213,6 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
 
         # Trigger initial scan
         logger.info(f"Triggering initial scan for source: {created.id}")
-        catalog_repo = MarketplaceCatalogRepository()
-        transaction_handler = MarketplaceTransactionHandler()
 
         scan_result = await _perform_scan(
             source=created,
@@ -2319,6 +2259,8 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
     """,
 )
 async def list_sources(
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
     limit: int = Query(50, ge=1, le=100, description="Maximum items per page"),
     cursor: Optional[str] = Query(None, description="Cursor for next page"),
     artifact_type: Optional[str] = Query(
@@ -2354,17 +2296,15 @@ async def list_sources(
     Raises:
         HTTPException 500: If database operation fails
     """
-    source_repo = MarketplaceSourceRepository()
     source_manager = SourceManager()
 
     try:
         # Pre-fetch composite aggregates once per request (avoid N+1).
         # This single query covers all composites across the local DB.
-        composite_aggs = get_composite_aggregates()
+        composite_aggs = get_composite_aggregates(catalog_repo)
 
         # Pre-fetch catalog status counts for all sources in one query (avoid N+1).
         # Result: {source_id: {status: count}}
-        catalog_repo = MarketplaceCatalogRepository()
         status_counts_bulk = catalog_repo.count_by_status_bulk()
 
         # Check if any filters are provided
@@ -2527,11 +2467,17 @@ async def list_sources(
         500: {"description": "Internal server error"},
     },
 )
-async def get_source(source_id: str) -> SourceResponse:
+async def get_source(
+    source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
+) -> SourceResponse:
     """Get a marketplace source by ID.
 
     Args:
         source_id: Unique source identifier
+        source_repo: Injected MarketplaceSourceRepository dependency.
+        catalog_repo: Injected MarketplaceCatalogRepository dependency.
 
     Returns:
         Source details
@@ -2540,8 +2486,6 @@ async def get_source(source_id: str) -> SourceResponse:
         HTTPException 404: If source not found
         HTTPException 500: If database operation fails
     """
-    source_repo = MarketplaceSourceRepository()
-
     try:
         source = source_repo.get_by_id(source_id)
         if not source:
@@ -2551,7 +2495,6 @@ async def get_source(source_id: str) -> SourceResponse:
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        catalog_repo = MarketplaceCatalogRepository()
         status_counts = catalog_repo.count_by_status(source_id)
         return source_to_response(source, counts_by_status=status_counts)
     except HTTPException:
@@ -2623,6 +2566,7 @@ async def get_source(source_id: str) -> SourceResponse:
 async def update_source(
     source_id: str,
     request: UpdateSourceRequest,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> SourceResponse:
     """Update a marketplace source.
 
@@ -2681,8 +2625,6 @@ async def update_source(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one update parameter must be provided",
         )
-
-    source_repo = MarketplaceSourceRepository()
 
     try:
         # Fetch existing source
@@ -2879,18 +2821,20 @@ async def update_source(
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
 )
-async def delete_source(source_id: str) -> None:
+async def delete_source(
+    source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+) -> None:
     """Delete a marketplace source.
 
     Args:
         source_id: Unique source identifier
+        source_repo: Injected MarketplaceSourceRepository dependency.
 
     Raises:
         HTTPException 404: If source not found
         HTTPException 500: If database operation fails
     """
-    source_repo = MarketplaceSourceRepository()
-
     try:
         deleted = source_repo.delete(source_id)
         if not deleted:
@@ -2975,11 +2919,20 @@ async def delete_source(source_id: str) -> None:
         500: {"description": "Scan failed - check error message in response"},
     },
 )
-async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResultDTO:
+async def rescan_source(
+    source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
+    transaction_handler: MarketplaceTransactionHandlerDep,
+    request: ScanRequest = None,
+) -> ScanResultDTO:
     """Trigger a rescan of a marketplace source.
 
     Args:
         source_id: Unique source identifier
+        source_repo: Injected MarketplaceSourceRepository dependency.
+        catalog_repo: Injected MarketplaceCatalogRepository dependency.
+        transaction_handler: Injected MarketplaceTransactionHandler dependency.
         request: Optional scan configuration (force rescan, etc.)
 
     Returns:
@@ -2991,10 +2944,6 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
     """
     if request is None:
         request = ScanRequest()
-
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
-    transaction_handler = MarketplaceTransactionHandler()
 
     try:
         # Fetch source
@@ -3067,6 +3016,8 @@ async def sync_imported_artifacts(
     request: BulkSyncRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
 ) -> BulkSyncResponse:
     """Sync imported artifacts from a marketplace source with upstream.
 
@@ -3087,9 +3038,6 @@ async def sync_imported_artifacts(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="artifact_ids cannot be empty",
         )
-
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
 
     try:
         # Verify source exists
@@ -3385,6 +3333,8 @@ async def sync_imported_artifacts(
 )
 async def list_artifacts(
     source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
     artifact_type: Optional[str] = Query(
         None, description="Filter by artifact type (skill, command, agent, etc.)"
     ),
@@ -3462,9 +3412,6 @@ async def list_artifacts(
         >>> # Count by status shows excluded entries
         >>> assert response.counts_by_status.get("excluded", 0) >= 0
     """
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
-
     try:
         # Verify source exists
         source = source_repo.get_by_id(source_id)
@@ -3647,11 +3594,11 @@ async def update_catalog_entry_name(
     source_id: str,
     entry_id: str,
     request: UpdateCatalogEntryNameRequest,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
     collection_mgr: CollectionManagerDep = None,
 ) -> CatalogEntryResponse:
     """Update the name for a catalog entry."""
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
     collection_keys = (
         get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
     )
@@ -3674,43 +3621,23 @@ async def update_catalog_entry_name(
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        session = catalog_repo._get_session()
         try:
-            entry = (
-                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+            entry = catalog_repo.update_name(entry_id, source_id, normalized_name)
+        except ValueError as ve:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(ve),
+            ) from ve
+
+        if not entry:
+            logger.warning(f"Catalog entry not found: {entry_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Catalog entry with ID '{entry_id}' not found",
             )
-            if not entry:
-                logger.warning(f"Catalog entry not found: {entry_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Catalog entry with ID '{entry_id}' not found",
-                )
 
-            # Verify entry belongs to this source
-            if entry.source_id != source_id:
-                logger.warning(
-                    f"Entry {entry_id} does not belong to source {source_id}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
-                )
-
-            entry.name = normalized_name
-            session.commit()
-            session.refresh(entry)
-
-            logger.info(f"Updated catalog entry name: {entry_id} -> {normalized_name}")
-            return entry_to_response(entry, collection_keys)
-
-        except HTTPException:
-            session.rollback()
-            raise
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
+        logger.info(f"Updated catalog entry name: {entry_id} -> {normalized_name}")
+        return entry_to_response(entry, collection_keys)
 
     except HTTPException:
         raise
@@ -3731,7 +3658,7 @@ async def update_catalog_entry_name(
 
 
 def _wire_skill_composite(
-    session,
+    ctx: "ImportContext",
     source_id: str,
     entry,
     catalog_repo: "MarketplaceCatalogRepository",
@@ -3743,7 +3670,7 @@ def _wire_skill_composite(
     is set.  Retrieves the embedded artifact list stored in the catalog entry's
     ``metadata_json`` at scan time, then calls
     :meth:`~skillmeat.core.services.composite_service.CompositeService.create_skill_composite_with_session`
-    within the caller-supplied session so the composite rows are part of the
+    within the caller-supplied transaction context so the composite rows are part of the
     same atomic transaction as the skill's ``Artifact`` row.
 
     If no embedded artifacts are found in ``metadata_json`` the function is a
@@ -3753,13 +3680,12 @@ def _wire_skill_composite(
     and no orphaned rows are left in the database.
 
     Args:
-        session: Active SQLAlchemy session owned by ``import_artifacts()``.
+        ctx: Active ``ImportContext`` owned by ``import_artifacts()``.
         source_id: Marketplace source ID (used for catalog lookup).
         entry: ``ImportEntry`` for the successfully imported skill.
         catalog_repo: Repository for fetching the full catalog entry.
         collection_id: Owning collection identifier (e.g. ``"default"``).
     """
-    from skillmeat.cache.models import Artifact
     from skillmeat.core.services.composite_service import CompositeService
 
     # Retrieve embedded artifacts stored in metadata_json at scan time.
@@ -3814,11 +3740,9 @@ def _wire_skill_composite(
         )
         return
 
-    # Resolve the Artifact ORM row for this skill.
+    # Resolve the Artifact ORM row for this skill within the active session.
     artifact_id = f"{entry.artifact_type}:{entry.name}"
-    skill_artifact = (
-        session.query(Artifact).filter(Artifact.id == artifact_id).first()
-    )
+    skill_artifact = ctx.get_artifact_in_session(artifact_id)
     if skill_artifact is None:
         logger.error(
             "_wire_skill_composite: Artifact row for '%s' not found — cannot create composite",
@@ -3830,7 +3754,7 @@ def _wire_skill_composite(
 
     svc = CompositeService()
     svc.create_skill_composite_with_session(
-        session=session,
+        session=ctx.session,
         skill_artifact=skill_artifact,
         embedded_list=embedded_list,
         collection_id=collection_id,
@@ -4028,62 +3952,27 @@ def _import_composite_children(
     # This must run after all populate_fn calls so that Artifact rows exist.
     # ------------------------------------------------------------------
     composite_id = f"composite:{composite_entry.name}"
-    from skillmeat.cache.models import Artifact as _Artifact, CompositeMembership as _CompositeMembership  # noqa: E402
 
-    membership_count = 0
-    for idx, child_artifact_id in enumerate(membership_child_ids):
-
-        artifact_row = (
-            session.query(_Artifact)
-            .filter(_Artifact.id == child_artifact_id)
-            .first()
+    # Create/update CompositeMembership rows via repository method (avoids
+    # raw session access in router code).
+    if membership_child_ids:
+        from skillmeat.core.repositories.local_marketplace_source import (
+            LocalMarketplaceSourceRepository,
         )
-        if artifact_row is None:
-            logger.debug(
-                "CompositeMembership: artifact row not found for '%s', skipping",
-                child_artifact_id,
-            )
-            continue
 
-        existing = (
-            session.query(_CompositeMembership)
-            .filter(
-                _CompositeMembership.collection_id == DEFAULT_COLLECTION_ID,
-                _CompositeMembership.composite_id == composite_id,
-                _CompositeMembership.child_artifact_uuid == artifact_row.uuid,
-            )
-            .first()
-        )
-        if existing is None:
-            membership = _CompositeMembership(
-                collection_id=DEFAULT_COLLECTION_ID,
+        _ms_repo = LocalMarketplaceSourceRepository()
+        try:
+            _ms_repo.upsert_composite_memberships(
                 composite_id=composite_id,
-                child_artifact_uuid=artifact_row.uuid,
-                relationship_type="contains",
-                pinned_version_hash=None,
-                position=idx,
+                child_artifact_ids=membership_child_ids,
+                collection_id=DEFAULT_COLLECTION_ID,
             )
-            session.add(membership)
-            membership_count += 1
-        else:
-            existing.position = idx
-
-    try:
-        session.commit()
-        logger.info(
-            "Created %d CompositeMembership row(s) for composite '%s' "
-            "(%d child association target(s))",
-            membership_count,
-            composite_id,
-            len(membership_child_ids),
-        )
-    except Exception as mem_err:
-        session.rollback()
-        logger.warning(
-            "CompositeMembership creation failed for '%s': %s",
-            composite_id,
-            mem_err,
-        )
+        except Exception as mem_err:
+            logger.warning(
+                "CompositeMembership creation failed for '%s': %s",
+                composite_id,
+                mem_err,
+            )
 
     return children_added
 
@@ -4121,14 +4010,15 @@ async def import_artifacts(
     request: ImportRequest,
     collection_mgr: CollectionManagerDep,
     artifact_mgr: ArtifactManagerDep,
-    session: DbSessionDep,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
+    transaction_handler: MarketplaceTransactionHandlerDep,
 ) -> ImportResultDTO:
     """Import catalog entries to local collection.
 
     Args:
         source_id: Unique source identifier
         request: Import request with entry IDs and conflict strategy
-        session: Database session for adding artifacts to default collection
 
     Returns:
         Import result with statistics
@@ -4143,10 +4033,6 @@ async def import_artifacts(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one of entry_ids or artifact_paths must be provided",
         )
-
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
-    transaction_handler = MarketplaceTransactionHandler()
 
     try:
         # Verify source exists
@@ -4317,7 +4203,7 @@ async def import_artifacts(
                     # Ensure the default collection row exists (idempotent).
                     # Only required on the first batch; subsequent batches find it.
                     if batch_idx == 0:
-                        ensure_default_collection(ctx.session)
+                        ctx.ensure_default_collection(DEFAULT_COLLECTION_ID, "Default Collection")
 
                     db_added_count = 0
                     for entry in batch_entries:
@@ -4337,7 +4223,7 @@ async def import_artifacts(
                         # CompositeArtifact row atomically within this same session.
                         if _sca_enabled and entry.artifact_type == "skill":
                             _wire_skill_composite(
-                                session=ctx.session,
+                                ctx=ctx,
                                 source_id=source_id,
                                 entry=entry,
                                 catalog_repo=catalog_repo,
@@ -4408,7 +4294,7 @@ async def import_artifacts(
             total_skipped_synced = 0
             try:
                 with transaction_handler.import_transaction(source_id) as ctx:
-                    ensure_default_collection(ctx.session)
+                    ctx.ensure_default_collection(DEFAULT_COLLECTION_ID, "Default Collection")
                     for entry in skipped_entries:
                         try:
                             populate_collection_artifact_from_import(
@@ -4553,7 +4439,9 @@ async def reimport_catalog_entry(
     request: ReimportRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
-    session: DbSessionDep,
+    source_repo: MarketplaceSourceConcreteRepoDep,
+    catalog_repo: MarketplaceCatalogRepoDep,
+    transaction_handler: MarketplaceTransactionHandlerDep,
 ) -> ReimportResponse:
     """Force re-import a catalog entry from upstream.
 
@@ -4568,7 +4456,6 @@ async def reimport_catalog_entry(
         request: Re-import request with keep_deployments flag
         artifact_mgr: Artifact manager dependency
         collection_mgr: Collection manager dependency
-        session: Database session
 
     Returns:
         ReimportResponse with success status and details
@@ -4577,10 +4464,6 @@ async def reimport_catalog_entry(
         HTTPException 404: If source or entry not found
         HTTPException 500: If re-import operation fails
     """
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
-    transaction_handler = MarketplaceTransactionHandler()
-
     try:
         # Verify source exists
         source = source_repo.get_by_id(source_id)
@@ -4723,7 +4606,6 @@ async def reimport_catalog_entry(
         # Add to default database collection with full metadata.
         # For composite artifacts, child artifacts are also imported automatically.
         try:
-            ensure_default_collection(session)
             from skillmeat.api.services.artifact_cache_service import (
                 populate_collection_artifact_from_import,
             )
@@ -4731,9 +4613,11 @@ async def reimport_catalog_entry(
             # import_result.entries[0] has the ImportEntry with full context
             import_entry = import_result.entries[0] if import_result.entries else None
             if import_entry and import_entry.status.value == "success":
-                populate_collection_artifact_from_import(
-                    session, artifact_mgr, DEFAULT_COLLECTION_ID, import_entry
-                )
+                with transaction_handler.import_transaction(source_id) as ctx:
+                    ctx.ensure_default_collection(DEFAULT_COLLECTION_ID, "Default Collection")
+                    populate_collection_artifact_from_import(
+                        ctx.session, artifact_mgr, DEFAULT_COLLECTION_ID, import_entry
+                    )
                 logger.info(
                     f"Added artifact to database collection with full metadata: "
                     f"{artifact_id}"
@@ -4742,18 +4626,19 @@ async def reimport_catalog_entry(
                 # For composite reimports, also import child artifacts.
                 if import_entry.artifact_type == "composite":
                     try:
-                        _import_composite_children(
-                            session=session,
-                            artifact_mgr=artifact_mgr,
-                            collection_mgr=collection_mgr,
-                            catalog_repo=catalog_repo,
-                            transaction_handler=transaction_handler,
-                            source_id=source_id,
-                            source_ref=source.ref,
-                            composite_entry=import_entry,
-                            strategy=ConflictStrategy.OVERWRITE,
-                            populate_fn=populate_collection_artifact_from_import,
-                        )
+                        with transaction_handler.import_transaction(source_id) as ctx:
+                            _import_composite_children(
+                                session=ctx.session,
+                                artifact_mgr=artifact_mgr,
+                                collection_mgr=collection_mgr,
+                                catalog_repo=catalog_repo,
+                                transaction_handler=transaction_handler,
+                                source_id=source_id,
+                                source_ref=source.ref,
+                                composite_entry=import_entry,
+                                strategy=ConflictStrategy.OVERWRITE,
+                                populate_fn=populate_collection_artifact_from_import,
+                            )
                     except Exception as child_err:
                         logger.warning(
                             f"Child import failed for composite "
@@ -4766,10 +4651,6 @@ async def reimport_catalog_entry(
                 )
         except Exception as e:
             logger.warning(f"Failed to add artifact to database collection: {e}")
-            try:
-                session.rollback()
-            except Exception:
-                pass
 
         # Restore deployments if requested
         deployments_restored = 0
@@ -4851,6 +4732,7 @@ async def exclude_artifact(
     source_id: str,
     entry_id: str,
     request: ExcludeArtifactRequest,
+    source_repo: MarketplaceSourceRepoDep,
     collection_mgr: CollectionManagerDep = None,
 ) -> CatalogEntryResponse:
     """Mark or restore a catalog entry as excluded.
@@ -4883,81 +4765,48 @@ async def exclude_artifact(
         >>> assert response.excluded_at is not None
         >>> assert response.status == "excluded"
     """
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
     collection_keys = (
         get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
     )
 
     try:
         # Verify source exists
-        source = source_repo.get_by_id(source_id)
-        if not source:
+        source_dto = source_repo.get_source(source_id)
+        if not source_dto:
             logger.warning(f"Source not found: {source_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        # Use catalog_repo's session for atomic update
-        session = catalog_repo._get_session()
-        try:
-            # Fetch catalog entry within same session for update
-            entry = (
-                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+        # Apply exclusion or restoration via repository method.
+        if request.excluded:
+            logger.info(
+                f"Marking catalog entry as excluded: {entry_id} "
+                f"(reason: {request.reason or 'none provided'})"
             )
-            if not entry:
-                logger.warning(f"Catalog entry not found: {entry_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Catalog entry with ID '{entry_id}' not found",
-                )
+        else:
+            logger.info(f"Restoring catalog entry from exclusion: {entry_id}")
 
-            # Verify entry belongs to this source
-            if entry.source_id != source_id:
-                logger.warning(
-                    f"Entry {entry_id} does not belong to source {source_id}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
-                )
+        try:
+            entry = source_repo.update_catalog_entry_exclusion(
+                entry_id=entry_id,
+                source_id=source_id,
+                excluded=request.excluded,
+                reason=request.reason,
+            )
+        except KeyError as e:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e),
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            )
 
-            # Apply exclusion or restoration
-            if request.excluded:
-                # Mark as excluded (idempotent - skip if already excluded)
-                if entry.excluded_at is None:
-                    entry.excluded_at = datetime.now(timezone.utc)
-                entry.excluded_reason = request.reason
-                entry.status = "excluded"
-                logger.info(
-                    f"Marked catalog entry as excluded: {entry_id} "
-                    f"(reason: {request.reason or 'none provided'})"
-                )
-            else:
-                # Restore from exclusion
-                entry.excluded_at = None
-                entry.excluded_reason = None
-                # Restore to "new" status (or could check import_date to set "imported")
-                entry.status = "new" if entry.import_date is None else "imported"
-                logger.info(f"Restored catalog entry from exclusion: {entry_id}")
-
-            # Commit changes
-            session.commit()
-
-            # Refresh to get updated timestamps
-            session.refresh(entry)
-
-            return entry_to_response(entry, collection_keys)
-
-        except HTTPException:
-            session.rollback()
-            raise
-        except Exception as e:
-            session.rollback()
-            raise e
-        finally:
-            session.close()
+        return entry_to_response(entry, collection_keys)
 
     except HTTPException:
         raise
@@ -5007,6 +4856,7 @@ async def exclude_artifact(
 async def restore_excluded_artifact(
     source_id: str,
     entry_id: str,
+    source_repo: MarketplaceSourceRepoDep,
     collection_mgr: CollectionManagerDep = None,
 ) -> CatalogEntryResponse:
     """Restore an excluded catalog entry to the catalog.
@@ -5034,72 +4884,40 @@ async def restore_excluded_artifact(
         >>> assert response.excluded_reason is None
         >>> assert response.status == "new"  # or "imported" if previously imported
     """
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
     collection_keys = (
         get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
     )
 
     try:
         # Verify source exists
-        source = source_repo.get_by_id(source_id)
-        if not source:
+        source_dto = source_repo.get_source(source_id)
+        if not source_dto:
             logger.warning(f"Source not found: {source_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        # Use catalog_repo's session for atomic update
-        session = catalog_repo._get_session()
+        # Restore from exclusion via repository method (idempotent).
+        logger.info(f"Restoring catalog entry from exclusion: {entry_id}")
         try:
-            # Fetch catalog entry within same session for update
-            entry = (
-                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+            entry = source_repo.update_catalog_entry_exclusion(
+                entry_id=entry_id,
+                source_id=source_id,
+                excluded=False,
             )
-            if not entry:
-                logger.warning(f"Catalog entry not found: {entry_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Catalog entry with ID '{entry_id}' not found",
-                )
+        except KeyError as e:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e),
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            )
 
-            # Verify entry belongs to this source
-            if entry.source_id != source_id:
-                logger.warning(
-                    f"Entry {entry_id} does not belong to source {source_id}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
-                )
-
-            # Restore from exclusion (idempotent - no-op if not excluded)
-            if entry.excluded_at is not None:
-                entry.excluded_at = None
-                entry.excluded_reason = None
-                # Restore to "new" status if never imported, otherwise "imported"
-                entry.status = "new" if entry.import_date is None else "imported"
-                logger.info(f"Restored catalog entry from exclusion: {entry_id}")
-            else:
-                logger.debug(f"Entry {entry_id} was not excluded, no-op")
-
-            # Commit changes
-            session.commit()
-
-            # Refresh to get updated timestamps
-            session.refresh(entry)
-
-            return entry_to_response(entry, collection_keys)
-
-        except HTTPException:
-            session.rollback()
-            raise
-        except Exception as e:
-            session.rollback()
-            raise e
-        finally:
-            session.close()
+        return entry_to_response(entry, collection_keys)
 
     except HTTPException:
         raise
@@ -5149,6 +4967,7 @@ async def restore_excluded_artifact(
 async def get_path_tags(
     source_id: str,
     entry_id: str,
+    source_repo: MarketplaceSourceRepoDep,
 ) -> PathSegmentsResponse:
     """Get extracted path segments for a catalog entry.
 
@@ -5173,85 +4992,64 @@ async def get_path_tags(
         >>> assert len(response.extracted) == 2
         >>> assert response.extracted[0].segment == "ui-ux"
     """
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
-
     try:
         # Verify source exists
-        source = source_repo.get_by_id(source_id)
-        if not source:
+        source_dto = source_repo.get_source(source_id)
+        if not source_dto:
             logger.warning(f"Source not found: {source_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        # Use catalog_repo's session for query
-        session = catalog_repo._get_session()
-        try:
-            # Find the catalog entry
-            entry = (
-                session.query(MarketplaceCatalogEntry)
-                .filter(
-                    MarketplaceCatalogEntry.source_id == source_id,
-                    MarketplaceCatalogEntry.id == entry_id,
-                )
-                .first()
+        # Fetch catalog entry via repository method.
+        entry = source_repo.get_catalog_entry_raw(entry_id, source_id)
+        if not entry:
+            logger.warning(
+                f"Catalog entry '{entry_id}' not found in source '{source_id}'"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Catalog entry '{entry_id}' not found in source '{source_id}'",
             )
 
-            if not entry:
-                logger.warning(
-                    f"Catalog entry '{entry_id}' not found in source '{source_id}'"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Catalog entry '{entry_id}' not found in source '{source_id}'",
-                )
+        # Check if path_segments exists
+        if not entry.path_segments:
+            logger.info(
+                f"Entry '{entry_id}' has no path_segments (not extracted yet)"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Entry '{entry_id}' has no path_segments (not extracted yet)",
+            )
 
-            # Check if path_segments exists
-            if not entry.path_segments:
-                logger.info(
-                    f"Entry '{entry_id}' has no path_segments (not extracted yet)"
+        # Parse path_segments JSON
+        try:
+            data = json.loads(entry.path_segments)
+
+            # Build ExtractedSegmentResponse list
+            extracted_segments = [
+                ExtractedSegmentResponse(
+                    segment=seg["segment"],
+                    normalized=seg["normalized"],
+                    status=seg["status"],
+                    reason=seg.get("reason"),
                 )
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Entry '{entry_id}' has no path_segments (not extracted yet)",
-                )
+                for seg in data["extracted"]
+            ]
 
-            # Parse path_segments JSON
-            try:
-                data = json.loads(entry.path_segments)
-
-                # Build ExtractedSegmentResponse list
-                extracted_segments = [
-                    ExtractedSegmentResponse(
-                        segment=seg["segment"],
-                        normalized=seg["normalized"],
-                        status=seg["status"],
-                        reason=seg.get("reason"),
-                    )
-                    for seg in data["extracted"]
-                ]
-
-                return PathSegmentsResponse(
-                    entry_id=entry_id,
-                    raw_path=data["raw_path"],
-                    extracted=extracted_segments,
-                    extracted_at=datetime.fromisoformat(data["extracted_at"]),
-                )
-            except (json.JSONDecodeError, KeyError, ValueError) as e:
-                logger.error(f"Malformed path_segments for entry {entry_id}: {e}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Internal error parsing path_segments",
-                ) from e
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise e
-        finally:
-            session.close()
+            return PathSegmentsResponse(
+                entry_id=entry_id,
+                raw_path=data["raw_path"],
+                extracted=extracted_segments,
+                extracted_at=datetime.fromisoformat(data["extracted_at"]),
+            )
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.error(f"Malformed path_segments for entry {entry_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal error parsing path_segments",
+            ) from e
 
     except HTTPException:
         raise
@@ -5303,6 +5101,7 @@ async def update_path_tag_status(
     source_id: str,
     entry_id: str,
     request: UpdateSegmentStatusRequest,
+    source_repo: MarketplaceSourceRepoDep,
     collection_mgr: CollectionManagerDep,
 ) -> UpdateSegmentStatusResponse:
     """Update approval status of a single path segment.
@@ -5329,172 +5128,159 @@ async def update_path_tag_status(
         >>> response = await update_path_tag_status("src-123", "cat-456", request)
         >>> assert response.extracted[0].status == "approved"
     """
-    source_repo = MarketplaceSourceRepository()
-    catalog_repo = MarketplaceCatalogRepository()
-
     try:
         # Verify source exists
-        source = source_repo.get_by_id(source_id)
-        if not source:
+        source_dto = source_repo.get_source(source_id)
+        if not source_dto:
             logger.warning(f"Source not found: {source_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        # Use catalog_repo's session for atomic update
-        session = catalog_repo._get_session()
+        # Fetch catalog entry via repository method.
+        entry = source_repo.get_catalog_entry_raw(entry_id, source_id)
+        if not entry:
+            logger.warning(
+                f"Catalog entry '{entry_id}' not found in source '{source_id}'"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Catalog entry '{entry_id}' not found in source '{source_id}'",
+            )
+
+        # Check if path_segments exists
+        if not entry.path_segments:
+            logger.info(
+                f"Entry '{entry_id}' has no path_segments (not extracted yet)"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Entry '{entry_id}' has no path_segments (not extracted yet)",
+            )
+
+        # Parse path_segments JSON
         try:
-            # Find the catalog entry
-            entry = (
-                session.query(MarketplaceCatalogEntry)
-                .filter(
-                    MarketplaceCatalogEntry.source_id == source_id,
-                    MarketplaceCatalogEntry.id == entry_id,
-                )
-                .first()
+            segments_data = json.loads(entry.path_segments)
+        except json.JSONDecodeError:
+            logger.error(f"Malformed path_segments for entry {entry_id}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal error: malformed path_segments JSON",
             )
 
-            if not entry:
-                logger.warning(
-                    f"Catalog entry '{entry_id}' not found in source '{source_id}'"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Catalog entry '{entry_id}' not found in source '{source_id}'",
-                )
+        # Find and update the segment in memory
+        segment_found = False
+        request_lower = request.segment.lower()
+        for seg in segments_data["extracted"]:
+            if (
+                seg["segment"].lower() == request_lower
+                or seg.get("normalized", "").lower() == request_lower
+            ):
+                segment_found = True
 
-            # Check if path_segments exists
-            if not entry.path_segments:
+                # Cannot change "excluded" segments
+                if seg["status"] == "excluded":
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Cannot change status of excluded segment '{request.segment}'",
+                    )
+
+                # Cannot double-approve/reject
+                if seg["status"] in ["approved", "rejected"]:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Segment '{request.segment}' already has status '{seg['status']}'",
+                    )
+
+                # Update status
+                seg["status"] = request.status
                 logger.info(
-                    f"Entry '{entry_id}' has no path_segments (not extracted yet)"
+                    f"Updated segment '{request.segment}' (matched '{seg['segment']}') "
+                    f"to status '{request.status}' in entry '{entry_id}'"
                 )
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Entry '{entry_id}' has no path_segments (not extracted yet)",
-                )
+                break
 
-            # Parse path_segments JSON
-            try:
-                segments_data = json.loads(entry.path_segments)
-            except json.JSONDecodeError:
-                logger.error(f"Malformed path_segments for entry {entry_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Internal error: malformed path_segments JSON",
-                )
-
-            # Find and update the segment
-            segment_found = False
-            request_lower = request.segment.lower()
-            for seg in segments_data["extracted"]:
-                if (
-                    seg["segment"].lower() == request_lower
-                    or seg.get("normalized", "").lower() == request_lower
-                ):
-                    segment_found = True
-
-                    # Cannot change "excluded" segments
-                    if seg["status"] == "excluded":
-                        raise HTTPException(
-                            status_code=status.HTTP_409_CONFLICT,
-                            detail=f"Cannot change status of excluded segment '{request.segment}'",
-                        )
-
-                    # Cannot double-approve/reject
-                    if seg["status"] in ["approved", "rejected"]:
-                        raise HTTPException(
-                            status_code=status.HTTP_409_CONFLICT,
-                            detail=f"Segment '{request.segment}' already has status '{seg['status']}'",
-                        )
-
-                    # Update status
-                    seg["status"] = request.status
-                    logger.info(
-                        f"Updated segment '{request.segment}' (matched '{seg['segment']}') "
-                        f"to status '{request.status}' in entry '{entry_id}'"
-                    )
-                    break
-
-            if not segment_found:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Segment '{request.segment}' not found in entry '{entry_id}'",
-                )
-
-            # Save back to DB
-            entry.path_segments = json.dumps(segments_data)
-            session.commit()
-
-            # Sync approved tag to collection artifact if already imported
-            if request.status == "approved":
-                try:
-                    # Check if artifact is in collection
-                    in_collection, artifact_id, _ = (
-                        collection_mgr.artifact_in_collection(
-                            name=entry.name,
-                            artifact_type=entry.artifact_type,
-                        )
-                    )
-
-                    if in_collection:
-                        # Get the normalized tag value to add
-                        normalized_tag = None
-                        for seg in segments_data["extracted"]:
-                            if (
-                                seg["segment"].lower() == request_lower
-                                or seg.get("normalized", "").lower() == request_lower
-                            ):
-                                normalized_tag = seg.get("normalized") or seg["segment"]
-                                break
-
-                        if normalized_tag:
-                            # Load collection, find artifact, add tag
-                            collection = collection_mgr.load_collection()
-                            for artifact in collection.artifacts:
-                                if (
-                                    f"{artifact.type.value}:{artifact.name}"
-                                    == artifact_id
-                                ):
-                                    # Add tag if not already present
-                                    if normalized_tag not in artifact.tags:
-                                        artifact.tags.append(normalized_tag)
-                                        collection_mgr.save_collection(collection)
-                                        logger.info(
-                                            f"Synced tag '{normalized_tag}' to collection "
-                                            f"artifact '{artifact_id}'"
-                                        )
-                                    break
-                except Exception as e:
-                    # Log but don't fail - source tag update already succeeded
-                    logger.warning(f"Failed to sync tag to collection artifact: {e}")
-
-            # Build response
-            extracted_segments = [
-                ExtractedSegmentResponse(
-                    segment=seg["segment"],
-                    normalized=seg["normalized"],
-                    status=seg["status"],
-                    reason=seg.get("reason"),
-                )
-                for seg in segments_data["extracted"]
-            ]
-
-            return UpdateSegmentStatusResponse(
-                entry_id=entry_id,
-                raw_path=segments_data["raw_path"],
-                extracted=extracted_segments,
-                updated_at=datetime.utcnow(),
+        if not segment_found:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Segment '{request.segment}' not found in entry '{entry_id}'",
             )
 
-        except HTTPException:
-            session.rollback()
-            raise
-        except Exception as e:
-            session.rollback()
-            raise e
-        finally:
-            session.close()
+        # Save back to DB via repository method.
+        updated_path_segments_json = json.dumps(segments_data)
+        try:
+            entry = source_repo.update_catalog_entry_path_tags(
+                entry_id=entry_id,
+                source_id=source_id,
+                path_segments_json=updated_path_segments_json,
+            )
+        except KeyError as e:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e),
+            )
+
+        # Sync approved tag to collection artifact if already imported
+        if request.status == "approved":
+            try:
+                # Check if artifact is in collection
+                in_collection, artifact_id, _ = (
+                    collection_mgr.artifact_in_collection(
+                        name=entry.name,
+                        artifact_type=entry.artifact_type,
+                    )
+                )
+
+                if in_collection:
+                    # Get the normalized tag value to add
+                    normalized_tag = None
+                    for seg in segments_data["extracted"]:
+                        if (
+                            seg["segment"].lower() == request_lower
+                            or seg.get("normalized", "").lower() == request_lower
+                        ):
+                            normalized_tag = seg.get("normalized") or seg["segment"]
+                            break
+
+                    if normalized_tag:
+                        # Load collection, find artifact, add tag
+                        collection = collection_mgr.load_collection()
+                        for artifact in collection.artifacts:
+                            if (
+                                f"{artifact.type.value}:{artifact.name}"
+                                == artifact_id
+                            ):
+                                # Add tag if not already present
+                                if normalized_tag not in artifact.tags:
+                                    artifact.tags.append(normalized_tag)
+                                    collection_mgr.save_collection(collection)
+                                    logger.info(
+                                        f"Synced tag '{normalized_tag}' to collection "
+                                        f"artifact '{artifact_id}'"
+                                    )
+                                break
+            except Exception as e:
+                # Log but don't fail - source tag update already succeeded
+                logger.warning(f"Failed to sync tag to collection artifact: {e}")
+
+        # Build response
+        extracted_segments = [
+            ExtractedSegmentResponse(
+                segment=seg["segment"],
+                normalized=seg["normalized"],
+                status=seg["status"],
+                reason=seg.get("reason"),
+            )
+            for seg in segments_data["extracted"]
+        ]
+
+        return UpdateSegmentStatusResponse(
+            entry_id=entry_id,
+            raw_path=segments_data["raw_path"],
+            extracted=extracted_segments,
+            updated_at=datetime.utcnow(),
+        )
 
     except HTTPException:
         raise
@@ -5553,6 +5339,7 @@ def _map_tree_entry_type(entry_type: str) -> str:
 async def get_artifact_file_tree(
     source_id: str,
     artifact_path: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> FileTreeResponse:
     """Get file tree for a marketplace artifact.
 
@@ -5577,8 +5364,6 @@ async def get_artifact_file_tree(
     # but empty string is the canonical representation for API operations
     if artifact_path == ".":
         artifact_path = ""
-
-    source_repo = MarketplaceSourceRepository()
 
     try:
         # Get marketplace source
@@ -5774,6 +5559,7 @@ async def get_artifact_file_content(
     source_id: str,
     artifact_path: str,
     file_path: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> FileContentResponse:
     """Get content of a file within a marketplace artifact.
 
@@ -5800,8 +5586,6 @@ async def get_artifact_file_content(
     # but empty string is the canonical representation for API operations
     if artifact_path == ".":
         artifact_path = ""
-
-    source_repo = MarketplaceSourceRepository()
 
     try:
         # Get marketplace source
@@ -5985,11 +5769,13 @@ async def get_artifact_file_content(
 )
 async def get_source_auto_tags(
     source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> AutoTagsResponse:
     """Get auto-tag suggestions for a marketplace source.
 
     Args:
         source_id: Unique source identifier
+        source_repo: Injected MarketplaceSourceRepository dependency.
 
     Returns:
         AutoTagsResponse with all auto-tags and their status
@@ -5997,8 +5783,6 @@ async def get_source_auto_tags(
     Raises:
         HTTPException 404: If source not found
     """
-    source_repo = MarketplaceSourceRepository()
-
     try:
         source = source_repo.get_by_id(source_id)
         if not source:
@@ -6066,12 +5850,17 @@ async def get_source_auto_tags(
 async def update_source_auto_tag(
     source_id: str,
     request: UpdateAutoTagRequest,
+    source_repo: MarketplaceSourceRepoDep,
+    concrete_source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> UpdateAutoTagResponse:
     """Update approval status of an auto-tag.
 
     Args:
         source_id: Unique source identifier
         request: Request body with tag value and new status
+        source_repo: IMarketplaceSourceRepository DI dependency.
+        concrete_source_repo: Concrete MarketplaceSourceRepository for ORM-level
+            auto_tags mutations not exposed by the interface.
 
     Returns:
         UpdateAutoTagResponse with updated tag and any tags added
@@ -6080,10 +5869,8 @@ async def update_source_auto_tag(
         HTTPException 404: If source or auto-tag not found
         HTTPException 500: If update fails
     """
-    source_repo = MarketplaceSourceRepository()
-
     try:
-        source = source_repo.get_by_id(source_id)
+        source = concrete_source_repo.get_by_id(source_id)
         if not source:
             logger.warning(f"Source not found for auto-tag update: {source_id}")
             raise HTTPException(
@@ -6149,9 +5936,8 @@ async def update_source_auto_tag(
             except Exception as e:
                 logger.warning(f"Failed to add approved tag to source {source_id}: {e}")
 
-        # Commit changes
-        session = source_repo._get_session()
-        session.commit()
+        # Persist mutations on the source ORM object via repository update.
+        concrete_source_repo.update(source)
 
         logger.info(
             f"Updated auto-tag '{request.value}' to status '{request.status}' "
@@ -6179,7 +5965,7 @@ async def update_source_auto_tag(
 
 def _refresh_auto_tags_for_source(
     source: MarketplaceSource,
-    source_repo: MarketplaceSourceRepository,
+    source_repo: "MarketplaceSourceRepository",
 ) -> tuple[int, int, int, List[AutoTagSegment]]:
     """Refresh auto-tags for a single source by fetching GitHub topics.
 
@@ -6233,9 +6019,8 @@ def _refresh_auto_tags_for_source(
         auto_tags_data = {"extracted": new_segments}
         source.set_auto_tags_dict(auto_tags_data)
 
-    # Commit changes
-    session = source_repo._get_session()
-    session.commit()
+    # Persist mutations on the source ORM object via repository update.
+    source_repo.update(source)
 
     # Build response segments
     segments = [
@@ -6266,6 +6051,7 @@ def _refresh_auto_tags_for_source(
 )
 async def refresh_source_auto_tags(
     source_id: str,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> AutoTagRefreshResponse:
     """Refresh auto-tags by fetching GitHub topics for the source.
 
@@ -6285,8 +6071,6 @@ async def refresh_source_auto_tags(
         GitHubNotFoundError,
         GitHubRateLimitError,
     )
-
-    source_repo = MarketplaceSourceRepository()
 
     try:
         source = source_repo.get_by_id(source_id)
@@ -6364,11 +6148,13 @@ async def refresh_source_auto_tags(
 )
 async def bulk_refresh_auto_tags(
     request: BulkAutoTagRefreshRequest,
+    source_repo: MarketplaceSourceConcreteRepoDep,
 ) -> BulkAutoTagRefreshResponse:
     """Refresh auto-tags for multiple sources.
 
     Args:
         request: BulkAutoTagRefreshRequest with list of source IDs
+        source_repo: Injected MarketplaceSourceRepository dependency.
 
     Returns:
         BulkAutoTagRefreshResponse with individual results and summary
@@ -6377,8 +6163,6 @@ async def bulk_refresh_auto_tags(
         GitHubClientError,
         GitHubRateLimitError,
     )
-
-    source_repo = MarketplaceSourceRepository()
     results: List[BulkAutoTagRefreshItemResult] = []
     total_succeeded = 0
     total_failed = 0

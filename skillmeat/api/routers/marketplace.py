@@ -11,7 +11,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
-from skillmeat.api.dependencies import verify_api_key
+from skillmeat.api.dependencies import MarketplaceSourceRepoDep, verify_api_key
 from skillmeat.api.middleware.auth import OptionalTokenDep, TokenDep
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.marketplace import (
@@ -29,7 +29,7 @@ from skillmeat.api.services.artifact_cache_service import (
     populate_collection_artifact_from_import,
 )
 from skillmeat.api.utils.cache import get_cache_manager
-from skillmeat.cache.models import Artifact as ArtifactModel, CompositeMembership, get_session
+from skillmeat.cache.models import get_session
 from skillmeat.core.sharing.bundle import Bundle
 from skillmeat.core.sharing.importer import BundleImporter
 from skillmeat.marketplace.broker import (
@@ -458,6 +458,7 @@ async def get_listing_detail(
 async def install_listing(
     install_req: InstallRequest,
     token: TokenDep,
+    repo: MarketplaceSourceRepoDep,
 ) -> InstallResponse:
     """Install a marketplace listing.
 
@@ -640,61 +641,24 @@ async def install_listing(
                             and a.resolution in ("imported", "forked", "merged")
                         ]
 
-                        membership_count = 0
-                        for idx, child in enumerate(children):
-                            child_name = child.new_name or child.name
-                            child_artifact_id = f"{child.type}:{child_name}"
-
-                            # Resolve stable UUID from the Artifact table
-                            artifact_row = (
-                                db_session.query(ArtifactModel)
-                                .filter(ArtifactModel.id == child_artifact_id)
-                                .first()
-                            )
-
-                            if artifact_row is None:
-                                logger.warning(
-                                    f"CompositeMembership: artifact row not found for "
-                                    f"'{child_artifact_id}', skipping"
-                                )
-                                continue
-
-                            # Upsert membership row
-                            existing = (
-                                db_session.query(CompositeMembership)
-                                .filter(
-                                    CompositeMembership.collection_id == collection_id,
-                                    CompositeMembership.composite_id == composite_id,
-                                    CompositeMembership.child_artifact_uuid
-                                    == artifact_row.uuid,
-                                )
-                                .first()
-                            )
-
-                            if existing is None:
-                                membership = CompositeMembership(
-                                    collection_id=collection_id,
-                                    composite_id=composite_id,
-                                    child_artifact_uuid=artifact_row.uuid,
-                                    relationship_type="contains",
-                                    pinned_version_hash=None,
-                                    position=idx,
-                                )
-                                db_session.add(membership)
-                                membership_count += 1
-                            else:
-                                # Already linked; update position in case ordering changed
-                                existing.position = idx
+                        child_artifact_ids = [
+                            f"{child.type}:{child.new_name or child.name}"
+                            for child in children
+                        ]
 
                         try:
-                            db_session.flush()
+                            membership_count = repo.upsert_composite_memberships(
+                                composite_id=composite_id,
+                                child_artifact_ids=child_artifact_ids,
+                                collection_id=collection_id,
+                            )
                             logger.info(
                                 f"Created {membership_count} CompositeMembership rows "
                                 f"for composite '{composite_id}'"
                             )
                         except Exception as mem_err:
                             logger.warning(
-                                f"CompositeMembership flush failed for '{composite_id}': "
+                                f"CompositeMembership upsert failed for '{composite_id}': "
                                 f"{mem_err}"
                             )
                 finally:
@@ -772,6 +736,8 @@ async def publish_bundle(
 
     try:
         # Validate bundle path exists
+        # TODO: migrate to repository — bundle file access could go through an IBundleRepository
+        # once bundle storage is abstracted beyond direct filesystem paths.
         bundle_path = Path(publish_req.bundle_path)
         if not bundle_path.exists():
             raise HTTPException(

@@ -448,6 +448,154 @@ Minimal agent for testing.
     return agent_file
 
 
+# =============================================================================
+# Mock Repository Fixtures (hexagonal architecture / DI overrides)
+# =============================================================================
+
+
+@pytest.fixture
+def mock_repos():
+    """Instantiate all six mock repository implementations and reset them.
+
+    Each mock is an in-memory implementation of the corresponding interface
+    from ``skillmeat.core.interfaces.repositories``.  Calling ``reset()``
+    before each test ensures complete isolation between tests.
+
+    Returns:
+        Dict[str, MockXxxRepository]: Keyed by short name for easy access.
+
+    Example::
+
+        def test_something(mock_repos):
+            mock_repos["artifacts"].seed(my_artifact_dto)
+            mock_repos["tags"].seed(my_tag_dto)
+    """
+    from tests.mocks.repositories import (
+        MockArtifactRepository,
+        MockCollectionRepository,
+        MockDeploymentRepository,
+        MockProjectRepository,
+        MockSettingsRepository,
+        MockTagRepository,
+    )
+
+    repos = {
+        "artifacts": MockArtifactRepository(),
+        "projects": MockProjectRepository(),
+        "collections": MockCollectionRepository(),
+        "deployments": MockDeploymentRepository(),
+        "tags": MockTagRepository(),
+        "settings": MockSettingsRepository(),
+    }
+
+    # Ensure a clean slate — guards against state leaking from constructor args
+    for repo in repos.values():
+        repo.reset()
+
+    return repos
+
+
+@pytest.fixture
+def app_with_mocks(mock_repos):
+    """Create a FastAPI test app with all repository DI providers overridden.
+
+    Repository provider functions defined in ``skillmeat.api.dependencies``
+    are replaced with simple lambdas that return the corresponding mock.
+    The ``get_app_state`` dependency is also bypassed so the full
+    ``AppState.initialize()`` path (which hits the filesystem) is never
+    executed.
+
+    The overrides are applied for the duration of the fixture and then
+    removed, so other tests that import ``create_app`` continue to work
+    normally.
+
+    Returns:
+        FastAPI: Configured application with mock repository overrides.
+
+    Example::
+
+        def test_list_artifacts(app_with_mocks, mock_repos):
+            from fastapi.testclient import TestClient
+            mock_repos["artifacts"].seed(some_dto)
+            with TestClient(app_with_mocks) as client:
+                resp = client.get("/api/v1/artifacts")
+                assert resp.status_code == 200
+    """
+    from skillmeat.api.config import APISettings, Environment
+    from skillmeat.api.dependencies import (
+        get_artifact_repository,
+        get_collection_repository,
+        get_deployment_repository,
+        get_project_repository,
+        get_settings_repository,
+        get_tag_repository,
+    )
+    from skillmeat.api.server import create_app
+
+    test_settings = APISettings(
+        env=Environment.TESTING,
+        host="127.0.0.1",
+        port=8000,
+        log_level="WARNING",
+        api_key_enabled=False,
+        rate_limit_enabled=False,
+    )
+
+    app = create_app(test_settings)
+
+    # Override every repository provider with a factory that returns the mock
+    app.dependency_overrides[get_artifact_repository] = (
+        lambda: mock_repos["artifacts"]
+    )
+    app.dependency_overrides[get_project_repository] = (
+        lambda: mock_repos["projects"]
+    )
+    app.dependency_overrides[get_collection_repository] = (
+        lambda: mock_repos["collections"]
+    )
+    app.dependency_overrides[get_deployment_repository] = (
+        lambda: mock_repos["deployments"]
+    )
+    app.dependency_overrides[get_tag_repository] = (
+        lambda: mock_repos["tags"]
+    )
+    app.dependency_overrides[get_settings_repository] = (
+        lambda: mock_repos["settings"]
+    )
+
+    yield app
+
+    # Clean up overrides so they don't leak into other test modules
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client_with_mocks(app_with_mocks):
+    """Create a ``TestClient`` backed by mock repositories.
+
+    Combines ``app_with_mocks`` with ``fastapi.testclient.TestClient`` so
+    tests that only need HTTP-level access don't have to manage the client
+    themselves.
+
+    The client is yielded inside the ASGI lifespan context so startup /
+    shutdown hooks run normally.
+
+    Returns:
+        TestClient: Ready-to-use test client.
+
+    Example::
+
+        def test_list_artifacts_empty(client_with_mocks):
+            resp = client_with_mocks.get("/api/v1/artifacts")
+            assert resp.status_code == 200
+            assert resp.json()["artifacts"] == []
+    """
+    from fastapi.testclient import TestClient
+
+    with TestClient(app_with_mocks) as client:
+        yield client
+
+
 # Export helper functions for use in tests
 pytest.create_minimal_skill = create_minimal_skill
 pytest.create_minimal_command = create_minimal_command

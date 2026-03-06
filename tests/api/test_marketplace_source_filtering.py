@@ -25,6 +25,9 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import (
+    get_marketplace_source_repository_concrete,
+)
 from skillmeat.api.schemas.marketplace import (
     CreateSourceRequest,
     ScanResultDTO,
@@ -564,7 +567,7 @@ class TestSchemaTagValidation:
 class TestListSourcesNoFilters:
     """Test GET /marketplace/sources without filters returns all sources."""
 
-    def test_list_sources_no_filters_returns_all(self, client, mock_source_repo):
+    def test_list_sources_no_filters_returns_all(self, app, client, mock_source_repo):
         """Test listing sources without filters returns all sources."""
         # Create mock sources
         mock_source1 = MarketplaceSource(
@@ -600,11 +603,13 @@ class TestListSourcesNoFilters:
             items=[mock_source1, mock_source2], has_more=False
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
             response = client.get("/api/v1/marketplace/sources")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -615,7 +620,7 @@ class TestListSourcesNoFilters:
 class TestListSourcesFilterByArtifactType:
     """Test GET /marketplace/sources?artifact_type=skill returns only matching sources."""
 
-    def test_filter_by_skill_type(self, client, mock_source_repo):
+    def test_filter_by_skill_type(self, app, client, mock_source_repo):
         """Test filtering sources by artifact_type=skill."""
         # Create sources with different artifact types
         mock_source_with_skills = MarketplaceSource(
@@ -655,17 +660,20 @@ class TestListSourcesFilterByArtifactType:
             mock_source_with_commands,
         ]
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.SourceManager"
-        ) as MockSourceManager:
-            manager_instance = MagicMock()
-            manager_instance.apply_filters.return_value = [mock_source_with_skills]
-            MockSourceManager.return_value = manager_instance
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources.SourceManager"
+            ) as MockSourceManager:
+                manager_instance = MagicMock()
+                manager_instance.apply_filters.return_value = [mock_source_with_skills]
+                MockSourceManager.return_value = manager_instance
 
-            response = client.get("/api/v1/marketplace/sources?artifact_type=skill")
+                response = client.get("/api/v1/marketplace/sources?artifact_type=skill")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -676,7 +684,7 @@ class TestListSourcesFilterByArtifactType:
 class TestListSourcesFilterByTags:
     """Test GET /marketplace/sources?tags=ui returns sources with ui tag."""
 
-    def test_filter_by_single_tag(self, client, mock_source_repo):
+    def test_filter_by_single_tag(self, app, client, mock_source_repo):
         """Test filtering sources by single tag."""
         mock_source_with_ui = MarketplaceSource(
             id="src_ui",
@@ -715,17 +723,20 @@ class TestListSourcesFilterByTags:
             mock_source_without_ui,
         ]
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.SourceManager"
-        ) as MockSourceManager:
-            manager_instance = MagicMock()
-            manager_instance.apply_filters.return_value = [mock_source_with_ui]
-            MockSourceManager.return_value = manager_instance
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources.SourceManager"
+            ) as MockSourceManager:
+                manager_instance = MagicMock()
+                manager_instance.apply_filters.return_value = [mock_source_with_ui]
+                MockSourceManager.return_value = manager_instance
 
-            response = client.get("/api/v1/marketplace/sources?tags=ui")
+                response = client.get("/api/v1/marketplace/sources?tags=ui")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -736,7 +747,7 @@ class TestListSourcesFilterByTags:
 class TestListSourcesFilterCombined:
     """Test GET /marketplace/sources?artifact_type=skill&tags=ui returns intersection."""
 
-    def test_filter_combined_and_logic(self, client, mock_source_repo):
+    def test_filter_combined_and_logic(self, app, client, mock_source_repo):
         """Test combined artifact_type and tags filter with AND logic."""
         # Source with skills and ui tag
         mock_source_skills_ui = MarketplaceSource(
@@ -798,20 +809,23 @@ class TestListSourcesFilterCombined:
             mock_source_ui_only,
         ]
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources.SourceManager"
-        ) as MockSourceManager:
-            manager_instance = MagicMock()
-            # Only source with both skills AND ui tag should match
-            manager_instance.apply_filters.return_value = [mock_source_skills_ui]
-            MockSourceManager.return_value = manager_instance
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources.SourceManager"
+            ) as MockSourceManager:
+                manager_instance = MagicMock()
+                # Only source with both skills AND ui tag should match
+                manager_instance.apply_filters.return_value = [mock_source_skills_ui]
+                MockSourceManager.return_value = manager_instance
 
-            response = client.get(
-                "/api/v1/marketplace/sources?artifact_type=skill&tags=ui"
-            )
+                response = client.get(
+                    "/api/v1/marketplace/sources?artifact_type=skill&tags=ui"
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -822,7 +836,7 @@ class TestListSourcesFilterCombined:
 class TestCreateSourceWithDetails:
     """Test POST /marketplace/sources with repo details toggle."""
 
-    def test_create_source_with_repo_details_toggle(self, client, mock_source_repo):
+    def test_create_source_with_repo_details_toggle(self, app, client, mock_source_repo):
         """Test creating source with import_repo_description and import_repo_readme flags."""
         mock_source = MarketplaceSource(
             id="src_new",
@@ -857,22 +871,25 @@ class TestCreateSourceWithDetails:
                 scanned_at=datetime(2025, 12, 6, 10, 35, 0),
             )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources._perform_scan",
-            side_effect=mock_perform_scan,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/test/new-repo",
-                    "ref": "main",
-                    "import_repo_description": True,
-                    "import_repo_readme": True,
-                },
-            )
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources._perform_scan",
+                side_effect=mock_perform_scan,
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources",
+                    json={
+                        "repo_url": "https://github.com/test/new-repo",
+                        "ref": "main",
+                        "import_repo_description": True,
+                        "import_repo_readme": True,
+                    },
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_201_CREATED
 
@@ -880,7 +897,7 @@ class TestCreateSourceWithDetails:
 class TestCreateSourceWithTags:
     """Test POST /marketplace/sources with tags stores tags."""
 
-    def test_create_source_with_tags(self, client, mock_source_repo):
+    def test_create_source_with_tags(self, app, client, mock_source_repo):
         """Test creating source with tags."""
         mock_source = MarketplaceSource(
             id="src_tagged",
@@ -916,21 +933,24 @@ class TestCreateSourceWithTags:
                 scanned_at=datetime(2025, 12, 6, 10, 35, 0),
             )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
-            "skillmeat.api.routers.marketplace_sources._perform_scan",
-            side_effect=mock_perform_scan,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/test/tagged-repo",
-                    "ref": "main",
-                    "tags": ["python", "fastapi"],
-                },
-            )
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
+            with patch(
+                "skillmeat.api.routers.marketplace_sources._perform_scan",
+                side_effect=mock_perform_scan,
+            ):
+                response = client.post(
+                    "/api/v1/marketplace/sources",
+                    json={
+                        "repo_url": "https://github.com/test/tagged-repo",
+                        "ref": "main",
+                        "tags": ["python", "fastapi"],
+                    },
+                )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_201_CREATED
 
@@ -938,7 +958,7 @@ class TestCreateSourceWithTags:
 class TestUpdateSourceTags:
     """Test PUT/PATCH /marketplace/sources/{id} updates tags."""
 
-    def test_update_source_tags_with_description(self, client, mock_source_repo):
+    def test_update_source_tags_with_description(self, app, client, mock_source_repo):
         """Test updating source tags via PATCH (along with another valid field).
 
         Note: The current implementation requires at least one of the following
@@ -985,10 +1005,10 @@ class TestUpdateSourceTags:
         mock_source_repo.get_by_id.side_effect = [mock_source, updated_source]
         mock_source_repo.update.return_value = updated_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
             # Include description to satisfy the update validation
             response = client.patch(
                 "/api/v1/marketplace/sources/src_update",
@@ -997,12 +1017,14 @@ class TestUpdateSourceTags:
                     "description": "Updated description",
                 },
             )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data.get("id") == "src_update"
 
-    def test_update_source_tags_only_succeeds(self, client, mock_source_repo):
+    def test_update_source_tags_only_succeeds(self, app, client, mock_source_repo):
         """Test that updating with only tags now succeeds (returns 200).
 
         Tags are now included in the list of valid standalone update parameters,
@@ -1028,14 +1050,16 @@ class TestUpdateSourceTags:
         mock_source_repo.get_by_id.return_value = mock_source
         mock_source_repo.update.return_value = mock_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
             response = client.patch(
                 "/api/v1/marketplace/sources/src_update",
                 json={"tags": ["new-tag1", "new-tag2"]},
             )
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Tags alone is now a valid update — endpoint returns 200
         assert response.status_code == status.HTTP_200_OK
@@ -1046,7 +1070,7 @@ class TestUpdateSourceTags:
 class TestGetSourceDetails:
     """Test GET /marketplace/sources/{id} returns source with all fields."""
 
-    def test_get_source_returns_basic_details(self, client, mock_source_repo):
+    def test_get_source_returns_basic_details(self, app, client, mock_source_repo):
         """Test getting source returns basic source details.
 
         Note: repo_description and repo_readme are included in the SourceResponse
@@ -1070,11 +1094,13 @@ class TestGetSourceDetails:
 
         mock_source_repo.get_by_id.return_value = mock_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_details")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -1085,7 +1111,7 @@ class TestGetSourceDetails:
         assert data["scan_status"] == "success"
         assert data["artifact_count"] == 5
 
-    def test_get_source_includes_schema_fields(self, client, mock_source_repo):
+    def test_get_source_includes_schema_fields(self, app, client, mock_source_repo):
         """Test that response includes all SourceResponse schema fields.
 
         The SourceResponse schema includes repo_description, repo_readme,
@@ -1109,11 +1135,13 @@ class TestGetSourceDetails:
 
         mock_source_repo.get_by_id.return_value = mock_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_schema")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -1146,15 +1174,17 @@ class TestGetSourceDetails:
         for field in expected_fields:
             assert field in data, f"Missing field: {field}"
 
-    def test_get_source_not_found(self, client, mock_source_repo):
+    def test_get_source_not_found(self, app, client, mock_source_repo):
         """Test getting non-existent source returns 404."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/nonexistent")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 

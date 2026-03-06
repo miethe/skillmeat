@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from skillmeat.api.dependencies import (
     CollectionManagerDep,
+    DeploymentRepoDep,
     verify_api_key,
 )
 from skillmeat.api.middleware.auth import TokenDep
@@ -23,12 +24,7 @@ from skillmeat.api.schemas.deployments import (
     UndeployRequest,
     UndeployResponse,
 )
-from skillmeat.api.services.artifact_cache_service import (
-    add_deployment_to_cache,
-    remove_deployment_from_cache,
-)
 from skillmeat.cache.deployment_stats_cache import get_deployment_stats_cache
-from skillmeat.cache.models import get_session
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.deployment import DeploymentManager
 from skillmeat.observability.timing import PerfTimer
@@ -121,6 +117,7 @@ async def deploy_artifact(
     request: DeployRequest,
     deployment_mgr: DeploymentManager = Depends(get_deployment_manager),
     token: TokenDep = None,
+    deployment_repo: DeploymentRepoDep = None,
 ) -> DeploymentResponse:
     """Deploy an artifact to a project.
 
@@ -270,37 +267,23 @@ async def deploy_artifact(
                 artifact_name=request.artifact_name,
                 project_path=str(project_path),
             ):
-                session = get_session()
-                try:
+                if deployment_repo is not None:
                     for deployed in deployments:
-                        artifact_id = f"{deployed.artifact_type}:{deployed.artifact_name}"
-                        try:
-                            add_deployment_to_cache(
-                                session=session,
-                                artifact_id=artifact_id,
-                                project_path=str(project_path),
-                                project_name=project_path.name,
-                                deployed_at=deployed.deployed_at,
-                                content_hash=deployed.content_hash,
-                                deployment_profile_id=deployed.deployment_profile_id,
-                                local_modifications=deployed.local_modifications,
-                                platform=(
-                                    deployed.platform.value if deployed.platform else None
-                                ),
-                            )
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to update deployment cache for {artifact_id}: {e}"
-                            )
-                    session.commit()
-                except Exception as e:
-                    logger.warning(f"Failed to update deployment cache: {e}")
-                    try:
-                        session.rollback()
-                    except Exception:
-                        pass  # Ignore rollback errors
-                finally:
-                    session.close()
+                        artifact_id = (
+                            f"{deployed.artifact_type}:{deployed.artifact_name}"
+                        )
+                        deployment_repo.sync_deployment_cache(
+                            artifact_id=artifact_id,
+                            project_path=str(project_path),
+                            project_name=project_path.name,
+                            deployed_at=deployed.deployed_at,
+                            content_hash=deployed.content_hash,
+                            deployment_profile_id=deployed.deployment_profile_id,
+                            local_modifications=deployed.local_modifications,
+                            platform=(
+                                deployed.platform.value if deployed.platform else None
+                            ),
+                        )
 
             # Invalidate deployment stats cache
             get_deployment_stats_cache().invalidate_all()
@@ -344,6 +327,7 @@ async def undeploy_artifact(
     request: UndeployRequest,
     deployment_mgr: DeploymentManager = Depends(get_deployment_manager),
     token: TokenDep = None,
+    deployment_repo: DeploymentRepoDep = None,
 ) -> UndeployResponse:
     """Remove a deployed artifact from a project.
 
@@ -403,22 +387,13 @@ async def undeploy_artifact(
                 artifact_name=request.artifact_name,
                 project_path=str(project_path),
             ):
-                session = get_session()
-                try:
+                if deployment_repo is not None:
                     artifact_id = f"{request.artifact_type}:{request.artifact_name}"
-                    try:
-                        remove_deployment_from_cache(
-                            session=session,
-                            artifact_id=artifact_id,
-                            project_path=str(project_path),
-                            profile_id=request.profile_id,
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to update deployment cache after undeploy: {e}"
-                        )
-                finally:
-                    session.close()
+                    deployment_repo.remove_deployment_cache(
+                        artifact_id=artifact_id,
+                        project_path=str(project_path),
+                        profile_id=request.profile_id,
+                    )
 
             response = UndeployResponse(
                 success=True,
@@ -470,6 +445,7 @@ async def undeploy_artifact(
     },
 )
 async def list_deployments(
+    deployment_repo: DeploymentRepoDep,
     deployment_mgr: DeploymentManager = Depends(get_deployment_manager),
     token: TokenDep = None,
     project_path: Optional[str] = Query(

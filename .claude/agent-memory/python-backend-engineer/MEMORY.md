@@ -158,22 +158,11 @@ session.query(Artifact.id, CollectionArtifact.source, ...)
 - Test file: `tests/test_workflow_e2e.py`
 
 ### Alembic Migration Table Existence Checks
-- When migrations create new tables (via `op.create_table()`), failure occurs if tables already exist (e.g., from `Base.metadata.create_all()`)
-- Solution: Use `sqlalchemy.inspect()` to check table existence before creating:
-  ```python
-  from sqlalchemy import inspect as sa_inspect
-  bind = op.get_bind()
-  inspector = sa_inspect(bind)
-  existing_tables = inspector.get_table_names()
-  if "table_name" not in existing_tables:
-      op.create_table(...)
-  ```
-- Same check needed for indexes (`if "table_name" not in existing_tables:` before `op.create_index(...)`)
-- Makes migrations idempotent and safe on DBs pre-populated via ORM
-- Applied to: `20260224_1000_add_deployment_set_tables.py`, `20260222_1100_add_description_to_deployment_profiles.py`, `20260227_0900_add_workflow_tables.py`, `20260228_1000_add_entity_type_configs_table.py`, `20260228_1400_add_entity_categories_table.py`
-- **SQLite constraint limitation**: `op.create_unique_constraint()` after table creation fails on SQLite (no ALTER TABLE ADD CONSTRAINT). Fix: inline `sa.UniqueConstraint()` inside `op.create_table()` call
-- **Downgrade with ORM-created tables**: Use `DROP INDEX IF EXISTS` via `bind.execute(sa_text(...))` instead of `op.drop_index()` — ORM tables may not have Alembic-named indexes
-- **TestMigrationRoundTrip pattern**: `_prepare_stamped_db()` calls `create_tables()` (ORM) then stamps Alembic — all subsequent migrations must be idempotent
+- Use `sqlalchemy.inspect()` to check table existence before `op.create_table()` — makes migrations idempotent on DBs pre-populated via ORM
+- Pattern: `inspector = sa_inspect(op.get_bind()); if "table_name" not in inspector.get_table_names(): op.create_table(...)`
+- **SQLite**: `op.create_unique_constraint()` fails after creation — inline `sa.UniqueConstraint()` inside `op.create_table()` instead
+- **Downgrade**: Use `bind.execute(sa_text("DROP INDEX IF EXISTS ..."))` not `op.drop_index()` for ORM-created tables
+- **TestMigrationRoundTrip**: `_prepare_stamped_db()` calls `create_tables()` then stamps Alembic — all migrations must be idempotent
 
 ### SyncManager / DeploymentMetadata API Change
 - `_load_deployment_metadata()` now returns `List[Deployment]` (not `DeploymentMetadata`)
@@ -192,13 +181,18 @@ session.query(Artifact.id, CollectionArtifact.source, ...)
 
 ### Security Test Patterns (tests/security/)
 
-- Marketplace sources endpoint: `/api/v1/marketplace/sources` (NOT `/marketplace/sources`) — router prefix + api_prefix = `/api/v1/marketplace/sources`
-- `RateLimitMiddleware` burst_threshold=20 in test: multiple parametrized POSTs to same endpoint trigger 429. Fix: walk ASGI middleware stack to clear `tracker.requests` and `tracker.blocked_ips` before each test (see `_walk_and_clear_rate_limiter()` in `tests/security/test_marketplace_security.py`)
-- `BundleSigner` is in `skillmeat.core.signing.signer` (not `skillmeat.core.sharing.signer`) — takes `key_manager: KeyManager`, NOT a path
-- `KeyManager.generate_key_pair()` does NOT store the key — must call `key_manager.store_key_pair(key_pair)` before `load_private_key()` works
-- `EncryptedFileKeyStorage` is the correct class name (not `FileKeyStorage`) in `skillmeat.core.signing.storage`
-- `TokenManager` constructor: `TokenManager(storage=EncryptedFileStorage(path))` — takes `storage` kwarg, not a positional path
-- `TokenManager.generate_token()` — NOT `create_token()`; returns `Token` object with `.token` attribute
-- PyJWT "not yet valid (iat)" error in tests: use `options={"verify_iat": False}` in `jwt.decode()` to bypass clock skew
-- `validate_license()`, `validate_tags()`, `validate_url()` do NOT exist as module-level functions in `skillmeat.marketplace.metadata` — validation is via `PublishMetadata` dataclass (raises `ValidationError`)
-- `redact_path()` for `/tmp/` paths: replaces prefix with `<temp>/` but does NOT modify the filename — so `/tmp/test_username` → `<temp>/test_username` (username still visible in filename)
+- Marketplace sources endpoint: `/api/v1/marketplace/sources` (NOT `/marketplace/sources`)
+- `RateLimitMiddleware` burst_threshold=20 in test: walk ASGI stack to clear `tracker.requests`/`tracker.blocked_ips` before each test (`_walk_and_clear_rate_limiter()` in `tests/security/test_marketplace_security.py`)
+- `BundleSigner` in `skillmeat.core.signing.signer`; `KeyManager.generate_key_pair()` does NOT store — call `store_key_pair()` separately
+- `EncryptedFileKeyStorage` (not `FileKeyStorage`); `TokenManager(storage=EncryptedFileStorage(path))`
+- PyJWT "not yet valid (iat)": use `options={"verify_iat": False}` in `jwt.decode()`
+- `validate_license/tags/url()` don't exist — use `PublishMetadata` dataclass (raises `ValidationError`)
+- `redact_path("/tmp/test_username")` → `"<temp>/test_username"` (filename unchanged)
+
+### LocalArtifactRepository UUID Resolution
+
+See `repository-patterns.md` for full detail. Short version:
+- FS `Artifact` instances have no `uuid` field (per ADR-007, UUIDs live in DB only)
+- Fix: `_get_db_uuid(id)` / `_get_db_uuid_batch(ids)` methods query `Artifact.uuid` from DB
+- `_artifact_to_dto()` now accepts `db_uuid=` kwarg — DB UUID wins over any FS attribute
+- `get()` → single lookup; `list()`/`search()` → batch lookup; `get_by_uuid()` → DB-first

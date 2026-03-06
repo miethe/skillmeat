@@ -2,50 +2,62 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "repo-pattern-refactor"
-feature_slug: "repo-pattern-refactor"
+prd: repo-pattern-refactor
+feature_slug: repo-pattern-refactor
 phase: 4
-phase_title: "Router Migration"
-status: pending
+phase_title: Router Migration
+status: completed
 created: 2026-03-01
-updated: 2026-03-01
+updated: '2026-03-04'
 prd_ref: docs/project_plans/PRDs/refactors/repo-pattern-refactor-v1.md
 plan_ref: docs/project_plans/implementation_plans/refactors/repo-pattern-refactor-v1.md
 commit_refs: []
 pr_refs: []
-
-owners: ["python-backend-engineer", "refactoring-expert"]
+owners:
+- python-backend-engineer
+- refactoring-expert
 contributors: []
-
 tasks:
-  - id: "TASK-4.1"
-    title: "Migrate artifacts.py (largest router, 9400+ lines)"
-    status: "pending"
-    assigned_to: ["refactoring-expert"]
-    dependencies: []
-    estimate: "3 pts"
-  - id: "TASK-4.2"
-    title: "Migrate projects.py"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "1 pt"
-  - id: "TASK-4.3"
-    title: "Migrate collections + deployments routers"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "2 pts"
-  - id: "TASK-4.4"
-    title: "Migrate context + remaining 9 routers"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "2 pts"
-
+- id: TASK-4.1
+  title: Migrate artifacts.py (largest router, 9400+ lines)
+  status: completed
+  assigned_to:
+  - refactoring-expert
+  dependencies: []
+  estimate: 3 pts
+- id: TASK-4.2
+  title: Migrate projects.py
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 1 pt
+- id: TASK-4.3
+  title: Migrate collections + deployments routers
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 2 pts
+- id: TASK-4.4
+  title: Migrate context + remaining 9 routers
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 2 pts
 parallelization:
-  batch_1: ["TASK-4.1", "TASK-4.2"]
-  batch_2: ["TASK-4.3", "TASK-4.4"]
+  batch_1:
+  - TASK-4.1
+  - TASK-4.2
+  batch_2:
+  - TASK-4.3
+  - TASK-4.4
+total_tasks: 4
+completed_tasks: 4
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 100
 ---
 
 # Phase 4: Router Migration — Progress

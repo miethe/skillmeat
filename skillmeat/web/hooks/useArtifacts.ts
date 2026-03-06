@@ -285,9 +285,16 @@ async function fetchArtifactsFromApi(
     const response = await apiRequest<ApiArtifactListResponse>(`/artifacts?${params.toString()}`);
 
     // Map API responses to unified Artifact type using centralized mapper
-    const mappedArtifacts = response.items.map((item) =>
-      mapApiResponseToArtifact(item, 'collection')
-    );
+    // Filter out items with unknown types (e.g. "workflow") that the mapper cannot handle
+    const mappedArtifacts = response.items
+      .map((item) => {
+        try {
+          return mapApiResponseToArtifact(item, 'collection');
+        } catch {
+          return null;
+        }
+      })
+      .filter((a): a is Artifact => a !== null);
     const filtered = filterAndSortArtifacts(mappedArtifacts, filters, sort);
 
     return {

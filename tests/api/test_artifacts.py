@@ -25,7 +25,7 @@ from skillmeat.api.dependencies import (
     get_artifact_manager,
     get_collection_manager,
 )
-from skillmeat.api.routers.artifacts import get_db_session
+from skillmeat.cache.session import get_db_session
 
 
 @pytest.fixture

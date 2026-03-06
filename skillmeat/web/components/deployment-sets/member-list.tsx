@@ -258,7 +258,7 @@ interface MemberGridProps {
 
 function MemberGrid({ members, setId, onArtifactClick, onSetClick, onGroupClick }: MemberGridProps) {
   // Fetch all artifacts to build a UUID lookup map — already cached by the collection page
-  const { data: artifactsResponse } = useArtifacts({ limit: 500 });
+  const { data: artifactsResponse, isLoading: isArtifactsLoading } = useArtifacts({ limit: 500 });
 
   const artifactByUuid = useMemo<Record<string, Artifact>>(() => {
     const artifacts = artifactsResponse?.artifacts ?? [];
@@ -278,10 +278,23 @@ function MemberGrid({ members, setId, onArtifactClick, onSetClick, onGroupClick 
           const artifact = member.artifact_uuid ? artifactByUuid[member.artifact_uuid] : undefined;
 
           if (!artifact) {
-            // Still loading or unresolved — show a skeleton placeholder
+            if (isArtifactsLoading) {
+              // Artifacts still loading — show skeleton placeholder
+              return (
+                <div key={member.id} role="listitem">
+                  <MiniDeploymentSetCardSkeleton />
+                </div>
+              );
+            }
+            // Artifact UUID not found in collection — show not-found placeholder
             return (
-              <div key={member.id} role="listitem">
-                <MiniDeploymentSetCardSkeleton />
+              <div
+                key={member.id}
+                role="listitem"
+                className="flex min-h-[140px] items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground"
+                aria-label="Artifact not found"
+              >
+                Artifact not found
               </div>
             );
           }

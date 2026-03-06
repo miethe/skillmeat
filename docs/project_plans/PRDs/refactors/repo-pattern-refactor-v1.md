@@ -2,9 +2,9 @@
 schema_version: 2
 doc_type: prd
 title: 'PRD: Storage Abstraction & Repository Pattern Refactor'
-status: draft
+status: in-progress
 created: 2026-03-01
-updated: '2026-03-01'
+updated: '2026-03-04'
 feature_slug: repo-pattern-refactor
 feature_version: v1
 prd_ref: null
@@ -12,6 +12,7 @@ plan_ref: docs/project_plans/implementation_plans/refactors/repo-pattern-refacto
 related_documents:
 - docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 - docs/project_plans/PRDs/refactors/enterprise-db-storage-v1.md
+- docs/project_plans/implementation_plans/refactors/repo-pattern-gap-closure-v1.md
 owner: null
 contributors:
 - Gemini
@@ -69,7 +70,6 @@ risks:
 - Regressions in write-through cache patterns
 - Performance impact from added abstraction layers
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**

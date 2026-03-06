@@ -10,11 +10,40 @@ from typing import Annotated, Any, Optional
 
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
+from sqlalchemy.orm import Session
 
 from skillmeat.config import ConfigManager
 from skillmeat.core.artifact import ArtifactManager
 from skillmeat.core.auth import TokenManager
 from skillmeat.core.collection import CollectionManager
+from skillmeat.core.interfaces.repositories import (
+    IArtifactRepository,
+    ICollectionRepository,
+    IContextEntityRepository,
+    IDbArtifactHistoryRepository,
+    IDbCollectionArtifactRepository,
+    IDbUserCollectionRepository,
+    IDeploymentRepository,
+    IGroupRepository,
+    IMarketplaceSourceRepository,
+    IProjectRepository,
+    IProjectTemplateRepository,
+    ISettingsRepository,
+    ITagRepository,
+)
+from skillmeat.cache.repositories import (
+    DbArtifactHistoryRepository,
+    DbCollectionArtifactRepository,
+    DbUserCollectionRepository,
+    DeploymentProfileRepository,
+    DeploymentSetRepository,
+    DuplicatePairRepository,
+    MarketplaceCatalogRepository,
+    MarketplaceSourceRepository,
+    MarketplaceTransactionHandler,
+)
+from skillmeat.cache.session import get_db_session
+from skillmeat.core.path_resolver import ProjectPathResolver
 from skillmeat.core.services.context_sync import ContextSyncService
 from skillmeat.core.sync import SyncManager
 
@@ -46,6 +75,7 @@ class AppState:
         self.metadata_cache: Optional[Any] = None  # MetadataCache, lazily initialized
         self.cache_manager: Optional[Any] = None  # CacheManager, lazily initialized
         self.refresh_job: Optional[Any] = None  # RefreshJob, lazily initialized
+        self.path_resolver: Optional[ProjectPathResolver] = None
 
     def initialize(self, settings: APISettings) -> None:
         """Initialize all managers with settings.
@@ -65,6 +95,7 @@ class AppState:
             collection_manager=self.collection_manager,
             artifact_manager=self.artifact_manager,
         )
+        self.path_resolver = ProjectPathResolver()
 
         # Initialize cache manager if not already initialized (lazy init pattern)
         if self.cache_manager is None:
@@ -113,6 +144,7 @@ class AppState:
         self.metadata_cache = None
         self.cache_manager = None
         self.refresh_job = None
+        self.path_resolver = None
         logger.info("Application state shutdown complete")
 
 
@@ -310,6 +342,380 @@ def require_memory_context_enabled(
     return
 
 
+# ---------------------------------------------------------------------------
+# Repository factory providers (hexagonal architecture)
+# ---------------------------------------------------------------------------
+
+
+def get_artifact_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IArtifactRepository:
+    """Get IArtifactRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IArtifactRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalArtifactRepository
+
+        return LocalArtifactRepository(
+            artifact_manager=state.artifact_manager,
+            path_resolver=state.path_resolver,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_project_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IProjectRepository:
+    """Get IProjectRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IProjectRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalProjectRepository
+
+        return LocalProjectRepository(
+            path_resolver=state.path_resolver,
+            cache_manager=state.cache_manager,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_collection_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ICollectionRepository:
+    """Get ICollectionRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        ICollectionRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalCollectionRepository
+
+        return LocalCollectionRepository(
+            collection_manager=state.collection_manager,
+            path_resolver=state.path_resolver,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_deployment_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IDeploymentRepository:
+    """Get IDeploymentRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IDeploymentRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.deployment import DeploymentManager
+        from skillmeat.core.repositories import LocalDeploymentRepository
+
+        deployment_manager = DeploymentManager(collection_mgr=state.collection_manager)
+        return LocalDeploymentRepository(
+            deployment_manager=deployment_manager,
+            path_resolver=state.path_resolver,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_tag_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ITagRepository:
+    """Get ITagRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        ITagRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalTagRepository
+
+        return LocalTagRepository()
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_settings_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ISettingsRepository:
+    """Get ISettingsRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        ISettingsRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalSettingsRepository
+
+        return LocalSettingsRepository(
+            path_resolver=state.path_resolver,
+            config_manager=state.config_manager,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_group_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IGroupRepository:
+    """Get IGroupRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IGroupRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalGroupRepository
+
+        return LocalGroupRepository()
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_context_entity_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IContextEntityRepository:
+    """Get IContextEntityRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IContextEntityRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalContextEntityRepository
+
+        return LocalContextEntityRepository()
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_marketplace_source_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IMarketplaceSourceRepository:
+    """Get IMarketplaceSourceRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IMarketplaceSourceRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalMarketplaceSourceRepository
+
+        return LocalMarketplaceSourceRepository()
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_project_template_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> IProjectTemplateRepository:
+    """Get IProjectTemplateRepository dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        IProjectTemplateRepository implementation for the configured edition
+
+    Raises:
+        HTTPException: If the configured edition is not supported
+    """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        from skillmeat.core.repositories import LocalProjectTemplateRepository
+
+        return LocalProjectTemplateRepository()
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Unsupported edition: {edition}",
+    )
+
+
+def get_deployment_set_repository() -> DeploymentSetRepository:
+    """Get DeploymentSetRepository dependency.
+
+    Returns a new ``DeploymentSetRepository`` instance.  The repository
+    manages its own session lifecycle internally, so no state injection is
+    required.
+
+    Returns:
+        DeploymentSetRepository instance.
+    """
+    return DeploymentSetRepository()
+
+
+def get_deployment_profile_repository() -> DeploymentProfileRepository:
+    """Get DeploymentProfileRepository dependency.
+
+    Returns a new ``DeploymentProfileRepository`` instance.  The repository
+    manages its own session lifecycle internally, so no state injection is
+    required.
+
+    Returns:
+        DeploymentProfileRepository instance.
+    """
+    return DeploymentProfileRepository()
+
+
+def get_marketplace_source_repository_concrete() -> MarketplaceSourceRepository:
+    """Get concrete MarketplaceSourceRepository dependency.
+
+    Returns the concrete ``MarketplaceSourceRepository`` instance when the full
+    set of repository methods (beyond the ``IMarketplaceSourceRepository``
+    interface) is required — e.g. in the marketplace-sources router which uses
+    ORM-level helpers not exposed by the interface.
+
+    Returns:
+        MarketplaceSourceRepository instance.
+    """
+    return MarketplaceSourceRepository()
+
+
+def get_marketplace_catalog_repository() -> MarketplaceCatalogRepository:
+    """Get MarketplaceCatalogRepository dependency.
+
+    Returns a new ``MarketplaceCatalogRepository`` instance.  The repository
+    manages its own session lifecycle internally.
+
+    Returns:
+        MarketplaceCatalogRepository instance.
+    """
+    return MarketplaceCatalogRepository()
+
+
+def get_marketplace_transaction_handler() -> MarketplaceTransactionHandler:
+    """Get MarketplaceTransactionHandler dependency.
+
+    Returns a new ``MarketplaceTransactionHandler`` instance for coordinating
+    atomic cross-table marketplace operations.
+
+    Returns:
+        MarketplaceTransactionHandler instance.
+    """
+    return MarketplaceTransactionHandler()
+
+
+def get_db_user_collection_repository() -> IDbUserCollectionRepository:
+    """Get DbUserCollectionRepository dependency.
+
+    Returns a new ``DbUserCollectionRepository`` instance.  The repository
+    manages its own session lifecycle internally, so no state injection is
+    required.
+
+    Returns:
+        IDbUserCollectionRepository implementation backed by the SQLite cache.
+    """
+    return DbUserCollectionRepository()
+
+
+def get_db_collection_artifact_repository() -> IDbCollectionArtifactRepository:
+    """Get DbCollectionArtifactRepository dependency.
+
+    Returns a new ``DbCollectionArtifactRepository`` instance.  The repository
+    manages its own session lifecycle internally, so no state injection is
+    required.
+
+    Returns:
+        IDbCollectionArtifactRepository implementation backed by the SQLite cache.
+    """
+    return DbCollectionArtifactRepository()
+
+
+def get_duplicate_pair_repository() -> DuplicatePairRepository:
+    """Get DuplicatePairRepository dependency.
+
+    Returns a new ``DuplicatePairRepository`` instance.  The repository
+    manages its own session lifecycle internally.
+
+    Returns:
+        DuplicatePairRepository instance.
+    """
+    return DuplicatePairRepository()
+
+
 # Type aliases for cleaner dependency injection
 ConfigManagerDep = Annotated[ConfigManager, Depends(get_config_manager)]
 CollectionManagerDep = Annotated[CollectionManager, Depends(get_collection_manager)]
@@ -320,3 +726,67 @@ ContextSyncServiceDep = Annotated[ContextSyncService, Depends(get_context_sync_s
 SettingsDep = Annotated[APISettings, Depends(get_settings)]
 APIKeyDep = Annotated[None, Depends(verify_api_key)]
 MemoryContextEnabledDep = Annotated[None, Depends(require_memory_context_enabled)]
+
+# Repository DI aliases (hexagonal architecture)
+ArtifactRepoDep = Annotated[IArtifactRepository, Depends(get_artifact_repository)]
+ProjectRepoDep = Annotated[IProjectRepository, Depends(get_project_repository)]
+CollectionRepoDep = Annotated[ICollectionRepository, Depends(get_collection_repository)]
+DeploymentRepoDep = Annotated[IDeploymentRepository, Depends(get_deployment_repository)]
+TagRepoDep = Annotated[ITagRepository, Depends(get_tag_repository)]
+SettingsRepoDep = Annotated[ISettingsRepository, Depends(get_settings_repository)]
+GroupRepoDep = Annotated[IGroupRepository, Depends(get_group_repository)]
+ContextEntityRepoDep = Annotated[
+    IContextEntityRepository, Depends(get_context_entity_repository)
+]
+MarketplaceSourceRepoDep = Annotated[
+    IMarketplaceSourceRepository, Depends(get_marketplace_source_repository)
+]
+ProjectTemplateRepoDep = Annotated[
+    IProjectTemplateRepository, Depends(get_project_template_repository)
+]
+DeploymentSetRepoDep = Annotated[
+    DeploymentSetRepository, Depends(get_deployment_set_repository)
+]
+DeploymentProfileRepoDep = Annotated[
+    DeploymentProfileRepository, Depends(get_deployment_profile_repository)
+]
+MarketplaceCatalogRepoDep = Annotated[
+    MarketplaceCatalogRepository, Depends(get_marketplace_catalog_repository)
+]
+DuplicatePairRepoDep = Annotated[
+    DuplicatePairRepository, Depends(get_duplicate_pair_repository)
+]
+# Concrete MarketplaceSourceRepository (vs IMarketplaceSourceRepository interface).
+# Use this in marketplace_sources router which requires methods beyond the interface.
+MarketplaceSourceConcreteRepoDep = Annotated[
+    MarketplaceSourceRepository, Depends(get_marketplace_source_repository_concrete)
+]
+MarketplaceTransactionHandlerDep = Annotated[
+    MarketplaceTransactionHandler, Depends(get_marketplace_transaction_handler)
+]
+DbUserCollectionRepoDep = Annotated[
+    IDbUserCollectionRepository, Depends(get_db_user_collection_repository)
+]
+DbCollectionArtifactRepoDep = Annotated[
+    IDbCollectionArtifactRepository, Depends(get_db_collection_artifact_repository)
+]
+
+
+def get_db_artifact_history_repository() -> IDbArtifactHistoryRepository:
+    """Get DbArtifactHistoryRepository dependency.
+
+    Returns a new ``DbArtifactHistoryRepository`` instance.  The repository
+    manages its own session lifecycle per operation.
+
+    Returns:
+        IDbArtifactHistoryRepository implementation backed by the SQLite cache.
+    """
+    return DbArtifactHistoryRepository()
+
+
+DbArtifactHistoryRepoDep = Annotated[
+    IDbArtifactHistoryRepository, Depends(get_db_artifact_history_repository)
+]
+
+# Per-request SQLAlchemy session (hexagonal architecture)
+DbSessionDep = Annotated[Session, Depends(get_db_session)]

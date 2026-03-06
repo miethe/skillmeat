@@ -18,14 +18,18 @@ API Endpoints:
     POST /groups/{id}/reorder-artifacts - Bulk reorder artifacts in group
 """
 
-import json
 import logging
-import uuid
-from typing import List, Optional
+from typing import TYPE_CHECKING, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy.exc import IntegrityError
 
+from skillmeat.api.dependencies import (
+    ArtifactRepoDep,
+    GroupRepoDep,
+)
+
+if TYPE_CHECKING:
+    from skillmeat.core.interfaces.repositories import IArtifactRepository
 from skillmeat.api.schemas.groups import (
     AddGroupArtifactsRequest,
     ArtifactPositionUpdate,
@@ -40,14 +44,7 @@ from skillmeat.api.schemas.groups import (
     GroupWithArtifactsResponse,
     ReorderArtifactsRequest,
 )
-from skillmeat.cache.models import (
-    Artifact,
-    Collection,
-    CollectionArtifact,
-    Group,
-    GroupArtifact,
-    get_session,
-)
+from skillmeat.core.interfaces.dtos import GroupDTO
 
 logger = logging.getLogger(__name__)
 
@@ -57,72 +54,91 @@ router = APIRouter(
 )
 
 
-def _resolve_artifact_ids(
-    session,
-    group_artifacts: list,
-) -> dict[str, str]:
-    """Return a mapping of artifact_uuid → artifact.id for the given GroupArtifacts.
+# =============================================================================
+# Internal helpers
+# =============================================================================
 
-    Performs a single batch query against the Artifact table so callers can
-    build GroupArtifactResponse objects with the optional ``artifact_id`` field
-    populated (ADR-007 resolved ID for backward-compat frontend lookups).
+
+def _build_artifact_responses(
+    group_artifacts: list,
+    artifact_repo: "IArtifactRepository",
+) -> list["GroupArtifactResponse"]:
+    """Build GroupArtifactResponse objects from GroupArtifactDTO records.
+
+    Resolves artifact UUIDs to their ``type:name`` IDs via a single batch
+    lookup against the artifact repository.
 
     Args:
-        session: SQLAlchemy session
-        group_artifacts: list of GroupArtifact ORM objects
+        group_artifacts: List of GroupArtifactDTO objects.
+        artifact_repo: IArtifactRepository used for UUID → ID resolution.
 
     Returns:
-        Dict mapping artifact_uuid → artifact.id (type:name string).
-        UUIDs with no matching Artifact row are omitted.
+        List of GroupArtifactResponse objects with ``artifact_id`` populated
+        where resolvable.
     """
     uuids = [ga.artifact_uuid for ga in group_artifacts]
-    if not uuids:
-        return {}
-    rows = (
-        session.query(Artifact.uuid, Artifact.id)
-        .filter(Artifact.uuid.in_(uuids))
-        .all()
-    )
-    return {row.uuid: row.id for row in rows}
+    uuid_to_id: dict[str, str] = artifact_repo.get_ids_by_uuids(uuids) if uuids else {}
+    return [
+        GroupArtifactResponse(
+            artifact_uuid=ga.artifact_uuid,
+            artifact_id=uuid_to_id.get(ga.artifact_uuid),
+            position=ga.position,
+            added_at=ga.added_at,
+        )
+        for ga in group_artifacts
+    ]
 
 
-def _parse_group_tags(tags_json: Optional[str]) -> list[str]:
-    """Parse group tags JSON safely."""
-    if not tags_json:
-        return []
-    try:
-        parsed = json.loads(tags_json)
-    except json.JSONDecodeError:
-        return []
-    if not isinstance(parsed, list):
-        return []
-    return [tag for tag in parsed if isinstance(tag, str)]
+def _dto_to_group_response(dto: GroupDTO) -> GroupResponse:
+    """Convert a GroupDTO to a GroupResponse API schema.
 
+    Args:
+        dto: GroupDTO from the repository layer.
 
-def _build_group_response(
-    session,
-    group: Group,
-    *,
-    artifact_count: Optional[int] = None,
-) -> GroupResponse:
-    """Map ORM Group model to API response with metadata fields."""
-    count = (
-        artifact_count
-        if artifact_count is not None
-        else session.query(GroupArtifact).filter_by(group_id=group.id).count()
-    )
+    Returns:
+        GroupResponse suitable for API serialisation.
+    """
     return GroupResponse(
-        id=group.id,
-        collection_id=group.collection_id,
-        name=group.name,
-        description=group.description,
-        tags=_parse_group_tags(group.tags_json),
-        color=group.color or "slate",
-        icon=group.icon or "layers",
-        position=group.position,
-        created_at=group.created_at,
-        updated_at=group.updated_at,
-        artifact_count=count,
+        id=dto.id,
+        collection_id=dto.collection_id,
+        name=dto.name,
+        description=dto.description,
+        tags=list(dto.tags),
+        color=dto.color,
+        icon=dto.icon,
+        position=dto.position,
+        created_at=dto.created_at,
+        updated_at=dto.updated_at,
+        artifact_count=dto.artifact_count,
+    )
+
+
+def _build_group_with_artifacts_response(
+    dto: GroupDTO,
+    artifacts: list[GroupArtifactResponse],
+) -> GroupWithArtifactsResponse:
+    """Build a GroupWithArtifactsResponse from a DTO and resolved artifact list.
+
+    Args:
+        dto: GroupDTO from the repository.
+        artifacts: Resolved list of GroupArtifactResponse objects.
+
+    Returns:
+        GroupWithArtifactsResponse for API serialisation.
+    """
+    return GroupWithArtifactsResponse(
+        id=dto.id,
+        collection_id=dto.collection_id,
+        name=dto.name,
+        description=dto.description,
+        tags=list(dto.tags),
+        color=dto.color,
+        icon=dto.icon,
+        position=dto.position,
+        created_at=dto.created_at,
+        updated_at=dto.updated_at,
+        artifact_count=len(artifacts),
+        artifacts=artifacts,
     )
 
 
@@ -143,11 +159,15 @@ def _build_group_response(
     the display order (0-based, default 0).
     """,
 )
-async def create_group(request: GroupCreateRequest) -> GroupResponse:
+async def create_group(
+    request: GroupCreateRequest,
+    group_repo: GroupRepoDep,
+) -> GroupResponse:
     """Create a new group in a collection.
 
     Args:
         request: Group creation request with collection_id, name, description, position
+        group_repo: Injected IGroupRepository
 
     Returns:
         Created group with metadata
@@ -157,77 +177,54 @@ async def create_group(request: GroupCreateRequest) -> GroupResponse:
         HTTPException 404: If collection not found
         HTTPException 500: If database operation fails
     """
-    session = get_session()
     try:
-        # Verify collection exists
-        collection = (
-            session.query(Collection).filter_by(id=request.collection_id).first()
-        )
-        if not collection:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Collection '{request.collection_id}' not found",
-            )
-
-        # Check unique name constraint
-        existing = (
-            session.query(Group)
-            .filter_by(collection_id=request.collection_id, name=request.name)
-            .first()
-        )
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Group '{request.name}' already exists in collection '{request.collection_id}'",
-            )
-
-        # Create group
-        group = Group(
-            id=uuid.uuid4().hex,
-            collection_id=request.collection_id,
+        dto = group_repo.create(
             name=request.name,
+            collection_id=request.collection_id,
             description=request.description,
-            tags_json=json.dumps(request.tags or []),
-            color=request.color,
-            icon=request.icon,
             position=request.position,
         )
-
-        session.add(group)
-        session.commit()
-        session.refresh(group)
-
-        logger.info(
-            f"Created group: {group.id} ('{group.name}') in collection {group.collection_id}"
-        )
-
-        try:
-            from skillmeat.core.services.manifest_sync_service import ManifestSyncService
-            ManifestSyncService().sync_groups(session, request.collection_id)
-        except Exception as e:
-            logger.warning(f"Failed to sync groups to manifest: {e}")
-
-        return _build_group_response(session, group, artifact_count=0)
-
-    except HTTPException:
-        session.rollback()
-        raise
-    except IntegrityError as e:
-        session.rollback()
-        logger.error(f"Integrity error creating group: {e}")
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Group name must be unique within collection",
+            detail=str(e),
         ) from e
-    except Exception as e:
-        session.rollback()
+    except RuntimeError as e:
         logger.error(f"Failed to create group: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create group",
         ) from e
-    finally:
-        session.close()
+
+    logger.info(
+        f"Created group: {dto.id} ('{dto.name}') in collection {dto.collection_id}"
+    )
+
+    # Apply tags/color/icon via update if provided (create only accepts name/description/position)
+    needs_update = (
+        (request.tags is not None and request.tags != [])
+        or request.color is not None
+        or request.icon is not None
+    )
+    if needs_update:
+        updates: dict = {}
+        if request.tags is not None:
+            updates["tags"] = request.tags
+        if request.color is not None:
+            updates["color"] = request.color
+        if request.icon is not None:
+            updates["icon"] = request.icon
+        try:
+            dto = group_repo.update(dto.id, updates)
+        except Exception as e:
+            logger.warning(f"Failed to apply tags/color/icon on new group {dto.id}: {e}")
+
+    return _dto_to_group_response(dto)
 
 
 @router.get(
@@ -242,6 +239,7 @@ async def create_group(request: GroupCreateRequest) -> GroupResponse:
     """,
 )
 async def list_groups(
+    group_repo: GroupRepoDep,
     collection_id: str = Query(..., description="Collection ID to list groups from"),
     search: Optional[str] = Query(
         None, description="Filter groups by name (case-insensitive)"
@@ -253,6 +251,7 @@ async def list_groups(
     """List all groups in a collection.
 
     Args:
+        group_repo: Injected IGroupRepository
         collection_id: Collection ID (required)
         search: Optional name filter
         artifact_id: Optional artifact ID filter - returns only groups containing this artifact
@@ -264,75 +263,38 @@ async def list_groups(
         HTTPException 404: If collection not found
         HTTPException 500: If database operation fails
     """
-    session = get_session()
+    filters: dict = {}
+    if search:
+        filters["search"] = search
+    if artifact_id:
+        filters["artifact_id"] = artifact_id
+
     try:
-        # Verify collection exists
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Collection '{collection_id}' not found",
-            )
-
-        # Build query
-        query = session.query(Group).filter_by(collection_id=collection_id)
-
-        # Apply search filter if provided
-        if search:
-            query = query.filter(Group.name.ilike(f"%{search}%"))
-
-        # Apply artifact_id filter if provided — join through Artifact to
-        # resolve the UUID, since GroupArtifact now stores artifact_uuid.
-        if artifact_id:
-            query = (
-                query.join(GroupArtifact)
-                .join(
-                    Artifact,
-                    Artifact.uuid == GroupArtifact.artifact_uuid,
-                )
-                .filter(Artifact.id == artifact_id)
-            )
-
-        # Order by position
-        query = query.order_by(Group.position)
-
-        groups = query.all()
-
-        # Build response with artifact counts
-        group_responses = []
-        for group in groups:
-            artifact_count = (
-                session.query(GroupArtifact).filter_by(group_id=group.id).count()
-            )
-            group_responses.append(
-                _build_group_response(
-                    session,
-                    group,
-                    artifact_count=artifact_count,
-                )
-            )
-
-        logger.info(
-            f"Listed {len(group_responses)} groups from collection {collection_id}"
-            + (f" (search: {search})" if search else "")
-            + (f" (artifact_id: {artifact_id})" if artifact_id else "")
-        )
-
-        return GroupListResponse(
-            groups=group_responses,
-            total=len(group_responses),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
+        dtos = group_repo.list(collection_id, filters=filters or None)
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except RuntimeError as e:
         logger.error(f"Failed to list groups: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list groups",
         ) from e
-    finally:
-        session.close()
+
+    group_responses = [_dto_to_group_response(dto) for dto in dtos]
+
+    logger.info(
+        f"Listed {len(group_responses)} groups from collection {collection_id}"
+        + (f" (search: {search})" if search else "")
+        + (f" (artifact_id: {artifact_id})" if artifact_id else "")
+    )
+
+    return GroupListResponse(
+        groups=group_responses,
+        total=len(group_responses),
+    )
 
 
 @router.get(
@@ -345,11 +307,17 @@ async def list_groups(
     Artifacts are returned ordered by their position within the group.
     """,
 )
-async def get_group(group_id: str) -> GroupWithArtifactsResponse:
+async def get_group(
+    group_id: str,
+    group_repo: GroupRepoDep,
+    artifact_repo: ArtifactRepoDep,
+) -> GroupWithArtifactsResponse:
     """Get a single group with its artifacts.
 
     Args:
         group_id: Group ID
+        group_repo: Injected IGroupRepository
+        artifact_repo: Injected IArtifactRepository for UUID → ID resolution
 
     Returns:
         Group with artifacts list
@@ -358,63 +326,28 @@ async def get_group(group_id: str) -> GroupWithArtifactsResponse:
         HTTPException 404: If group not found
         HTTPException 500: If database operation fails
     """
-    session = get_session()
     try:
-        group = session.query(Group).filter_by(id=group_id).first()
-        if not group:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Group '{group_id}' not found",
-            )
-
-        # Get artifacts ordered by position
-        group_artifacts = (
-            session.query(GroupArtifact)
-            .filter_by(group_id=group_id)
-            .order_by(GroupArtifact.position)
-            .all()
-        )
-
-        # Resolve artifact_uuid → artifact.id in one batch query
-        uuid_to_id = _resolve_artifact_ids(session, group_artifacts)
-
-        artifacts = [
-            GroupArtifactResponse(
-                artifact_uuid=ga.artifact_uuid,
-                artifact_id=uuid_to_id.get(ga.artifact_uuid),
-                position=ga.position,
-                added_at=ga.added_at,
-            )
-            for ga in group_artifacts
-        ]
-
-        logger.info(f"Retrieved group {group_id} with {len(artifacts)} artifacts")
-
-        return GroupWithArtifactsResponse(
-            id=group.id,
-            collection_id=group.collection_id,
-            name=group.name,
-            description=group.description,
-            tags=_parse_group_tags(group.tags_json),
-            color=group.color or "slate",
-            icon=group.icon or "layers",
-            position=group.position,
-            created_at=group.created_at,
-            updated_at=group.updated_at,
-            artifact_count=len(artifacts),
-            artifacts=artifacts,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
+        dto = group_repo.get_with_artifacts(group_id)
+    except RuntimeError as e:
         logger.error(f"Failed to get group {group_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get group",
         ) from e
-    finally:
-        session.close()
+
+    if not dto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group '{group_id}' not found",
+        )
+
+    # Fetch ordered artifact memberships via repository
+    group_artifact_dtos = group_repo.list_group_artifacts(group_id)
+    artifacts = _build_artifact_responses(group_artifact_dtos, artifact_repo)
+
+    logger.info(f"Retrieved group {group_id} with {len(artifacts)} artifacts")
+
+    return _build_group_with_artifacts_response(dto, artifacts)
 
 
 @router.put(
@@ -427,12 +360,17 @@ async def get_group(group_id: str) -> GroupWithArtifactsResponse:
     All fields are optional. Only provided fields will be updated.
     """,
 )
-async def update_group(group_id: str, request: GroupUpdateRequest) -> GroupResponse:
+async def update_group(
+    group_id: str,
+    request: GroupUpdateRequest,
+    group_repo: GroupRepoDep,
+) -> GroupResponse:
     """Update a group's metadata.
 
     Args:
         group_id: Group ID
         request: Update request with optional name, description, position
+        group_repo: Injected IGroupRepository
 
     Returns:
         Updated group
@@ -442,75 +380,41 @@ async def update_group(group_id: str, request: GroupUpdateRequest) -> GroupRespo
         HTTPException 404: If group not found
         HTTPException 500: If database operation fails
     """
-    session = get_session()
+    updates: dict = {}
+    if request.name is not None:
+        updates["name"] = request.name
+    if request.description is not None:
+        updates["description"] = request.description
+    if request.tags is not None:
+        updates["tags"] = request.tags
+    if request.color is not None:
+        updates["color"] = request.color
+    if request.icon is not None:
+        updates["icon"] = request.icon
+    if request.position is not None:
+        updates["position"] = request.position
+
     try:
-        group = session.query(Group).filter_by(id=group_id).first()
-        if not group:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Group '{group_id}' not found",
-            )
-
-        # Check name uniqueness if changing name
-        if request.name and request.name != group.name:
-            existing = (
-                session.query(Group)
-                .filter_by(collection_id=group.collection_id, name=request.name)
-                .first()
-            )
-            if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Group '{request.name}' already exists in collection",
-                )
-
-        # Update fields
-        if request.name is not None:
-            group.name = request.name
-        if request.description is not None:
-            group.description = request.description
-        if request.tags is not None:
-            group.tags_json = json.dumps(request.tags)
-        if request.color is not None:
-            group.color = request.color
-        if request.icon is not None:
-            group.icon = request.icon
-        if request.position is not None:
-            group.position = request.position
-
-        collection_id = group.collection_id
-        session.commit()
-        session.refresh(group)
-
-        logger.info(f"Updated group {group_id}")
-
-        try:
-            from skillmeat.core.services.manifest_sync_service import ManifestSyncService
-            ManifestSyncService().sync_groups(session, collection_id)
-        except Exception as e:
-            logger.warning(f"Failed to sync groups to manifest: {e}")
-
-        return _build_group_response(session, group)
-
-    except HTTPException:
-        session.rollback()
-        raise
-    except IntegrityError as e:
-        session.rollback()
-        logger.error(f"Integrity error updating group: {e}")
+        dto = group_repo.update(group_id, updates)
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Group name must be unique within collection",
+            detail=str(e),
         ) from e
-    except Exception as e:
-        session.rollback()
+    except RuntimeError as e:
         logger.error(f"Failed to update group {group_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update group",
         ) from e
-    finally:
-        session.close()
+
+    logger.info(f"Updated group {group_id}")
+    return _dto_to_group_response(dto)
 
 
 @router.delete(
@@ -524,51 +428,35 @@ async def update_group(group_id: str, request: GroupUpdateRequest) -> GroupRespo
     The group-artifact associations are cascaded automatically.
     """,
 )
-async def delete_group(group_id: str) -> None:
+async def delete_group(
+    group_id: str,
+    group_repo: GroupRepoDep,
+) -> None:
     """Delete a group.
 
     Args:
         group_id: Group ID
+        group_repo: Injected IGroupRepository
 
     Raises:
         HTTPException 404: If group not found
         HTTPException 500: If database operation fails
     """
-    session = get_session()
     try:
-        group = session.query(Group).filter_by(id=group_id).first()
-        if not group:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Group '{group_id}' not found",
-            )
-
-        collection_id = group.collection_id
-
-        # Delete group (cascade will remove group_artifacts)
-        session.delete(group)
-        session.commit()
-
-        logger.info(f"Deleted group {group_id}")
-
-        try:
-            from skillmeat.core.services.manifest_sync_service import ManifestSyncService
-            ManifestSyncService().sync_groups(session, collection_id)
-        except Exception as e:
-            logger.warning(f"Failed to sync groups to manifest: {e}")
-
-    except HTTPException:
-        session.rollback()
-        raise
-    except Exception as e:
-        session.rollback()
+        group_repo.delete(group_id)
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except RuntimeError as e:
         logger.error(f"Failed to delete group {group_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete group",
         ) from e
-    finally:
-        session.close()
+
+    logger.info(f"Deleted group {group_id}")
 
 
 # =============================================================================
@@ -592,12 +480,14 @@ async def delete_group(group_id: str) -> None:
 async def copy_group(
     group_id: str,
     request: CopyGroupRequest,
+    group_repo: GroupRepoDep,
 ) -> GroupResponse:
     """Copy a group to another collection.
 
     Args:
         group_id: Source group ID to copy
         request: Copy request with target_collection_id
+        group_repo: Injected IGroupRepository
 
     Returns:
         The newly created group in the target collection
@@ -607,140 +497,30 @@ async def copy_group(
         HTTPException 400: If group name already exists in target collection
         HTTPException 500: If database operation fails
     """
-    session = get_session()
     try:
-        # Verify source group exists and load its artifacts
-        source_group = session.query(Group).filter_by(id=group_id).first()
-        if not source_group:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Group '{group_id}' not found",
-            )
-
-        # Verify target collection exists
-        target_collection = (
-            session.query(Collection).filter_by(id=request.target_collection_id).first()
-        )
-        if not target_collection:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Target collection '{request.target_collection_id}' not found",
-            )
-
-        # Create new group name with " (Copy)" suffix
-        new_group_name = f"{source_group.name} (Copy)"
-
-        # Check if group name already exists in target collection
-        existing_group = (
-            session.query(Group)
-            .filter_by(collection_id=request.target_collection_id, name=new_group_name)
-            .first()
-        )
-        if existing_group:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Group '{new_group_name}' already exists in target collection",
-            )
-
-        # Determine position for new group (append to end)
-        max_position = (
-            session.query(Group.position)
-            .filter_by(collection_id=request.target_collection_id)
-            .order_by(Group.position.desc())
-            .first()
-        )
-        new_position = (max_position[0] + 1) if max_position else 0
-
-        # Create new group in target collection
-        new_group = Group(
-            id=uuid.uuid4().hex,
-            collection_id=request.target_collection_id,
-            name=new_group_name,
-            description=source_group.description,
-            tags_json=source_group.tags_json or "[]",
-            color=source_group.color or "slate",
-            icon=source_group.icon or "layers",
-            position=new_position,
-        )
-        session.add(new_group)
-        session.flush()  # Get the new group ID
-
-        # Get source group artifacts
-        source_artifacts = (
-            session.query(GroupArtifact)
-            .filter_by(group_id=group_id)
-            .order_by(GroupArtifact.position)
-            .all()
-        )
-
-        # Get existing artifact UUIDs in target collection (P5-01: artifact_uuid FK)
-        existing_collection_artifacts = {
-            ca.artifact_uuid
-            for ca in session.query(CollectionArtifact)
-            .filter_by(collection_id=request.target_collection_id)
-            .all()
-        }
-
-        # Copy artifacts to new group and add to collection if needed
-        for source_ga in source_artifacts:
-            # Add artifact to target collection if not already there
-            if source_ga.artifact_uuid not in existing_collection_artifacts:
-                collection_artifact = CollectionArtifact(
-                    collection_id=request.target_collection_id,
-                    artifact_uuid=source_ga.artifact_uuid,
-                    added_at=source_ga.added_at,
-                )
-                session.add(collection_artifact)
-                existing_collection_artifacts.add(source_ga.artifact_uuid)
-
-            # Add artifact to new group with same position
-            new_group_artifact = GroupArtifact(
-                group_id=new_group.id,
-                artifact_uuid=source_ga.artifact_uuid,
-                position=source_ga.position,
-            )
-            session.add(new_group_artifact)
-
-        source_collection_id = source_group.collection_id
-        session.commit()
-        session.refresh(new_group)
-
-        logger.info(
-            f"Copied group '{source_group.name}' ({group_id}) to collection "
-            f"'{request.target_collection_id}' as '{new_group_name}' ({new_group.id}) "
-            f"with {len(source_artifacts)} artifacts"
-        )
-
-        try:
-            from skillmeat.core.services.manifest_sync_service import ManifestSyncService
-            svc = ManifestSyncService()
-            svc.sync_groups(session, request.target_collection_id)
-            if source_collection_id != request.target_collection_id:
-                svc.sync_groups(session, source_collection_id)
-        except Exception as e:
-            logger.warning(f"Failed to sync groups to manifest: {e}")
-
-        return _build_group_response(session, new_group, artifact_count=len(source_artifacts))
-
-    except HTTPException:
-        session.rollback()
-        raise
-    except IntegrityError as e:
-        session.rollback()
-        logger.error(f"Integrity error copying group: {e}")
+        dto = group_repo.copy_to_collection(group_id, request.target_collection_id)
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Group name must be unique within collection",
+            detail=str(e),
         ) from e
-    except Exception as e:
-        session.rollback()
+    except RuntimeError as e:
         logger.error(f"Failed to copy group {group_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to copy group",
         ) from e
-    finally:
-        session.close()
+
+    logger.info(
+        f"Copied group ({group_id}) to collection "
+        f"'{request.target_collection_id}' as group '{dto.id}'"
+    )
+    return _dto_to_group_response(dto)
 
 
 # =============================================================================
@@ -759,11 +539,15 @@ async def copy_group(
     atomic updates across all groups.
     """,
 )
-async def reorder_groups(request: GroupReorderRequest) -> GroupListResponse:
+async def reorder_groups(
+    request: GroupReorderRequest,
+    group_repo: GroupRepoDep,
+) -> GroupListResponse:
     """Bulk reorder groups by updating their positions.
 
     Args:
         request: List of groups with new positions
+        group_repo: Injected IGroupRepository
 
     Returns:
         Updated groups ordered by position
@@ -772,76 +556,73 @@ async def reorder_groups(request: GroupReorderRequest) -> GroupListResponse:
         HTTPException 404: If any group not found
         HTTPException 500: If database operation fails
     """
-    session = get_session()
+    if not request.groups:
+        return GroupListResponse(groups=[], total=0)
+
+    # Derive the collection_id from the first group's position update.
+    # The original endpoint stored the collection_id from the loaded ORM object;
+    # here we need to fetch the group first to get it, then call reorder_groups.
+    # We fetch the first group to determine the collection, then build ordered_ids
+    # from the request's position field (sorted ascending).
+    first_group_id = request.groups[0].id
     try:
-        # Load all groups
-        group_ids = [g.id for g in request.groups]
-        groups = session.query(Group).filter(Group.id.in_(group_ids)).all()
-
-        # Verify all groups exist
-        found_ids = {g.id for g in groups}
-        missing_ids = set(group_ids) - found_ids
-        if missing_ids:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Groups not found: {', '.join(missing_ids)}",
-            )
-
-        # Build position map
-        position_map = {g.id: g.position for g in request.groups}
-
-        # Update positions
-        for group in groups:
-            new_position = position_map.get(group.id)
-            if new_position is not None:
-                group.position = new_position
-
-        # Capture collection_id before commit (all groups share the same collection)
-        collection_id = groups[0].collection_id if groups else None
-
-        session.commit()
-
-        logger.info(f"Reordered {len(groups)} groups")
-
-        if collection_id:
-            try:
-                from skillmeat.core.services.manifest_sync_service import ManifestSyncService
-                ManifestSyncService().sync_groups(session, collection_id)
-            except Exception as e:
-                logger.warning(f"Failed to sync groups to manifest: {e}")
-
-        # Refresh and build response
-        group_responses = []
-        for group in sorted(groups, key=lambda g: g.position):
-            session.refresh(group)
-            artifact_count = (
-                session.query(GroupArtifact).filter_by(group_id=group.id).count()
-            )
-            group_responses.append(
-                _build_group_response(
-                    session,
-                    group,
-                    artifact_count=artifact_count,
-                )
-            )
-
-        return GroupListResponse(
-            groups=group_responses,
-            total=len(group_responses),
-        )
-
-    except HTTPException:
-        session.rollback()
-        raise
-    except Exception as e:
-        session.rollback()
+        first_dto = group_repo.get_with_artifacts(first_group_id)
+    except RuntimeError as e:
         logger.error(f"Failed to reorder groups: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to reorder groups",
         ) from e
-    finally:
-        session.close()
+
+    if not first_dto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group '{first_group_id}' not found",
+        )
+
+    collection_id = first_dto.collection_id
+
+    # Build ordered_ids from the request position map (sort by position ascending)
+    sorted_groups = sorted(request.groups, key=lambda g: g.position)
+    ordered_ids = [g.id for g in sorted_groups]
+
+    try:
+        group_repo.reorder_groups(collection_id, ordered_ids)
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except RuntimeError as e:
+        logger.error(f"Failed to reorder groups: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reorder groups",
+        ) from e
+
+    logger.info(f"Reordered {len(ordered_ids)} groups")
+
+    # Fetch updated group list for response
+    try:
+        dtos = group_repo.list(collection_id)
+    except RuntimeError as e:
+        logger.error(f"Failed to fetch groups after reorder: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reorder groups",
+        ) from e
+
+    group_responses = [_dto_to_group_response(dto) for dto in dtos]
+
+    return GroupListResponse(
+        groups=group_responses,
+        total=len(group_responses),
+    )
 
 
 # =============================================================================
@@ -863,12 +644,16 @@ async def reorder_groups(request: GroupReorderRequest) -> GroupListResponse:
 async def add_artifacts_to_group(
     group_id: str,
     request: AddGroupArtifactsRequest,
+    group_repo: GroupRepoDep,
+    artifact_repo: ArtifactRepoDep,
 ) -> GroupWithArtifactsResponse:
     """Add artifacts to a group.
 
     Args:
         group_id: Group ID
         request: List of artifact IDs and optional position
+        group_repo: Injected IGroupRepository
+        artifact_repo: Injected IArtifactRepository for UUID resolution
 
     Returns:
         Updated group with artifacts
@@ -877,130 +662,100 @@ async def add_artifacts_to_group(
         HTTPException 404: If group not found
         HTTPException 500: If database operation fails
     """
-    session = get_session()
+    # Verify group exists
     try:
-        # Verify group exists
-        group = session.query(Group).filter_by(id=group_id).first()
-        if not group:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Group '{group_id}' not found",
-            )
-
-        # Resolve artifact IDs → UUIDs via the Artifact table
-        requested_artifacts = (
-            session.query(Artifact)
-            .filter(Artifact.id.in_(request.artifact_ids))
-            .all()
-        )
-        artifact_uuid_map = {a.id: a.uuid for a in requested_artifacts}
-
-        # Get existing artifact UUIDs already in this group
-        existing_artifact_uuids = {
-            ga.artifact_uuid
-            for ga in session.query(GroupArtifact).filter_by(group_id=group_id).all()
-        }
-
-        # Filter to artifact IDs whose resolved UUIDs are not already present
-        new_artifact_ids = [
-            aid
-            for aid in request.artifact_ids
-            if aid in artifact_uuid_map
-            and artifact_uuid_map[aid] not in existing_artifact_uuids
-        ]
-
-        if not new_artifact_ids:
-            logger.info(f"No new artifacts to add to group {group_id} (all duplicates or not found)")
-        else:
-            # Determine position
-            if request.position is not None:
-                # Shift existing artifacts at and after position
-                session.query(GroupArtifact).filter(
-                    GroupArtifact.group_id == group_id,
-                    GroupArtifact.position >= request.position,
-                ).update(
-                    {
-                        GroupArtifact.position: GroupArtifact.position
-                        + len(new_artifact_ids)
-                    }
-                )
-                start_position = request.position
-            else:
-                # Append to end
-                max_position = (
-                    session.query(GroupArtifact.position)
-                    .filter_by(group_id=group_id)
-                    .order_by(GroupArtifact.position.desc())
-                    .first()
-                )
-                start_position = (max_position[0] + 1) if max_position else 0
-
-            # Add new artifacts
-            for i, artifact_id in enumerate(new_artifact_ids):
-                group_artifact = GroupArtifact(
-                    group_id=group_id,
-                    artifact_uuid=artifact_uuid_map[artifact_id],
-                    position=start_position + i,
-                )
-                session.add(group_artifact)
-
-            session.commit()
-            logger.info(f"Added {len(new_artifact_ids)} artifacts to group {group_id}")
-
-            try:
-                from skillmeat.core.services.manifest_sync_service import ManifestSyncService
-                ManifestSyncService().sync_groups(session, group.collection_id)
-            except Exception as e:
-                logger.warning(f"Failed to sync groups to manifest: {e}")
-
-        # Get updated artifacts
-        group_artifacts = (
-            session.query(GroupArtifact)
-            .filter_by(group_id=group_id)
-            .order_by(GroupArtifact.position)
-            .all()
-        )
-
-        # Resolve artifact_uuid → artifact.id in one batch query
-        uuid_to_id = _resolve_artifact_ids(session, group_artifacts)
-
-        artifacts = [
-            GroupArtifactResponse(
-                artifact_uuid=ga.artifact_uuid,
-                artifact_id=uuid_to_id.get(ga.artifact_uuid),
-                position=ga.position,
-                added_at=ga.added_at,
-            )
-            for ga in group_artifacts
-        ]
-
-        return GroupWithArtifactsResponse(
-            id=group.id,
-            collection_id=group.collection_id,
-            name=group.name,
-            description=group.description,
-            tags=_parse_group_tags(group.tags_json),
-            color=group.color or "slate",
-            icon=group.icon or "layers",
-            position=group.position,
-            created_at=group.created_at,
-            updated_at=group.updated_at,
-            artifact_count=len(artifacts),
-            artifacts=artifacts,
-        )
-
-    except HTTPException:
-        session.rollback()
-        raise
-    except Exception as e:
-        session.rollback()
+        dto = group_repo.get_with_artifacts(group_id)
+    except RuntimeError as e:
         logger.error(f"Failed to add artifacts to group {group_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to add artifacts to group",
         ) from e
-    finally:
-        session.close()
+
+    if not dto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group '{group_id}' not found",
+        )
+
+    # Resolve artifact_ids (type:name strings) → UUIDs via artifact repo
+    type_name_pairs = []
+    for aid in request.artifact_ids:
+        parts = aid.split(":", 1)
+        if len(parts) == 2:
+            type_name_pairs.append((parts[0], parts[1]))
+
+    uuid_map: dict[str, str] = {}  # artifact_id → uuid
+    if type_name_pairs:
+        resolved = artifact_repo.batch_resolve_uuids(type_name_pairs)
+        for (art_type, art_name), art_uuid in resolved.items():
+            uuid_map[f"{art_type}:{art_name}"] = art_uuid
+
+    # Determine UUIDs for artifacts not already in the group
+    # The repo's add_artifacts handles deduplication silently
+    new_uuids = [uuid_map[aid] for aid in request.artifact_ids if aid in uuid_map]
+
+    if new_uuids:
+        if request.position is not None:
+            # Position-aware insert: shift existing, then insert at target position
+            try:
+                group_repo.add_artifacts_at_position(group_id, new_uuids, request.position)
+                logger.info(
+                    f"Added {len(new_uuids)} artifacts at position {request.position} "
+                    f"in group {group_id}"
+                )
+            except KeyError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=str(e),
+                ) from e
+            except RuntimeError as e:
+                logger.error(
+                    f"Failed to add artifacts at position in group {group_id}: {e}",
+                    exc_info=True,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to add artifacts to group",
+                ) from e
+        else:
+            # Append mode — repo handles deduplication and positioning
+            try:
+                group_repo.add_artifacts(group_id, new_uuids)
+                logger.info(f"Added artifacts to group {group_id}")
+            except KeyError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=str(e),
+                ) from e
+            except RuntimeError as e:
+                logger.error(
+                    f"Failed to add artifacts to group {group_id}: {e}", exc_info=True
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to add artifacts to group",
+                ) from e
+    else:
+        logger.info(
+            f"No new artifacts to add to group {group_id} (all duplicates or not found)"
+        )
+
+    # Refresh group DTO after mutation
+    try:
+        dto = group_repo.get_with_artifacts(group_id)
+    except RuntimeError as e:
+        logger.error(f"Failed to refresh group {group_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to add artifacts to group",
+        ) from e
+
+    # Fetch current artifact memberships for response
+    group_artifact_dtos = group_repo.list_group_artifacts(group_id)
+    artifacts = _build_artifact_responses(group_artifact_dtos, artifact_repo)
+
+    return _build_group_with_artifacts_response(dto, artifacts)
 
 
 @router.delete(
@@ -1014,70 +769,47 @@ async def add_artifacts_to_group(
     The artifact itself is not deleted from the collection.
     """,
 )
-async def remove_artifact_from_group(group_id: str, artifact_id: str) -> None:
+async def remove_artifact_from_group(
+    group_id: str,
+    artifact_id: str,
+    group_repo: GroupRepoDep,
+    artifact_repo: ArtifactRepoDep,
+) -> None:
     """Remove an artifact from a group.
 
     Args:
         group_id: Group ID
-        artifact_id: Artifact ID
+        artifact_id: Artifact ID (type:name format)
+        group_repo: Injected IGroupRepository
+        artifact_repo: Injected IArtifactRepository for UUID resolution
 
     Raises:
         HTTPException 404: If group or artifact association not found
         HTTPException 500: If database operation fails
     """
-    session = get_session()
-    try:
-        # Resolve artifact_id (type:name string) → artifact_uuid via Artifact table
-        artifact = session.query(Artifact).filter_by(id=artifact_id).first()
-        if not artifact:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found",
-            )
-
-        # Find association by group_id + artifact_uuid
-        group_artifact = (
-            session.query(GroupArtifact)
-            .filter_by(group_id=group_id, artifact_uuid=artifact.uuid)
-            .first()
+    # Resolve artifact_id (type:name string) → artifact_uuid
+    parts = artifact_id.split(":", 1)
+    if len(parts) != 2:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact '{artifact_id}' not found",
+        )
+    art_type, art_name = parts
+    artifact_uuid = artifact_repo.resolve_uuid_by_type_name(art_type, art_name)
+    if not artifact_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact '{artifact_id}' not found",
         )
 
-        if not group_artifact:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found in group '{group_id}'",
-            )
-
-        removed_position = group_artifact.position
-        # Capture group's collection_id before deletion
-        group = session.query(Group).filter_by(id=group_id).first()
-        collection_id = group.collection_id if group else None
-
-        # Delete association
-        session.delete(group_artifact)
-
-        # Reorder remaining artifacts (shift down)
-        session.query(GroupArtifact).filter(
-            GroupArtifact.group_id == group_id,
-            GroupArtifact.position > removed_position,
-        ).update({GroupArtifact.position: GroupArtifact.position - 1})
-
-        session.commit()
-
-        logger.info(f"Removed artifact {artifact_id} from group {group_id}")
-
-        if collection_id:
-            try:
-                from skillmeat.core.services.manifest_sync_service import ManifestSyncService
-                ManifestSyncService().sync_groups(session, collection_id)
-            except Exception as e:
-                logger.warning(f"Failed to sync groups to manifest: {e}")
-
-    except HTTPException:
-        session.rollback()
-        raise
-    except Exception as e:
-        session.rollback()
+    try:
+        group_repo.remove_artifact(group_id, artifact_uuid)
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except RuntimeError as e:
         logger.error(
             f"Failed to remove artifact {artifact_id} from group {group_id}: {e}",
             exc_info=True,
@@ -1086,8 +818,8 @@ async def remove_artifact_from_group(group_id: str, artifact_id: str) -> None:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to remove artifact from group",
         ) from e
-    finally:
-        session.close()
+
+    logger.info(f"Removed artifact {artifact_id} from group {group_id}")
 
 
 @router.put(
@@ -1104,13 +836,17 @@ async def update_artifact_position(
     group_id: str,
     artifact_id: str,
     position_update: ArtifactPositionUpdate,
+    group_repo: GroupRepoDep,
+    artifact_repo: ArtifactRepoDep,
 ) -> GroupArtifactResponse:
     """Update an artifact's position in a group.
 
     Args:
         group_id: Group ID
-        artifact_id: Artifact ID
+        artifact_id: Artifact ID (type:name format)
         position_update: New position
+        group_repo: Injected IGroupRepository
+        artifact_repo: Injected IArtifactRepository for UUID resolution
 
     Returns:
         Updated artifact association
@@ -1119,79 +855,31 @@ async def update_artifact_position(
         HTTPException 404: If group or artifact association not found
         HTTPException 500: If database operation fails
     """
-    session = get_session()
+    # Resolve artifact_id (type:name string) → artifact_uuid
+    parts = artifact_id.split(":", 1)
+    if len(parts) != 2:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact '{artifact_id}' not found",
+        )
+    art_type, art_name = parts
+    artifact_uuid = artifact_repo.resolve_uuid_by_type_name(art_type, art_name)
+    if not artifact_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact '{artifact_id}' not found",
+        )
+
     try:
-        # Resolve artifact_id (type:name string) → artifact_uuid via Artifact table
-        artifact = session.query(Artifact).filter_by(id=artifact_id).first()
-        if not artifact:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found",
-            )
-
-        # Find association by group_id + artifact_uuid
-        group_artifact = (
-            session.query(GroupArtifact)
-            .filter_by(group_id=group_id, artifact_uuid=artifact.uuid)
-            .first()
+        group_repo.update_artifact_position(
+            group_id, artifact_uuid, position_update.position
         )
-
-        if not group_artifact:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found in group '{group_id}'",
-            )
-
-        old_position = group_artifact.position
-        new_position = position_update.position
-
-        if old_position != new_position:
-            # Shift artifacts between old and new position
-            if new_position > old_position:
-                # Moving down: shift up artifacts in range (old+1, new]
-                session.query(GroupArtifact).filter(
-                    GroupArtifact.group_id == group_id,
-                    GroupArtifact.position > old_position,
-                    GroupArtifact.position <= new_position,
-                ).update({GroupArtifact.position: GroupArtifact.position - 1})
-            else:
-                # Moving up: shift down artifacts in range [new, old-1]
-                session.query(GroupArtifact).filter(
-                    GroupArtifact.group_id == group_id,
-                    GroupArtifact.position >= new_position,
-                    GroupArtifact.position < old_position,
-                ).update({GroupArtifact.position: GroupArtifact.position + 1})
-
-            # Update artifact position
-            group_artifact.position = new_position
-
-            session.commit()
-            session.refresh(group_artifact)
-
-            logger.info(
-                f"Updated artifact {artifact_id} position in group {group_id}: {old_position} -> {new_position}"
-            )
-
-            try:
-                from skillmeat.core.services.manifest_sync_service import ManifestSyncService
-                grp = session.query(Group).filter_by(id=group_id).first()
-                if grp:
-                    ManifestSyncService().sync_groups(session, grp.collection_id)
-            except Exception as e:
-                logger.warning(f"Failed to sync groups to manifest: {e}")
-
-        return GroupArtifactResponse(
-            artifact_uuid=group_artifact.artifact_uuid,
-            artifact_id=artifact_id,
-            position=group_artifact.position,
-            added_at=group_artifact.added_at,
-        )
-
-    except HTTPException:
-        session.rollback()
-        raise
-    except Exception as e:
-        session.rollback()
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except RuntimeError as e:
         logger.error(
             f"Failed to update artifact {artifact_id} position in group {group_id}: {e}",
             exc_info=True,
@@ -1200,8 +888,33 @@ async def update_artifact_position(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update artifact position",
         ) from e
-    finally:
-        session.close()
+
+    logger.info(
+        f"Updated artifact {artifact_id} position in group {group_id} "
+        f"to {position_update.position}"
+    )
+
+    # Read back the updated membership record for the response via repository
+    group_artifact_dtos = group_repo.list_group_artifacts(group_id)
+    matching = next(
+        (ga for ga in group_artifact_dtos if ga.artifact_uuid == artifact_uuid),
+        None,
+    )
+    if matching:
+        return GroupArtifactResponse(
+            artifact_uuid=matching.artifact_uuid,
+            artifact_id=artifact_id,
+            position=matching.position,
+            added_at=matching.added_at,
+        )
+
+    # Fallback: return the requested position directly
+    return GroupArtifactResponse(
+        artifact_uuid=artifact_uuid,
+        artifact_id=artifact_id,
+        position=position_update.position,
+        added_at=None,
+    )
 
 
 @router.post(
@@ -1218,12 +931,16 @@ async def update_artifact_position(
 async def reorder_artifacts_in_group(
     group_id: str,
     request: ReorderArtifactsRequest,
+    group_repo: GroupRepoDep,
+    artifact_repo: ArtifactRepoDep,
 ) -> GroupWithArtifactsResponse:
     """Bulk reorder artifacts in a group.
 
     Args:
         group_id: Group ID
-        request: List of artifacts with new positions
+        request: List of artifacts with new positions (uses artifact_uuid values directly)
+        group_repo: Injected IGroupRepository
+        artifact_repo: Injected IArtifactRepository for UUID → ID resolution in response
 
     Returns:
         Updated group with artifacts
@@ -1232,98 +949,10 @@ async def reorder_artifacts_in_group(
         HTTPException 404: If group or any artifact not found
         HTTPException 500: If database operation fails
     """
-    session = get_session()
+    # Verify group exists
     try:
-        # Verify group exists
-        group = session.query(Group).filter_by(id=group_id).first()
-        if not group:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Group '{group_id}' not found",
-            )
-
-        # The request already uses artifact_uuid values directly
-        artifact_ids = [a.artifact_uuid for a in request.artifacts]
-
-        # Load all group artifacts matching the provided UUIDs
-        group_artifacts = (
-            session.query(GroupArtifact)
-            .filter(
-                GroupArtifact.group_id == group_id,
-                GroupArtifact.artifact_uuid.in_(artifact_ids),
-            )
-            .all()
-        )
-
-        # Verify all artifacts exist in group
-        found_uuids = {ga.artifact_uuid for ga in group_artifacts}
-        missing_uuids = set(artifact_ids) - found_uuids
-        if missing_uuids:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifacts not found in group: {', '.join(missing_uuids)}",
-            )
-
-        # Build position map keyed by artifact_uuid
-        position_map = {a.artifact_uuid: a.position for a in request.artifacts}
-
-        # Update positions
-        for ga in group_artifacts:
-            new_position = position_map.get(ga.artifact_uuid)
-            if new_position is not None:
-                ga.position = new_position
-
-        session.commit()
-
-        logger.info(f"Reordered {len(group_artifacts)} artifacts in group {group_id}")
-
-        try:
-            from skillmeat.core.services.manifest_sync_service import ManifestSyncService
-            ManifestSyncService().sync_groups(session, group.collection_id)
-        except Exception as e:
-            logger.warning(f"Failed to sync groups to manifest: {e}")
-
-        # Get all artifacts ordered by position
-        all_group_artifacts = (
-            session.query(GroupArtifact)
-            .filter_by(group_id=group_id)
-            .order_by(GroupArtifact.position)
-            .all()
-        )
-
-        # Resolve artifact_uuid → artifact.id in one batch query
-        uuid_to_id = _resolve_artifact_ids(session, all_group_artifacts)
-
-        artifacts = [
-            GroupArtifactResponse(
-                artifact_uuid=ga.artifact_uuid,
-                artifact_id=uuid_to_id.get(ga.artifact_uuid),
-                position=ga.position,
-                added_at=ga.added_at,
-            )
-            for ga in all_group_artifacts
-        ]
-
-        return GroupWithArtifactsResponse(
-            id=group.id,
-            collection_id=group.collection_id,
-            name=group.name,
-            description=group.description,
-            tags=_parse_group_tags(group.tags_json),
-            color=group.color or "slate",
-            icon=group.icon or "layers",
-            position=group.position,
-            created_at=group.created_at,
-            updated_at=group.updated_at,
-            artifact_count=len(artifacts),
-            artifacts=artifacts,
-        )
-
-    except HTTPException:
-        session.rollback()
-        raise
-    except Exception as e:
-        session.rollback()
+        dto = group_repo.get_with_artifacts(group_id)
+    except RuntimeError as e:
         logger.error(
             f"Failed to reorder artifacts in group {group_id}: {e}", exc_info=True
         )
@@ -1331,5 +960,41 @@ async def reorder_artifacts_in_group(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to reorder artifacts",
         ) from e
-    finally:
-        session.close()
+
+    if not dto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group '{group_id}' not found",
+        )
+
+    # The request uses artifact_uuid values directly
+    ordered_uuids = [a.artifact_uuid for a in request.artifacts]
+
+    try:
+        group_repo.reorder_artifacts(group_id, ordered_uuids)
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except RuntimeError as e:
+        logger.error(
+            f"Failed to reorder artifacts in group {group_id}: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reorder artifacts",
+        ) from e
+
+    logger.info(f"Reordered {len(ordered_uuids)} artifacts in group {group_id}")
+
+    # Fetch updated artifact memberships for response
+    group_artifact_dtos = group_repo.list_group_artifacts(group_id)
+    artifacts = _build_artifact_responses(group_artifact_dtos, artifact_repo)
+
+    return _build_group_with_artifacts_response(dto, artifacts)

@@ -128,23 +128,6 @@ def test_settings():
 
 
 @pytest.fixture
-def app(test_settings):
-    """Create FastAPI app for testing."""
-    from skillmeat.api.config import get_settings
-
-    app = create_app(test_settings)
-    app.dependency_overrides[get_settings] = lambda: test_settings
-    return app
-
-
-@pytest.fixture
-def client(app):
-    """Create test client with lifespan context."""
-    with TestClient(app) as test_client:
-        yield test_client
-
-
-@pytest.fixture
 def mock_source():
     """Create a mock MarketplaceSource."""
     return MarketplaceSource(
@@ -174,6 +157,35 @@ def mock_source_repo(mock_source):
     mock.create.return_value = mock_source
     mock.update.return_value = mock_source
     return mock
+
+
+@pytest.fixture
+def app(test_settings, mock_source_repo):
+    """Create FastAPI app for testing with repository DI overrides."""
+    from skillmeat.api.config import get_settings
+    from skillmeat.api.dependencies import (
+        get_marketplace_source_repository,
+        get_marketplace_source_repository_concrete,
+    )
+
+    application = create_app(test_settings)
+    application.dependency_overrides[get_settings] = lambda: test_settings
+    # Override both the interface and concrete repository dependencies so that
+    # tests never hit the real DB or the AppState initialization check.
+    application.dependency_overrides[get_marketplace_source_repository] = (
+        lambda: mock_source_repo
+    )
+    application.dependency_overrides[get_marketplace_source_repository_concrete] = (
+        lambda: mock_source_repo
+    )
+    return application
+
+
+@pytest.fixture
+def client(app):
+    """Create test client with lifespan context."""
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 # =============================================================================
@@ -274,11 +286,7 @@ class TestXSSPrevention:
         mock_source.description = xss_description
         mock_source_repo.get_by_id.return_value = mock_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
-            response = client.get("/api/v1/marketplace/sources/src_test_123")
+        response = client.get("/api/v1/marketplace/sources/src_test_123")
 
         assert response.status_code == status.HTTP_200_OK
         # Verify the response doesn't auto-execute (just returns as string)
@@ -312,11 +320,7 @@ class TestSQLInjectionPrevention:
 
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
-            response = client.get(f"/api/v1/marketplace/sources/{sql_payload}")
+        response = client.get(f"/api/v1/marketplace/sources/{sql_payload}")
 
         # Should return 400 (invalid ID format) or 404 (not found), not 500
         assert response.status_code in [
@@ -411,14 +415,10 @@ class TestPathTraversalPrevention:
 
     def test_path_traversal_in_artifact_path_rejected(self, client, mock_source_repo):
         """Test that path traversal in artifact file paths is rejected."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
-            # Try to access file with path traversal
-            response = client.get(
-                "/api/v1/marketplace/sources/src_test_123/artifacts/../../../etc/passwd/files"
-            )
+        # Try to access file with path traversal
+        response = client.get(
+            "/api/v1/marketplace/sources/src_test_123/artifacts/../../../etc/passwd/files"
+        )
 
         # Should be rejected with 400 or 404, not expose file system
         assert response.status_code in [
@@ -447,9 +447,6 @@ class TestRateLimitingVerification:
         mock_source_repo.get_by_id.return_value = mock_source
 
         with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
             "skillmeat.api.routers.marketplace_sources._perform_scan",
             side_effect=RateLimitError("API rate limit exceeded", reset_at=1234567890),
         ):
@@ -484,9 +481,6 @@ class TestRateLimitingVerification:
         mock_source_repo.get_by_id.return_value = mock_source
 
         with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
             "skillmeat.api.routers.marketplace_sources._perform_scan",
             side_effect=RateLimitError(
                 "Detailed internal error: token xyz123 rate limited",
@@ -513,11 +507,7 @@ class TestNoSensitiveDataInErrors:
         """Test that 404 errors don't leak internal information."""
         mock_source_repo.get_by_id.return_value = None
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
-            response = client.get("/api/v1/marketplace/sources/nonexistent_id")
+        response = client.get("/api/v1/marketplace/sources/nonexistent_id")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
         error_detail = response.json().get("detail", "")
@@ -556,11 +546,7 @@ class TestNoSensitiveDataInErrors:
             "Internal database error: connection failed to postgresql://user:password@localhost"
         )
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
-            response = client.get("/api/v1/marketplace/sources/src_test_123")
+        response = client.get("/api/v1/marketplace/sources/src_test_123")
 
         # Should return error but not leak details
         assert response.status_code >= 400
@@ -591,9 +577,6 @@ class TestNoSensitiveDataInErrors:
         mock_source_repo.get_by_id.return_value = mock_source
 
         with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
             "skillmeat.api.routers.marketplace_sources._perform_scan",
             side_effect=Exception("GitHub API error: Bad credentials for token ghp_1234567890abcdef"),
         ):
@@ -638,9 +621,6 @@ class TestAccessTokenHandling:
             )
 
         with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ), patch(
             "skillmeat.api.routers.marketplace_sources._perform_scan",
             side_effect=mock_scan,
         ):
@@ -671,18 +651,14 @@ class TestAccessTokenHandling:
         mock_source_repo.get_by_repo_url.return_value = None
         mock_source_repo.create.side_effect = Exception("Failed to create source")
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
-        ):
-            response = client.post(
-                "/api/v1/marketplace/sources",
-                json={
-                    "repo_url": "https://github.com/test/repo",
-                    "ref": "main",
-                    "access_token": "ghp_secret_token_xyz",
-                },
-            )
+        response = client.post(
+            "/api/v1/marketplace/sources",
+            json={
+                "repo_url": "https://github.com/test/repo",
+                "ref": "main",
+                "access_token": "ghp_secret_token_xyz",
+            },
+        )
 
         # Verify error response
         assert response.status_code >= 400

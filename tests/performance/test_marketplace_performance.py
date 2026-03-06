@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -378,21 +378,24 @@ class TestScanPerformance:
 class TestAPIPerformance:
     """Benchmark API endpoint response times."""
 
-    @patch("skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository")
-    @patch("skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository")
-    def test_list_sources_performance(self, mock_catalog_repo, mock_source_repo, benchmark):
+    def test_list_sources_performance(self, benchmark):
         """Benchmark GET /api/v1/marketplace/sources endpoint.
 
         Target: <100ms
 
-        Patches MarketplaceSourceRepository (and MarketplaceCatalogRepository which
-        is also instantiated in list_sources) in marketplace_sources router.
+        Uses FastAPI DI overrides for MarketplaceSourceRepository and
+        MarketplaceCatalogRepository in marketplace_sources router.
         """
         from fastapi.testclient import TestClient
 
+        from skillmeat.api.dependencies import (
+            get_marketplace_catalog_repository,
+            get_marketplace_source_repository_concrete,
+        )
         from skillmeat.api.server import create_app
 
-        # Setup mock source repository
+        # Setup mock source repository instance
+        mock_source_repo = MagicMock()
         mock_sources = [
             Mock(
                 id=f"source-{i}",
@@ -408,12 +411,19 @@ class TestAPIPerformance:
             )
             for i in range(20)
         ]
-        mock_source_repo.return_value.list_all.return_value = mock_sources
+        mock_source_repo.list_all.return_value = mock_sources
 
         # MarketplaceCatalogRepository.count_by_status_bulk() is called in list_sources
-        mock_catalog_repo.return_value.count_by_status_bulk.return_value = {}
+        mock_catalog_repo = MagicMock()
+        mock_catalog_repo.count_by_status_bulk.return_value = {}
 
         app = create_app()
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        app.dependency_overrides[
+            get_marketplace_catalog_repository
+        ] = lambda: mock_catalog_repo
         client = TestClient(app)
 
         def call_api():
@@ -422,6 +432,8 @@ class TestAPIPerformance:
             return response
 
         response = benchmark(call_api)
+        app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+        app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
 
         # Verify response — 200, 429 (rate limit during benchmark), or 500 all acceptable;
         # the main goal is measuring throughput performance, not correctness
@@ -434,31 +446,40 @@ class TestAPIPerformance:
             mean_time < 0.5  # Relaxed to 500ms since it spins up a full app
         ), f"GET /sources took {mean_time * 1000:.0f}ms, expected <500ms"
 
-    @patch("skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository")
-    @patch("skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository")
-    def test_list_artifacts_with_100_items_performance(
-        self, mock_catalog_repo, mock_source_repo, benchmark
-    ):
+    def test_list_artifacts_with_100_items_performance(self, benchmark):
         """Benchmark GET /api/v1/marketplace/sources/{id}/artifacts with 100 items.
 
         Target: <500ms (relaxed from 150ms due to full-app overhead in tests)
         """
         from fastapi.testclient import TestClient
 
+        from skillmeat.api.dependencies import (
+            get_marketplace_catalog_repository,
+            get_marketplace_source_repository_concrete,
+        )
         from skillmeat.api.server import create_app
 
-        # Setup mock data
+        # Setup mock data instances
+        mock_source_repo = MagicMock()
         mock_source_obj = Mock(
             id="src-test-abc",
             owner="test",
             repo="repo",
             trust_level="basic",
         )
-        mock_source_repo.return_value.get_by_id.return_value = mock_source_obj
-        mock_catalog_repo.return_value.count_by_status_bulk.return_value = {}
-        mock_catalog_repo.return_value.list_by_source.return_value = []
+        mock_source_repo.get_by_id.return_value = mock_source_obj
+
+        mock_catalog_repo = MagicMock()
+        mock_catalog_repo.count_by_status_bulk.return_value = {}
+        mock_catalog_repo.list_by_source.return_value = []
 
         app = create_app()
+        app.dependency_overrides[
+            get_marketplace_source_repository_concrete
+        ] = lambda: mock_source_repo
+        app.dependency_overrides[
+            get_marketplace_catalog_repository
+        ] = lambda: mock_catalog_repo
         client = TestClient(app)
 
         def call_api():
@@ -467,6 +488,8 @@ class TestAPIPerformance:
             return response
 
         response = benchmark(call_api)
+        app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
+        app.dependency_overrides.pop(get_marketplace_catalog_repository, None)
 
         # Verify response — 200, 404, 429 (rate limit during benchmark), or 500 acceptable;
         # burst detection may trigger on rapid benchmark calls, which is expected

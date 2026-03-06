@@ -1,0 +1,96 @@
+"""
+Interfaces layer for SkillMeat's hexagonal architecture.
+
+This module defines the contracts between the application core and its
+infrastructure adapters. It contains:
+
+- Abstract repository interfaces (ABCs): define data access contracts that
+  infrastructure implementations must satisfy, keeping the core independent
+  of any specific storage technology.
+
+- Domain DTOs (dataclasses): lightweight, immutable data transfer objects
+  used to pass data across layer boundaries without leaking ORM models or
+  external schemas into the core.
+
+- RequestContext: carries per-request metadata (auth, tracing, etc.) through
+  the call stack without threading globals.
+
+Design principles:
+- Nothing in this module may import from other skillmeat modules except
+  `skillmeat.core.enums` and `skillmeat.core.exceptions`.
+- All interfaces use Python's `abc.ABC` / `abc.abstractmethod`.
+- DTOs are frozen dataclasses to enforce immutability at the boundary.
+"""
+
+from skillmeat.core.interfaces.context import RequestContext
+from skillmeat.core.interfaces.dtos import (
+    ArtifactDTO,
+    CatalogItemDTO,
+    CategoryDTO,
+    CollectionArtifactDTO,
+    CollectionDTO,
+    CollectionMembershipDTO,
+    ContextEntityDTO,
+    DeploymentDTO,
+    EntityTypeConfigDTO,
+    GroupArtifactDTO,
+    GroupDTO,
+    MarketplaceSourceDTO,
+    ProjectDTO,
+    ProjectTemplateDTO,
+    SettingsDTO,
+    TagDTO,
+    TemplateEntityDTO,
+    UserCollectionDTO,
+)
+from skillmeat.core.interfaces.repositories import (
+    IArtifactRepository,
+    ICollectionRepository,
+    IContextEntityRepository,
+    IDbCollectionArtifactRepository,
+    IDbUserCollectionRepository,
+    IDeploymentRepository,
+    IGroupRepository,
+    IMarketplaceSourceRepository,
+    IProjectRepository,
+    IProjectTemplateRepository,
+    ISettingsRepository,
+    ITagRepository,
+)
+
+__all__: list[str] = [
+    # Context
+    "RequestContext",
+    # DTOs
+    "ArtifactDTO",
+    "CatalogItemDTO",
+    "CategoryDTO",
+    "CollectionArtifactDTO",
+    "CollectionDTO",
+    "CollectionMembershipDTO",
+    "ContextEntityDTO",
+    "DeploymentDTO",
+    "EntityTypeConfigDTO",
+    "GroupArtifactDTO",
+    "GroupDTO",
+    "MarketplaceSourceDTO",
+    "ProjectDTO",
+    "ProjectTemplateDTO",
+    "SettingsDTO",
+    "TagDTO",
+    "TemplateEntityDTO",
+    "UserCollectionDTO",
+    # Repository interfaces
+    "IArtifactRepository",
+    "ICollectionRepository",
+    "IContextEntityRepository",
+    "IDbCollectionArtifactRepository",
+    "IDbUserCollectionRepository",
+    "IDeploymentRepository",
+    "IGroupRepository",
+    "IMarketplaceSourceRepository",
+    "IProjectRepository",
+    "IProjectTemplateRepository",
+    "ISettingsRepository",
+    "ITagRepository",
+]

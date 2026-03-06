@@ -1,7 +1,16 @@
-"""Profile-aware path resolution utilities for project deployments.
+"""Path resolution utilities for SkillMeat deployments and collections.
 
-This module centralizes profile-root path construction and validation so
-deployment, storage, and API layers can avoid hardcoded ``.claude`` paths.
+Two complementary utilities live here:
+
+``ProjectPathResolver``
+    Centralises all path construction for the user's personal collection
+    (``~/.skillmeat/collection/``) and global/local deployment targets.
+    Use this wherever code currently hard-codes collection or deploy paths.
+
+Profile-aware helpers (``resolve_profile_root``, ``resolve_artifact_path``, …)
+    Lower-level utilities for resolving paths *within* a project's profile
+    root (e.g. ``.claude/skills/…``).  These back the deployment layer and
+    remain available for callers that need fine-grained profile control.
 """
 
 from __future__ import annotations
@@ -234,3 +243,246 @@ def _warn_if_symlink(candidate: Path, project_root: Path, profile_id: str) -> No
                 },
             )
             return
+
+
+# ---------------------------------------------------------------------------
+# Collection-level path resolver
+# ---------------------------------------------------------------------------
+
+#: Subdirectory under ``~/.skillmeat`` that holds the active collection.
+_DEFAULT_COLLECTION_SUBDIR = "collection"
+
+#: Subdirectory inside a collection root that holds all artifacts.
+_ARTIFACTS_SUBDIR = "artifacts"
+
+#: Filename of the collection manifest.
+_MANIFEST_FILENAME = "manifest.toml"
+
+#: Filename of the collection lock-file.
+_LOCKFILE_FILENAME = "lockfile.toml"
+
+#: Subdirectory inside ``~/.skillmeat`` that holds snapshots.
+_SNAPSHOTS_SUBDIR = "snapshots"
+
+#: Path segments for the global (user-scope) Claude Code skill directory.
+_USER_DEPLOY_SEGMENTS = (".claude", "skills", "user")
+
+#: Path segments for the local (project-scope) Claude Code skill directory.
+_LOCAL_DEPLOY_SEGMENTS = (".claude", "skills")
+
+
+class ProjectPathResolver:
+    """Centralised path resolution for the SkillMeat collection and deploy targets.
+
+    All paths that were previously hard-coded as ``Path.home() / ".skillmeat"``
+    or ``Path.home() / ".claude" / "skills" / "user"`` across the codebase should
+    be obtained through this class instead.
+
+    Design notes
+    ------------
+    * ``collection_root`` is the only configurable parameter.  Everything else
+      is derived deterministically from it so that tests can redirect all I/O to
+      a temporary directory by passing a single value.
+    * The class is deliberately *not* a singleton — it is intended to be
+      constructed once and injected wherever path resolution is needed.
+    * No I/O is performed in any method; all paths are returned as
+      ``pathlib.Path`` objects and creation is left to the caller.
+    * Python 3.9+ compatible (no ``X | Y`` union syntax in annotations).
+
+    Parameters
+    ----------
+    collection_root:
+        Override the collection root directory.  Defaults to
+        ``~/.skillmeat/collection``.  Pass an explicit path in tests to avoid
+        touching the real user home directory.
+
+    Examples
+    --------
+    >>> resolver = ProjectPathResolver()
+    >>> resolver.collection_root()
+    PosixPath('/home/user/.skillmeat/collection')
+
+    >>> resolver = ProjectPathResolver(collection_root=Path("/tmp/test-collection"))
+    >>> str(resolver.artifacts_dir())
+    '/tmp/test-collection/artifacts'
+    """
+
+    def __init__(self, collection_root: Optional[Path] = None) -> None:
+        if collection_root is not None:
+            self._collection_root = Path(collection_root)
+        else:
+            self._collection_root = (
+                Path.home() / ".skillmeat" / _DEFAULT_COLLECTION_SUBDIR
+            )
+
+    # ------------------------------------------------------------------
+    # Collection paths
+    # ------------------------------------------------------------------
+
+    def collection_root(self) -> Path:
+        """Return the collection root directory (``~/.skillmeat/collection``).
+
+        Returns
+        -------
+        Path
+            Absolute path to the collection root.
+        """
+        return self._collection_root
+
+    def artifacts_dir(self) -> Path:
+        """Return the artifacts sub-directory of the collection.
+
+        Returns
+        -------
+        Path
+            ``<collection_root>/artifacts``
+        """
+        return self._collection_root / _ARTIFACTS_SUBDIR
+
+    def artifact_path(self, name: str, artifact_type: str) -> Path:
+        """Return the directory path for a specific artifact in the collection.
+
+        Artifacts are stored under
+        ``<collection_root>/artifacts/<type>s/<name>`` following the
+        convention established by ``CollectionManager``.  The plural form
+        (e.g. ``skills``, ``commands``) is used as the container directory
+        name to match the layout on disk.
+
+        Parameters
+        ----------
+        name:
+            Artifact name (e.g. ``"canvas-design"``).
+        artifact_type:
+            Artifact type string, singular form (e.g. ``"skill"``,
+            ``"command"``, ``"agent"``, ``"hook"``, ``"mcp"``).
+
+        Returns
+        -------
+        Path
+            ``<collection_root>/artifacts/<artifact_type_plural>/<name>``
+
+        Raises
+        ------
+        ValueError
+            If *artifact_type* is not a recognised type string.
+        """
+        container = DEFAULT_ARTIFACT_PATH_MAP.get(artifact_type)
+        if not container:
+            raise ValueError(
+                f"Unknown artifact type '{artifact_type}'. "
+                f"Valid types: {sorted(DEFAULT_ARTIFACT_PATH_MAP)}"
+            )
+        return self.artifacts_dir() / container / name
+
+    def manifest_path(self) -> Path:
+        """Return the path to the collection manifest file.
+
+        Returns
+        -------
+        Path
+            ``<collection_root>/manifest.toml``
+        """
+        return self._collection_root / _MANIFEST_FILENAME
+
+    def lockfile_path(self) -> Path:
+        """Return the path to the collection lock-file.
+
+        Returns
+        -------
+        Path
+            ``<collection_root>/lockfile.toml``
+        """
+        return self._collection_root / _LOCKFILE_FILENAME
+
+    def snapshots_dir(self) -> Path:
+        """Return the snapshots directory for the collection.
+
+        Snapshots are stored as siblings of the collection root under
+        ``~/.skillmeat/snapshots`` so that they are not accidentally
+        treated as collection contents.
+
+        Returns
+        -------
+        Path
+            ``<collection_root_parent>/snapshots``
+        """
+        return self._collection_root.parent / _SNAPSHOTS_SUBDIR
+
+    # ------------------------------------------------------------------
+    # Deployment target paths
+    # ------------------------------------------------------------------
+
+    def user_deploy_dir(self) -> Path:
+        """Return the global (user-scope) skill deployment directory.
+
+        This is the directory that Claude Code reads from at startup when
+        resolving user-scoped skills: ``~/.claude/skills/user/``.
+
+        Returns
+        -------
+        Path
+            ``~/.claude/skills/user``
+        """
+        result = Path.home()
+        for segment in _USER_DEPLOY_SEGMENTS:
+            result = result / segment
+        return result
+
+    def local_deploy_dir(self, project_root: Path) -> Path:
+        """Return the local (project-scope) skill deployment directory.
+
+        This is the directory inside a specific project from which Claude
+        Code loads project-local skills: ``<project_root>/.claude/skills/``.
+
+        Parameters
+        ----------
+        project_root:
+            Absolute path to the project root directory.
+
+        Returns
+        -------
+        Path
+            ``<project_root>/.claude/skills``
+        """
+        result = Path(project_root)
+        for segment in _LOCAL_DEPLOY_SEGMENTS:
+            result = result / segment
+        return result
+
+    def deploy_target(
+        self,
+        scope: str,
+        project_root: Optional[Path] = None,
+    ) -> Path:
+        """Resolve a deployment target directory by scope name.
+
+        Parameters
+        ----------
+        scope:
+            Either ``"user"`` (global, ``~/.claude/skills/user/``) or
+            ``"local"`` (project-specific, ``<project_root>/.claude/skills/``).
+        project_root:
+            Required when *scope* is ``"local"``; ignored for ``"user"`` scope.
+
+        Returns
+        -------
+        Path
+            The resolved deployment target directory.
+
+        Raises
+        ------
+        ValueError
+            If *scope* is not ``"user"`` or ``"local"``, or if *scope* is
+            ``"local"`` but *project_root* is not provided.
+        """
+        if scope == "user":
+            return self.user_deploy_dir()
+        if scope == "local":
+            if project_root is None:
+                raise ValueError(
+                    "project_root must be provided when scope is 'local'"
+                )
+            return self.local_deploy_dir(project_root)
+        raise ValueError(
+            f"Invalid scope '{scope}'. Valid values: 'user', 'local'"
+        )

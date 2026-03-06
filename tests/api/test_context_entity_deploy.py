@@ -9,13 +9,14 @@ from pathlib import Path
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import sessionmaker
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import get_deployment_profile_repository
 from skillmeat.api.server import create_app
 from skillmeat.cache.models import Project, create_db_engine, create_tables
 from skillmeat.cache.repositories import DeploymentProfileRepository
 from skillmeat.core.enums import Platform
+from skillmeat.core.repositories import LocalContextEntityRepository
 
 
 @pytest.fixture
@@ -31,10 +32,11 @@ def temp_db():
 
 
 @pytest.fixture
-def app(temp_db, monkeypatch):
+def app(temp_db):
     """Create API app with context-entities router bound to temp DB."""
+    from sqlalchemy.orm import sessionmaker
     from skillmeat.api.config import get_settings
-    from skillmeat.api.routers import context_entities
+    from skillmeat.api.dependencies import get_context_entity_repository
     from skillmeat.api.middleware.auth import verify_token
 
     settings = APISettings(
@@ -45,19 +47,10 @@ def app(temp_db, monkeypatch):
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[verify_token] = lambda: "test-token"
 
+    # Seed the temp DB with tables and a project row.
     create_tables(temp_db)
     engine = create_db_engine(temp_db)
     SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-
-    def _get_session():
-        return SessionLocal()
-
-    monkeypatch.setattr(context_entities, "get_session", _get_session)
-    monkeypatch.setattr(
-        context_entities,
-        "DeploymentProfileRepository",
-        lambda: DeploymentProfileRepository(db_path=temp_db),
-    )
 
     session = SessionLocal()
     try:
@@ -74,6 +67,24 @@ def app(temp_db, monkeypatch):
     finally:
         session.close()
         engine.dispose()
+
+    # Reset the global SessionLocal so that LocalContextEntityRepository's
+    # get_session(db_path=temp_db) re-initialises to temp_db.
+    # Without this, app startup has already set SessionLocal to the default DB
+    # and get_session() ignores the db_path argument.
+    import skillmeat.cache.models as _models
+    _models.SessionLocal = None
+
+    # Override context entity repository DI to use the temp DB.
+    app.dependency_overrides[get_context_entity_repository] = (
+        lambda: LocalContextEntityRepository(db_path=temp_db)
+    )
+
+    # Override DeploymentProfileRepository DI so _resolve_deploy_profiles
+    # also targets the temp DB.
+    app.dependency_overrides[get_deployment_profile_repository] = (
+        lambda: DeploymentProfileRepository(db_path=temp_db)
+    )
 
     return app
 
@@ -137,16 +148,6 @@ def test_deploy_context_entity_rewrites_to_selected_profile(client, project_path
 def test_deploy_context_entity_all_profiles(client, project_path, temp_db):
     """all_profiles should deploy once for each configured profile."""
     entity_id = _create_context_entity(client)
-
-    # The app lifespan calls init_session_factory() with no arguments, which
-    # initialises the module-level SessionLocal to the default ~/.skillmeat DB.
-    # BaseRepository._get_session() calls get_session(self.db_path) but skips
-    # re-initialisation if SessionLocal is already set, so it ends up using the
-    # wrong DB (missing the Project row we seeded in temp_db).
-    # Reset the global SessionLocal so get_session() re-initialises with temp_db.
-    import skillmeat.cache.models as _models
-
-    _models.SessionLocal = None
 
     repo = DeploymentProfileRepository(db_path=temp_db)
     repo.create(

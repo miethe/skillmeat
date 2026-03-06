@@ -8,7 +8,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, apiConfig } from '@/lib/api';
-import { mapArtifactsToEntities, type ApiArtifactResponse } from '@/lib/api/entity-mapper';
+import { mapArtifactsToEntitiesSafe, type ApiArtifactResponse } from '@/lib/api/entity-mapper';
 import type { SyncStatus } from '@/types/artifact';
 import type { Entity, EntityType, EntityStatus } from '@/types/entity';
 import type {
@@ -585,7 +585,7 @@ async function fetchCollectionEntities(
 ): Promise<Entity[]> {
   const processItems = (items: ApiArtifactResponse[]): Entity[] => {
     // Use centralized mapper with 'collection' context
-    const entities: Entity[] = mapArtifactsToEntities(items, 'collection');
+    const entities: Entity[] = mapArtifactsToEntitiesSafe(items, 'collection');
 
     // Attach collection info if provided (mapper doesn't have access to external collectionId)
     const entitiesWithCollection: Entity[] = entities.map((entity) => ({

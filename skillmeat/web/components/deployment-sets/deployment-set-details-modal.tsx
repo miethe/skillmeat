@@ -654,6 +654,7 @@ interface MemberSectionProps {
   isCollapsed: boolean;
   onToggle: () => void;
   artifactByUuid: Record<string, Artifact>;
+  isArtifactsLoading: boolean;
   setId: string;
   onArtifactClick: (artifact: Artifact) => void;
   onSetClick: (nestedSetId: string) => void;
@@ -665,6 +666,7 @@ function MemberSection({
   isCollapsed,
   onToggle,
   artifactByUuid,
+  isArtifactsLoading,
   setId,
   onArtifactClick,
   onSetClick,
@@ -710,10 +712,23 @@ function MemberSection({
                   : undefined;
 
                 if (!artifact) {
-                  // Artifact not yet resolved — show skeleton placeholder
+                  if (isArtifactsLoading) {
+                    // Artifacts still loading — show skeleton placeholder
+                    return (
+                      <div key={member.id} role="listitem">
+                        <MiniDeploymentSetCardSkeleton />
+                      </div>
+                    );
+                  }
+                  // Artifact UUID not found in collection — show not-found placeholder
                   return (
-                    <div key={member.id} role="listitem">
-                      <MiniDeploymentSetCardSkeleton />
+                    <div
+                      key={member.id}
+                      role="listitem"
+                      className="flex min-h-[140px] items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground"
+                      aria-label="Artifact not found"
+                    >
+                      Artifact not found
                     </div>
                   );
                 }
@@ -925,6 +940,7 @@ function DeploymentSetMembersTab({ setId, collectionId }: { setId: string; colle
                 isCollapsed={collapsedSections.has(typeKey)}
                 onToggle={() => toggleSection(typeKey)}
                 artifactByUuid={artifactByUuid}
+                isArtifactsLoading={isArtifactsLoading}
                 setId={setId}
                 onArtifactClick={(artifact) => {
                   setSelectedArtifact(artifact);

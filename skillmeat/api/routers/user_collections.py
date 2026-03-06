@@ -7,14 +7,28 @@ Distinct from file-based collections in collections.py router.
 import base64
 import json
 import logging
-import uuid
 from datetime import datetime
-from typing import Annotated, List, Optional
+from typing import List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Body, HTTPException, Query, status
 
-from skillmeat.api.dependencies import ArtifactManagerDep, CollectionManagerDep
+from skillmeat.api.dependencies import (
+    ArtifactManagerDep,
+    ArtifactRepoDep,
+    CollectionManagerDep,
+    DbCollectionArtifactRepoDep,
+    DbSessionDep,
+    DbUserCollectionRepoDep,
+    GroupRepoDep,
+    ProjectRepoDep,
+)
+from skillmeat.core.interfaces.dtos import UserCollectionDTO
+from skillmeat.core.interfaces.repositories import (
+    IDbCollectionArtifactRepository,
+    IDbUserCollectionRepository,
+    IGroupRepository,
+    IProjectRepository,
+)
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.collections import (
     RefreshModeEnum,
@@ -23,7 +37,6 @@ from skillmeat.api.schemas.collections import (
     UpdateCheckResponse,
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
-from skillmeat.api.schemas.deployments import DeploymentSummary
 from skillmeat.api.schemas.user_collections import (
     AddArtifactsRequest,
     ArtifactGroupMembership,
@@ -47,14 +60,7 @@ from skillmeat.core.artifact import ArtifactType as CoreArtifactType
 from skillmeat.core.refresher import CollectionRefresher, RefreshMode, validate_fields
 from skillmeat.cache.models import (
     DEFAULT_COLLECTION_ID,
-    DEFAULT_COLLECTION_NAME,
-    Artifact,
-    Collection,
-    CollectionArtifact,
-    Group,
-    GroupArtifact,
     Project,
-    get_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -71,32 +77,21 @@ router = APIRouter(
 
 
 # =============================================================================
-# Database Session Dependency
-# =============================================================================
-
-
-def get_db_session():
-    """Get database session with proper cleanup.
-
-    Yields:
-        SQLAlchemy session instance
-
-    Note:
-        Session is automatically closed after request completes
-    """
-    session = get_session()
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-DbSessionDep = Annotated[Session, Depends(get_db_session)]
-
-
-# =============================================================================
 # Helper Functions
 # =============================================================================
+# Helper functions have been migrated to use repository DI
+# (IDbUserCollectionRepository, IDbCollectionArtifactRepository, IGroupRepository)
+# in place of direct SQLAlchemy session access.
+#
+# Remaining direct session/ORM usage is confined to functions that have no
+# repository ABC counterpart yet (e.g. _ensure_collection_project_sentinel uses
+# Project ORM directly because IProjectRepository.ensure_sentinel() is not yet
+# defined).  Those cases carry explicit TODO comments.
+#
+# CRUD endpoint bodies (list, create, get, update, delete) were migrated to
+# repository DI in TASK-4.1 and TASK-4.2.  Non-CRUD endpoints (artifact ops,
+# cache/sync, entity management) still use DbSessionDep directly — that
+# migration is Phase 5 work (TASK-5.1, TASK-5.2).
 
 
 def encode_cursor(value: str) -> str:
@@ -133,65 +128,80 @@ def decode_cursor(cursor: str) -> str:
 
 
 def collection_to_response(
-    collection: Collection, session: Session
+    collection_dto: UserCollectionDTO,
+    collection_repo: IDbUserCollectionRepository,
 ) -> UserCollectionResponse:
-    """Convert Collection ORM model to API response.
+    """Convert a UserCollectionDTO to an API response model.
+
+    Uses the repository to compute live group and artifact counts rather than
+    relying on cached values embedded in the DTO, which may be stale.
 
     Args:
-        collection: Collection ORM instance
-        session: Database session for computing counts
+        collection_dto: DTO representation of the collection.
+        collection_repo: Repository used to query live group and artifact counts.
 
     Returns:
-        UserCollectionResponse DTO
+        UserCollectionResponse Pydantic model ready for serialisation.
+
+    Note:
+        The previous signature ``(collection: Collection, session: Session)``
+        accepted ORM models and a raw SQLAlchemy session.  All CRUD endpoints
+        were updated to the repository-based call pattern in TASK-4.1/TASK-4.2.
     """
-    # Compute counts
-    group_count = len(collection.groups)
-    artifact_count = (
-        session.query(CollectionArtifact).filter_by(collection_id=collection.id).count()
-    )
+    group_count = len(collection_repo.get_groups(collection_dto.id))
+    artifact_count = collection_repo.get_artifact_count(collection_dto.id)
+
+    def _parse_dt(value: Optional[str]) -> datetime:
+        """Parse ISO-8601 string to datetime; fall back to utcnow on failure."""
+        if value:
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                pass
+        return datetime.utcnow()
 
     return UserCollectionResponse(
-        id=collection.id,
-        name=collection.name,
-        description=collection.description,
-        created_by=collection.created_by,
-        collection_type=collection.collection_type,
-        context_category=collection.context_category,
-        created_at=collection.created_at,
-        updated_at=collection.updated_at,
+        id=collection_dto.id,
+        name=collection_dto.name,
+        description=collection_dto.description,
+        created_by=collection_dto.created_by,
+        collection_type=collection_dto.collection_type,
+        context_category=collection_dto.context_category,
+        created_at=_parse_dt(collection_dto.created_at),
+        updated_at=_parse_dt(collection_dto.updated_at),
         group_count=group_count,
         artifact_count=artifact_count,
     )
 
 
 def collection_to_response_with_groups(
-    collection: Collection, session: Session
+    collection_dto: UserCollectionDTO,
+    collection_repo: IDbUserCollectionRepository,
+    group_repo: IGroupRepository,
 ) -> UserCollectionWithGroupsResponse:
-    """Convert Collection ORM model to API response with groups.
+    """Convert a UserCollectionDTO to an API response model with nested groups.
 
     Args:
-        collection: Collection ORM instance
-        session: Database session for computing counts
+        collection_dto: DTO representation of the collection.
+        collection_repo: Repository used to compute live group/artifact counts.
+        group_repo: Repository used to list groups belonging to this collection.
 
     Returns:
-        UserCollectionWithGroupsResponse DTO with nested groups
+        UserCollectionWithGroupsResponse Pydantic model with nested group list.
     """
-    # Get base response
-    base_response = collection_to_response(collection, session)
+    base_response = collection_to_response(collection_dto, collection_repo)
 
-    # Build group summaries
-    groups = []
-    for group in sorted(collection.groups, key=lambda g: g.position):
-        artifact_count = len(group.group_artifacts)
-        groups.append(
-            GroupSummary(
-                id=group.id,
-                name=group.name,
-                description=group.description,
-                position=group.position,
-                artifact_count=artifact_count,
-            )
+    group_dtos = sorted(group_repo.list(collection_dto.id), key=lambda g: g.position)
+    groups = [
+        GroupSummary(
+            id=g.id,
+            name=g.name,
+            description=g.description,
+            position=g.position,
+            artifact_count=g.artifact_count,
         )
+        for g in group_dtos
+    ]
 
     return UserCollectionWithGroupsResponse(
         **base_response.model_dump(),
@@ -199,61 +209,53 @@ def collection_to_response_with_groups(
     )
 
 
-def ensure_default_collection(session: Session) -> Collection:
+def ensure_default_collection(
+    collection_repo: IDbUserCollectionRepository,
+) -> UserCollectionDTO:
     """Ensure the default collection exists, creating it if necessary.
 
     This function should be called during server startup to guarantee
     the default collection exists for artifact assignments.
 
+    Delegates to :meth:`IDbUserCollectionRepository.ensure_default` which is
+    idempotent: concurrent callers will not produce duplicate collections.
+
     Args:
-        session: Database session
+        collection_repo: Repository used to find or create the default
+            collection.
 
     Returns:
-        The default Collection instance (existing or newly created)
+        UserCollectionDTO for the default collection (existing or newly created).
     """
-    existing = session.query(Collection).filter_by(id=DEFAULT_COLLECTION_ID).first()
-    if existing:
-        logger.debug(f"Default collection '{DEFAULT_COLLECTION_ID}' already exists")
-        return existing
-
-    default_collection = Collection(
-        id=DEFAULT_COLLECTION_ID,
-        name=DEFAULT_COLLECTION_NAME,
-        description="Default collection for all artifacts. Artifacts are automatically added here when no specific collection is specified.",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+    dto = collection_repo.ensure_default()
+    logger.info(
+        "ensure_default_collection: verified/created default collection id=%r",
+        dto.id,
     )
-    session.add(default_collection)
-    session.commit()
-    logger.info(f"Created default collection '{DEFAULT_COLLECTION_ID}'")
-    return default_collection
+    return dto
 
 
-def _ensure_collection_project_sentinel(session: Session) -> None:
+def _ensure_collection_project_sentinel(
+    collection_repo: IDbUserCollectionRepository,
+) -> None:
     """Ensure the sentinel Project row for collection artifacts exists.
 
     Artifact rows require a project_id FK. Collection-level (filesystem)
     artifacts are not tied to any real deployed project, so we use a
     sentinel project to satisfy the constraint.
+
+    Delegates to :meth:`IDbUserCollectionRepository.ensure_sentinel_project`
+    which manages its own session and transaction.
     """
-    existing = session.query(Project).filter_by(id=COLLECTION_ARTIFACTS_PROJECT_ID).first()
-    if not existing:
-        sentinel = Project(
-            id=COLLECTION_ARTIFACTS_PROJECT_ID,
-            name="Collection Artifacts",
-            path="~/.skillmeat/collections",
-            description="Sentinel project for filesystem collection artifacts",
-            status="active",
-        )
-        session.add(sentinel)
-        session.commit()
-        logger.debug(f"Created sentinel project '{COLLECTION_ARTIFACTS_PROJECT_ID}'")
+    collection_repo.ensure_sentinel_project()
+    logger.debug(f"Ensured sentinel project '{COLLECTION_ARTIFACTS_PROJECT_ID}'")
 
 
 def _ensure_artifacts_in_cache(
-    session: Session,
     artifact_mgr,
     collection_mgr,
+    collection_repo: IDbUserCollectionRepository,
+    artifact_repo_ca: IDbCollectionArtifactRepository,
 ) -> int:
     """Ensure every filesystem artifact has a corresponding Artifact ORM row.
 
@@ -265,58 +267,36 @@ def _ensure_artifacts_in_cache(
     and migrate_artifacts_to_default_collection() process their artifacts.
 
     Args:
-        session: Database session
         artifact_mgr: ArtifactManager for listing filesystem artifacts
         collection_mgr: CollectionManager for enumerating collections
+        collection_repo: IDbUserCollectionRepository for sentinel project bootstrap
+        artifact_repo_ca: IDbCollectionArtifactRepository for artifact row creation
 
     Returns:
         Number of Artifact rows created
+
     """
-    _ensure_collection_project_sentinel(session)
+    _ensure_collection_project_sentinel(collection_repo)
 
-    # Gather existing artifact IDs to avoid unnecessary queries per-artifact
-    existing_ids = {
-        row[0] for row in session.query(Artifact.id).all()
-    }
-
-    created_count = 0
+    # Gather all filesystem artifacts across all collections
+    all_artifacts: list = []
     for coll_name in collection_mgr.list_collections():
         try:
             artifacts = artifact_mgr.list_artifacts(collection_name=coll_name)
+            all_artifacts.extend(artifacts)
         except Exception as e:
             logger.warning(
                 f"_ensure_artifacts_in_cache: failed to list '{coll_name}': {e}"
             )
             continue
 
-        for artifact in artifacts:
-            artifact_id = f"{artifact.type.value}:{artifact.name}"
-            if artifact_id in existing_ids:
-                continue
-
-            try:
-                version = artifact.metadata.version if artifact.metadata else None
-                new_artifact = Artifact(
-                    id=artifact_id,
-                    uuid=uuid.uuid4().hex,
-                    project_id=COLLECTION_ARTIFACTS_PROJECT_ID,
-                    name=artifact.name,
-                    type=artifact.type.value,
-                    source=artifact.upstream,
-                    deployed_version=version,
-                )
-                session.add(new_artifact)
-                existing_ids.add(artifact_id)
-                created_count += 1
-            except Exception as e:
-                logger.warning(
-                    f"_ensure_artifacts_in_cache: failed to create Artifact "
-                    f"row for '{artifact_id}': {e}"
-                )
-                continue
+    # Batch-insert missing artifact rows via the repository
+    created_count = artifact_repo_ca.ensure_artifact_rows(
+        all_artifacts,
+        project_id=COLLECTION_ARTIFACTS_PROJECT_ID,
+    )
 
     if created_count > 0:
-        session.commit()
         logger.info(
             f"_ensure_artifacts_in_cache: created {created_count} Artifact rows"
         )
@@ -325,9 +305,12 @@ def _ensure_artifacts_in_cache(
 
 
 def migrate_artifacts_to_default_collection(
-    session: Session,
     artifact_mgr,
     collection_mgr,
+    collection_repo: Optional[IDbUserCollectionRepository] = None,
+    artifact_repo_ca: Optional[IDbCollectionArtifactRepository] = None,
+    project_repo: Optional[IProjectRepository] = None,
+    session=None,
 ) -> dict:
     """Migrate all existing artifacts to the default collection.
 
@@ -337,32 +320,64 @@ def migrate_artifacts_to_default_collection(
     the metadata cache for efficient artifact card rendering.
 
     Args:
-        session: Database session
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
+        collection_repo: Optional injected IDbUserCollectionRepository.
+            When provided (e.g. from an endpoint's DI), used directly.
+            Falls back to constructing DbUserCollectionRepository() if None.
+        artifact_repo_ca: Optional injected IDbCollectionArtifactRepository.
+            When provided, used for batch artifact adds.
+            Falls back to constructing DbCollectionArtifactRepository() if None.
+        project_repo: Optional injected IProjectRepository for listing project
+            paths during deployment scanning.  Falls back to
+            constructing LocalProjectRepository() if None.
+        session: Optional SQLAlchemy Session forwarded to
+            ``_recover_default_collection_metadata``, which delegates to
+            ``recover_collection_metadata`` in the service layer.  When None
+            a fresh session is obtained internally.
 
     Returns:
         dict with migration stats: migrated_count, already_present_count,
         total_artifacts, and metadata_cache stats
-    """
-    # 1. Ensure default collection exists first
-    ensure_default_collection(session)
 
-    # 2. Ensure every filesystem artifact has an Artifact ORM row.
+    """
+    # 1. Ensure default collection exists first (prefer injected repo)
+    if collection_repo is None:
+        from skillmeat.cache.repositories import DbUserCollectionRepository as _CollRepo
+
+        collection_repo = _CollRepo()
+
+    ensure_default_collection(collection_repo)
+
+    # 2. Ensure artifact_repo_ca is initialised before _ensure_artifacts_in_cache.
+    if artifact_repo_ca is None:
+        from skillmeat.cache.repositories import (
+            DbCollectionArtifactRepository as _CaRepo,
+        )
+
+        artifact_repo_ca = _CaRepo()
+
+    # 3. Ensure every filesystem artifact has an Artifact ORM row.
     # populate_collection_artifact_metadata() and the migration loop both
     # skip artifacts that are not yet in the artifacts table, so this step
     # must come first.
-    ensure_count = _ensure_artifacts_in_cache(session, artifact_mgr, collection_mgr)
+    ensure_count = _ensure_artifacts_in_cache(
+        artifact_mgr, collection_mgr, collection_repo, artifact_repo_ca
+    )
     logger.info(f"Artifact cache bootstrap: {ensure_count} new Artifact rows created")
 
-    # 3. Populate metadata cache from file-based artifacts
+    # 4. Populate metadata cache from file-based artifacts
     # This creates/updates CollectionArtifact rows with full metadata
     # enabling the /collection page to render without N file reads
     metadata_stats = populate_collection_artifact_metadata(
-        session, artifact_mgr, collection_mgr
+        artifact_mgr,
+        collection_mgr,
+        collection_repo=collection_repo,
+        artifact_repo_ca=artifact_repo_ca,
+        project_repo=project_repo,
     )
 
-    # 4. Get all artifacts from all file-system collections
+    # 5. Get all artifacts from all file-system collections
     all_artifact_ids = set()
     for coll_name in collection_mgr.list_collections():
         try:
@@ -380,58 +395,47 @@ def migrate_artifacts_to_default_collection(
         f"Found {len(all_artifact_ids)} unique artifacts across all collections"
     )
 
-    # 5. Get existing associations for the default collection.
-    # CollectionArtifact now uses artifact_uuid FK; join through Artifact to
-    # resolve the type:name string (Artifact.id) for the set membership check.
-    existing_associations = (
-        session.query(Artifact.id)
-        .join(CollectionArtifact, CollectionArtifact.artifact_uuid == Artifact.uuid)
-        .filter(CollectionArtifact.collection_id == DEFAULT_COLLECTION_ID)
-        .all()
+    # 6. Get existing associations for the default collection via the repository.
+    existing_artifact_ids = artifact_repo_ca.list_artifact_ids_in_collection(
+        DEFAULT_COLLECTION_ID
     )
-    existing_artifact_ids = {row[0] for row in existing_associations}
 
-    # 6. Find artifacts not yet in default collection
+    # 7. Find artifacts not yet in default collection
     missing_artifact_ids = all_artifact_ids - existing_artifact_ids
 
-    # 7. Add missing artifacts to default collection.
-    # CollectionArtifact PK is (collection_id, artifact_uuid) — resolve UUID first.
-    migrated_count = 0
+    # 8. Add missing artifacts to default collection.
+    # Resolve UUIDs for all missing artifact IDs, then batch-add via repo.
+    uuids_to_migrate: list[str] = []
     for artifact_id in missing_artifact_ids:
         try:
-            artifact_row = (
-                session.query(Artifact.uuid).filter(Artifact.id == artifact_id).first()
-            )
-            if not artifact_row:
+            artifact_uuid = artifact_repo_ca.resolve_uuid_by_id(artifact_id)
+            if not artifact_uuid:
                 logger.debug(
                     f"Skipping migration for '{artifact_id}': not yet in artifacts cache"
                 )
                 continue
-            new_association = CollectionArtifact(
-                collection_id=DEFAULT_COLLECTION_ID,
-                artifact_uuid=artifact_row[0],
-                added_at=datetime.utcnow(),
-            )
-            session.add(new_association)
-            migrated_count += 1
+            uuids_to_migrate.append(artifact_uuid)
         except Exception as e:
-            logger.warning(
-                f"Failed to add artifact '{artifact_id}' to default collection: {e}"
-            )
+            logger.warning(f"Failed to resolve UUID for '{artifact_id}': {e}")
             continue
 
-    if migrated_count > 0:
-        session.commit()
-        logger.info(f"Migrated {migrated_count} artifacts to default collection")
+    migrated_count = 0
+    if uuids_to_migrate:
+        try:
+            artifact_repo_ca.add_artifacts(DEFAULT_COLLECTION_ID, uuids_to_migrate)
+            migrated_count = len(uuids_to_migrate)
+            logger.info(f"Migrated {migrated_count} artifacts to default collection")
+        except Exception as e:
+            logger.warning(f"Failed to batch-add artifacts to default collection: {e}")
 
-    # 8. Sync tags from CollectionArtifact cache to Tag ORM tables
-    tag_sync_count = _sync_all_tags_to_orm(session)
+    # 9. Sync tags from CollectionArtifact cache to Tag ORM tables.
+    tag_sync_count = _sync_all_tags_to_orm(artifact_repo=artifact_repo_ca)
 
-    # 9. FS → DB Recovery: restore tag definitions and groups from collection.toml
+    # 10. FS → DB Recovery: restore tag definitions and groups from collection.toml
     # This runs AFTER artifacts are populated so that group member resolution works.
     recovery_stats = _recover_default_collection_metadata(session, collection_mgr)
 
-    # 10. Return combined stats including metadata cache results
+    # 11. Return combined stats including metadata cache results
     return {
         "migrated_count": migrated_count,
         "already_present_count": len(existing_artifact_ids),
@@ -442,12 +446,20 @@ def migrate_artifacts_to_default_collection(
     }
 
 
-def _sync_all_tags_to_orm(session: Session) -> int:
+def _sync_all_tags_to_orm(
+    artifact_repo: Optional[IDbCollectionArtifactRepository] = None,
+) -> int:
     """Sync all CollectionArtifact tags to the Tag ORM tables.
 
     Iterates all CollectionArtifact rows with tags_json and calls
     TagService.sync_artifact_tags() for each. Tag sync failure does
     NOT block the caller.
+
+    Args:
+        artifact_repo: Optional injected IDbCollectionArtifactRepository.
+            When provided, uses list_all_with_tags() to retrieve tagged
+            artifacts across all collections.  When None, a fresh
+            DbCollectionArtifactRepository is constructed internally.
 
     Returns:
         Number of artifacts successfully synced.
@@ -460,28 +472,53 @@ def _sync_all_tags_to_orm(session: Session) -> int:
         logger.warning(f"Failed to initialize TagService for bulk tag sync: {e}")
         return 0
 
-    all_cas = (
-        session.query(CollectionArtifact)
-        .filter(CollectionArtifact.tags_json.isnot(None))
-        .all()
-    )
+    # Resolve repository; fall back to constructing one if not injected.
+    if artifact_repo is None:
+        from skillmeat.cache.repositories import (
+            DbCollectionArtifactRepository as _CaRepo,
+        )
+
+        artifact_repo = _CaRepo()
+
+    try:
+        all_cas = artifact_repo.list_all_with_tags()
+    except Exception as e:
+        logger.warning(
+            f"_sync_all_tags_to_orm: list_all_with_tags() failed ({e}); "
+            "skipping tag sync"
+        )
+        return 0
 
     synced = 0
     for ca in all_cas:
         try:
-            tags = json.loads(ca.tags_json)
+            artifact_uuid = getattr(ca, "artifact_uuid", None)
+            if not artifact_uuid:
+                continue
+
+            # DTOs expose a pre-parsed ``tags`` list.
+            tags: list
+            if hasattr(ca, "tags") and isinstance(getattr(ca, "tags"), list):
+                tags = ca.tags
+            else:
+                tags_json_val = getattr(ca, "tags_json", None)
+                if not tags_json_val:
+                    continue
+                tags = json.loads(tags_json_val)
+
             if tags:
-                tag_service.sync_artifact_tags(ca.artifact_uuid, tags)
+                tag_service.sync_artifact_tags(artifact_uuid, tags)
                 synced += 1
         except Exception as e:
-            logger.warning(f"Tag ORM sync failed for {ca.artifact_uuid}: {e}")
+            artifact_uuid_str = getattr(ca, "artifact_uuid", "<unknown>")
+            logger.warning(f"Tag ORM sync failed for {artifact_uuid_str}: {e}")
 
-    logger.info(f"Synced tags for {synced}/{len(all_cas)} artifacts to Tag ORM")
+    logger.info(f"Synced tags for {synced} artifacts to Tag ORM")
     return synced
 
 
 def _recover_default_collection_metadata(
-    session: Session,
+    session,
     collection_mgr,
 ) -> dict:
     """Trigger FS → DB recovery for the default (active) collection.
@@ -492,7 +529,9 @@ def _recover_default_collection_metadata(
     Non-fatal: any errors are logged and an empty stats dict returned.
 
     Args:
-        session: Active SQLAlchemy session.
+        session: Active SQLAlchemy session (may be None; a fresh session is
+            obtained internally in that case via
+            ``skillmeat.cache.models.get_session``).
         collection_mgr: CollectionManager used to resolve the collection path.
 
     Returns:
@@ -502,6 +541,12 @@ def _recover_default_collection_metadata(
         from skillmeat.api.services.artifact_cache_service import (
             recover_collection_metadata,
         )
+
+        # Lazily obtain a session when the caller does not supply one
+        if session is None:
+            from skillmeat.cache.models import get_session as _get_session
+
+            session = _get_session()
 
         active_name = collection_mgr.get_active_collection_name()
         collection_path = collection_mgr.config.get_collection_path(active_name)
@@ -531,16 +576,16 @@ def _recover_default_collection_metadata(
             )
         return stats
     except Exception as exc:
-        logger.warning(
-            "_recover_default_collection_metadata: recovery failed: %s", exc
-        )
+        logger.warning("_recover_default_collection_metadata: recovery failed: %s", exc)
         return {}
 
 
 def populate_collection_artifact_metadata(
-    session: Session,
     artifact_mgr,
     collection_mgr,
+    collection_repo: Optional[IDbUserCollectionRepository] = None,
+    artifact_repo_ca: Optional[IDbCollectionArtifactRepository] = None,
+    project_repo: Optional[IProjectRepository] = None,
 ) -> dict:
     """Populate CollectionArtifact metadata cache from file-based artifacts.
 
@@ -549,12 +594,20 @@ def populate_collection_artifact_metadata(
     /collection page to render artifact cards without N file reads.
 
     Args:
-        session: Database session
         artifact_mgr: ArtifactManager for listing and reading artifacts
         collection_mgr: CollectionManager for collection access
+        collection_repo: Optional injected IDbUserCollectionRepository.
+            Falls back to constructing DbUserCollectionRepository() if None.
+        artifact_repo_ca: Optional injected IDbCollectionArtifactRepository.
+            When provided, used for upsert_metadata() calls.
+            Falls back to constructing DbCollectionArtifactRepository() if None.
+        project_repo: Optional injected IProjectRepository used to list
+            project paths for deployment scanning.  Falls back to
+            constructing DbProjectRepository() if None.
 
     Returns:
         dict with stats: created_count, updated_count, skipped_count, errors
+
     """
     import json
     import time
@@ -567,8 +620,21 @@ def populate_collection_artifact_metadata(
     skipped_count = 0
     errors = []
 
-    # Ensure default collection exists
-    ensure_default_collection(session)
+    # Ensure default collection exists (prefer injected repo)
+    if collection_repo is None:
+        from skillmeat.cache.repositories import DbUserCollectionRepository as _CollRepo
+
+        collection_repo = _CollRepo()
+
+    ensure_default_collection(collection_repo)
+
+    # Ensure artifact_repo_ca is available for upsert_metadata calls
+    if artifact_repo_ca is None:
+        from skillmeat.cache.repositories import (
+            DbCollectionArtifactRepository as _CaRepo2,
+        )
+
+        artifact_repo_ca = _CaRepo2()
 
     # Iterate all file-based collections
     for coll_name in collection_mgr.list_collections():
@@ -610,68 +676,41 @@ def populate_collection_artifact_metadata(
                 resolved_sha = getattr(artifact, "resolved_sha", None)
                 resolved_version = getattr(artifact, "resolved_version", None)
 
-                # Resolve artifact_id → artifact_uuid via the Artifact table.
+                # Resolve artifact_id → artifact_uuid via the repository.
                 # CollectionArtifact PK is (collection_id, artifact_uuid) since
                 # the CAI-P5-01 migration; filter_by(artifact_id=) is no longer valid.
-                artifact_uuid_row = (
-                    session.query(Artifact.uuid)
-                    .filter(Artifact.id == artifact_id)
-                    .first()
-                )
-                if not artifact_uuid_row:
+                artifact_uuid_val = artifact_repo_ca.resolve_uuid_by_id(artifact_id)
+                if not artifact_uuid_val:
                     # Artifact not yet in the DB cache — skip for now
                     logger.debug(
                         f"Skipping metadata populate for '{artifact_id}': "
                         "not yet in artifacts cache"
                     )
                     continue
-                artifact_uuid_val = artifact_uuid_row[0]
 
-                # Check if CollectionArtifact exists for default collection
-                existing = (
-                    session.query(CollectionArtifact)
-                    .filter_by(
-                        collection_id=DEFAULT_COLLECTION_ID,
-                        artifact_uuid=artifact_uuid_val,
-                    )
-                    .first()
+                # Determine if this is a create or update for stats tracking.
+                existing = artifact_repo_ca.get_by_pk(
+                    DEFAULT_COLLECTION_ID, artifact_uuid_val
+                )
+
+                # Upsert via repository (handles both create and update internally).
+                artifact_repo_ca.upsert_metadata(
+                    DEFAULT_COLLECTION_ID,
+                    artifact_uuid_val,
+                    description=description,
+                    author=author,
+                    license=license_val,
+                    tags=json.loads(tags_json) if tags_json else [],
+                    tools=json.loads(tools_json) if tools_json else [],
+                    source=source,
+                    origin=origin,
+                    resolved_sha=resolved_sha,
+                    resolved_version=resolved_version,
                 )
 
                 if existing:
-                    # Update existing row
-                    existing.description = description
-                    existing.author = author
-                    existing.license = license_val
-                    existing.tags_json = tags_json
-                    existing.tools_json = tools_json
-                    existing.version = version
-                    existing.source = source
-                    existing.origin = origin
-                    existing.origin_source = origin_source
-                    existing.resolved_sha = resolved_sha
-                    existing.resolved_version = resolved_version
-                    existing.synced_at = datetime.utcnow()
                     updated_count += 1
                 else:
-                    # Create new row
-                    new_association = CollectionArtifact(
-                        collection_id=DEFAULT_COLLECTION_ID,
-                        artifact_uuid=artifact_uuid_val,
-                        added_at=datetime.utcnow(),
-                        description=description,
-                        author=author,
-                        license=license_val,
-                        tags_json=tags_json,
-                        tools_json=tools_json,
-                        version=version,
-                        source=source,
-                        origin=origin,
-                        origin_source=origin_source,
-                        resolved_sha=resolved_sha,
-                        resolved_version=resolved_version,
-                        synced_at=datetime.utcnow(),
-                    )
-                    session.add(new_association)
                     created_count += 1
 
             except Exception as e:
@@ -688,22 +727,38 @@ def populate_collection_artifact_metadata(
     try:
         import os
         from pathlib import Path
-        from sqlalchemy import update, and_
         from skillmeat.core.deployment import DeploymentManager
 
         deployment_mgr = DeploymentManager()
 
-        # Get all known projects from DB cache
-        all_projects = session.query(Project).all()
+        # Build project_paths: prefer injected repo, fall back to direct DB query
         project_paths = []
-        for proj in all_projects:
-            proj_path = Path(proj.path)
-            if proj_path.exists():
-                project_paths.append((proj.name, proj_path))
-            else:
-                logger.debug(
-                    f"Skipping project '{proj.name}' — path does not exist: {proj.path}"
-                )
+        if project_repo is not None:
+            for proj_dto in project_repo.list():
+                proj_path = Path(proj_dto.path)
+                if proj_path.exists():
+                    project_paths.append((proj_dto.name, proj_path))
+                else:
+                    logger.debug(
+                        f"Skipping project '{proj_dto.name}' — path does not exist: {proj_dto.path}"
+                    )
+        else:
+            # Fallback: query Project table directly (no path_resolver needed)
+            from skillmeat.cache.models import get_session as _get_db_session
+
+            _db_sess = _get_db_session()
+            try:
+                _proj_rows: list[Project] = _db_sess.query(Project).all()
+            finally:
+                _db_sess.close()
+            for _row in _proj_rows:
+                _proj_path = Path(_row.path)
+                if _proj_path.exists():
+                    project_paths.append((_row.name, _proj_path))
+                else:
+                    logger.debug(
+                        f"Skipping project '{_row.name}' — path does not exist: {_row.path}"
+                    )
 
         # Fallback: if no projects in DB, at least scan cwd
         if not project_paths:
@@ -735,11 +790,7 @@ def populate_collection_artifact_metadata(
 
                 deployments_by_artifact[artifact_name].append(
                     {
-                        "project_path": (
-                            str(deployment.project_path)
-                            if hasattr(deployment, "project_path")
-                            else str(project_path)
-                        ),
+                        "project_path": str(project_path),
                         "project_name": project_name,
                         "deployed_at": (
                             deployment.deployed_at.isoformat()
@@ -749,30 +800,15 @@ def populate_collection_artifact_metadata(
                     }
                 )
 
-        # Update cache entries with deployment data.
-        # CollectionArtifact now uses artifact_uuid FK; resolve via Artifact.name
-        # (suffix of the type:name id, e.g. "skill:canvas" → name="canvas").
+        # Update cache entries with deployment data via repository DI.
         deployment_update_count = 0
         for artifact_name, deployments_list in deployments_by_artifact.items():
-            # Find artifact UUIDs whose name matches (may cover multiple types)
-            matching_uuids = (
-                session.query(Artifact.uuid)
-                .filter(Artifact.name == artifact_name)
-                .all()
+            updated = artifact_repo_ca.update_deployments_by_name(
+                DEFAULT_COLLECTION_ID,
+                artifact_name,
+                json.dumps(deployments_list),
             )
-            for (artifact_uuid,) in matching_uuids:
-                stmt = (
-                    update(CollectionArtifact)
-                    .where(
-                        and_(
-                            CollectionArtifact.collection_id == DEFAULT_COLLECTION_ID,
-                            CollectionArtifact.artifact_uuid == artifact_uuid,
-                        )
-                    )
-                    .values(deployments_json=json.dumps(deployments_list))
-                )
-                result = session.execute(stmt)
-                deployment_update_count += result.rowcount
+            deployment_update_count += updated
 
         if deployment_update_count > 0:
             logger.info(
@@ -784,20 +820,13 @@ def populate_collection_artifact_metadata(
         logger.warning(f"Failed to populate deployment data: {e}")
         # Non-fatal: cache still works without deployment data
 
-    # Batch commit after all artifacts processed
-    try:
-        session.commit()
-        duration = time.time() - start_time
-        logger.info(
-            f"CollectionArtifact metadata cache: created={created_count}, "
-            f"updated={updated_count}, skipped={skipped_count}, errors={len(errors)}"
-        )
-        logger.info(f"Metadata cache population completed in {duration:.2f}s")
-    except Exception as e:
-        session.rollback()
-        error_msg = f"Failed to commit metadata updates: {e}"
-        logger.error(error_msg)
-        errors.append(error_msg)
+    # All writes were committed by the repository methods; no explicit flush needed.
+    duration = time.time() - start_time
+    logger.info(
+        f"CollectionArtifact metadata cache: created={created_count}, "
+        f"updated={updated_count}, skipped={skipped_count}, errors={len(errors)}"
+    )
+    logger.info(f"Metadata cache population completed in {duration:.2f}s")
 
     return {
         "created_count": created_count,
@@ -826,9 +855,11 @@ def populate_collection_artifact_metadata(
     },
 )
 async def migrate_to_default_collection(
-    session: DbSessionDep,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
+    project_repo: ProjectRepoDep,
     token: TokenDep,
 ) -> dict:
     """Migrate all artifacts to the default collection.
@@ -838,9 +869,11 @@ async def migrate_to_default_collection(
     Groups and other collection features.
 
     Args:
-        session: Database session
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
+        collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
+        project_repo: Project repository for deployment scanning (injected)
         token: Authentication token
 
     Returns:
@@ -852,9 +885,11 @@ async def migrate_to_default_collection(
     """
     try:
         result = migrate_artifacts_to_default_collection(
-            session=session,
             artifact_mgr=artifact_mgr,
             collection_mgr=collection_mgr,
+            collection_repo=collection_repo,
+            artifact_repo_ca=artifact_repo_ca,
+            project_repo=project_repo,
         )
 
         logger.info(
@@ -881,9 +916,9 @@ async def migrate_to_default_collection(
 
 
 def _refresh_single_collection_cache(
-    session: Session,
-    collection: Collection,
+    collection_id: str,
     artifact_mgr,
+    artifact_repo_ca: IDbCollectionArtifactRepository,
 ) -> dict:
     """Refresh CollectionArtifact metadata cache for a single DB collection.
 
@@ -891,9 +926,10 @@ def _refresh_single_collection_cache(
     and batch refresh endpoints.
 
     Args:
-        session: Database session
-        collection: Collection ORM instance to refresh
-        artifact_mgr: ArtifactManager for reading file-based artifacts
+        collection_id: ID of the collection to refresh.
+        artifact_mgr: ArtifactManager for reading file-based artifacts.
+        artifact_repo_ca: DB collection artifact repository for reads and
+            bulk metadata updates.
 
     Returns:
         dict with stats:
@@ -901,6 +937,7 @@ def _refresh_single_collection_cache(
             - updated: int (artifacts updated)
             - skipped: int (artifacts skipped/unchanged)
             - errors: list of error strings
+
     """
     updated = 0
     skipped = 0
@@ -914,35 +951,29 @@ def _refresh_single_collection_cache(
         logger.warning(f"Failed to initialize TagService for tag sync: {e}")
         tag_service = None
 
-    logger.debug(f"Refreshing cache for collection '{collection.id}'")
+    logger.debug(f"Refreshing cache for collection '{collection_id}'")
 
-    # Get all CollectionArtifact rows for this collection
-    collection_artifacts = (
-        session.query(CollectionArtifact).filter_by(collection_id=collection.id).all()
-    )
+    # Get all CollectionArtifact DTOs for this collection via repository DI.
+    ca_dtos = artifact_repo_ca.list_by_collection(collection_id, limit=100_000)
 
-    if not collection_artifacts:
-        logger.debug(f"Collection '{collection.id}' has no artifacts to refresh")
+    if not ca_dtos:
+        logger.debug(f"Collection '{collection_id}' has no artifacts to refresh")
         return {
-            "collection_id": collection.id,
+            "collection_id": collection_id,
             "updated": 0,
             "skipped": 0,
             "errors": [],
         }
 
-    # Batch-resolve artifact_uuid → type:name id to avoid N+1 lazy loads.
-    ca_uuids = [ca.artifact_uuid for ca in collection_artifacts]
-    ca_uuid_to_id: dict[str, str] = {}
-    if ca_uuids:
-        id_rows = (
-            session.query(Artifact.uuid, Artifact.id)
-            .filter(Artifact.uuid.in_(ca_uuids))
-            .all()
-        )
-        ca_uuid_to_id = {r[0]: r[1] for r in id_rows}
+    # Batch-resolve artifact_uuid → type:name id via repository DI.
+    ca_uuids = [ca.artifact_uuid for ca in ca_dtos]
+    ca_uuid_to_id = artifact_repo_ca.resolve_uuid_to_id_batch(ca_uuids)
 
-    # Process each CollectionArtifact
-    for ca in collection_artifacts:
+    # Build bulk-update list — collect updates then commit in one call.
+    bulk_updates: list[dict] = []
+
+    # Process each CollectionArtifact DTO
+    for ca in ca_dtos:
         try:
             ca_artifact_id = ca_uuid_to_id.get(ca.artifact_uuid, "")
             # Parse artifact_id (format: "type:name")
@@ -967,6 +998,7 @@ def _refresh_single_collection_cache(
                 file_artifact = artifact_mgr.show(
                     artifact_name=artifact_name,
                     artifact_type=artifact_type_enum,
+                    collection_name=collection_id,
                 )
             except Exception as e:
                 logger.debug(f"File-based lookup failed for {ca_artifact_id}: {e}")
@@ -999,19 +1031,24 @@ def _refresh_single_collection_cache(
             resolved_sha = getattr(file_artifact, "resolved_sha", None)
             resolved_version = getattr(file_artifact, "resolved_version", None)
 
-            # Update CollectionArtifact row
-            ca.description = description
-            ca.author = author
-            ca.license = license_val
-            ca.tags_json = tags_json
-            ca.tools_json = tools_json
-            ca.version = version
-            ca.source = source
-            ca.origin = origin
-            ca.origin_source = origin_source
-            ca.resolved_sha = resolved_sha
-            ca.resolved_version = resolved_version
-            ca.synced_at = datetime.utcnow()
+            # Stage update for bulk commit via repository DI
+            bulk_updates.append(
+                {
+                    "artifact_uuid": ca.artifact_uuid,
+                    "description": description,
+                    "author": author,
+                    "license": license_val,
+                    "tags_json": tags_json,
+                    "tools_json": tools_json,
+                    "version": version,
+                    "source": source,
+                    "origin": origin,
+                    "origin_source": origin_source,
+                    "resolved_sha": resolved_sha,
+                    "resolved_version": resolved_version,
+                    "synced_at": datetime.utcnow(),
+                }
+            )
             updated += 1
 
             # Sync tags to ORM
@@ -1027,8 +1064,12 @@ def _refresh_single_collection_cache(
             errors.append(error_msg)
             skipped += 1
 
+    # Commit all metadata updates in a single repository call
+    if bulk_updates:
+        artifact_repo_ca.bulk_update_metadata(bulk_updates)
+
     return {
-        "collection_id": collection.id,
+        "collection_id": collection_id,
         "updated": updated,
         "skipped": skipped,
         "errors": errors,
@@ -1055,7 +1096,8 @@ def _refresh_single_collection_cache(
 async def refresh_all_collections_cache(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     token: TokenDep,
 ) -> dict:
     """Refresh CollectionArtifact metadata cache across all DB collections.
@@ -1066,7 +1108,8 @@ async def refresh_all_collections_cache(
     Args:
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
-        session: Database session
+        collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
         token: Authentication token
 
     Returns:
@@ -1085,12 +1128,12 @@ async def refresh_all_collections_cache(
     logger.info("Starting batch cache refresh for all collections")
 
     try:
-        # Query all Collection rows from database
-        all_collections = session.query(Collection).all()
-        logger.info(f"Found {len(all_collections)} collections to refresh")
+        # List all collections via repository DI.
+        all_collection_dtos = collection_repo.list(limit=10_000, offset=0)
+        logger.info(f"Found {len(all_collection_dtos)} collections to refresh")
 
         # Handle empty database gracefully
-        if not all_collections:
+        if not all_collection_dtos:
             logger.info("No collections found in database, cache refresh skipped")
             return {
                 "success": True,
@@ -1106,13 +1149,13 @@ async def refresh_all_collections_cache(
         total_skipped = 0
         errors = []
 
-        # Process each collection
-        for collection in all_collections:
+        # Process each collection using repository DI throughout.
+        for dto in all_collection_dtos:
             try:
                 result = _refresh_single_collection_cache(
-                    session=session,
-                    collection=collection,
+                    collection_id=dto.id,
                     artifact_mgr=artifact_mgr,
+                    artifact_repo_ca=artifact_repo_ca,
                 )
 
                 collections_refreshed += 1
@@ -1122,28 +1165,25 @@ async def refresh_all_collections_cache(
                 if result["errors"]:
                     errors.append(
                         {
-                            "collection_id": collection.id,
+                            "collection_id": dto.id,
                             "errors": result["errors"],
                         }
                     )
 
                 logger.debug(
-                    f"Collection '{collection.id}': updated={result['updated']}, "
+                    f"Collection '{dto.id}': updated={result['updated']}, "
                     f"skipped={result['skipped']}"
                 )
 
             except Exception as e:
-                error_msg = f"Failed to refresh collection '{collection.id}': {e}"
+                error_msg = f"Failed to refresh collection '{dto.id}': {e}"
                 logger.warning(error_msg)
                 errors.append(
                     {
-                        "collection_id": collection.id,
+                        "collection_id": dto.id,
                         "errors": [str(e)],
                     }
                 )
-
-        # Commit all changes
-        session.commit()
 
         duration = time.time() - start_time
         logger.info(
@@ -1162,7 +1202,6 @@ async def refresh_all_collections_cache(
         }
 
     except Exception as e:
-        session.rollback()
         logger.error(f"Batch cache refresh failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1190,7 +1229,7 @@ async def refresh_all_collections_cache(
     },
 )
 async def list_user_collections(
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
     limit: int = Query(
         default=20,
@@ -1214,7 +1253,7 @@ async def list_user_collections(
     """List all user collections with cursor-based pagination.
 
     Args:
-        session: Database session
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
         limit: Number of items per page
         after: Cursor for next page
@@ -1233,27 +1272,31 @@ async def list_user_collections(
             f"type={collection_type})"
         )
 
-        # Build base query
-        query = session.query(Collection).order_by(Collection.id)
+        # Fetch all collections via repository (large limit to support cursor pagination).
+        # The repo list() does not support name search or order-by-id natively, so we
+        # fetch a large batch and filter/sort in Python.  For realistic collection counts
+        # (<<10k) this is acceptable; a dedicated search method can replace this later.
+        all_dtos = collection_repo.list(
+            collection_type=collection_type,
+            limit=10000,
+            offset=0,
+        )
 
-        # Apply search filter if provided
+        # Apply case-insensitive name search if provided
         if search:
-            query = query.filter(Collection.name.ilike(f"%{search}%"))
+            search_lower = search.lower()
+            all_dtos = [d for d in all_dtos if search_lower in d.name.lower()]
 
-        # Apply collection_type filter if provided
-        if collection_type:
-            query = query.filter(Collection.collection_type == collection_type)
-
-        # Get all matching collections (for pagination)
-        all_collections = query.all()
+        # Sort by id to provide stable cursor-based pagination
+        all_dtos.sort(key=lambda d: d.id)
 
         # Decode cursor if provided
         start_idx = 0
         if after:
             cursor_value = decode_cursor(after)
             try:
-                collection_ids = [c.id for c in all_collections]
-                start_idx = collection_ids.index(cursor_value) + 1
+                dto_ids = [d.id for d in all_dtos]
+                start_idx = dto_ids.index(cursor_value) + 1
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -1262,31 +1305,26 @@ async def list_user_collections(
 
         # Paginate
         end_idx = start_idx + limit
-        page_collections = all_collections[start_idx:end_idx]
+        page_dtos = all_dtos[start_idx:end_idx]
 
         # Convert to response format
         items: List[UserCollectionResponse] = [
-            collection_to_response(collection, session)
-            for collection in page_collections
+            collection_to_response(dto, collection_repo) for dto in page_dtos
         ]
 
         # Build pagination info
-        has_next = end_idx < len(all_collections)
+        has_next = end_idx < len(all_dtos)
         has_previous = start_idx > 0
 
-        start_cursor = (
-            encode_cursor(page_collections[0].id) if page_collections else None
-        )
-        end_cursor = (
-            encode_cursor(page_collections[-1].id) if page_collections else None
-        )
+        start_cursor = encode_cursor(page_dtos[0].id) if page_dtos else None
+        end_cursor = encode_cursor(page_dtos[-1].id) if page_dtos else None
 
         page_info = PageInfo(
             has_next_page=has_next,
             has_previous_page=has_previous,
             start_cursor=start_cursor,
             end_cursor=end_cursor,
-            total_count=len(all_collections),
+            total_count=len(all_dtos),
         )
 
         logger.info(f"Retrieved {len(items)} user collections")
@@ -1317,14 +1355,14 @@ async def list_user_collections(
 )
 async def create_user_collection(
     request: UserCollectionCreateRequest,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
 ) -> UserCollectionResponse:
     """Create a new user collection.
 
     Args:
         request: Collection creation request
-        session: Database session
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
 
     Returns:
@@ -1336,38 +1374,28 @@ async def create_user_collection(
     try:
         logger.info(f"Creating user collection: {request.name}")
 
-        # Check if name already exists
-        existing = session.query(Collection).filter_by(name=request.name).first()
-        if existing:
+        # Delegate to repository — raises ValueError on duplicate name
+        try:
+            collection_dto = collection_repo.create(
+                name=request.name,
+                description=request.description,
+                collection_type=request.collection_type,
+                context_category=request.context_category,
+                created_by=None,  # TODO: Set from authentication context
+            )
+        except ValueError as exc:
             logger.warning(f"Collection name already exists: {request.name}")
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Collection with name '{request.name}' already exists",
-            )
+            ) from exc
 
-        # Create new collection
-        collection_id = uuid.uuid4().hex
-        collection = Collection(
-            id=collection_id,
-            name=request.name,
-            description=request.description,
-            collection_type=request.collection_type,
-            context_category=request.context_category,
-            created_by=None,  # TODO: Set from authentication context
-        )
-
-        session.add(collection)
-        session.commit()
-        session.refresh(collection)
-
-        logger.info(f"Created user collection: {collection_id} ({request.name})")
-        return collection_to_response(collection, session)
+        logger.info(f"Created user collection: {collection_dto.id} ({request.name})")
+        return collection_to_response(collection_dto, collection_repo)
 
     except HTTPException:
-        session.rollback()
         raise
     except Exception as e:
-        session.rollback()
         logger.error(f"Error creating user collection: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1388,14 +1416,16 @@ async def create_user_collection(
 )
 async def get_user_collection(
     collection_id: str,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
+    group_repo: GroupRepoDep,
     token: TokenDep,
 ) -> UserCollectionWithGroupsResponse:
     """Get details for a specific user collection.
 
     Args:
         collection_id: Collection identifier
-        session: Database session
+        collection_repo: DB user collection repository (injected)
+        group_repo: Group repository (injected)
         token: Authentication token
 
     Returns:
@@ -1407,16 +1437,17 @@ async def get_user_collection(
     try:
         logger.info(f"Getting user collection: {collection_id}")
 
-        # Fetch collection
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        collection_dto = collection_repo.get_by_id(collection_id)
+        if not collection_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        return collection_to_response_with_groups(collection, session)
+        return collection_to_response_with_groups(
+            collection_dto, collection_repo, group_repo
+        )
 
     except HTTPException:
         raise
@@ -1446,7 +1477,7 @@ async def get_user_collection(
 async def update_user_collection(
     collection_id: str,
     request: UserCollectionUpdateRequest,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
 ) -> UserCollectionResponse:
     """Update a user collection.
@@ -1454,7 +1485,7 @@ async def update_user_collection(
     Args:
         collection_id: Collection identifier
         request: Update request with fields to modify
-        session: Database session
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
 
     Returns:
@@ -1478,49 +1509,56 @@ async def update_user_collection(
                 detail="At least one update parameter must be provided",
             )
 
-        # Fetch collection
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        # Verify the collection exists before attempting update
+        existing_dto = collection_repo.get_by_id(collection_id)
+        if not existing_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        # Check name uniqueness if changing name
-        if request.name is not None and request.name != collection.name:
-            existing = session.query(Collection).filter_by(name=request.name).first()
-            if existing:
+        # Check name uniqueness if changing name — the repo.update() will raise
+        # KeyError on missing and RuntimeError on DB errors; name conflicts may
+        # surface as RuntimeError wrapping an IntegrityError.  We do a pre-check
+        # here to return a 409 with a clear message before delegating to the repo.
+        if request.name is not None and request.name != existing_dto.name:
+            all_dtos = collection_repo.list(limit=10000)
+            name_taken = any(
+                d.id != collection_id and d.name == request.name for d in all_dtos
+            )
+            if name_taken:
                 logger.warning(f"Collection name already exists: {request.name}")
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Collection with name '{request.name}' already exists",
                 )
-            collection.name = request.name
 
-        # Update description if provided
+        # Build kwargs for partial update
+        update_kwargs: dict = {}
+        if request.name is not None:
+            update_kwargs["name"] = request.name
         if request.description is not None:
-            collection.description = request.description
-
-        # Update collection_type if provided
+            update_kwargs["description"] = request.description
         if request.collection_type is not None:
-            collection.collection_type = request.collection_type
-
-        # Update context_category if provided
+            update_kwargs["collection_type"] = request.collection_type
         if request.context_category is not None:
-            collection.context_category = request.context_category
+            update_kwargs["context_category"] = request.context_category
 
-        session.commit()
-        session.refresh(collection)
+        try:
+            updated_dto = collection_repo.update(collection_id, **update_kwargs)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_id}' not found",
+            ) from exc
 
         logger.info(f"Updated user collection: {collection_id}")
-        return collection_to_response(collection, session)
+        return collection_to_response(updated_dto, collection_repo)
 
     except HTTPException:
-        session.rollback()
         raise
     except Exception as e:
-        session.rollback()
         logger.error(
             f"Error updating user collection '{collection_id}': {e}", exc_info=True
         )
@@ -1543,14 +1581,14 @@ async def update_user_collection(
 )
 async def delete_user_collection(
     collection_id: str,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
 ) -> None:
     """Delete a user collection.
 
     Args:
         collection_id: Collection identifier
-        session: Database session
+        collection_repo: DB user collection repository (injected)
         token: Authentication token
 
     Raises:
@@ -1562,17 +1600,13 @@ async def delete_user_collection(
     try:
         logger.info(f"Deleting user collection: {collection_id}")
 
-        # Fetch collection
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        deleted = collection_repo.delete(collection_id)
+        if not deleted:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
-
-        session.delete(collection)
-        session.commit()
 
         # Invalidate cache for deleted collection
         cache = get_collection_count_cache()
@@ -1581,10 +1615,8 @@ async def delete_user_collection(
         logger.info(f"Deleted user collection: {collection_id}")
 
     except HTTPException:
-        session.rollback()
         raise
     except Exception as e:
-        session.rollback()
         logger.error(
             f"Error deleting user collection '{collection_id}': {e}", exc_info=True
         )
@@ -1607,8 +1639,9 @@ async def delete_user_collection(
 )
 async def list_collection_artifacts(
     collection_id: str,
-    session: DbSessionDep,
     artifact_mgr: ArtifactManagerDep,
+    collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     token: TokenDep,
     limit: int = Query(default=20, ge=1, le=100),
     after: Optional[str] = Query(default=None),
@@ -1628,7 +1661,9 @@ async def list_collection_artifacts(
 
     Args:
         collection_id: Collection identifier
-        session: Database session
+        artifact_mgr: Artifact manager for filesystem metadata fallback
+        collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
         token: Authentication token
         limit: Number of items per page
         after: Cursor for next page
@@ -1650,56 +1685,30 @@ async def list_collection_artifacts(
             f"group_id={group_id}, include_groups={include_groups})"
         )
 
-        # Verify collection exists
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        # Verify collection exists via repository DI
+        collection_dto = collection_repo.get_by_id(collection_id)
+        if not collection_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        # Build query for collection artifacts.
-        # CollectionArtifact uses artifact_uuid FK; join Artifact for ordering
-        # by the stable type:name id string (Artifact.id).
-        query = (
-            session.query(CollectionArtifact)
-            .join(Artifact, Artifact.uuid == CollectionArtifact.artifact_uuid)
-            .filter(CollectionArtifact.collection_id == collection_id)
-            .order_by(Artifact.id)
-        )
-
-        # Get all matching artifact associations
-        all_associations = query.all()
+        # Fetch all memberships ordered by artifact type:name ID via repository DI.
+        all_associations = artifact_repo_ca.list_all_ordered(collection_id)
 
         # Filter by group membership if group_id is provided
         if group_id:
-            # Get artifact UUIDs that belong to the specified group, then resolve
-            # to type:name ids for comparison with CollectionArtifact instances.
-            group_artifact_uuids = {
-                ga.artifact_uuid
-                for ga in session.query(GroupArtifact)
-                .filter_by(group_id=group_id)
-                .all()
-            }
-            # Filter associations to only those in the group
+            group_artifact_uuids = artifact_repo_ca.get_group_artifact_uuids(group_id)
             all_associations = [
                 assoc
                 for assoc in all_associations
                 if assoc.artifact_uuid in group_artifact_uuids
             ]
 
-        # Build a UUID → artifact_id map for all associations (needed for filtering
-        # and cursor operations before the page slice is known).
+        # Batch-resolve artifact_uuid → type:name id for all associations.
         all_uuids = [a.artifact_uuid for a in all_associations]
-        all_uuid_to_id: dict[str, str] = {}
-        if all_uuids:
-            id_rows = (
-                session.query(Artifact.uuid, Artifact.id)
-                .filter(Artifact.uuid.in_(all_uuids))
-                .all()
-            )
-            all_uuid_to_id = {r[0]: r[1] for r in id_rows}
+        all_uuid_to_id = artifact_repo_ca.resolve_uuid_to_id_batch(all_uuids)
 
         # Filter by artifact type BEFORE cursor pagination.
         # This keeps page boundaries and total_count consistent with the selected tab.
@@ -1731,73 +1740,46 @@ async def list_collection_artifacts(
         end_idx = start_idx + limit
         page_associations = all_associations[start_idx:end_idx]
 
-        # Batch fetch sources from DB (avoids N+1 queries).
-        # CollectionArtifact uses artifact_uuid FK; join Artifact to map
-        # type:name ids → source values in a single query.
+        # Batch fetch sources from DB via repository DI (avoids N+1 queries).
         source_lookup: dict[str, str] = {}
         if page_associations:
             page_artifact_uuids = [assoc.artifact_uuid for assoc in page_associations]
-            db_sources = (
-                session.query(
-                    Artifact.id,
-                    CollectionArtifact.source,
-                )
-                .join(CollectionArtifact, CollectionArtifact.artifact_uuid == Artifact.uuid)
-                .filter(CollectionArtifact.artifact_uuid.in_(page_artifact_uuids))
-                .filter(CollectionArtifact.source.isnot(None))
-                .all()
-            )
-            source_lookup = {row[0]: row[1] for row in db_sources}
+            source_lookup = artifact_repo_ca.get_source_for_uuids(page_artifact_uuids)
 
-        # Batch fetch group memberships if requested (avoids N+1 queries)
+        # Batch fetch group memberships if requested via repository DI.
         artifact_groups_map: dict[str, list[ArtifactGroupMembership]] = {}
         if include_groups and page_associations:
             page_artifact_uuids = [assoc.artifact_uuid for assoc in page_associations]
-
-            # Get all groups in this collection
-            collection_group_ids = [g.id for g in collection.groups]
-
-            if collection_group_ids:
-                # Batch query: get all group-artifact associations for page artifacts
-                # within collection's groups.
-                # GroupArtifact uses artifact_uuid FK; join Artifact to resolve
-                # the type:name id for the lookup map key.
-                group_artifacts = (
-                    session.query(GroupArtifact, Group, Artifact)
-                    .join(Group, GroupArtifact.group_id == Group.id)
-                    .join(Artifact, Artifact.uuid == GroupArtifact.artifact_uuid)
-                    .filter(
-                        GroupArtifact.artifact_uuid.in_(page_artifact_uuids),
-                        GroupArtifact.group_id.in_(collection_group_ids),
+            membership_rows = artifact_repo_ca.get_group_memberships_batch(
+                page_artifact_uuids, collection_id
+            )
+            for row in membership_rows:
+                artifact_id = row["artifact_id"]
+                if artifact_id not in artifact_groups_map:
+                    artifact_groups_map[artifact_id] = []
+                artifact_groups_map[artifact_id].append(
+                    ArtifactGroupMembership(
+                        id=row["group_id"],
+                        name=row["group_name"],
+                        position=row["position"],
                     )
-                    .all()
                 )
 
-                # Build lookup map: artifact_id (type:name) -> list of group memberships
-                for ga, group, artifact in group_artifacts:
-                    artifact_id = artifact.id
-                    if artifact_id not in artifact_groups_map:
-                        artifact_groups_map[artifact_id] = []
-                    artifact_groups_map[artifact_id].append(
-                        ArtifactGroupMembership(
-                            id=group.id,
-                            name=group.name,
-                            position=ga.position,
-                        )
-                    )
+        # Build UUID → artifact_id lookup for the page items.
+        # all_uuid_to_id already contains all association UUIDs; re-use it.
+        uuid_to_artifact_id = {
+            uuid: all_uuid_to_id[uuid]
+            for uuid in (a.artifact_uuid for a in page_associations)
+            if uuid in all_uuid_to_id
+        }
 
-        # Build UUID → artifact_id lookup to avoid N+1 queries in the loop below.
-        # CollectionArtifact has an artifact_id property that lazy-loads the Artifact
-        # relationship; batch-resolve here for all page items at once instead.
-        uuid_to_artifact_id: dict[str, str] = {}
-        if page_associations:
-            uuids = [a.artifact_uuid for a in page_associations]
-            rows = (
-                session.query(Artifact.uuid, Artifact.id)
-                .filter(Artifact.uuid.in_(uuids))
-                .all()
-            )
-            uuid_to_artifact_id = {r[0]: r[1] for r in rows}
+        # Acquire a session for legacy helpers that still require one
+        # (_get_artifact_collections, get_artifact_metadata).  These have not
+        # yet been migrated to repository DI; a single shared session per
+        # request is safe here because the helpers are read-only.
+        from skillmeat.cache.models import get_session as _get_session_for_lookup
+
+        _lookup_session = _get_session_for_lookup()
 
         # Fetch artifact metadata for each association
         # Priority: 1. DB cache (if synced_at is set), 2. File system, 3. Marketplace
@@ -1815,13 +1797,9 @@ async def list_collection_artifacts(
 
             # 1. Primary: Try to build from DB cache (check synced_at)
             if assoc.synced_at is not None:
-                # Cache hit - use cached fields from CollectionArtifact
-                tags = None
-                if assoc.tags_json:
-                    try:
-                        tags = json.loads(assoc.tags_json)
-                    except (json.JSONDecodeError, TypeError):
-                        tags = None
+                # Cache hit - use cached fields from CollectionArtifact DTO.
+                # assoc.tags is already a List[str] (parsed from tags_json by DTO).
+                tags = assoc.tags or None
 
                 # Resolve source: DB lookup > filesystem > artifact_id fallback
                 db_source = source_lookup.get(resolved_artifact_id)
@@ -1859,11 +1837,15 @@ async def list_collection_artifacts(
                     description=assoc.description,
                     author=assoc.author,
                     tags=tags,
-                    tools=assoc.tools,
+                    tools=assoc.tools or None,
                     origin=assoc.origin,
                     origin_source=assoc.origin_source,
-                    collections=_get_artifact_collections(session, resolved_artifact_id),
-                    deployments=parse_deployments(assoc.deployments_json),
+                    collections=_get_artifact_collections(
+                        _lookup_session, resolved_artifact_id
+                    ),
+                    deployments=parse_deployments(
+                        json.dumps(assoc.deployments) if assoc.deployments else None
+                    ),
                 )
                 logger.debug(f"Cache hit for {resolved_artifact_id}")
 
@@ -1921,9 +1903,13 @@ async def list_collection_artifacts(
                             origin=getattr(file_artifact, "origin", None),
                             origin_source=getattr(file_artifact, "origin_source", None),
                             collections=_get_artifact_collections(
-                                session, resolved_artifact_id
+                                _lookup_session, resolved_artifact_id
                             ),
-                            deployments=parse_deployments(assoc.deployments_json),
+                            deployments=parse_deployments(
+                                json.dumps(assoc.deployments)
+                                if assoc.deployments
+                                else None
+                            ),
                         )
                         logger.debug(f"File-based lookup for {resolved_artifact_id}")
                 except (ValueError, Exception) as e:
@@ -1934,13 +1920,17 @@ async def list_collection_artifacts(
 
             # 3. Last resort: Fallback to marketplace/database service
             if artifact_summary is None:
-                artifact_summary = get_artifact_metadata(session, resolved_artifact_id)
+                artifact_summary = get_artifact_metadata(
+                    _lookup_session, resolved_artifact_id
+                )
                 logger.debug(f"Marketplace fallback for {resolved_artifact_id}")
 
-            # Add deployments from cache to all artifact summaries
-            # (deployments are always sourced from CollectionArtifact.deployments_json)
+            # Add deployments from cache to all artifact summaries.
+            # assoc.deployments is already a List[str] parsed from deployments_json by DTO.
             if artifact_summary and not artifact_summary.deployments:
-                artifact_summary.deployments = parse_deployments(assoc.deployments_json)
+                artifact_summary.deployments = parse_deployments(
+                    json.dumps(assoc.deployments) if assoc.deployments else None
+                )
 
             if include_groups:
                 # Add groups field to artifact summary while preserving all metadata
@@ -1965,6 +1955,12 @@ async def list_collection_artifacts(
                 )
             else:
                 items.append(artifact_summary)
+
+        # Close the lookup session opened for legacy helper functions above.
+        try:
+            _lookup_session.close()
+        except Exception:
+            pass
 
         # Build pagination info
         has_next = end_idx < len(all_associations)
@@ -2032,7 +2028,10 @@ async def list_collection_artifacts(
 async def add_artifacts_to_collection(
     collection_id: str,
     request: AddArtifactsRequest,
+    collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     session: DbSessionDep,
+    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
 ) -> dict:
     """Add artifacts to a collection.
@@ -2040,7 +2039,11 @@ async def add_artifacts_to_collection(
     Args:
         collection_id: Collection identifier
         request: Request with artifact IDs
-        session: Database session
+        collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
+        session: Database session (used for idempotency check join query pending
+            IDbCollectionArtifactRepository.list_artifact_ids_for_collection())
+        artifact_repo: Artifact repository for UUID resolution (injected)
         token: Authentication token
 
     Returns:
@@ -2057,54 +2060,60 @@ async def add_artifacts_to_collection(
             f"Adding {len(request.artifact_ids)} artifacts to collection: {collection_id}"
         )
 
-        # Verify collection exists
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        # Verify collection exists via repository
+        collection_dto = collection_repo.get_by_id(collection_id)
+        if not collection_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        # Get existing associations.
-        # CollectionArtifact uses artifact_uuid FK; join Artifact to resolve
-        # type:name ids for the idempotency check.
-        existing_artifact_ids = {
-            row[0]
-            for row in (
-                session.query(Artifact.id)
-                .join(
-                    CollectionArtifact,
-                    CollectionArtifact.artifact_uuid == Artifact.uuid,
-                )
-                .filter(CollectionArtifact.collection_id == collection_id)
-                .all()
-            )
-        }
+        # Get existing associations for idempotency check.
+        # list_by_collection() with a large limit avoids direct ORM query usage.
+        existing_ca_dtos = artifact_repo_ca.list_by_collection(
+            collection_id, limit=100_000
+        )
+        # Resolve UUIDs → type:name ids via batch lookup on the artifact repo.
+        existing_uuids = [dto.artifact_uuid for dto in existing_ca_dtos]
+        existing_artifact_ids: set[str] = set()
+        if existing_uuids:
+            uuid_to_id_map = artifact_repo.get_ids_by_uuids(existing_uuids)
+            existing_artifact_ids = set(uuid_to_id_map.values())
 
-        # Add new associations.
-        # Resolve each artifact_id → artifact_uuid via Artifact table.
-        added_count = 0
+        # Resolve each artifact_id (format: "type:name") → artifact_uuid via
+        # the ArtifactRepository to avoid direct ORM access here.
+        uuids_to_add: list[str] = []
+        skipped_count = 0
         for artifact_id in request.artifact_ids:
             if artifact_id not in existing_artifact_ids:
-                artifact_row = (
-                    session.query(Artifact.uuid)
-                    .filter(Artifact.id == artifact_id)
-                    .first()
-                )
-                if not artifact_row:
+                # Resolve UUID via repository (delegates to DB cache internally).
+                if ":" in artifact_id:
+                    type_str, art_name = artifact_id.split(":", 1)
+                    artifact_uuid = artifact_repo.resolve_uuid_by_type_name(
+                        type_str, art_name
+                    )
+                else:
+                    artifact_uuid = None
+                if not artifact_uuid:
                     logger.warning(
                         f"Skipping add: artifact '{artifact_id}' not found in cache"
                     )
+                    skipped_count += 1
                     continue
-                association = CollectionArtifact(
-                    collection_id=collection_id,
-                    artifact_uuid=artifact_row[0],
-                )
-                session.add(association)
-                added_count += 1
+                uuids_to_add.append(artifact_uuid)
 
-        session.commit()
+        # Delegate batch add to repository (handles commit internally)
+        if uuids_to_add:
+            try:
+                artifact_repo_ca.add_artifacts(collection_id, uuids_to_add)
+            except (KeyError, ValueError) as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(e),
+                )
+
+        added_count = len(uuids_to_add)
 
         # Invalidate collection count cache
         cache = get_collection_count_cache()
@@ -2117,8 +2126,11 @@ async def add_artifacts_to_collection(
 
         logger.info(
             f"Added {added_count} new artifacts to collection {collection_id} "
-            f"({len(request.artifact_ids) - added_count} already present)"
+            f"({len(request.artifact_ids) - added_count - skipped_count} already present, "
+            f"{skipped_count} skipped/not found)"
         )
+
+        already_present_count = len(request.artifact_ids) - added_count - skipped_count
 
         # Return 200 if all were already present (idempotent), 201 if any added
         status_code = (
@@ -2128,15 +2140,13 @@ async def add_artifacts_to_collection(
         return {
             "collection_id": collection_id,
             "added_count": added_count,
-            "already_present_count": len(request.artifact_ids) - added_count,
+            "already_present_count": already_present_count,
             "total_artifacts": len(existing_artifact_ids) + added_count,
         }
 
     except HTTPException:
-        session.rollback()
         raise
     except Exception as e:
-        session.rollback()
         logger.error(
             f"Error adding artifacts to collection '{collection_id}': {e}",
             exc_info=True,
@@ -2161,15 +2171,19 @@ async def add_artifacts_to_collection(
 async def remove_artifact_from_collection(
     collection_id: str,
     artifact_id: str,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
+    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
 ) -> None:
     """Remove an artifact from a collection.
 
     Args:
         collection_id: Collection identifier
-        artifact_id: Artifact identifier
-        session: Database session
+        artifact_id: Artifact identifier (type:name format)
+        collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
+        artifact_repo: Artifact repository for UUID resolution (injected)
         token: Authentication token
 
     Raises:
@@ -2181,49 +2195,47 @@ async def remove_artifact_from_collection(
     try:
         logger.info(f"Removing artifact {artifact_id} from collection: {collection_id}")
 
-        # Verify collection exists
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        # Verify collection exists via repository
+        collection_dto = collection_repo.get_by_id(collection_id)
+        if not collection_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        # Remove association if exists.
-        # CollectionArtifact PK is (collection_id, artifact_uuid); join through
-        # Artifact to resolve the type:name artifact_id string.
-        association = (
-            session.query(CollectionArtifact)
-            .join(Artifact, Artifact.uuid == CollectionArtifact.artifact_uuid)
-            .filter(
-                CollectionArtifact.collection_id == collection_id,
-                Artifact.id == artifact_id,
-            )
-            .first()
-        )
+        # Resolve artifact_id (type:name) → artifact_uuid via repository.
+        artifact_uuid: str | None = None
+        if ":" in artifact_id:
+            type_str, art_name = artifact_id.split(":", 1)
+            artifact_uuid = artifact_repo.resolve_uuid_by_type_name(type_str, art_name)
+        else:
+            artifact_dto = artifact_repo.get(artifact_id)
+            if artifact_dto:
+                artifact_uuid = artifact_dto.uuid
 
-        if association:
-            session.delete(association)
-            session.commit()
-
-            # Invalidate cache for this collection
-            cache = get_collection_count_cache()
-            cache.invalidate(collection_id)
-
-            logger.info(
-                f"Removed artifact {artifact_id} from collection {collection_id}"
-            )
+        if artifact_uuid:
+            # Delegate removal to repository (handles commit internally)
+            removed = artifact_repo_ca.remove_artifact(collection_id, artifact_uuid)
+            if removed:
+                # Invalidate cache for this collection
+                cache = get_collection_count_cache()
+                cache.invalidate(collection_id)
+                logger.info(
+                    f"Removed artifact {artifact_id} from collection {collection_id}"
+                )
+            else:
+                logger.info(
+                    f"Artifact {artifact_id} not in collection {collection_id} (idempotent)"
+                )
         else:
             logger.info(
-                f"Artifact {artifact_id} not in collection {collection_id} (idempotent)"
+                f"Artifact {artifact_id} not found in cache (idempotent remove)"
             )
 
     except HTTPException:
-        session.rollback()
         raise
     except Exception as e:
-        session.rollback()
         logger.error(
             f"Error removing artifact from collection '{collection_id}': {e}",
             exc_info=True,
@@ -2261,7 +2273,9 @@ async def remove_artifact_from_collection(
 async def add_entity_to_collection(
     collection_id: str,
     entity_id: str,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
+    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
 ) -> dict:
     """Add a context entity to a collection.
@@ -2269,7 +2283,9 @@ async def add_entity_to_collection(
     Args:
         collection_id: Collection identifier
         entity_id: Entity (artifact) identifier
-        session: Database session
+        collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
+        artifact_repo: Artifact repository for entity UUID resolution (injected)
         token: Authentication token
 
     Returns:
@@ -2284,31 +2300,33 @@ async def add_entity_to_collection(
     try:
         logger.info(f"Adding entity {entity_id} to collection: {collection_id}")
 
-        # Verify collection exists
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        # Verify collection exists via repository DI
+        collection_dto = collection_repo.get_by_id(collection_id)
+        if not collection_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        # Check if entity exists in artifacts table
-        entity = session.query(Artifact).filter_by(id=entity_id).first()
-        if not entity:
+        # Check if entity exists and retrieve its UUID via repository.
+        entity_dto = artifact_repo.get(entity_id)
+        if not entity_dto:
             logger.warning(f"Entity not found: {entity_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Entity '{entity_id}' not found",
             )
+        entity_uuid = entity_dto.uuid
+        if not entity_uuid:
+            logger.warning(f"Entity {entity_id} has no UUID in cache — cannot add")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Entity '{entity_id}' is not yet cached (no UUID); run a cache refresh first",
+            )
 
-        # Check if association already exists.
-        # CollectionArtifact PK is (collection_id, artifact_uuid) since CAI-P5-01.
-        existing = (
-            session.query(CollectionArtifact)
-            .filter_by(collection_id=collection_id, artifact_uuid=entity.uuid)
-            .first()
-        )
+        # Check if association already exists via repository
+        existing = artifact_repo_ca.get_by_pk(collection_id, entity_uuid)
 
         if existing:
             logger.info(
@@ -2320,13 +2338,14 @@ async def add_entity_to_collection(
                 "status": "already_present",
             }
 
-        # Create association using artifact_uuid (FK to artifacts.uuid).
-        association = CollectionArtifact(
-            collection_id=collection_id,
-            artifact_uuid=entity.uuid,
-        )
-        session.add(association)
-        session.commit()
+        # Delegate add to repository (handles commit internally)
+        try:
+            artifact_repo_ca.add_artifacts(collection_id, [entity_uuid])
+        except (KeyError, ValueError) as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            )
 
         logger.info(f"Added entity {entity_id} to collection {collection_id}")
         return {
@@ -2336,10 +2355,8 @@ async def add_entity_to_collection(
         }
 
     except HTTPException:
-        session.rollback()
         raise
     except Exception as e:
-        session.rollback()
         logger.error(
             f"Error adding entity to collection '{collection_id}': {e}",
             exc_info=True,
@@ -2364,7 +2381,9 @@ async def add_entity_to_collection(
 async def remove_entity_from_collection(
     collection_id: str,
     entity_id: str,
-    session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
+    artifact_repo: ArtifactRepoDep,
     token: TokenDep,
 ) -> None:
     """Remove a context entity from a collection.
@@ -2372,7 +2391,9 @@ async def remove_entity_from_collection(
     Args:
         collection_id: Collection identifier
         entity_id: Entity (artifact) identifier
-        session: Database session
+        collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
+        artifact_repo: Artifact repository for UUID resolution (injected)
         token: Authentication token
 
     Raises:
@@ -2384,42 +2405,42 @@ async def remove_entity_from_collection(
     try:
         logger.info(f"Removing entity {entity_id} from collection: {collection_id}")
 
-        # Verify collection exists
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        # Verify collection exists via repository DI
+        collection_dto = collection_repo.get_by_id(collection_id)
+        if not collection_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        # Remove association if exists.
-        # CollectionArtifact PK is (collection_id, artifact_uuid); join through
-        # Artifact to resolve the type:name entity_id string.
-        association = (
-            session.query(CollectionArtifact)
-            .join(Artifact, Artifact.uuid == CollectionArtifact.artifact_uuid)
-            .filter(
-                CollectionArtifact.collection_id == collection_id,
-                Artifact.id == entity_id,
-            )
-            .first()
-        )
-
-        if association:
-            session.delete(association)
-            session.commit()
-            logger.info(f"Removed entity {entity_id} from collection {collection_id}")
+        # Resolve entity_id (type:name) → artifact_uuid via repository.
+        artifact_uuid: str | None = None
+        if ":" in entity_id:
+            type_str, art_name = entity_id.split(":", 1)
+            artifact_uuid = artifact_repo.resolve_uuid_by_type_name(type_str, art_name)
         else:
-            logger.info(
-                f"Entity {entity_id} not in collection {collection_id} (idempotent)"
-            )
+            entity_dto = artifact_repo.get(entity_id)
+            if entity_dto:
+                artifact_uuid = entity_dto.uuid
+
+        if artifact_uuid:
+            # Delegate removal to repository (handles commit internally)
+            removed = artifact_repo_ca.remove_artifact(collection_id, artifact_uuid)
+            if removed:
+                logger.info(
+                    f"Removed entity {entity_id} from collection {collection_id}"
+                )
+            else:
+                logger.info(
+                    f"Entity {entity_id} not in collection {collection_id} (idempotent)"
+                )
+        else:
+            logger.info(f"Entity {entity_id} not found in cache (idempotent remove)")
 
     except HTTPException:
-        session.rollback()
         raise
     except Exception as e:
-        session.rollback()
         logger.error(
             f"Error removing entity from collection '{collection_id}': {e}",
             exc_info=True,
@@ -2443,6 +2464,8 @@ async def remove_entity_from_collection(
 )
 async def list_collection_entities(
     collection_id: str,
+    collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     session: DbSessionDep,
     token: TokenDep,
     limit: int = Query(default=20, ge=1, le=100),
@@ -2452,7 +2475,9 @@ async def list_collection_entities(
 
     Args:
         collection_id: Collection identifier
-        session: Database session
+        collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
+        session: Database session (passed to get_artifact_metadata service)
         token: Authentication token
         limit: Number of items per page
         after: Cursor for next page
@@ -2469,37 +2494,21 @@ async def list_collection_entities(
             f"(limit={limit}, after={after})"
         )
 
-        # Verify collection exists
-        collection = session.query(Collection).filter_by(id=collection_id).first()
-        if not collection:
+        # Verify collection exists via repository DI
+        collection_dto = collection_repo.get_by_id(collection_id)
+        if not collection_dto:
             logger.warning(f"User collection not found: {collection_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        # Build query for collection artifacts.
-        # Join Artifact for ordering by the stable type:name id (Artifact.id).
-        query = (
-            session.query(CollectionArtifact)
-            .join(Artifact, Artifact.uuid == CollectionArtifact.artifact_uuid)
-            .filter(CollectionArtifact.collection_id == collection_id)
-            .order_by(Artifact.id)
-        )
+        # Fetch all memberships ordered by artifact type:name ID via repository DI.
+        all_associations = artifact_repo_ca.list_all_ordered(collection_id)
 
-        # Get all matching artifact associations
-        all_associations = query.all()
-
-        # Resolve all artifact UUIDs → type:name ids in a single query.
+        # Batch-resolve artifact_uuid → type:name ids via repository DI.
         ent_all_uuids = [a.artifact_uuid for a in all_associations]
-        ent_uuid_to_id: dict[str, str] = {}
-        if ent_all_uuids:
-            ent_id_rows = (
-                session.query(Artifact.uuid, Artifact.id)
-                .filter(Artifact.uuid.in_(ent_all_uuids))
-                .all()
-            )
-            ent_uuid_to_id = {r[0]: r[1] for r in ent_id_rows}
+        ent_uuid_to_id = artifact_repo_ca.resolve_uuid_to_id_batch(ent_all_uuids)
 
         # Decode cursor if provided
         start_idx = 0
@@ -2534,16 +2543,12 @@ async def list_collection_entities(
         has_previous = start_idx > 0
 
         start_cursor = (
-            encode_cursor(
-                ent_uuid_to_id.get(page_associations[0].artifact_uuid, "")
-            )
+            encode_cursor(ent_uuid_to_id.get(page_associations[0].artifact_uuid, ""))
             if page_associations
             else None
         )
         end_cursor = (
-            encode_cursor(
-                ent_uuid_to_id.get(page_associations[-1].artifact_uuid, "")
-            )
+            encode_cursor(ent_uuid_to_id.get(page_associations[-1].artifact_uuid, ""))
             if page_associations
             else None
         )
@@ -2602,7 +2607,8 @@ async def refresh_collection_cache(
     collection_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
-    db_session: DbSessionDep,
+    collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     token: TokenDep,
 ) -> dict:
     """Refresh CollectionArtifact metadata cache for a specific DB collection.
@@ -2617,7 +2623,8 @@ async def refresh_collection_cache(
         collection_id: UUID or name of the collection
         artifact_mgr: Artifact manager for reading file-based metadata
         collection_mgr: Collection manager for file-based collection access
-        db_session: Database session
+        collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
         token: Authentication token
 
     Returns:
@@ -2626,15 +2633,14 @@ async def refresh_collection_cache(
     Raises:
         HTTPException: If collection not found in database
     """
-    import json
     import time
 
     logger.info(f"Starting DB cache refresh for collection '{collection_id}'")
     start_time = time.time()
 
-    # 1. Validate collection exists in database (Collection table)
-    collection = db_session.query(Collection).filter_by(id=collection_id).first()
-    if not collection:
+    # 1. Validate collection exists via repository DI.
+    collection_dto = collection_repo.get_by_id(collection_id)
+    if not collection_dto:
         logger.error(f"Collection not found in database: {collection_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -2645,137 +2651,26 @@ async def refresh_collection_cache(
             },
         )
 
-    # 2. Query all CollectionArtifact rows for this collection_id
-    collection_artifacts = (
-        db_session.query(CollectionArtifact)
-        .filter_by(collection_id=collection_id)
-        .all()
+    # 2. Delegate to the refactored helper which uses repository DI throughout.
+    result = _refresh_single_collection_cache(
+        collection_id=collection_id,
+        artifact_mgr=artifact_mgr,
+        artifact_repo_ca=artifact_repo_ca,
     )
 
-    logger.debug(
-        f"Found {len(collection_artifacts)} artifacts in collection '{collection_id}'"
+    duration = time.time() - start_time
+    logger.info(
+        f"DB cache refresh for collection '{collection_id}' completed: "
+        f"updated={result['updated']}, skipped={result['skipped']}, "
+        f"errors={len(result['errors'])}, duration={duration:.2f}s"
     )
 
-    updated_count = 0
-    skipped_count = 0
-    errors: list[str] = []
-
-    # 3. Batch-resolve artifact_uuid → type:name id to avoid N+1 lazy loads.
-    refresh_ca_uuids = [ca.artifact_uuid for ca in collection_artifacts]
-    refresh_uuid_to_id: dict[str, str] = {}
-    if refresh_ca_uuids:
-        id_rows = (
-            db_session.query(Artifact.uuid, Artifact.id)
-            .filter(Artifact.uuid.in_(refresh_ca_uuids))
-            .all()
-        )
-        refresh_uuid_to_id = {r[0]: r[1] for r in id_rows}
-
-    # For each artifact: Read file-based metadata via ArtifactManager, update cache
-    for ca in collection_artifacts:
-        try:
-            ca_artifact_id = refresh_uuid_to_id.get(ca.artifact_uuid, "")
-            # Parse artifact_id (format: "type:name")
-            if ":" in ca_artifact_id:
-                type_str, artifact_name = ca_artifact_id.split(":", 1)
-            else:
-                type_str, artifact_name = "unknown", ca_artifact_id
-
-            # Try to get artifact from file-based manager
-            artifact_type_enum = None
-            try:
-                artifact_type_enum = CoreArtifactType(type_str)
-            except ValueError:
-                pass
-
-            file_artifact = artifact_mgr.show(
-                artifact_name=artifact_name,
-                artifact_type=artifact_type_enum,
-            )
-
-            if file_artifact is None:
-                # Artifact no longer exists in file system
-                logger.debug(
-                    f"Artifact '{ca_artifact_id}' not found in file system, skipping"
-                )
-                skipped_count += 1
-                continue
-
-            # Extract metadata fields from artifact
-            metadata = file_artifact.metadata
-            description = metadata.description if metadata else None
-            author = metadata.author if metadata else None
-            license_val = metadata.license if metadata else None
-            version = metadata.version if metadata else None
-
-            # Convert tags list to JSON string
-            tags_json = json.dumps(file_artifact.tags) if file_artifact.tags else None
-
-            # Convert tools list to JSON string
-            tools_json = None
-            if metadata and metadata.tools:
-                tools_json = json.dumps(metadata.tools)
-
-            # Source and origin fields
-            source = file_artifact.upstream
-            origin = file_artifact.origin
-            origin_source = file_artifact.origin_source
-            resolved_sha = getattr(file_artifact, "resolved_sha", None)
-            resolved_version = getattr(file_artifact, "resolved_version", None)
-
-            # Update cache fields
-            ca.description = description
-            ca.author = author
-            ca.license = license_val
-            ca.tags_json = tags_json
-            ca.tools_json = tools_json
-            ca.version = version
-            ca.source = source
-            ca.origin = origin
-            ca.origin_source = origin_source
-            ca.resolved_sha = resolved_sha
-            ca.resolved_version = resolved_version
-            ca.synced_at = datetime.utcnow()
-
-            updated_count += 1
-            logger.debug(f"Updated cache for artifact '{ca_artifact_id}'")
-
-        except Exception as e:
-            error_msg = f"Failed to refresh cache for artifact '{refresh_uuid_to_id.get(ca.artifact_uuid, ca.artifact_uuid)}': {e}"
-            logger.warning(error_msg)
-            errors.append(error_msg)
-            skipped_count += 1
-            continue
-
-    # 4. Commit all updates
-    try:
-        db_session.commit()
-        duration = time.time() - start_time
-        logger.info(
-            f"DB cache refresh for collection '{collection_id}' completed: "
-            f"updated={updated_count}, skipped={skipped_count}, errors={len(errors)}, "
-            f"duration={duration:.2f}s"
-        )
-    except Exception as e:
-        db_session.rollback()
-        logger.error(
-            f"Failed to commit cache updates for collection '{collection_id}': {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "cache_commit_failed",
-                "collection_id": collection_id,
-                "message": f"Failed to commit cache updates: {str(e)}",
-            },
-        )
-
-    # 5. Return stats
+    # 3. Return stats
     return {
         "collection_id": collection_id,
-        "updated_count": updated_count,
-        "skipped_count": skipped_count,
-        "errors": errors,
+        "updated_count": result["updated"],
+        "skipped_count": result["skipped"],
+        "errors": result["errors"],
     }
 
 
@@ -2983,6 +2878,7 @@ async def refresh_collection(
 )
 async def get_cache_stats(
     db_session: DbSessionDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     ttl_seconds: int = Query(
         default=None,
         description="Custom TTL in seconds for staleness calculation. "
@@ -3032,14 +2928,12 @@ async def get_cache_stats(
     )
 
     try:
-        stats = get_staleness_stats(db_session, effective_ttl)
-
-        # Add collection_id filter if provided
         if collection_id:
-            # Re-query with collection filter
-            stats = _get_filtered_staleness_stats(
-                db_session, effective_ttl, collection_id
-            )
+            # Per-collection stats via repository DI (no raw session needed).
+            stats = artifact_repo_ca.get_staleness_stats(collection_id, effective_ttl)
+        else:
+            # Global stats delegated to service (uses db_session internally).
+            stats = get_staleness_stats(db_session, effective_ttl)
 
         logger.debug(
             f"Cache stats requested: total={stats['total_artifacts']}, "
@@ -3054,75 +2948,3 @@ async def get_cache_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get cache statistics: {str(e)}",
         )
-
-
-def _get_filtered_staleness_stats(
-    session: Session,
-    ttl_seconds: int,
-    collection_id: str,
-) -> dict:
-    """Get staleness stats filtered to a specific collection.
-
-    Args:
-        session: Database session
-        ttl_seconds: TTL for staleness calculation
-        collection_id: Collection ID to filter by
-
-    Returns:
-        Dictionary with staleness statistics for the collection
-    """
-    from datetime import timedelta
-
-    cutoff_time = datetime.utcnow() - timedelta(seconds=ttl_seconds)
-
-    # Filter to specific collection
-    total = (
-        session.query(CollectionArtifact)
-        .filter(CollectionArtifact.collection_id == collection_id)
-        .count()
-    )
-
-    if total == 0:
-        return {
-            "total_artifacts": 0,
-            "stale_count": 0,
-            "fresh_count": 0,
-            "oldest_sync_age_seconds": 0,
-            "percentage_stale": 0.0,
-            "ttl_seconds": ttl_seconds,
-            "collection_id": collection_id,
-        }
-
-    # Count stale artifacts in this collection
-    stale_count = (
-        session.query(CollectionArtifact)
-        .filter(CollectionArtifact.collection_id == collection_id)
-        .filter(
-            (CollectionArtifact.synced_at.is_(None))
-            | (CollectionArtifact.synced_at < cutoff_time)
-        )
-        .count()
-    )
-
-    # Find oldest sync time in this collection
-    oldest = (
-        session.query(CollectionArtifact.synced_at)
-        .filter(CollectionArtifact.collection_id == collection_id)
-        .filter(CollectionArtifact.synced_at.isnot(None))
-        .order_by(CollectionArtifact.synced_at.asc())
-        .first()
-    )
-
-    oldest_age = 0
-    if oldest and oldest[0]:
-        oldest_age = (datetime.utcnow() - oldest[0]).total_seconds()
-
-    return {
-        "total_artifacts": total,
-        "stale_count": stale_count,
-        "fresh_count": total - stale_count,
-        "oldest_sync_age_seconds": oldest_age,
-        "percentage_stale": round((stale_count / total * 100), 1) if total > 0 else 0.0,
-        "ttl_seconds": ttl_seconds,
-        "collection_id": collection_id,
-    }

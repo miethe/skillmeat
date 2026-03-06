@@ -11,13 +11,14 @@ including:
 import json
 from datetime import datetime
 from typing import Dict, Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.dependencies import get_marketplace_source_repository_concrete
 from skillmeat.api.server import create_app
 from skillmeat.cache.models import MarketplaceSource
 
@@ -86,7 +87,7 @@ def create_mock_source(manual_map: Optional[Dict[str, str]] = None) -> Marketpla
 class TestGetSourceManualMap:
     """Test GET /marketplace/sources/{source_id} manual_map field."""
 
-    def test_get_source_with_manual_map(self, client):
+    def test_get_source_with_manual_map(self, app, client):
         """GET should return manual_map when source has mapping configured."""
         # Arrange: Create source with manual_map
         manual_map = {
@@ -100,11 +101,11 @@ class TestGetSourceManualMap:
         mock_repo.get_by_id.return_value = mock_source
 
         # Act: GET source
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Assert: manual_map in response matches database value
         assert response.status_code == status.HTTP_200_OK
@@ -118,7 +119,7 @@ class TestGetSourceManualMap:
         assert data["manual_map"]["commands/dev"] == "command"
         assert data["manual_map"]["agents/helper"] == "agent"
 
-    def test_get_source_without_manual_map(self, client):
+    def test_get_source_without_manual_map(self, app, client):
         """GET should return None for manual_map when not configured."""
         # Arrange: Create source without manual_map (None)
         mock_source = create_mock_source(manual_map=None)
@@ -127,11 +128,11 @@ class TestGetSourceManualMap:
         mock_repo.get_by_id.return_value = mock_source
 
         # Act: GET source
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Assert: manual_map is None
         assert response.status_code == status.HTTP_200_OK
@@ -140,7 +141,7 @@ class TestGetSourceManualMap:
         assert "manual_map" in data
         assert data["manual_map"] is None
 
-    def test_get_source_with_empty_manual_map(self, client):
+    def test_get_source_with_empty_manual_map(self, app, client):
         """GET should return empty dict when manual_map is empty."""
         # Arrange: Create source with empty manual_map
         mock_source = create_mock_source(manual_map={})
@@ -149,11 +150,11 @@ class TestGetSourceManualMap:
         mock_repo.get_by_id.return_value = mock_source
 
         # Act: GET source
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Assert: manual_map is empty dict, not None
         assert response.status_code == status.HTTP_200_OK
@@ -164,7 +165,7 @@ class TestGetSourceManualMap:
         assert isinstance(data["manual_map"], dict)
         assert len(data["manual_map"]) == 0
 
-    def test_get_source_manual_map_deserialization(self, client):
+    def test_get_source_manual_map_deserialization(self, app, client):
         """manual_map should be properly deserialized from JSON as Dict, not string."""
         # Arrange: Create source with complex manual_map
         complex_map = {
@@ -179,11 +180,11 @@ class TestGetSourceManualMap:
         mock_repo.get_by_id.return_value = mock_source
 
         # Act: GET source
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Assert: Dict structure is correct, not JSON string
         assert response.status_code == status.HTTP_200_OK
@@ -200,7 +201,7 @@ class TestGetSourceManualMap:
         assert data["manual_map"]["single"] == "skill"
         assert len(data["manual_map"]) == 4
 
-    def test_get_source_manual_map_with_special_characters(self, client):
+    def test_get_source_manual_map_with_special_characters(self, app, client):
         """manual_map should handle paths with special characters correctly."""
         # Arrange: Create source with special character paths
         special_map = {
@@ -216,11 +217,11 @@ class TestGetSourceManualMap:
         mock_repo.get_by_id.return_value = mock_source
 
         # Act: GET source
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Assert: Special characters are preserved
         assert response.status_code == status.HTTP_200_OK
@@ -230,7 +231,7 @@ class TestGetSourceManualMap:
         assert "path/with spaces" in data["manual_map"]
         assert "path/@special/chars" in data["manual_map"]
 
-    def test_get_source_manual_map_type_validation(self, client):
+    def test_get_source_manual_map_type_validation(self, app, client):
         """Response schema should validate manual_map as Optional[Dict[str, str]]."""
         # Arrange: Create source with valid manual_map
         valid_map = {"path/one": "skill", "path/two": "command"}
@@ -240,11 +241,11 @@ class TestGetSourceManualMap:
         mock_repo.get_by_id.return_value = mock_source
 
         # Act: GET source
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Assert: Schema validation passes
         assert response.status_code == status.HTTP_200_OK
@@ -256,7 +257,7 @@ class TestGetSourceManualMap:
             assert isinstance(key, str), f"Key {key} should be string"
             assert isinstance(value, str), f"Value {value} should be string"
 
-    def test_get_source_response_includes_all_fields(self, client):
+    def test_get_source_response_includes_all_fields(self, app, client):
         """GET should return all fields including manual_map alongside other metadata."""
         # Arrange: Create source with manual_map and other fields
         manual_map = {"skills": "skill"}
@@ -266,11 +267,11 @@ class TestGetSourceManualMap:
         mock_repo.get_by_id.return_value = mock_source
 
         # Act: GET source
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Assert: All expected fields present
         assert response.status_code == status.HTTP_200_OK
@@ -292,18 +293,18 @@ class TestGetSourceManualMap:
         assert "created_at" in data
         assert "updated_at" in data
 
-    def test_get_source_not_found_with_manual_map_query(self, client):
+    def test_get_source_not_found_with_manual_map_query(self, app, client):
         """GET should still return 404 when source not found, regardless of manual_map."""
         # Arrange: Mock repository returns None (source not found)
         mock_repo = MagicMock()
         mock_repo.get_by_id.return_value = None
 
         # Act: GET non-existent source
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/nonexistent")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         # Assert: 404 error
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -313,7 +314,7 @@ class TestGetSourceManualMap:
 class TestGetSourceManualMapEdgeCases:
     """Test edge cases for manual_map in GET response."""
 
-    def test_manual_map_with_single_entry(self, client):
+    def test_manual_map_with_single_entry(self, app, client):
         """manual_map should handle single entry correctly."""
         single_map = {"skills": "skill"}
         mock_source = create_mock_source(manual_map=single_map)
@@ -321,18 +322,18 @@ class TestGetSourceManualMapEdgeCases:
         mock_repo = MagicMock()
         mock_repo.get_by_id.return_value = mock_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["manual_map"] == single_map
         assert len(data["manual_map"]) == 1
 
-    def test_manual_map_with_many_entries(self, client):
+    def test_manual_map_with_many_entries(self, app, client):
         """manual_map should handle many entries correctly."""
         large_map = {f"path/{i}": "skill" if i % 2 == 0 else "command" for i in range(100)}
         mock_source = create_mock_source(manual_map=large_map)
@@ -340,18 +341,18 @@ class TestGetSourceManualMapEdgeCases:
         mock_repo = MagicMock()
         mock_repo.get_by_id.return_value = mock_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["manual_map"] == large_map
         assert len(data["manual_map"]) == 100
 
-    def test_manual_map_with_long_paths(self, client):
+    def test_manual_map_with_long_paths(self, app, client):
         """manual_map should handle very long directory paths."""
         long_path_map = {
             "very/deeply/nested/directory/structure/with/many/levels/skills": "skill",
@@ -362,17 +363,17 @@ class TestGetSourceManualMapEdgeCases:
         mock_repo = MagicMock()
         mock_repo.get_by_id.return_value = mock_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["manual_map"] == long_path_map
 
-    def test_manual_map_preserves_order(self, client):
+    def test_manual_map_preserves_order(self, app, client):
         """manual_map should preserve insertion order (Python 3.7+)."""
         ordered_map = {
             "z_last": "skill",
@@ -384,11 +385,11 @@ class TestGetSourceManualMapEdgeCases:
         mock_repo = MagicMock()
         mock_repo.get_by_id.return_value = mock_source
 
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_repo,
-        ):
+        app.dependency_overrides[get_marketplace_source_repository_concrete] = lambda: mock_repo
+        try:
             response = client.get("/api/v1/marketplace/sources/src_test_manual_map")
+        finally:
+            app.dependency_overrides.pop(get_marketplace_source_repository_concrete, None)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()

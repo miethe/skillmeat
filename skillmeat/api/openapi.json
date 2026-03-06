@@ -2026,26 +2026,6 @@
               "title": "Project Id"
             },
             "description": "Base64-encoded project path to also record deployments for the imports"
-          },
-          {
-            "name": "db_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "string",
-                  "format": "path"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Db Path"
-            }
           }
         ],
         "requestBody": {
@@ -10747,7 +10727,7 @@
           "deployment-sets"
         ],
         "summary": "Create a new deployment set",
-        "description": "Create a new named deployment set owned by the current user.\n\nArgs:\n    request: Deployment set creation payload.\n    settings: API settings (owner derived from auth state).\n\nReturns:\n    The newly created deployment set.",
+        "description": "Create a new named deployment set owned by the current user.\n\nArgs:\n    request: Deployment set creation payload.\n    settings: API settings (owner derived from auth state).\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    The newly created deployment set.",
         "operationId": "create_deployment_set_api_v1_deployment_sets_post",
         "requestBody": {
           "required": true,
@@ -10788,7 +10768,7 @@
           "deployment-sets"
         ],
         "summary": "List deployment sets",
-        "description": "List deployment sets owned by the current user, with optional filtering.\n\nArgs:\n    settings: API settings.\n    name: Optional substring filter on set name.\n    tag: Optional tag filter.\n    limit: Maximum number of results to return.\n    offset: Number of results to skip.\n\nReturns:\n    Paginated list of deployment sets with total count.",
+        "description": "List deployment sets owned by the current user, with optional filtering.\n\nArgs:\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n    name: Optional substring filter on set name.\n    tag: Optional tag filter.\n    limit: Maximum number of results to return.\n    offset: Number of results to skip.\n\nReturns:\n    Paginated list of deployment sets with total count.",
         "operationId": "list_deployment_sets_api_v1_deployment_sets_get",
         "parameters": [
           {
@@ -10886,7 +10866,7 @@
           "deployment-sets"
         ],
         "summary": "Get a deployment set by ID",
-        "description": "Fetch a single deployment set by its ID including its members.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    settings: API settings (owner scoping).\n\nReturns:\n    The requested deployment set.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
+        "description": "Fetch a single deployment set by its ID including its members.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    settings: API settings (owner scoping).\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    The requested deployment set.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
         "operationId": "get_deployment_set_api_v1_deployment_sets__set_id__get",
         "parameters": [
           {
@@ -10928,7 +10908,7 @@
           "deployment-sets"
         ],
         "summary": "Update a deployment set",
-        "description": "Update mutable metadata fields on a deployment set.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    request: Partial update payload (only provided fields are applied).\n    settings: API settings.\n\nReturns:\n    The updated deployment set.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
+        "description": "Update mutable metadata fields on a deployment set.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    request: Partial update payload (only provided fields are applied).\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    The updated deployment set.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
         "operationId": "update_deployment_set_api_v1_deployment_sets__set_id__put",
         "parameters": [
           {
@@ -10980,7 +10960,7 @@
           "deployment-sets"
         ],
         "summary": "Delete a deployment set",
-        "description": "Delete a deployment set and cascade-delete its member rows.\n\nPer FR-10: any member rows in *other* sets that reference this set as a\nnested member are also removed before the set itself is deleted.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    settings: API settings.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
+        "description": "Delete a deployment set and cascade-delete its member rows.\n\nPer FR-10: any member rows in *other* sets that reference this set as a\nnested member are also removed before the set itself is deleted.\n\nArgs:\n    set_id: Primary key of the deployment set.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
         "operationId": "delete_deployment_set_api_v1_deployment_sets__set_id__delete",
         "parameters": [
           {
@@ -11017,7 +10997,7 @@
           "deployment-sets"
         ],
         "summary": "Clone a deployment set",
-        "description": "Clone a deployment set and all its members.\n\nThe clone receives a name of ``\"<original name> (copy)\"`` and a new UUID.\nMember rows are recreated preserving type, reference, and position.\n\nArgs:\n    set_id: Primary key of the source deployment set.\n    settings: API settings.\n\nReturns:\n    The newly created clone deployment set.\n\nRaises:\n    HTTPException 404: If the source set does not exist.",
+        "description": "Clone a deployment set and all its members.\n\nThe clone receives a name of ``\"<original name> (copy)\"`` and a new UUID.\nMember rows are recreated preserving type, reference, and position.\n\nArgs:\n    set_id: Primary key of the source deployment set.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    The newly created clone deployment set.\n\nRaises:\n    HTTPException 404: If the source set does not exist.",
         "operationId": "clone_deployment_set_api_v1_deployment_sets__set_id__clone_post",
         "parameters": [
           {
@@ -11061,7 +11041,7 @@
           "deployment-sets"
         ],
         "summary": "List members of a deployment set",
-        "description": "Return all members of a deployment set ordered by position.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    settings: API settings.\n\nReturns:\n    Ordered list of member rows.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
+        "description": "Return all members of a deployment set ordered by position.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    Ordered list of member rows.\n\nRaises:\n    HTTPException 404: If the set does not exist or belongs to another owner.",
         "operationId": "list_members_api_v1_deployment_sets__set_id__members_get",
         "parameters": [
           {
@@ -11107,7 +11087,7 @@
           "deployment-sets"
         ],
         "summary": "Add a member to a deployment set",
-        "description": "Add an artifact, group, or nested deployment set as a member.\n\nFor nested set members (``nested_set_id`` provided), circular-reference\ndetection is performed before insertion.  If the proposed nesting would\ncreate a cycle, HTTP 422 is returned.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    request: Member creation payload (exactly one ref must be set).\n    settings: API settings.\n\nReturns:\n    The newly created member row.\n\nRaises:\n    HTTPException 404: If the parent set does not exist.\n    HTTPException 422: If adding the member would create a circular reference.",
+        "description": "Add an artifact, group, or nested deployment set as a member.\n\nFor nested set members (``nested_set_id`` provided), circular-reference\ndetection is performed before insertion.  If the proposed nesting would\ncreate a cycle, HTTP 422 is returned.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    request: Member creation payload (exactly one ref must be set).\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    The newly created member row.\n\nRaises:\n    HTTPException 404: If the parent set does not exist.\n    HTTPException 422: If adding the member would create a circular reference.",
         "operationId": "add_member_api_v1_deployment_sets__set_id__members_post",
         "parameters": [
           {
@@ -11161,7 +11141,7 @@
           "deployment-sets"
         ],
         "summary": "Remove a member from a deployment set",
-        "description": "Remove a member row from a deployment set.\n\nArgs:\n    set_id: Primary key of the parent deployment set (used for owner check).\n    member_id: Primary key of the member row to remove.\n    settings: API settings.\n\nRaises:\n    HTTPException 404: If the set or member does not exist.",
+        "description": "Remove a member row from a deployment set.\n\nArgs:\n    set_id: Primary key of the parent deployment set (used for owner check).\n    member_id: Primary key of the member row to remove.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nRaises:\n    HTTPException 404: If the set or member does not exist.",
         "operationId": "remove_member_api_v1_deployment_sets__set_id__members__member_id__delete",
         "parameters": [
           {
@@ -11205,7 +11185,7 @@
           "deployment-sets"
         ],
         "summary": "Update a member's position",
-        "description": "Update the ordering position of a member within a deployment set.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    member_id: Primary key of the member to update.\n    request: Position update payload.\n    settings: API settings.\n\nReturns:\n    The updated member row.\n\nRaises:\n    HTTPException 404: If the set or member does not exist.",
+        "description": "Update the ordering position of a member within a deployment set.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    member_id: Primary key of the member to update.\n    request: Position update payload.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n\nReturns:\n    The updated member row.\n\nRaises:\n    HTTPException 404: If the set or member does not exist.",
         "operationId": "update_member_position_api_v1_deployment_sets__set_id__members__member_id__put",
         "parameters": [
           {
@@ -11268,7 +11248,7 @@
           "deployment-sets"
         ],
         "summary": "Resolve a deployment set to its flat artifact list",
-        "description": "Recursively resolve a deployment set into an ordered, deduplicated list\nof artifact UUIDs.\n\nTraversal is depth-first: artifact members are emitted directly, group\nmembers are expanded in position order, and nested set members are\nrecursed into.  The first occurrence of each UUID is kept; duplicates are\nsilently dropped.\n\nArgs:\n    set_id: Primary key of the root deployment set to resolve.\n    settings: API settings.\n\nReturns:\n    Resolution result including the flat artifact list and traversal metadata.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the resolution depth limit is exceeded.",
+        "description": "Recursively resolve a deployment set into an ordered, deduplicated list\nof artifact UUIDs.\n\nTraversal is depth-first: artifact members are emitted directly, group\nmembers are expanded in position order, and nested set members are\nrecursed into.  The first occurrence of each UUID is kept; duplicates are\nsilently dropped.\n\nArgs:\n    set_id: Primary key of the root deployment set to resolve.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n    artifact_repo: IArtifactRepository dependency (UUID → name/type lookup).\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    Resolution result including the flat artifact list and traversal metadata.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the resolution depth limit is exceeded.",
         "operationId": "resolve_deployment_set_api_v1_deployment_sets__set_id__resolve_get",
         "parameters": [
           {
@@ -11312,7 +11292,7 @@
           "deployment-sets"
         ],
         "summary": "Batch-deploy all artifacts in a deployment set",
-        "description": "Resolve the deployment set and deploy every artifact to the target project.\n\nEach artifact is deployed independently; per-artifact errors are captured\nand returned in the results list so a single failure does not abort the\nentire batch.\n\nArgs:\n    set_id: Primary key of the deployment set to deploy.\n    request: Batch deploy payload (project_path, dry_run).\n    settings: API settings.\n    artifact_mgr: ArtifactManager dependency.\n\nReturns:\n    Batch deployment result with per-artifact outcomes.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the project path is invalid or resolution fails.",
+        "description": "Resolve the deployment set and deploy every artifact to the target project.\n\nEach artifact is deployed independently; per-artifact errors are captured\nand returned in the results list so a single failure does not abort the\nentire batch.\n\nArgs:\n    set_id: Primary key of the deployment set to deploy.\n    request: Batch deploy payload (project_path, dry_run).\n    settings: API settings.\n    artifact_mgr: ArtifactManager dependency.\n    repo: DeploymentSetRepository dependency.\n    artifact_repo: IArtifactRepository dependency (UUID → name/type lookup).\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    Batch deployment result with per-artifact outcomes.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the project path is invalid or resolution fails.",
         "operationId": "batch_deploy_api_v1_deployment_sets__set_id__deploy_post",
         "parameters": [
           {
@@ -18295,6 +18275,97 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/integrations/idp/scaffold": {
+      "post": {
+        "tags": [
+          "integrations-idp",
+          "integrations-idp"
+        ],
+        "summary": "Generate scaffold files for an IDP target",
+        "description": "Renders a composite or skill artifact in-memory and returns the generated files as base64-encoded content.  Intended for use by Backstage software template actions and other IDP scaffolders.",
+        "operationId": "scaffold_api_v1_integrations_idp_scaffold_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IDPScaffoldRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Scaffold files rendered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IDPScaffoldResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid target_id or variable validation error"
+          },
+          "404": {
+            "description": "Target artifact not found"
+          },
+          "500": {
+            "description": "Internal rendering error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/integrations/idp/register-deployment": {
+      "post": {
+        "tags": [
+          "integrations-idp",
+          "integrations-idp"
+        ],
+        "summary": "Register or update an IDP deployment",
+        "description": "Records that a repository has deployed a given artifact target.  The operation is idempotent: re-submitting the same repo_url + target_id pair updates the existing DeploymentSet record instead of creating a duplicate.",
+        "operationId": "register_deployment_api_v1_integrations_idp_register_deployment_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IDPRegisterDeploymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Deployment registered or updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IDPRegisterDeploymentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request payload"
+          },
+          "500": {
+            "description": "Internal error persisting the deployment record"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/api/v1/projects": {
@@ -38068,6 +38139,164 @@
         "title": "HealthStatus",
         "description": "Health check response model."
       },
+      "IDPRegisterDeploymentRequest": {
+        "properties": {
+          "repo_url": {
+            "type": "string",
+            "title": "Repo Url",
+            "description": "HTTPS URL of the repository being registered (e.g. 'https://github.com/org/customer-api')",
+            "examples": [
+              "https://github.com/org/customer-api"
+            ]
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id",
+            "description": "Target artifact identifier in 'type:name' format (e.g. 'composite:fin-serv-compliance')",
+            "examples": [
+              "composite:fin-serv-compliance"
+            ]
+          },
+          "metadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Metadata",
+            "description": "Optional key/value metadata stored alongside the deployment record",
+            "examples": [
+              {
+                "environment": "production",
+                "team": "platform"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "repo_url",
+          "target_id"
+        ],
+        "title": "IDPRegisterDeploymentRequest",
+        "description": "Request to register an IDP deployment for an artifact target.\n\nRecords that a repository has deployed a given artifact target.  The\noperation is idempotent: re-submitting the same ``repo_url`` + ``target_id``\npair updates the existing deployment record rather than creating a duplicate.\n\nExamples:\n    >>> request = IDPRegisterDeploymentRequest(\n    ...     repo_url=\"https://github.com/org/customer-api\",\n    ...     target_id=\"composite:fin-serv-compliance\",\n    ...     metadata={\"team\": \"platform\"},\n    ... )",
+        "example": {
+          "metadata": {
+            "environment": "production",
+            "team": "platform"
+          },
+          "repo_url": "https://github.com/org/customer-api",
+          "target_id": "composite:fin-serv-compliance"
+        }
+      },
+      "IDPRegisterDeploymentResponse": {
+        "properties": {
+          "deployment_set_id": {
+            "type": "string",
+            "title": "Deployment Set Id",
+            "description": "UUID of the DeploymentSet record created or updated by this request",
+            "examples": [
+              "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            ]
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created",
+            "description": "True when a new DeploymentSet was created; False when an existing record was updated (idempotent re-registration)",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "deployment_set_id",
+          "created"
+        ],
+        "title": "IDPRegisterDeploymentResponse",
+        "description": "Response for a successful IDP deployment registration.\n\nReturns the UUID of the created or updated DeploymentSet together with an\nidempotency flag indicating whether the record was newly created.",
+        "example": {
+          "created": true,
+          "deployment_set_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        }
+      },
+      "IDPScaffoldRequest": {
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "title": "Target Id",
+            "description": "Target artifact identifier in 'type:name' format (e.g. 'composite:fin-serv-compliance', 'skill:canvas')",
+            "examples": [
+              "composite:fin-serv-compliance",
+              "skill:canvas"
+            ]
+          },
+          "variables": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Variables",
+            "description": "Optional key/value pairs substituted into rendered template files",
+            "examples": [
+              {
+                "AUTHOR": "Jane Doe",
+                "PROJECT_NAME": "customer-api"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_id"
+        ],
+        "title": "IDPScaffoldRequest",
+        "description": "Request to generate scaffold files for an IDP target.\n\nRenders a set of template files (e.g. CLAUDE.md, project config) for a\ngiven composite or skill target, with optional variable substitution.\n\nExamples:\n    >>> request = IDPScaffoldRequest(\n    ...     target_id=\"composite:fin-serv-compliance\",\n    ...     variables={\"PROJECT_NAME\": \"customer-api\"},\n    ... )",
+        "example": {
+          "target_id": "composite:fin-serv-compliance",
+          "variables": {
+            "AUTHOR": "Jane Doe",
+            "PROJECT_NAME": "customer-api"
+          }
+        }
+      },
+      "IDPScaffoldResponse": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/RenderedFile"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Rendered template files to be written to the target repository",
+            "examples": [
+              [
+                {
+                  "content_base64": "IyBDTEFVREUubWQ=",
+                  "path": ".claude/CLAUDE.md"
+                }
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "IDPScaffoldResponse",
+        "description": "Response containing rendered scaffold files for an IDP target.\n\nReturns a list of files that should be written to the repository by the\nIDP scaffolder (e.g. a Backstage software template action).",
+        "example": {
+          "files": [
+            {
+              "content_base64": "IyBDTEFVREUubWQ=",
+              "path": ".claude/CLAUDE.md"
+            },
+            {
+              "content_base64": "IyBDb21wbGlhbmNlIFJ1bGVz",
+              "path": ".claude/rules/compliance.md"
+            }
+          ]
+        }
+      },
       "IconPackResponse": {
         "properties": {
           "id": {
@@ -42212,10 +42441,11 @@
           "codex",
           "gemini",
           "cursor",
+          "remote_git",
           "other"
         ],
         "title": "Platform",
-        "description": "Supported platforms for artifact execution.\n\nRepresents the target execution environment where an artifact is designed\nto run. Used in frontmatter metadata to indicate platform compatibility.\n\nAttributes:\n    CLAUDE_CODE: Anthropic's Claude Code CLI tool\n    CODEX: OpenAI Codex CLI and integrations\n    GEMINI: Google Gemini CLI and integrations\n    CURSOR: Cursor AI editor\n    OTHER: Other platforms or unspecified\n\nExample:\n    >>> Platform.CLAUDE_CODE.value\n    'claude_code'\n    >>> Platform.CLAUDE_CODE == \"claude_code\"\n    True\n    >>> str(Platform.CURSOR)\n    'cursor'"
+        "description": "Supported platforms for artifact execution.\n\nRepresents the target execution environment where an artifact is designed\nto run. Used in frontmatter metadata to indicate platform compatibility.\n\nAttributes:\n    CLAUDE_CODE: Anthropic's Claude Code CLI tool\n    CODEX: OpenAI Codex CLI and integrations\n    GEMINI: Google Gemini CLI and integrations\n    CURSOR: Cursor AI editor\n    REMOTE_GIT: Remote Git repository (e.g. Backstage / IDP deployments)\n    OTHER: Other platforms or unspecified\n\nExample:\n    >>> Platform.CLAUDE_CODE.value\n    'claude_code'\n    >>> Platform.CLAUDE_CODE == \"claude_code\"\n    True\n    >>> str(Platform.CURSOR)\n    'cursor'\n    >>> Platform.REMOTE_GIT.value\n    'remote_git'"
       },
       "PlatformDefaultsEntry": {
         "properties": {
@@ -43823,6 +44053,34 @@
           "message": "Successfully re-imported artifact from upstream",
           "success": true
         }
+      },
+      "RenderedFile": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Relative path of the rendered file within the project (e.g. '.claude/CLAUDE.md')",
+            "examples": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/api-patterns.md"
+            ]
+          },
+          "content_base64": {
+            "type": "string",
+            "title": "Content Base64",
+            "description": "Base64-encoded UTF-8 file content",
+            "examples": [
+              "IyBDTEFVREUubWQKCk15IHByb2plY3QuCg=="
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "content_base64"
+        ],
+        "title": "RenderedFile",
+        "description": "A single rendered scaffold file.\n\nRepresents a file generated from a template during IDP scaffold rendering.\nContent is base64-encoded to safely transport arbitrary text (including\nCLAUDE.md files that may contain non-ASCII characters)."
       },
       "ReorderArtifactsRequest": {
         "properties": {

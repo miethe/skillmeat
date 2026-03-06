@@ -93,26 +93,23 @@ class TestUpdateSourceManualMapValidation:
             }
         )
 
+        mock_repo = Mock()
+        mock_repo.get_by_id.return_value = mock_source
+        mock_repo.update.return_value = mock_source
+
         with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository"
-        ) as mock_repo_class, patch(
             "skillmeat.api.routers.marketplace_sources.GitHubScanner"
         ) as mock_scanner_class:
-            # Setup repository mock
-            mock_repo = Mock()
-            mock_repo.get_by_id.return_value = mock_source
-            mock_repo.update.return_value = mock_source
-            mock_repo_class.return_value = mock_repo
-
             # Setup scanner mock
             mock_scanner = Mock()
             mock_scanner._fetch_tree.return_value = (mock_tree_with_paths, "main")
             mock_scanner_class.return_value = mock_scanner
 
-            # Execute update
+            # Execute update — pass mock_repo directly as source_repo DI param
             result = await update_source(
                 source_id="test-source-123",
                 request=request,
+                source_repo=mock_repo,
             )
 
             # Verify validation was called
@@ -135,16 +132,12 @@ class TestUpdateSourceManualMapValidation:
             }
         )
 
+        mock_repo = Mock()
+        mock_repo.get_by_id.return_value = mock_source
+
         with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository"
-        ) as mock_repo_class, patch(
             "skillmeat.api.routers.marketplace_sources.GitHubScanner"
         ) as mock_scanner_class:
-            # Setup repository mock
-            mock_repo = Mock()
-            mock_repo.get_by_id.return_value = mock_source
-            mock_repo_class.return_value = mock_repo
-
             # Setup scanner mock
             mock_scanner = Mock()
             mock_scanner._fetch_tree.return_value = (mock_tree_with_paths, "main")
@@ -155,6 +148,7 @@ class TestUpdateSourceManualMapValidation:
                 await update_source(
                     source_id="test-source-123",
                     request=request,
+                    source_repo=mock_repo,
                 )
 
             # Verify error
@@ -177,17 +171,13 @@ class TestUpdateSourceManualMapValidation:
             }
         )
 
+        mock_repo = Mock()
+        mock_repo.get_by_id.return_value = mock_source
+        mock_repo.update.return_value = mock_source
+
         with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository"
-        ) as mock_repo_class, patch(
             "skillmeat.api.routers.marketplace_sources.GitHubScanner"
         ) as mock_scanner_class:
-            # Setup repository mock
-            mock_repo = Mock()
-            mock_repo.get_by_id.return_value = mock_source
-            mock_repo.update.return_value = mock_source
-            mock_repo_class.return_value = mock_repo
-
             # Setup scanner mock
             mock_scanner = Mock()
             mock_scanner._fetch_tree.return_value = (mock_tree_with_paths, "main")
@@ -197,6 +187,7 @@ class TestUpdateSourceManualMapValidation:
             await update_source(
                 source_id="test-source-123",
                 request=request,
+                source_repo=mock_repo,
             )
 
             # Verify validation used new ref "develop", not old "main"
@@ -213,17 +204,13 @@ class TestUpdateSourceManualMapValidation:
             description="Updated description",
         )
 
+        mock_repo = Mock()
+        mock_repo.get_by_id.return_value = mock_source
+        mock_repo.update.return_value = mock_source
+
         with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository"
-        ) as mock_repo_class, patch(
             "skillmeat.api.routers.marketplace_sources.GitHubScanner"
         ) as mock_scanner_class:
-            # Setup repository mock
-            mock_repo = Mock()
-            mock_repo.get_by_id.return_value = mock_source
-            mock_repo.update.return_value = mock_source
-            mock_repo_class.return_value = mock_repo
-
             # Setup scanner mock
             mock_scanner = Mock()
             mock_scanner_class.return_value = mock_scanner
@@ -232,6 +219,7 @@ class TestUpdateSourceManualMapValidation:
             await update_source(
                 source_id="test-source-123",
                 request=request,
+                source_repo=mock_repo,
             )
 
             # Verify validation was NOT called

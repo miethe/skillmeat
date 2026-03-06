@@ -26,9 +26,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List
 
-from skillmeat.api.schemas.marketplace import DetectedArtifact
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.marketplace import DetectedArtifact
 from skillmeat.core.manifest_extractors import MANIFEST_EXTRACTORS
 from skillmeat.observability.tracing import trace_operation
 

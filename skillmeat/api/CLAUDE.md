@@ -120,6 +120,42 @@ export SKILLMEAT_GITHUB_TOKEN=ghp_xxx
 
 ---
 
+## Repository Pattern (Hexagonal Architecture)
+
+**File**: See `.claude/context/key-context/repository-architecture.md` for complete guide.
+
+**Quick Overview**: SkillMeat uses hexagonal architecture with abstract repository interfaces (ABCs) between routers and storage backends. This decouples the API from filesystem/database details and enables future multi-backend support.
+
+**Key Invariants**:
+1. **No direct filesystem access in routers** — use `Annotated[I*Repository, Depends(...)]` dependency injection
+2. **DTOs are the data contract** — never pass ORM models to routers
+3. **Write-through pattern** — mutations write filesystem first, then sync DB via `refresh_single_artifact_cache()`
+4. **Mock repositories in tests** — update `tests/mocks/repositories.py` when ABCs change
+
+**Module Map**:
+- **Interfaces**: `skillmeat/core/interfaces/repositories.py` (10 ABCs), `dtos.py` (frozen dataclasses)
+- **Implementations**: `skillmeat/core/repositories/local_*.py` (filesystem + SQLAlchemy)
+- **Factories**: `skillmeat/api/dependencies.py` (DI providers with edition-based routing)
+- **Mocks**: `tests/mocks/repositories.py` (in-memory test doubles)
+
+**DI Aliases** (in dependencies.py):
+```python
+ArtifactRepoDep = Annotated[IArtifactRepository, Depends(get_artifact_repository)]
+ProjectRepoDep = Annotated[IProjectRepository, Depends(get_project_repository)]
+CollectionRepoDep = Annotated[ICollectionRepository, Depends(get_collection_repository)]
+DeploymentRepoDep = Annotated[IDeploymentRepository, Depends(get_deployment_repository)]
+TagRepoDep = Annotated[ITagRepository, Depends(get_tag_repository)]
+SettingsRepoDep = Annotated[ISettingsRepository, Depends(get_settings_repository)]
+GroupRepoDep = Annotated[IGroupRepository, Depends(get_group_repository)]
+ContextEntityRepoDep = Annotated[IContextEntityRepository, Depends(get_context_entity_repository)]
+MarketplaceSourceRepoDep = Annotated[IMarketplaceSourceRepository, Depends(get_marketplace_source_repository)]
+ProjectTemplateRepoDep = Annotated[IProjectTemplateRepository, Depends(get_project_template_repository)]
+```
+
+**When Adding an Endpoint**: Read `.claude/context/key-context/repository-architecture.md` § "Recipe 1" for step-by-step guide.
+
+---
+
 ## Dependency Injection
 
 **File**: `dependencies.py`
@@ -354,16 +390,16 @@ See `utils/error_handlers.py` for centralized error handling patterns.
 **Architecture**:
 
 ```
-Routers → Dependencies → Managers (core/)
+Routers → Repository DI (I*Repository ABCs) → Local*Repository implementations
+    ↓                                                  ↓
+  (or legacy path)                          SQLAlchemy ORM (cache/models.py)
+    ↓                                                  ↓
+Services (api/services/)                   SQLite Database
     ↓
-Services (api/services/)
-    ↓
-SQLAlchemy ORM (cache/models.py)
-    ↓
-Repositories (cache/repositories.py)
-    ↓
-SQLite Database
+cache/repositories.py (internal helpers)
 ```
+
+**Note**: Routers access the database exclusively through repository DI aliases (`*RepoDep`). Direct `session.query()` calls in routers are prohibited — all DB access is mediated by `I*Repository` implementations in `skillmeat/core/repositories/`.
 
 **Components**:
 
@@ -520,6 +556,7 @@ async def create_artifact(
 
 | File | Load When |
 |------|-----------|
+| `.claude/context/key-context/repository-architecture.md` | **NEW**: Adding endpoints, refactoring routers to repository DI, designing new storage backends |
 | `.claude/context/key-context/context-loading-playbook.md` | Select minimal context by task |
 | `.claude/context/key-context/api-contract-source-of-truth.md` | Endpoint/schema validation and drift checks |
 | `.claude/context/key-context/fe-be-type-sync-playbook.md` | Backend schema changes affecting frontend payloads |
