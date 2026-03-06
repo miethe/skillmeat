@@ -4,6 +4,7 @@ Provides REST API for browsing, installing, and publishing marketplace listings
 through configured broker integrations.
 """
 
+import asyncio
 import base64
 import logging
 from pathlib import Path
@@ -381,20 +382,38 @@ async def get_listing_detail(
 
         # Search for listing across brokers
         found_listing: Optional[MarketplaceListing] = None
-        for broker in brokers:
+
+        # Helper for concurrent fetching
+        async def fetch_broker_listings(
+            broker_inst,
+        ) -> List[MarketplaceListing]:
             try:
                 # Fetch all listings and search for matching ID
                 # In production, brokers should have a get_listing(id) method
-                listings = broker.listings(page=1, page_size=100)
-                for listing in listings:
-                    if listing.listing_id == listing_id:
-                        found_listing = listing
-                        break
-                if found_listing:
-                    break
+                return await asyncio.to_thread(
+                    broker_inst.listings, page=1, page_size=100
+                )
             except MarketplaceBrokerError as e:
-                logger.warning(f"Error fetching from broker {broker.name}: {e}")
-                continue
+                logger.warning(f"Error fetching from broker {broker_inst.name}: {e}")
+                return []
+            except Exception as e:
+                logger.error(
+                    f"Unexpected error fetching from broker {broker_inst.name}: {e}"
+                )
+                return []
+
+        # Launch requests concurrently
+        tasks = [fetch_broker_listings(b) for b in brokers]
+        results = await asyncio.gather(*tasks)
+
+        # Process results
+        for listings in results:
+            for listing in listings:
+                if listing.listing_id == listing_id:
+                    found_listing = listing
+                    break
+            if found_listing:
+                break
 
         if not found_listing:
             raise HTTPException(
