@@ -2,176 +2,227 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "enterprise-db-storage"
-feature_slug: "enterprise-db-storage"
+prd: enterprise-db-storage
+feature_slug: enterprise-db-storage
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-db-storage-v1.md
 plan_ref: docs/project_plans/implementation_plans/refactors/enterprise-db-storage-v1.md
 phase: 1
-title: "Enterprise Schema & Database Foundation"
-status: "planning"
-started: "2026-03-06"
+title: Enterprise Schema & Database Foundation
+status: completed
+started: '2026-03-06'
 completed: null
 commit_refs: []
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 12
-completed_tasks: 0
+completed_tasks: 12
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["data-layer-expert"]
-contributors: ["backend-architect", "python-backend-engineer"]
-
+owners:
+- data-layer-expert
+contributors:
+- backend-architect
+- python-backend-engineer
 tasks:
-  - id: "ENT-1.1"
-    description: "PostgreSQL schema design document: tenant-aware schema DDL for all 4 enterprise tables, indexes, constraints, tenant isolation strategy"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "critical"
-
-  - id: "ENT-1.6"
-    description: "Design tenant scoping strategy: WHERE tenant_id = ? filtering pattern, context propagation, RLS migration path. Bootstrap strategy uses DEFAULT_TENANT_ID constant (single-tenant mode); no AuthContext dependency in Phase 1."
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["ENT-1.1"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "ENT-1.2"
-    description: "Create enterprise_artifacts table with tenant_id isolation, JSONB tags/custom_fields, composite unique constraint"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT-1.1"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "ENT-1.4"
-    description: "Create enterprise_collections table with tenant_id index, is_default flag, unique constraint on (tenant_id, name)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT-1.1"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "ENT-1.9"
-    description: "Database connection factory: env-based PostgreSQL/SQLite selection via DATABASE_URL / SKILLMEAT_DATABASE_URL"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT-1.1"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "ENT-1.3"
-    description: "Create artifact_versions table with content_hash (SHA256), markdown_payload, commit_sha, FK to enterprise_artifacts"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT-1.2"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "ENT-1.5"
-    description: "Create enterprise_collection_artifacts junction table with order_index, composite FK, unique(collection_id, artifact_id)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT-1.4", "ENT-1.2"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "ENT-1.7"
-    description: "Alembic migration: create enterprise schema (all 4 tables, indexes, FK constraints, reversible upgrade/downgrade)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT-1.2", "ENT-1.3", "ENT-1.4", "ENT-1.5"]
-    estimated_effort: "4h"
-    priority: "high"
-
-  - id: "ENT-1.8"
-    description: "Alembic migration: add tenant_id columns to existing shared tables with nullable backfill strategy"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT-1.7"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "ENT-1.10"
-    description: "Docker-compose PostgreSQL for testing: postgres:15-alpine with auto-migration, healthcheck, CI/CD integration"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["ENT-1.7", "ENT-1.8", "ENT-1.9"]
-    estimated_effort: "3h"
-    priority: "medium"
-
-  - id: "ENT-1.12"
-    description: "Migration rollback testing: upgrade/downgrade idempotency, data preservation, no dangling FKs (tests/integration/test_migrations.py)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT-1.7", "ENT-1.8"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "ENT-1.11"
-    description: "Schema integration tests: tenant isolation, content_hash deduplication, collection nesting, edge cases (tests/integration/test_enterprise_schema.py)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT-1.10"]
-    estimated_effort: "3h"
-    priority: "high"
-
+- id: ENT-1.1
+  description: 'PostgreSQL schema design document: tenant-aware schema DDL for all
+    4 enterprise tables, indexes, constraints, tenant isolation strategy'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 3h
+  priority: critical
+- id: ENT-1.6
+  description: 'Design tenant scoping strategy: WHERE tenant_id = ? filtering pattern,
+    context propagation, RLS migration path. Bootstrap strategy uses DEFAULT_TENANT_ID
+    constant (single-tenant mode); no AuthContext dependency in Phase 1.'
+  status: completed
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - ENT-1.1
+  estimated_effort: 2h
+  priority: high
+- id: ENT-1.2
+  description: Create enterprise_artifacts table with tenant_id isolation, JSONB tags/custom_fields,
+    composite unique constraint
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT-1.1
+  estimated_effort: 3h
+  priority: high
+- id: ENT-1.4
+  description: Create enterprise_collections table with tenant_id index, is_default
+    flag, unique constraint on (tenant_id, name)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT-1.1
+  estimated_effort: 2h
+  priority: high
+- id: ENT-1.9
+  description: 'Database connection factory: env-based PostgreSQL/SQLite selection
+    via DATABASE_URL / SKILLMEAT_DATABASE_URL'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT-1.1
+  estimated_effort: 2h
+  priority: high
+- id: ENT-1.3
+  description: Create artifact_versions table with content_hash (SHA256), markdown_payload,
+    commit_sha, FK to enterprise_artifacts
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT-1.2
+  estimated_effort: 2h
+  priority: high
+- id: ENT-1.5
+  description: Create enterprise_collection_artifacts junction table with order_index,
+    composite FK, unique(collection_id, artifact_id)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT-1.4
+  - ENT-1.2
+  estimated_effort: 2h
+  priority: high
+- id: ENT-1.7
+  description: 'Alembic migration: create enterprise schema (all 4 tables, indexes,
+    FK constraints, reversible upgrade/downgrade)'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT-1.2
+  - ENT-1.3
+  - ENT-1.4
+  - ENT-1.5
+  estimated_effort: 4h
+  priority: high
+- id: ENT-1.8
+  description: 'Alembic migration: add tenant_id columns to existing shared tables
+    with nullable backfill strategy'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT-1.7
+  estimated_effort: 3h
+  priority: high
+- id: ENT-1.10
+  description: 'Docker-compose PostgreSQL for testing: postgres:15-alpine with auto-migration,
+    healthcheck, CI/CD integration'
+  status: completed
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - ENT-1.7
+  - ENT-1.8
+  - ENT-1.9
+  estimated_effort: 3h
+  priority: medium
+- id: ENT-1.12
+  description: 'Migration rollback testing: upgrade/downgrade idempotency, data preservation,
+    no dangling FKs (tests/integration/test_migrations.py)'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT-1.7
+  - ENT-1.8
+  estimated_effort: 2h
+  priority: high
+- id: ENT-1.11
+  description: 'Schema integration tests: tenant isolation, content_hash deduplication,
+    collection nesting, edge cases (tests/integration/test_enterprise_schema.py)'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT-1.10
+  estimated_effort: 3h
+  priority: high
 parallelization:
-  batch_1: ["ENT-1.1"]
-  batch_2: ["ENT-1.2", "ENT-1.4", "ENT-1.6", "ENT-1.9"]
-  batch_3: ["ENT-1.3", "ENT-1.5"]
-  batch_4: ["ENT-1.7"]
-  batch_5: ["ENT-1.8"]
-  batch_6: ["ENT-1.10", "ENT-1.12"]
-  batch_7: ["ENT-1.11"]
-  critical_path: ["ENT-1.1", "ENT-1.2", "ENT-1.3", "ENT-1.7", "ENT-1.8", "ENT-1.10", "ENT-1.11"]
-  estimated_total_time: "22h"
-
+  batch_1:
+  - ENT-1.1
+  batch_2:
+  - ENT-1.2
+  - ENT-1.4
+  - ENT-1.6
+  - ENT-1.9
+  batch_3:
+  - ENT-1.3
+  - ENT-1.5
+  batch_4:
+  - ENT-1.7
+  batch_5:
+  - ENT-1.8
+  batch_6:
+  - ENT-1.10
+  - ENT-1.12
+  batch_7:
+  - ENT-1.11
+  critical_path:
+  - ENT-1.1
+  - ENT-1.2
+  - ENT-1.3
+  - ENT-1.7
+  - ENT-1.8
+  - ENT-1.10
+  - ENT-1.11
+  estimated_total_time: 22h
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "All 12 tasks marked complete"
-    status: "pending"
-  - id: "SC-2"
-    description: "All 4 enterprise tables created with proper indexes and constraints"
-    status: "pending"
-  - id: "SC-3"
-    description: "artifact_versions table with content_hash and markdown_payload columns verified"
-    status: "pending"
-  - id: "SC-4"
-    description: "Alembic migrations created, tested, and fully reversible"
-    status: "pending"
-  - id: "SC-5"
-    description: "Docker-compose PostgreSQL functional and integrated with CI"
-    status: "pending"
-  - id: "SC-6"
-    description: "Integration tests passing: tenant isolation, versioning, constraints"
-    status: "pending"
-  - id: "SC-7"
-    description: "Zero breaking changes to existing SQLite schema"
-    status: "pending"
-  - id: "SC-8"
-    description: "Migration rollback testing passing (upgrade/downgrade leaves clean state)"
-    status: "pending"
-  - id: "SC-9"
-    description: "Schema document and tenant scoping strategy reviewed and approved by backend-architect"
-    status: "pending"
-
+- id: SC-1
+  description: All 12 tasks marked complete
+  status: pending
+- id: SC-2
+  description: All 4 enterprise tables created with proper indexes and constraints
+  status: pending
+- id: SC-3
+  description: artifact_versions table with content_hash and markdown_payload columns
+    verified
+  status: pending
+- id: SC-4
+  description: Alembic migrations created, tested, and fully reversible
+  status: pending
+- id: SC-5
+  description: Docker-compose PostgreSQL functional and integrated with CI
+  status: pending
+- id: SC-6
+  description: 'Integration tests passing: tenant isolation, versioning, constraints'
+  status: pending
+- id: SC-7
+  description: Zero breaking changes to existing SQLite schema
+  status: pending
+- id: SC-8
+  description: Migration rollback testing passing (upgrade/downgrade leaves clean
+    state)
+  status: pending
+- id: SC-9
+  description: Schema document and tenant scoping strategy reviewed and approved by
+    backend-architect
+  status: pending
 files_modified:
-  - "skillmeat/cache/migrations/versions/20260306_XXXX_create_enterprise_schema.py"
-  - "skillmeat/cache/migrations/versions/20260306_XXXX_add_tenant_isolation.py"
-  - "skillmeat/cache/config.py"
-  - "docker-compose.test.yml"
-  - "tests/integration/test_enterprise_schema.py"
-  - "tests/integration/test_migrations.py"
+- skillmeat/cache/migrations/versions/20260306_XXXX_create_enterprise_schema.py
+- skillmeat/cache/migrations/versions/20260306_XXXX_add_tenant_isolation.py
+- skillmeat/cache/config.py
+- docker-compose.test.yml
+- tests/integration/test_enterprise_schema.py
+- tests/integration/test_migrations.py
+progress: 100
+updated: '2026-03-06'
 ---
 
 # enterprise-db-storage - Phase 1: Enterprise Schema & Database Foundation
