@@ -6234,6 +6234,25 @@ def _collection_artifact_to_dto(ca: Any) -> CollectionArtifactDTO:
                 return []
         return []
 
+    def _safe_json_raw(raw: Any) -> list:
+        """Return a list from a JSON string, a list, or ``None`` — without str coercion.
+
+        Unlike :func:`_safe_json_list`, this preserves the original element
+        types (dicts, ints, etc.) so that callers such as ``parse_deployments``
+        can call ``.get()`` on the resulting items.
+        """
+        if raw is None:
+            return []
+        if isinstance(raw, list):
+            return list(raw)
+        if isinstance(raw, str) and raw.strip():
+            try:
+                parsed = json.loads(raw)
+                return list(parsed) if isinstance(parsed, list) else []
+            except (json.JSONDecodeError, TypeError):
+                return []
+        return []
+
     added = ca.added_at
     synced = ca.synced_at
     return CollectionArtifactDTO(
@@ -6249,7 +6268,7 @@ def _collection_artifact_to_dto(ca: Any) -> CollectionArtifactDTO:
         license=ca.license,
         tags=_safe_json_list(ca.tags_json),
         tools=_safe_json_list(ca.tools_json),
-        deployments=_safe_json_list(ca.deployments_json),
+        deployments=_safe_json_raw(ca.deployments_json),
         artifact_content_hash=ca.artifact_content_hash,
         artifact_structure_hash=ca.artifact_structure_hash,
         artifact_file_count=(

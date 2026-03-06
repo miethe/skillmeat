@@ -1165,7 +1165,7 @@ class CollectionArtifactDTO:
         license: Cached SPDX license identifier (e.g. ``"MIT"``).
         tags: Cached tag name strings (deserialised from ``tags_json``).
         tools: Cached tool name strings (deserialised from ``tools_json``).
-        deployments: Cached deployment path strings (from ``deployments_json``).
+        deployments: Cached deployment objects or path strings (from ``deployments_json``).
         artifact_content_hash: SHA-256 hash of artifact file contents.
         artifact_structure_hash: Hash of the artifact directory structure.
         artifact_file_count: Number of files in the artifact.
@@ -1185,7 +1185,7 @@ class CollectionArtifactDTO:
     license: str | None = None
     tags: List[str] = field(default_factory=list)
     tools: List[str] = field(default_factory=list)
-    deployments: List[str] = field(default_factory=list)
+    deployments: List[Any] = field(default_factory=list)
     artifact_content_hash: str | None = None
     artifact_structure_hash: str | None = None
     artifact_file_count: int | None = None
