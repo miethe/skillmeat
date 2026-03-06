@@ -1632,9 +1632,9 @@ async def delete_user_collection(
 )
 async def list_collection_artifacts(
     collection_id: str,
-    session: DbSessionDep,
     artifact_mgr: ArtifactManagerDep,
     collection_repo: DbUserCollectionRepoDep,
+    artifact_repo_ca: DbCollectionArtifactRepoDep,
     token: TokenDep,
     limit: int = Query(default=20, ge=1, le=100),
     after: Optional[str] = Query(default=None),
@@ -1654,10 +1654,9 @@ async def list_collection_artifacts(
 
     Args:
         collection_id: Collection identifier
-        session: Database session (used for complex GroupArtifact joins pending
-            IDbGroupArtifactRepository implementation)
         artifact_mgr: Artifact manager for filesystem metadata fallback
         collection_repo: DB user collection repository (injected)
+        artifact_repo_ca: DB collection artifact repository (injected)
         token: Authentication token
         limit: Number of items per page
         after: Cursor for next page
@@ -1688,46 +1687,21 @@ async def list_collection_artifacts(
                 detail=f"Collection '{collection_id}' not found",
             )
 
-        # Build query for collection artifacts.
-        # CollectionArtifact uses artifact_uuid FK; join Artifact for ordering
-        # by the stable type:name id string (Artifact.id).
-        all_associations = (
-            session.execute(
-                select(CollectionArtifact)
-                .join(Artifact, Artifact.uuid == CollectionArtifact.artifact_uuid)
-                .filter(CollectionArtifact.collection_id == collection_id)
-                .order_by(Artifact.id)
-            )
-            .scalars()
-            .all()
-        )
+        # Fetch all memberships ordered by artifact type:name ID via repository DI.
+        all_associations = artifact_repo_ca.list_all_ordered(collection_id)
 
         # Filter by group membership if group_id is provided
         if group_id:
-            # Get artifact UUIDs that belong to the specified group, then resolve
-            # to type:name ids for comparison with CollectionArtifact instances.
-            group_artifact_uuids = {
-                row[0]
-                for row in session.execute(
-                    select(GroupArtifact.artifact_uuid).filter_by(group_id=group_id)
-                ).all()
-            }
-            # Filter associations to only those in the group
+            group_artifact_uuids = artifact_repo_ca.get_group_artifact_uuids(group_id)
             all_associations = [
                 assoc
                 for assoc in all_associations
                 if assoc.artifact_uuid in group_artifact_uuids
             ]
 
-        # Build a UUID → artifact_id map for all associations (needed for filtering
-        # and cursor operations before the page slice is known).
+        # Batch-resolve artifact_uuid → type:name id for all associations.
         all_uuids = [a.artifact_uuid for a in all_associations]
-        all_uuid_to_id: dict[str, str] = {}
-        if all_uuids:
-            id_rows = session.execute(
-                select(Artifact.uuid, Artifact.id).filter(Artifact.uuid.in_(all_uuids))
-            ).all()
-            all_uuid_to_id = {r[0]: r[1] for r in id_rows}
+        all_uuid_to_id = artifact_repo_ca.resolve_uuid_to_id_batch(all_uuids)
 
         # Filter by artifact type BEFORE cursor pagination.
         # This keeps page boundaries and total_count consistent with the selected tab.
@@ -1759,74 +1733,38 @@ async def list_collection_artifacts(
         end_idx = start_idx + limit
         page_associations = all_associations[start_idx:end_idx]
 
-        # Batch fetch sources from DB (avoids N+1 queries).
-        # CollectionArtifact uses artifact_uuid FK; join Artifact to map
-        # type:name ids → source values in a single query.
+        # Batch fetch sources from DB via repository DI (avoids N+1 queries).
         source_lookup: dict[str, str] = {}
         if page_associations:
             page_artifact_uuids = [assoc.artifact_uuid for assoc in page_associations]
-            db_sources = session.execute(
-                select(Artifact.id, CollectionArtifact.source)
-                .join(
-                    CollectionArtifact,
-                    CollectionArtifact.artifact_uuid == Artifact.uuid,
-                )
-                .filter(CollectionArtifact.artifact_uuid.in_(page_artifact_uuids))
-                .filter(CollectionArtifact.source.isnot(None))
-            ).all()
-            source_lookup = {row[0]: row[1] for row in db_sources}
+            source_lookup = artifact_repo_ca.get_source_for_uuids(page_artifact_uuids)
 
-        # Batch fetch group memberships if requested (avoids N+1 queries)
+        # Batch fetch group memberships if requested via repository DI.
         artifact_groups_map: dict[str, list[ArtifactGroupMembership]] = {}
         if include_groups and page_associations:
             page_artifact_uuids = [assoc.artifact_uuid for assoc in page_associations]
-
-            # Get all groups in this collection
-            collection_group_ids = [
-                row[0]
-                for row in session.execute(
-                    select(Group.id).filter(Group.collection_id == collection_id)
-                ).all()
-            ]
-
-            if collection_group_ids:
-                # Batch query: get all group-artifact associations for page artifacts
-                # within collection's groups.
-                # GroupArtifact uses artifact_uuid FK; join Artifact to resolve
-                # the type:name id for the lookup map key.
-                group_artifacts = session.execute(
-                    select(GroupArtifact, Group, Artifact)
-                    .join(Group, GroupArtifact.group_id == Group.id)
-                    .join(Artifact, Artifact.uuid == GroupArtifact.artifact_uuid)
-                    .filter(
-                        GroupArtifact.artifact_uuid.in_(page_artifact_uuids),
-                        GroupArtifact.group_id.in_(collection_group_ids),
+            membership_rows = artifact_repo_ca.get_group_memberships_batch(
+                page_artifact_uuids, collection_id
+            )
+            for row in membership_rows:
+                artifact_id = row["artifact_id"]
+                if artifact_id not in artifact_groups_map:
+                    artifact_groups_map[artifact_id] = []
+                artifact_groups_map[artifact_id].append(
+                    ArtifactGroupMembership(
+                        id=row["group_id"],
+                        name=row["group_name"],
+                        position=row["position"],
                     )
-                ).all()
+                )
 
-                # Build lookup map: artifact_id (type:name) -> list of group memberships
-                for ga, group, artifact in group_artifacts:
-                    artifact_id = artifact.id
-                    if artifact_id not in artifact_groups_map:
-                        artifact_groups_map[artifact_id] = []
-                    artifact_groups_map[artifact_id].append(
-                        ArtifactGroupMembership(
-                            id=group.id,
-                            name=group.name,
-                            position=ga.position,
-                        )
-                    )
-
-        # Build UUID → artifact_id lookup to avoid N+1 queries in the loop below.
-        # CollectionArtifact has an artifact_id property that lazy-loads the Artifact
-        # relationship; batch-resolve here for all page items at once instead.
-        uuid_to_artifact_id: dict[str, str] = {}
-        if page_associations:
-            uuids = [a.artifact_uuid for a in page_associations]
-            rows = session.execute(
-                select(Artifact.uuid, Artifact.id).filter(Artifact.uuid.in_(uuids))
-            ).all()
-            uuid_to_artifact_id = {r[0]: r[1] for r in rows}
+        # Build UUID → artifact_id lookup for the page items.
+        # all_uuid_to_id already contains all association UUIDs; re-use it.
+        uuid_to_artifact_id = {
+            uuid: all_uuid_to_id[uuid]
+            for uuid in (a.artifact_uuid for a in page_associations)
+            if uuid in all_uuid_to_id
+        }
 
         # Fetch artifact metadata for each association
         # Priority: 1. DB cache (if synced_at is set), 2. File system, 3. Marketplace
