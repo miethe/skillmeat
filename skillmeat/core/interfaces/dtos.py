@@ -1192,6 +1192,8 @@ class CollectionArtifactDTO:
     artifact_total_size: int | None = None
     source: str | None = None
     origin: str | None = None
+    origin_source: str | None = None
+    version: str | None = None
     resolved_sha: str | None = None
     resolved_version: str | None = None
     synced_at: str | None = None
@@ -1248,6 +1250,8 @@ class CollectionArtifactDTO:
             artifact_total_size=int(total_size) if total_size is not None else None,
             source=data.get("source"),
             origin=data.get("origin"),
+            origin_source=data.get("origin_source"),
+            version=data.get("version"),
             resolved_sha=data.get("resolved_sha"),
             resolved_version=data.get("resolved_version"),
             synced_at=_to_iso(data.get("synced_at")),

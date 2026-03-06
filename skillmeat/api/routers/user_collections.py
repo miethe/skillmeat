@@ -8,11 +8,9 @@ import base64
 import json
 import logging
 from datetime import datetime
-from typing import Annotated, List, Optional
+from typing import List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Body, HTTPException, Query, status
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
@@ -39,7 +37,6 @@ from skillmeat.api.schemas.collections import (
     UpdateCheckResponse,
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
-from skillmeat.api.schemas.deployments import DeploymentSummary
 from skillmeat.api.schemas.user_collections import (
     AddArtifactsRequest,
     ArtifactGroupMembership,
@@ -63,12 +60,6 @@ from skillmeat.core.artifact import ArtifactType as CoreArtifactType
 from skillmeat.core.refresher import CollectionRefresher, RefreshMode, validate_fields
 from skillmeat.cache.models import (
     DEFAULT_COLLECTION_ID,
-    DEFAULT_COLLECTION_NAME,
-    Artifact,
-    Collection,
-    CollectionArtifact,
-    Group,
-    GroupArtifact,
     Project,
 )
 
@@ -160,6 +151,15 @@ def collection_to_response(
     group_count = len(collection_repo.get_groups(collection_dto.id))
     artifact_count = collection_repo.get_artifact_count(collection_dto.id)
 
+    def _parse_dt(value: Optional[str]) -> datetime:
+        """Parse ISO-8601 string to datetime; fall back to utcnow on failure."""
+        if value:
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                pass
+        return datetime.utcnow()
+
     return UserCollectionResponse(
         id=collection_dto.id,
         name=collection_dto.name,
@@ -167,8 +167,8 @@ def collection_to_response(
         created_by=collection_dto.created_by,
         collection_type=collection_dto.collection_type,
         context_category=collection_dto.context_category,
-        created_at=collection_dto.created_at,
-        updated_at=collection_dto.updated_at,
+        created_at=_parse_dt(collection_dto.created_at),
+        updated_at=_parse_dt(collection_dto.updated_at),
         group_count=group_count,
         artifact_count=artifact_count,
     )
@@ -731,23 +731,34 @@ def populate_collection_artifact_metadata(
 
         deployment_mgr = DeploymentManager()
 
-        # Ensure project_repo is available for listing known projects
-        if project_repo is None:
-            from skillmeat.core.repositories import LocalProjectRepository as _ProjRepo
-
-            project_repo = _ProjRepo()
-
-        # Get all known projects from DB cache via repository DI
-        all_project_dtos = project_repo.list()
+        # Build project_paths: prefer injected repo, fall back to direct DB query
         project_paths = []
-        for proj_dto in all_project_dtos:
-            proj_path = Path(proj_dto.path)
-            if proj_path.exists():
-                project_paths.append((proj_dto.name, proj_path))
-            else:
-                logger.debug(
-                    f"Skipping project '{proj_dto.name}' — path does not exist: {proj_dto.path}"
-                )
+        if project_repo is not None:
+            for proj_dto in project_repo.list():
+                proj_path = Path(proj_dto.path)
+                if proj_path.exists():
+                    project_paths.append((proj_dto.name, proj_path))
+                else:
+                    logger.debug(
+                        f"Skipping project '{proj_dto.name}' — path does not exist: {proj_dto.path}"
+                    )
+        else:
+            # Fallback: query Project table directly (no path_resolver needed)
+            from skillmeat.cache.models import get_session as _get_db_session
+
+            _db_sess = _get_db_session()
+            try:
+                _proj_rows: list[Project] = _db_sess.query(Project).all()
+            finally:
+                _db_sess.close()
+            for _row in _proj_rows:
+                _proj_path = Path(_row.path)
+                if _proj_path.exists():
+                    project_paths.append((_row.name, _proj_path))
+                else:
+                    logger.debug(
+                        f"Skipping project '{_row.name}' — path does not exist: {_row.path}"
+                    )
 
         # Fallback: if no projects in DB, at least scan cwd
         if not project_paths:
@@ -779,11 +790,7 @@ def populate_collection_artifact_metadata(
 
                 deployments_by_artifact[artifact_name].append(
                     {
-                        "project_path": (
-                            str(deployment.project_path)
-                            if hasattr(deployment, "project_path")
-                            else str(project_path)
-                        ),
+                        "project_path": str(project_path),
                         "project_name": project_name,
                         "deployed_at": (
                             deployment.deployed_at.isoformat()
@@ -1766,6 +1773,14 @@ async def list_collection_artifacts(
             if uuid in all_uuid_to_id
         }
 
+        # Acquire a session for legacy helpers that still require one
+        # (_get_artifact_collections, get_artifact_metadata).  These have not
+        # yet been migrated to repository DI; a single shared session per
+        # request is safe here because the helpers are read-only.
+        from skillmeat.cache.models import get_session as _get_session_for_lookup
+
+        _lookup_session = _get_session_for_lookup()
+
         # Fetch artifact metadata for each association
         # Priority: 1. DB cache (if synced_at is set), 2. File system, 3. Marketplace
         items: List[ArtifactSummary] = []
@@ -1782,13 +1797,9 @@ async def list_collection_artifacts(
 
             # 1. Primary: Try to build from DB cache (check synced_at)
             if assoc.synced_at is not None:
-                # Cache hit - use cached fields from CollectionArtifact
-                tags = None
-                if assoc.tags_json:
-                    try:
-                        tags = json.loads(assoc.tags_json)
-                    except (json.JSONDecodeError, TypeError):
-                        tags = None
+                # Cache hit - use cached fields from CollectionArtifact DTO.
+                # assoc.tags is already a List[str] (parsed from tags_json by DTO).
+                tags = assoc.tags or None
 
                 # Resolve source: DB lookup > filesystem > artifact_id fallback
                 db_source = source_lookup.get(resolved_artifact_id)
@@ -1826,13 +1837,15 @@ async def list_collection_artifacts(
                     description=assoc.description,
                     author=assoc.author,
                     tags=tags,
-                    tools=assoc.tools,
+                    tools=assoc.tools or None,
                     origin=assoc.origin,
                     origin_source=assoc.origin_source,
                     collections=_get_artifact_collections(
-                        session, resolved_artifact_id
+                        _lookup_session, resolved_artifact_id
                     ),
-                    deployments=parse_deployments(assoc.deployments_json),
+                    deployments=parse_deployments(
+                        json.dumps(assoc.deployments) if assoc.deployments else None
+                    ),
                 )
                 logger.debug(f"Cache hit for {resolved_artifact_id}")
 
@@ -1890,9 +1903,13 @@ async def list_collection_artifacts(
                             origin=getattr(file_artifact, "origin", None),
                             origin_source=getattr(file_artifact, "origin_source", None),
                             collections=_get_artifact_collections(
-                                session, resolved_artifact_id
+                                _lookup_session, resolved_artifact_id
                             ),
-                            deployments=parse_deployments(assoc.deployments_json),
+                            deployments=parse_deployments(
+                                json.dumps(assoc.deployments)
+                                if assoc.deployments
+                                else None
+                            ),
                         )
                         logger.debug(f"File-based lookup for {resolved_artifact_id}")
                 except (ValueError, Exception) as e:
@@ -1903,13 +1920,17 @@ async def list_collection_artifacts(
 
             # 3. Last resort: Fallback to marketplace/database service
             if artifact_summary is None:
-                artifact_summary = get_artifact_metadata(session, resolved_artifact_id)
+                artifact_summary = get_artifact_metadata(
+                    _lookup_session, resolved_artifact_id
+                )
                 logger.debug(f"Marketplace fallback for {resolved_artifact_id}")
 
-            # Add deployments from cache to all artifact summaries
-            # (deployments are always sourced from CollectionArtifact.deployments_json)
+            # Add deployments from cache to all artifact summaries.
+            # assoc.deployments is already a List[str] parsed from deployments_json by DTO.
             if artifact_summary and not artifact_summary.deployments:
-                artifact_summary.deployments = parse_deployments(assoc.deployments_json)
+                artifact_summary.deployments = parse_deployments(
+                    json.dumps(assoc.deployments) if assoc.deployments else None
+                )
 
             if include_groups:
                 # Add groups field to artifact summary while preserving all metadata
@@ -1934,6 +1955,12 @@ async def list_collection_artifacts(
                 )
             else:
                 items.append(artifact_summary)
+
+        # Close the lookup session opened for legacy helper functions above.
+        try:
+            _lookup_session.close()
+        except Exception:
+            pass
 
         # Build pagination info
         has_next = end_idx < len(all_associations)
@@ -2291,6 +2318,12 @@ async def add_entity_to_collection(
                 detail=f"Entity '{entity_id}' not found",
             )
         entity_uuid = entity_dto.uuid
+        if not entity_uuid:
+            logger.warning(f"Entity {entity_id} has no UUID in cache — cannot add")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Entity '{entity_id}' is not yet cached (no UUID); run a cache refresh first",
+            )
 
         # Check if association already exists via repository
         existing = artifact_repo_ca.get_by_pk(collection_id, entity_uuid)
