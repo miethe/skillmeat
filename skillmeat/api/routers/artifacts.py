@@ -8987,14 +8987,25 @@ async def get_similar_artifacts(
         # 1. Resolve type:name → UUID.  Artifact.id stores the 'type:name' string;
         #    SimilarityService and SimilarityCacheManager expect the hex UUID.
         artifact_dto = artifact_repo.get(artifact_id)
-        if artifact_dto is None or artifact_dto.uuid is None:
-            logger.info("Artifact not found in DB cache: '%s'", artifact_id)
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found",
+        if artifact_dto is not None and artifact_dto.uuid is not None:
+            artifact_uuid: str = str(artifact_dto.uuid)
+        else:
+            # Filesystem miss — try DB-only UUID resolution (artifact may be in cache but not on FS)
+            try:
+                _type_str, _name = artifact_id.split(":", 1)
+            except ValueError:
+                _type_str, _name = "", artifact_id
+            _fallback_uuid = artifact_repo.resolve_uuid_by_type_name(_type_str, _name)
+            if _fallback_uuid is None:
+                logger.info("Artifact not found in collection or DB cache: '%s'", artifact_id)
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Artifact '{artifact_id}' not found",
+                )
+            artifact_uuid = _fallback_uuid
+            logger.debug(
+                "Resolved UUID for '%s' via DB fallback: %s", artifact_id, artifact_uuid
             )
-
-        artifact_uuid: str = str(artifact_dto.uuid)
 
         # 2. Try the similarity cache first.  Only the collection source is
         #    cached — marketplace and cross-source searches always go live.
