@@ -674,6 +674,8 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
 
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
+
         self._apply_auth_context(auth_context)
         obj = self.session.get(EnterpriseArtifact, artifact_id)
         if obj is None:
@@ -687,6 +689,17 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
                 artifact_id,
             )
             return None
+        # ENT-002: Enforce visibility after tenant check.  Private artifacts
+        # are only visible to their owner; admins bypass the filter.
+        # Returns None for both not-found and not-visible (prevents existence
+        # disclosure — callers cannot distinguish the two cases).
+        if auth_context is not None:
+            stmt = apply_visibility_filter_stmt(
+                select(EnterpriseArtifact).where(EnterpriseArtifact.id == artifact_id),
+                EnterpriseArtifact,
+                auth_context,
+            )
+            obj = self.session.execute(stmt).scalar_one_or_none()
         return obj
 
     def get_by_uuid(
@@ -720,9 +733,16 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
 
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
+
         self._apply_auth_context(auth_context)
         parsed: uuid.UUID = uuid.UUID(artifact_uuid)
         stmt = self._tenant_select().where(EnterpriseArtifact.id == parsed)
+        # ENT-002: Enforce visibility access control when auth context is present.
+        # Returns None for both not-found and not-visible (prevents existence
+        # disclosure — callers cannot distinguish the two cases).
+        if auth_context is not None:
+            stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
         return self.session.execute(stmt).scalar_one_or_none()
 
     def get_by_name(
@@ -752,6 +772,8 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
 
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
+
         self._apply_auth_context(auth_context)
         stmt = (
             self._tenant_select()
@@ -759,6 +781,11 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             .order_by(EnterpriseArtifact.created_at)
             .limit(1)
         )
+        # ENT-002: Enforce visibility access control when auth context is present.
+        # Returns None for both not-found and not-visible (prevents existence
+        # disclosure — callers cannot distinguish the two cases).
+        if auth_context is not None:
+            stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
         return self.session.execute(stmt).scalar_one_or_none()
 
     # ------------------------------------------------------------------
@@ -817,6 +844,7 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         # ENT-002: Apply visibility-based access control when auth context is
         # present.  Public and team items are visible to all tenant members;
         # private items are restricted to their owner.
+        # Visibility-excluded items are silently omitted from results.
         if auth_context is not None:
             stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
         stmt = stmt.offset(offset).limit(limit)
@@ -845,13 +873,25 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         from sqlalchemy import func
 
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
 
         self._apply_auth_context(auth_context)
-        stmt = self._apply_tenant_filter(
-            select(func.count()).select_from(EnterpriseArtifact)
-        )
-        if artifact_type is not None:
-            stmt = stmt.where(EnterpriseArtifact.artifact_type == artifact_type)
+        # ENT-002: For count with visibility, use a subquery approach so that
+        # apply_visibility_filter_stmt (which works on a Select of the model)
+        # can add its WHERE predicates before wrapping in count().
+        # Counts only visibility-filtered results — excluded artifacts are not counted.
+        if auth_context is not None:
+            inner = self._tenant_select()
+            if artifact_type is not None:
+                inner = inner.where(EnterpriseArtifact.artifact_type == artifact_type)
+            inner = apply_visibility_filter_stmt(inner, EnterpriseArtifact, auth_context)
+            stmt = select(func.count()).select_from(inner.subquery())
+        else:
+            stmt = self._apply_tenant_filter(
+                select(func.count()).select_from(EnterpriseArtifact)
+            )
+            if artifact_type is not None:
+                stmt = stmt.where(EnterpriseArtifact.artifact_type == artifact_type)
         result = self.session.execute(stmt).scalar_one()
         return int(result)
 
@@ -929,6 +969,13 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
                 .order_by(EnterpriseArtifact.created_at.desc())
             )
 
+        # ENT-002: Enforce visibility access control when auth context is present.
+        # Visibility-excluded items are silently omitted from results.
+        if auth_context is not None:
+            from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
+
+            stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
+
         return list(self.session.execute(stmt).scalars().all())
 
     # ------------------------------------------------------------------
@@ -967,7 +1014,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         from skillmeat.cache.models_enterprise import EnterpriseArtifactVersion
 
         self._apply_auth_context(auth_context)
-        artifact = self.get(artifact_id)
+        # get() returns None for both not-found and not-visible (prevents existence
+        # disclosure).  Propagate None immediately — no separate access-denied path.
+        artifact = self.get(artifact_id, auth_context=auth_context)
         if artifact is None:
             return None
 
@@ -1013,7 +1062,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         from skillmeat.cache.models_enterprise import EnterpriseArtifactVersion
 
         self._apply_auth_context(auth_context)
-        artifact = self.get(artifact_id)
+        # get() returns None for both not-found and not-visible (prevents existence
+        # disclosure).  Propagate empty list immediately — no separate access-denied path.
+        artifact = self.get(artifact_id, auth_context=auth_context)
         if artifact is None:
             return []
 
@@ -1459,6 +1510,13 @@ class EnterpriseCollectionRepository(
     ) -> "Optional[EnterpriseCollection]":
         """Retrieve a collection by primary key, asserting tenant ownership.
 
+        .. note::
+            Collections are intentionally **not** visibility-filtered.
+            ``EnterpriseCollection`` has no ``visibility`` column — all tenant
+            members share access to every collection (shared-library model).
+            Visibility filtering applies only to the *artifacts* returned
+            through a collection (see :meth:`list_artifacts`).
+
         Parameters
         ----------
         collection_id:
@@ -1493,6 +1551,13 @@ class EnterpriseCollectionRepository(
     ) -> "Optional[EnterpriseCollection]":
         """Retrieve a collection by name within the current tenant.
 
+        .. note::
+            Collections are intentionally **not** visibility-filtered.
+            ``EnterpriseCollection`` has no ``visibility`` column — all tenant
+            members share access to every collection (shared-library model).
+            Visibility filtering applies only to the *artifacts* returned
+            through a collection (see :meth:`list_artifacts`).
+
         Parameters
         ----------
         name:
@@ -1518,6 +1583,13 @@ class EnterpriseCollectionRepository(
         auth_context: Optional["AuthContext"] = None,
     ) -> "List[EnterpriseCollection]":
         """Return a paginated list of collections for the current tenant.
+
+        .. note::
+            Collections are intentionally **not** visibility-filtered.
+            ``EnterpriseCollection`` has no ``visibility`` column — all tenant
+            members share access to every collection (shared-library model).
+            Visibility filtering applies only to the *artifacts* returned
+            through a collection (see :meth:`list_artifacts`).
 
         Parameters
         ----------
@@ -1676,9 +1748,24 @@ class EnterpriseCollectionRepository(
     # ------------------------------------------------------------------
 
     def _get_artifact_for_tenant(
-        self, artifact_id: uuid.UUID
+        self,
+        artifact_id: uuid.UUID,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "Optional[EnterpriseArtifact]":
         """Return an EnterpriseArtifact if it exists and belongs to the current tenant.
+
+        This is a write-path helper (called from :meth:`add_artifact`).
+        Visibility filtering is intentionally not applied here: write
+        operations check tenant isolation only, not per-user visibility.
+
+        Parameters
+        ----------
+        artifact_id:
+            UUID of the artifact to look up.
+        auth_context:
+            Optional authentication context.  Reserved for future use;
+            currently unused in write-path existence checks (``None`` is the
+            expected default).
 
         Raises
         ------
@@ -1841,7 +1928,16 @@ class EnterpriseCollectionRepository(
         collection_id: uuid.UUID,
         auth_context: Optional["AuthContext"] = None,
     ) -> "List[EnterpriseArtifact]":
-        """Return the artifacts in a collection, ordered by position.
+        """Return the visibility-filtered artifacts in a collection, ordered by position.
+
+        Collections themselves are public-within-tenant (no ``visibility``
+        column on ``EnterpriseCollection``).  However, the *artifacts* inside
+        a collection DO carry per-row visibility, so a tenant member must not
+        see private artifacts owned by someone else just because they share a
+        collection.  When *auth_context* is provided,
+        :func:`~skillmeat.core.repositories.filters.apply_visibility_filter_stmt`
+        is applied to the ``EnterpriseArtifact`` half of the join so that only
+        rows the caller is permitted to see are returned.
 
         Parameters
         ----------
@@ -1849,12 +1945,14 @@ class EnterpriseCollectionRepository(
             UUID of the collection.
         auth_context:
             Optional authentication context.  When provided, sets the active
-            tenant via ``TenantContext`` before the ownership check.
+            tenant via ``TenantContext`` before the ownership check and applies
+            per-user visibility filtering to the returned artifacts.
 
         Returns
         -------
         List[EnterpriseArtifact]
-            Artifacts ordered by ``order_index`` ascending.
+            Artifacts ordered by ``order_index`` ascending, filtered by the
+            caller's visibility permissions when *auth_context* is not ``None``.
 
         Raises
         ------
@@ -1865,6 +1963,7 @@ class EnterpriseCollectionRepository(
             EnterpriseArtifact,
             EnterpriseCollectionArtifact,
         )
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
 
         self._apply_auth_context(auth_context)
         collection = self.get(collection_id)
@@ -1883,6 +1982,11 @@ class EnterpriseCollectionRepository(
             )
             .order_by(EnterpriseCollectionArtifact.order_index)
         )
+        # ENT-002: Visibility-excluded artifacts are silently omitted from
+        # results.  Members cannot see private artifacts owned by others even
+        # when they share the same collection.
+        if auth_context is not None:
+            stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
         return list(self.session.execute(stmt).scalars())
 
     def reorder_artifacts(
