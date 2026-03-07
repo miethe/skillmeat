@@ -16,8 +16,8 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 9
-completed_tasks: 3
-in_progress_tasks: 5
+completed_tasks: 4
+in_progress_tasks: 4
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
@@ -59,7 +59,7 @@ tasks:
   priority: high
 - id: TEST-005
   description: Frontend auth component tests (Clerk, workspace switcher)
-  status: in_progress
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies: []
@@ -140,7 +140,7 @@ files_modified:
 - skillmeat/web/tests/auth.e2e.ts
 - skillmeat/cli/tests/test_auth_flow.py
 - skillmeat/tests/test_security_edge_cases.py
-progress: 33
+progress: 44
 updated: '2026-03-07'
 ---
 
