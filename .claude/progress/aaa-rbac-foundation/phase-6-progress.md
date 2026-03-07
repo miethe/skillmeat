@@ -8,7 +8,7 @@ prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/aaa-rbac-foundation-v1.md
 phase: 6
 title: CLI Authentication - Device Code Flow & Credential Storage
-status: pending
+status: completed
 started: null
 completed: null
 commit_refs: []
@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 7
+completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -89,7 +89,7 @@ tasks:
 - id: CLI-008
   description: CLI integration tests (mocked device code flow, PAT input, credential
     storage)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -139,7 +139,7 @@ files_modified:
 - skillmeat/cli/http_client.py
 - skillmeat/cli.py
 updated: '2026-03-07'
-progress: 87
+progress: 100
 ---
 
 # aaa-rbac-foundation - Phase 6: CLI Authentication - Device Code Flow & Credential Storage
