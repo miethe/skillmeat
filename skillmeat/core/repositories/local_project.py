@@ -37,9 +37,12 @@ import base64
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import ArtifactDTO, ProjectDTO
 from skillmeat.core.interfaces.repositories import IProjectRepository
 from skillmeat.core.path_resolver import ProjectPathResolver
@@ -332,6 +335,7 @@ class LocalProjectRepository(IProjectRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[ProjectDTO]:
         """Return the project identified by *id*.
 
@@ -374,6 +378,7 @@ class LocalProjectRepository(IProjectRepository):
         self,
         filters: Optional[Dict[str, Any]] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[ProjectDTO]:
         """Return all known projects, optionally filtered.
 
@@ -419,6 +424,7 @@ class LocalProjectRepository(IProjectRepository):
         self,
         dto: ProjectDTO,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> ProjectDTO:
         """Register a new project and persist it to the DB cache.
 
@@ -469,6 +475,7 @@ class LocalProjectRepository(IProjectRepository):
         id: str,
         updates: Dict[str, Any],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> ProjectDTO:
         """Apply a partial update to an existing project.
 
@@ -526,6 +533,7 @@ class LocalProjectRepository(IProjectRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Remove a project record from the DB cache.
 
@@ -557,6 +565,7 @@ class LocalProjectRepository(IProjectRepository):
         self,
         project_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[ArtifactDTO]:
         """Return all artifacts deployed to a project.
 
@@ -642,6 +651,7 @@ class LocalProjectRepository(IProjectRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> ProjectDTO:
         """Re-scan a project's deployment files and sync to the DB cache.
 
@@ -734,6 +744,7 @@ class LocalProjectRepository(IProjectRepository):
         self,
         path: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[ProjectDTO]:
         """Return the project whose filesystem path matches *path*.
 
@@ -770,6 +781,7 @@ class LocalProjectRepository(IProjectRepository):
         self,
         path: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> ProjectDTO:
         """Return the project for *path*, creating a DB record if absent.
 

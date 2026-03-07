@@ -19,10 +19,13 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from skillmeat.core.collection import CollectionManager
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import ArtifactDTO, CollectionDTO
 from skillmeat.core.interfaces.repositories import ICollectionRepository
 from skillmeat.core.path_resolver import ProjectPathResolver
@@ -71,6 +74,7 @@ class LocalCollectionRepository(ICollectionRepository):
     def get(
         self,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[CollectionDTO]:
         """Return the active collection's metadata.
 
@@ -92,6 +96,7 @@ class LocalCollectionRepository(ICollectionRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[CollectionDTO]:
         """Return the collection identified by *id* (collection name).
 
@@ -118,6 +123,7 @@ class LocalCollectionRepository(ICollectionRepository):
     def list(
         self,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[CollectionDTO]:
         """Return all collections known to the manager.
 
@@ -139,6 +145,7 @@ class LocalCollectionRepository(ICollectionRepository):
     def get_stats(
         self,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Dict[str, Any]:
         """Return aggregate statistics for the active collection.
 
@@ -197,6 +204,7 @@ class LocalCollectionRepository(ICollectionRepository):
     def refresh(
         self,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> CollectionDTO:
         """Invalidate the in-memory manifest cache and reload from disk.
 
@@ -229,6 +237,7 @@ class LocalCollectionRepository(ICollectionRepository):
         offset: int = 0,
         limit: int = 50,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[ArtifactDTO]:
         """Return artifacts in *collection_id* with optional filtering and pagination.
 
@@ -299,6 +308,7 @@ class LocalCollectionRepository(ICollectionRepository):
         name: str,
         description: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> CollectionDTO:
         """Create a new collection on the filesystem.
 
@@ -327,6 +337,7 @@ class LocalCollectionRepository(ICollectionRepository):
         collection_id: str,
         updates: Dict[str, Any],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> CollectionDTO:
         """Apply a partial update to an existing collection.
 
@@ -373,6 +384,7 @@ class LocalCollectionRepository(ICollectionRepository):
         self,
         collection_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Delete a collection directory from the filesystem.
 
@@ -399,6 +411,7 @@ class LocalCollectionRepository(ICollectionRepository):
         collection_id: str,
         artifact_uuids: List[str],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Add artifacts to a collection by UUID.
 
@@ -436,6 +449,7 @@ class LocalCollectionRepository(ICollectionRepository):
         collection_id: str,
         artifact_uuid: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Remove an artifact from a collection by UUID.
 
@@ -472,6 +486,7 @@ class LocalCollectionRepository(ICollectionRepository):
         collection_id: str,
         entity_type: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[Any]:
         """Return entities associated with a collection.
 
@@ -503,6 +518,7 @@ class LocalCollectionRepository(ICollectionRepository):
         entity_type: str,
         entity_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Associate an entity with a collection in the in-memory registry.
 
@@ -531,6 +547,7 @@ class LocalCollectionRepository(ICollectionRepository):
         entity_type: str,
         entity_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Remove an entity association from a collection.
 
@@ -562,6 +579,7 @@ class LocalCollectionRepository(ICollectionRepository):
         self,
         collection_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Migrate a collection's artifacts and entities to the default collection.
 

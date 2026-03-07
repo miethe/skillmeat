@@ -31,9 +31,12 @@ import hashlib
 import logging
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import ContextEntityDTO
 from skillmeat.core.interfaces.repositories import IContextEntityRepository
 
@@ -287,6 +290,7 @@ class LocalContextEntityRepository(IContextEntityRepository):
         limit: int = 20,
         after: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[ContextEntityDTO]:
         """Return a page of context entities matching optional filter criteria.
 
@@ -358,6 +362,7 @@ class LocalContextEntityRepository(IContextEntityRepository):
         self,
         entity_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[ContextEntityDTO]:
         """Return a context entity by its identifier.
 
@@ -402,6 +407,7 @@ class LocalContextEntityRepository(IContextEntityRepository):
         target_platforms: Optional[List[str]] = None,
         category_ids: Optional[List[int]] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> ContextEntityDTO:
         """Persist a new context entity and return the stored representation.
 
@@ -479,6 +485,7 @@ class LocalContextEntityRepository(IContextEntityRepository):
         entity_id: str,
         updates: Dict[str, Any],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> ContextEntityDTO:
         """Apply a partial update to an existing context entity.
 
@@ -566,6 +573,7 @@ class LocalContextEntityRepository(IContextEntityRepository):
         self,
         entity_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Delete a context entity permanently.
 
@@ -609,6 +617,7 @@ class LocalContextEntityRepository(IContextEntityRepository):
         project_path: str,
         options: Optional[Dict[str, Any]] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Deploy a context entity's content to a filesystem project path.
 
@@ -682,6 +691,7 @@ class LocalContextEntityRepository(IContextEntityRepository):
         self,
         entity_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[str]:
         """Return the raw markdown content of a context entity.
 

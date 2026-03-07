@@ -25,9 +25,12 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import GroupArtifactDTO, GroupDTO
 from skillmeat.core.interfaces.repositories import IGroupRepository
 
@@ -197,6 +200,7 @@ class LocalGroupRepository(IGroupRepository):
         collection_id: str,
         filters: dict[str, Any] | None = None,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[GroupDTO]:
         """Return all groups in *collection_id* ordered by position.
 
@@ -286,6 +290,7 @@ class LocalGroupRepository(IGroupRepository):
         description: str | None = None,
         position: int | None = None,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> GroupDTO:
         """Create a new group in *collection_id*.
 
@@ -373,6 +378,7 @@ class LocalGroupRepository(IGroupRepository):
         group_id: int,
         updates: dict[str, Any],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> GroupDTO:
         """Apply a partial update to an existing group's metadata.
 
@@ -456,6 +462,7 @@ class LocalGroupRepository(IGroupRepository):
         self,
         group_id: int,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Delete a group and all its artifact membership records.
 
@@ -498,6 +505,7 @@ class LocalGroupRepository(IGroupRepository):
         group_id: int,
         target_collection_id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> GroupDTO:
         """Duplicate a group (and its artifact memberships) into another collection.
 
@@ -639,6 +647,7 @@ class LocalGroupRepository(IGroupRepository):
         collection_id: str,
         ordered_ids: list[int],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Bulk-set ``position`` for all groups in *collection_id*.
 
@@ -717,6 +726,7 @@ class LocalGroupRepository(IGroupRepository):
         group_id: int,
         artifact_uuids: list[str],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Add one or more artifacts (by UUID) to a group.
 
@@ -790,6 +800,7 @@ class LocalGroupRepository(IGroupRepository):
         group_id: int,
         artifact_uuid: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Remove a single artifact from a group and compact positions.
 
@@ -858,6 +869,7 @@ class LocalGroupRepository(IGroupRepository):
         artifact_uuid: str,
         position: int,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Update the display position of a single artifact within a group.
 
@@ -952,6 +964,7 @@ class LocalGroupRepository(IGroupRepository):
         group_id: int,
         ordered_uuids: list[str],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Bulk-set positions for all artifacts in a group.
 
@@ -1020,6 +1033,7 @@ class LocalGroupRepository(IGroupRepository):
         self,
         group_id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[GroupArtifactDTO]:
         """Return the ordered list of artifact membership records for a group.
 
@@ -1058,6 +1072,7 @@ class LocalGroupRepository(IGroupRepository):
         artifact_uuids: list[str],
         position: int,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Insert artifacts at a specific position within a group.
 

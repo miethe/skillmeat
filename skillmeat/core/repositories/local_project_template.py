@@ -29,9 +29,12 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import ProjectTemplateDTO, TemplateEntityDTO
 from skillmeat.core.interfaces.repositories import IProjectTemplateRepository
 
@@ -167,6 +170,7 @@ class LocalProjectTemplateRepository(IProjectTemplateRepository):
         limit: int = 50,
         offset: int = 0,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[ProjectTemplateDTO]:
         """Return a page of project templates ordered by ``created_at`` descending.
 
@@ -203,6 +207,7 @@ class LocalProjectTemplateRepository(IProjectTemplateRepository):
         self,
         filters: dict[str, Any] | None = None,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> int:
         """Return the total number of project templates matching optional filters.
 
@@ -235,6 +240,7 @@ class LocalProjectTemplateRepository(IProjectTemplateRepository):
         self,
         template_id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> ProjectTemplateDTO | None:
         """Return a project template by identifier, including full entity details.
 
@@ -271,6 +277,7 @@ class LocalProjectTemplateRepository(IProjectTemplateRepository):
         collection_id: str | None = None,
         default_project_config_id: str | None = None,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> ProjectTemplateDTO:
         """Create a new project template from an ordered list of entity IDs.
 
@@ -359,6 +366,7 @@ class LocalProjectTemplateRepository(IProjectTemplateRepository):
         template_id: str,
         updates: dict[str, Any],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> ProjectTemplateDTO:
         """Apply a partial update to an existing project template.
 
@@ -441,6 +449,7 @@ class LocalProjectTemplateRepository(IProjectTemplateRepository):
         self,
         template_id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Delete a project template and all its entity associations.
 
@@ -486,6 +495,7 @@ class LocalProjectTemplateRepository(IProjectTemplateRepository):
         project_path: str,
         options: dict[str, Any] | None = None,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> dict[str, Any]:
         """Deploy all template entities to a target project directory.
 

@@ -8,7 +8,7 @@ prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/aaa-rbac-foundation-v1.md
 phase: 2
 title: Repository & Service Layer - Auth Context Definition & Propagation
-status: pending
+status: completed
 started: null
 completed: null
 commit_refs: []
@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 5
+completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -63,7 +63,7 @@ tasks:
   priority: high
 - id: SVR-005
   description: Update local repository implementations with owner_id validation
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -73,7 +73,7 @@ tasks:
 - id: SVR-006
   description: Update enterprise repository implementations with tenant_id + owner_id
     enforcement
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   - data-layer-expert
@@ -83,7 +83,7 @@ tasks:
   priority: high
 - id: SVR-007
   description: Update artifact/collection services to accept and thread AuthContext
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -149,7 +149,7 @@ files_modified:
 - skillmeat/core/services/collection_service.py
 - skillmeat/api/schemas/artifacts.py
 - skillmeat/api/schemas/collections.py
-progress: 62
+progress: 100
 updated: '2026-03-06'
 ---
 

@@ -26,9 +26,12 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import TagDTO
 from skillmeat.core.interfaces.repositories import ITagRepository
 
@@ -196,6 +199,7 @@ class LocalTagRepository(ITagRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[TagDTO]:
         """Return a tag by its unique identifier.
 
@@ -215,6 +219,7 @@ class LocalTagRepository(ITagRepository):
         self,
         slug: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[TagDTO]:
         """Return a tag by its URL-friendly slug.
 
@@ -238,6 +243,7 @@ class LocalTagRepository(ITagRepository):
         self,
         filters: Optional[Dict[str, Any]] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[TagDTO]:
         """Return all tags, optionally filtered by name prefix.
 
@@ -272,6 +278,7 @@ class LocalTagRepository(ITagRepository):
         name: str,
         color: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> TagDTO:
         """Create a new tag.
 
@@ -302,6 +309,7 @@ class LocalTagRepository(ITagRepository):
         id: str,
         updates: Dict[str, Any],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> TagDTO:
         """Apply a partial update to an existing tag.
 
@@ -333,6 +341,7 @@ class LocalTagRepository(ITagRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Delete a tag and all its artifact associations.
 
@@ -355,6 +364,7 @@ class LocalTagRepository(ITagRepository):
         tag_id: str,
         artifact_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Associate a tag with an artifact.
 
@@ -399,6 +409,7 @@ class LocalTagRepository(ITagRepository):
         tag_id: str,
         artifact_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Remove the association between a tag and an artifact.
 
