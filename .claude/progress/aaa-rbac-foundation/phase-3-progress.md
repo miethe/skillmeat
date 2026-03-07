@@ -8,7 +8,7 @@ prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/aaa-rbac-foundation-v1.md
 phase: 3
 title: Middleware & Auth Providers - Pluggable Authentication
-status: pending
+status: completed
 started: null
 completed: null
 commit_refs: []
@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 6
+completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -72,7 +72,7 @@ tasks:
 - id: AUTH-006
   description: Create TenantContext middleware that sets ContextVar from AuthContext
     (REQ-20260306)
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -90,7 +90,7 @@ tasks:
   priority: medium
 - id: AUTH-008
   description: Unit tests for LocalAuthProvider, ClerkAuthProvider, require_auth
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -146,7 +146,7 @@ files_modified:
 - skillmeat/api/middleware/enterprise_auth.py
 - skillmeat/api/config.py
 - skillmeat/api/tests/test_auth_providers.py
-progress: 75
+progress: 100
 updated: '2026-03-07'
 ---
 

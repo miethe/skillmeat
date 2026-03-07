@@ -13,6 +13,7 @@ from .enterprise_auth import (
 )
 from .observability import ObservabilityMiddleware
 from .rate_limit import RateLimitMiddleware
+from .tenant_context import TenantContextDep, set_tenant_context_dep
 
 __all__ = [
     "AuthMiddleware",
@@ -25,4 +26,6 @@ __all__ = [
     "SlidingWindowTracker",
     "create_fingerprint",
     "ObservabilityMiddleware",
+    "TenantContextDep",
+    "set_tenant_context_dep",
 ]
