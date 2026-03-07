@@ -2,7 +2,7 @@
 title: 'Implementation Plan: AAA & RBAC Foundation (Individual & Team)'
 schema_version: 2
 doc_type: implementation_plan
-status: in-progress
+status: completed
 created: 2026-03-06
 updated: '2026-03-07'
 feature_slug: aaa-rbac-foundation
