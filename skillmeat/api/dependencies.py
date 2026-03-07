@@ -6,12 +6,15 @@ database connections, and configuration.
 """
 
 import logging
+from collections.abc import Callable, Coroutine
 from typing import Annotated, Any, Optional
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 
+from skillmeat.api.auth.provider import AuthProvider
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.config import ConfigManager
 from skillmeat.core.artifact import ArtifactManager
 from skillmeat.core.auth import TokenManager
@@ -150,6 +153,115 @@ class AppState:
 
 # Global application state (initialized in lifespan)
 app_state = AppState()
+
+# ---------------------------------------------------------------------------
+# Auth provider singleton
+# ---------------------------------------------------------------------------
+
+#: Module-level auth provider instance.  Set during app startup via
+#: ``set_auth_provider()``.  ``None`` until explicitly configured.
+_auth_provider: Optional[AuthProvider] = None
+
+
+def set_auth_provider(provider: AuthProvider) -> None:
+    """Register the application-wide authentication provider.
+
+    Call this once during startup (e.g. inside the lifespan function) before
+    any requests are handled.
+
+    Args:
+        provider: A concrete ``AuthProvider`` implementation.
+    """
+    global _auth_provider
+    _auth_provider = provider
+
+
+def get_auth_provider() -> AuthProvider:
+    """Return the configured authentication provider.
+
+    Returns:
+        The registered ``AuthProvider`` instance.
+
+    Raises:
+        HTTPException: 503 if no provider has been registered yet.
+    """
+    if _auth_provider is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication provider not configured",
+        )
+    return _auth_provider
+
+
+# ---------------------------------------------------------------------------
+# require_auth dependency
+# ---------------------------------------------------------------------------
+
+
+def require_auth(
+    scopes: list[str] | None = None,
+) -> Callable[..., Coroutine[Any, Any, AuthContext]]:
+    """FastAPI dependency factory that validates authentication and optional scopes.
+
+    Supports two usage patterns::
+
+        # No scope check — just authenticate
+        @router.get("/items")
+        async def list_items(auth: AuthContext = Depends(require_auth)):
+            ...
+
+        # With scope check — 403 if any required scope is missing
+        @router.post("/items")
+        async def create_item(auth: AuthContext = Depends(require_auth(scopes=["artifact:write"]))):
+            ...
+
+    When used directly as ``Depends(require_auth)`` FastAPI calls ``require_auth``
+    with no arguments (its default signature), which returns an inner coroutine
+    that FastAPI then calls with the ``Request``.  When used as
+    ``Depends(require_auth(scopes=[...]))`` the outer call returns the same inner
+    coroutine type, so both forms are structurally identical to FastAPI.
+
+    Args:
+        scopes: Optional list of scope strings (e.g. ``["artifact:read"]``) that
+            the authenticated context must carry.  Uses ``AuthContext.has_scope``
+            which honours the ``admin:*`` wildcard automatically.
+
+    Returns:
+        An async dependency coroutine that resolves to the authenticated
+        ``AuthContext``.
+
+    Raises:
+        HTTPException 401: Propagated from the provider when credentials are
+            absent or invalid.
+        HTTPException 403: When one or more required scopes are missing.
+        HTTPException 503: When no auth provider has been registered.
+    """
+
+    async def _dependency(request: Request) -> AuthContext:
+        provider = get_auth_provider()
+        auth_context = await provider.validate(request)
+
+        if scopes:
+            missing = [s for s in scopes if not auth_context.has_scope(s)]
+            if missing:
+                logger.warning(
+                    "Auth scope check failed: user=%s missing=%s",
+                    auth_context.user_id,
+                    missing,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Missing required scopes: {missing}",
+                )
+
+        return auth_context
+
+    return _dependency
+
+
+#: Pre-built ``Annotated`` alias for routes that only need authentication
+#: without explicit scope enforcement.
+AuthContextDep = Annotated[AuthContext, Depends(require_auth())]
 
 
 def get_app_state() -> AppState:

@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 2
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -35,7 +35,7 @@ tasks:
   priority: critical
 - id: AUTH-002
   description: Implement LocalAuthProvider (returns static local_admin AuthContext)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -44,7 +44,7 @@ tasks:
   priority: critical
 - id: AUTH-003
   description: Implement ClerkAuthProvider (validates JWTs, maps claims to AuthContext)
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   - python-backend-engineer
@@ -54,7 +54,7 @@ tasks:
   priority: high
 - id: AUTH-004
   description: Create require_auth FastAPI dependency with scope validation
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -81,7 +81,7 @@ tasks:
   priority: high
 - id: AUTH-007
   description: Add SKILLMEAT_AUTH_PROVIDER env var config and provider instantiation
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -146,7 +146,7 @@ files_modified:
 - skillmeat/api/middleware/enterprise_auth.py
 - skillmeat/api/config.py
 - skillmeat/api/tests/test_auth_providers.py
-progress: 25
+progress: 75
 updated: '2026-03-07'
 ---
 

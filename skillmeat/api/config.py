@@ -10,7 +10,7 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -157,6 +157,39 @@ class APISettings(BaseSettings):
     auth_enabled: bool = Field(
         default=False,
         description="Require bearer token authentication for API routes",
+    )
+
+    # Auth provider selection (AUTH-007)
+    # Valid values: "local" (LocalAuthProvider) or "clerk" (ClerkAuthProvider)
+    auth_provider: str = Field(
+        default="local",
+        description=(
+            "Authentication provider to use. "
+            "Valid values: 'local' (default, LocalAuthProvider) or "
+            "'clerk' (ClerkAuthProvider, requires CLERK_JWKS_URL and CLERK_ISSUER). "
+            "Configurable via SKILLMEAT_AUTH_PROVIDER env var."
+        ),
+    )
+
+    # Clerk authentication config (only required when auth_provider="clerk")
+    clerk_jwks_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("CLERK_JWKS_URL", "SKILLMEAT_CLERK_JWKS_URL"),
+        description=(
+            "Clerk JWKS endpoint URL for JWT public key discovery. "
+            "Required when auth_provider='clerk'. "
+            "Configurable via CLERK_JWKS_URL env var."
+        ),
+    )
+
+    clerk_issuer: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("CLERK_ISSUER", "SKILLMEAT_CLERK_ISSUER"),
+        description=(
+            "Expected JWT issuer claim for Clerk tokens. "
+            "Required when auth_provider='clerk'. "
+            "Configurable via CLERK_ISSUER env var."
+        ),
     )
 
     # Enterprise PAT authentication (ENT-3.4)
