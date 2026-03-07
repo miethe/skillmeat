@@ -9,7 +9,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from skillmeat.api.dependencies import verify_api_key
+from skillmeat.api.dependencies import (
+    verify_api_key,
+    get_auth_context,
+    require_auth,
+)
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse
 from skillmeat.api.schemas.merge import (
@@ -25,6 +29,7 @@ from skillmeat.api.schemas.merge import (
 from skillmeat.api.schemas.version import ConflictMetadataResponse
 from skillmeat.core.version_merge import VersionMergeService
 from skillmeat.models import ConflictMetadata
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +81,7 @@ async def analyze_merge(
     request: MergeAnalyzeRequest,
     merge_service: VersionMergeServiceDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MergeSafetyResponse:
     """Analyze merge safety (dry run).
 
@@ -167,6 +173,7 @@ async def preview_merge(
     request: MergePreviewRequest,
     merge_service: VersionMergeServiceDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MergePreviewResponse:
     """Preview merge changes without executing.
 
@@ -266,6 +273,7 @@ async def execute_merge(
     request: MergeExecuteRequest,
     merge_service: VersionMergeServiceDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MergeExecuteResponse:
     """Execute merge with conflict detection.
 
@@ -373,6 +381,7 @@ async def resolve_conflict(
     request: ConflictResolveRequest,
     merge_service: VersionMergeServiceDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ConflictResolveResponse:
     """Resolve a single merge conflict.
 

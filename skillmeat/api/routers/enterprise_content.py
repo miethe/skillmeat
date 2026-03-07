@@ -20,10 +20,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 
-from skillmeat.api.dependencies import DbSessionDep
+from skillmeat.api.dependencies import (
+    DbSessionDep,
+    get_auth_context,
+    require_auth,
+)
 from skillmeat.api.middleware.enterprise_auth import verify_enterprise_pat
 from skillmeat.api.schemas.enterprise import ArtifactDownloadResponse
 from skillmeat.cache.enterprise_repositories import EnterpriseArtifactRepository
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.services.enterprise_content import (
     ArtifactFilesystemError,
     ArtifactNotFoundError,
@@ -122,6 +127,7 @@ def download_artifact(
             "(Content-Type: application/gzip) instead of a JSON response."
         ),
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ArtifactDownloadResponse | Response:
     """Download an enterprise artifact bundle.
 

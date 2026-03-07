@@ -20,8 +20,9 @@ from fastapi import (
     status,
 )
 
-from skillmeat.api.dependencies import ConfigManagerDep
+from skillmeat.api.dependencies import ConfigManagerDep, get_auth_context, require_auth
 from skillmeat.api.middleware.auth import TokenDep
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.bundles import (
     ArtifactPopularity,
     BundleAnalyticsResponse,
@@ -97,6 +98,7 @@ async def import_bundle(
         default=None,
         description="Expected SHA-256 hash for verification",
     ),
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> BundleImportResponse:
     """Import artifact bundle into collection.
 
@@ -252,6 +254,7 @@ async def validate_bundle(
         default=None,
         description="Expected SHA-256 hash for verification",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> BundleValidationResponse:
     """Validate bundle without importing.
 
@@ -365,6 +368,7 @@ async def preview_bundle(
         default=None,
         description="Expected SHA-256 hash for verification",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> BundlePreviewResponse:
     """Preview bundle before importing.
 
@@ -609,6 +613,7 @@ async def export_bundle(
     config_mgr: ConfigManagerDep,
     token: TokenDep,
     request: BundleExportRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> BundleExportResponse:
     """Export artifacts as a bundle.
 
@@ -797,6 +802,7 @@ async def export_bundle(
 async def list_bundles(
     token: TokenDep,
     source_filter: Optional[str] = None,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> BundleListResponse:
     """List all bundles with optional filtering.
 
@@ -879,6 +885,7 @@ async def list_bundles(
 async def get_bundle(
     bundle_id: str,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> BundleDetailResponse:
     """Get detailed information about a specific bundle.
 
@@ -941,6 +948,7 @@ async def get_bundle(
 async def delete_bundle(
     bundle_id: str,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> BundleDeleteResponse:
     """Delete a bundle from the collection.
 
@@ -1020,6 +1028,7 @@ async def delete_bundle(
 async def get_bundle_analytics(
     bundle_id: str,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> BundleAnalyticsResponse:
     """Get analytics data for a specific bundle.
 
@@ -1301,6 +1310,7 @@ async def update_bundle_share_link(
     bundle_id: str,
     request: ShareLinkUpdateRequest,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> ShareLinkResponse:
     """Create or update a shareable link for a bundle.
 
@@ -1421,6 +1431,7 @@ async def update_bundle_share_link(
 async def delete_bundle_share_link(
     bundle_id: str,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> ShareLinkDeleteResponse:
     """Revoke and delete the shareable link for a bundle.
 

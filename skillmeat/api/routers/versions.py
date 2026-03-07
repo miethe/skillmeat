@@ -13,8 +13,9 @@ from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from skillmeat.api.dependencies import verify_api_key
+from skillmeat.api.dependencies import get_auth_context, require_auth, verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.version import (
     ConflictMetadataResponse,
@@ -139,6 +140,7 @@ async def list_snapshots(
         default=None,
         description="Cursor for pagination (next page)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> SnapshotListResponse:
     """List all snapshots with cursor-based pagination.
 
@@ -230,6 +232,7 @@ async def get_snapshot(
         default=None,
         description="Collection name (uses active collection if not specified)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> SnapshotResponse:
     """Get details for a specific snapshot.
 
@@ -291,6 +294,7 @@ async def create_snapshot(
     request: SnapshotCreateRequest,
     version_mgr: VersionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> SnapshotCreateResponse:
     """Create a new snapshot of a collection.
 
@@ -361,6 +365,7 @@ async def delete_snapshot(
         default=None,
         description="Collection name (uses active collection if not specified)",
     ),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Delete a specific snapshot.
 
@@ -420,6 +425,7 @@ async def analyze_rollback_safety(
         default=None,
         description="Collection name (uses active collection if not specified)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> RollbackSafetyAnalysisResponse:
     """Analyze whether rollback is safe before attempting.
 
@@ -487,6 +493,7 @@ async def rollback(
     request: RollbackRequest,
     version_mgr: VersionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> RollbackResponse:
     """Rollback to a specific snapshot.
 
@@ -585,6 +592,7 @@ async def diff_snapshots(
     version_mgr: VersionManagerDep,
     diff_engine: DiffEngineDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> VersionDiffResponse:
     """Compare two snapshots and generate a diff.
 

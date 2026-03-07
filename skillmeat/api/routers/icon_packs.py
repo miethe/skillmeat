@@ -15,7 +15,10 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+
+from skillmeat.api.dependencies import get_auth_context, require_auth
+from skillmeat.api.schemas.auth import AuthContext
 
 from skillmeat.api.schemas.icon_packs import (
     IconPackDefinition,
@@ -123,7 +126,9 @@ def _write_config(config: dict) -> None:
         500: {"description": "Config file could not be read"},
     },
 )
-async def list_icon_packs() -> List[IconPackResponse]:
+async def list_icon_packs(
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> List[IconPackResponse]:
     """List all icon packs with their enabled state.
 
     Returns:
@@ -169,6 +174,7 @@ async def list_icon_packs() -> List[IconPackResponse]:
 )
 async def update_icon_packs(
     updates: List[IconPackToggleRequest],
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> List[IconPackResponse]:
     """Toggle enabled state for one or more icon packs.
 
@@ -237,6 +243,7 @@ async def update_icon_packs(
 async def install_icon_pack(
     url: Optional[str] = Form(None, description="URL to a JSON icon pack definition"),
     file: Optional[UploadFile] = File(None, description="JSON icon pack definition file"),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> IconPackResponse:
     """Install a new icon pack from a URL or uploaded file.
 
@@ -363,7 +370,10 @@ async def install_icon_pack(
         500: {"description": "Config file could not be read or written"},
     },
 )
-async def delete_icon_pack(pack_id: str) -> None:
+async def delete_icon_pack(
+    pack_id: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> None:
     """Delete a user-installed icon pack.
 
     Args:

@@ -8,7 +8,10 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from skillmeat.api.dependencies import get_auth_context, require_auth
+from skillmeat.api.schemas.auth import AuthContext
 
 from skillmeat.api.schemas.scoring import (
     ArtifactScoreResponse,
@@ -50,6 +53,7 @@ router = APIRouter(
 async def submit_rating(
     artifact_id: str,
     request: UserRatingRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> UserRatingResponse:
     """Submit a rating for an artifact.
 
@@ -147,6 +151,7 @@ async def get_artifact_scores(
         le=100,
         description="Query match score from search context (0-100)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ArtifactScoreResponse:
     """Get confidence scores for an artifact.
 
@@ -210,6 +215,7 @@ async def list_artifact_ratings(
     limit: int = Query(
         default=50, ge=1, le=100, description="Maximum ratings to return"
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ):
     """List all ratings for an artifact.
 

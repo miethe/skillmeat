@@ -16,7 +16,13 @@ from typing import Any, Dict, Iterable, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
-from skillmeat.api.dependencies import ConfigManagerDep, verify_api_key
+from skillmeat.api.dependencies import (
+    ConfigManagerDep,
+    verify_api_key,
+    get_auth_context,
+    require_auth,
+)
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.analytics import (
     AnalyticsEventItem,
@@ -948,6 +954,7 @@ def _build_otel_export(summary: EnterpriseAnalyticsSummaryResponse) -> Dict[str,
 async def get_analytics_summary(
     config_mgr: ConfigManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> AnalyticsSummaryResponse:
     """Get overall analytics summary for existing dashboard widgets."""
     try:
@@ -984,6 +991,7 @@ async def get_analytics_summary(
 async def get_enterprise_summary(
     config_mgr: ConfigManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> EnterpriseAnalyticsSummaryResponse:
     """Get enterprise analytics summary optimized for operations and observability."""
     try:
@@ -1040,6 +1048,7 @@ async def list_analytics_events(
         default=None,
         description="Filter by collection name",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> AnalyticsEventsResponse:
     """List analytics events with normalized metadata and outcome fields."""
     try:
@@ -1143,6 +1152,7 @@ async def export_analytics(
         le=50000,
         description="Maximum number of raw events included in JSON export",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ):
     """Export enterprise analytics in observability-friendly formats."""
     normalized_format = format.strip().lower()
@@ -1221,6 +1231,7 @@ async def stream_analytics(
         le=60,
         description="Polling interval used by stream publisher",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ):
     """Stream enterprise analytics changes via SSE."""
     db = get_analytics_db(config_mgr)
@@ -1292,6 +1303,7 @@ async def get_top_artifacts(
         default=None,
         description="Filter by artifact type (skill, command, agent)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> TopArtifactsResponse:
     """Get top artifacts by usage."""
     try:
@@ -1398,6 +1410,7 @@ async def get_usage_trends(
         le=365,
         description="Number of days of history (max 365)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> TrendsResponse:
     """Get usage trends over time."""
     try:

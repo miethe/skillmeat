@@ -12,9 +12,16 @@ import json
 import logging
 from base64 import b64encode
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from skillmeat.api.dependencies import APIKeyDep, DbSessionDep, DeploymentRepoDep
+from skillmeat.api.dependencies import (
+    APIKeyDep,
+    DbSessionDep,
+    DeploymentRepoDep,
+    get_auth_context,
+    require_auth,
+)
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.idp_integration import (
     IDPRegisterDeploymentRequest,
     IDPRegisterDeploymentResponse,
@@ -57,6 +64,7 @@ async def scaffold(
     request: IDPScaffoldRequest,
     session: DbSessionDep,
     _auth: APIKeyDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> IDPScaffoldResponse:
     """Render scaffold files for a given artifact target.
 
@@ -159,6 +167,7 @@ async def register_deployment(
     request: IDPRegisterDeploymentRequest,
     deployment_repo: DeploymentRepoDep,
     _auth: APIKeyDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> IDPRegisterDeploymentResponse:
     """Register or idempotently update an IDP deployment set record.
 

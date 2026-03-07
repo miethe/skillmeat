@@ -29,7 +29,9 @@ import logging
 from typing import Optional
 from urllib.parse import unquote
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from skillmeat.api.dependencies import get_auth_context, require_auth
 from skillmeat.api.schemas.memory import (
     BulkActionResponse,
     BulkDeprecateRequest,
@@ -53,6 +55,7 @@ from skillmeat.api.schemas.memory import (
 )
 from skillmeat.core.services.memory_extractor_service import MemoryExtractorService
 from skillmeat.core.services.memory_service import MemoryService
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +119,7 @@ async def count_memory_items(
     project_id: str = Query(..., description="Project ID to scope the count"),
     status: Optional[MemoryStatus] = Query(None, description="Filter by status"),
     type: Optional[MemoryType] = Query(None, description="Filter by memory type"),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> dict:
     """Count memory items for a project with optional filters.
 
@@ -158,6 +162,7 @@ async def count_memory_items(
 )
 async def bulk_promote_memory_items(
     request: BulkPromoteRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> BulkActionResponse:
     """Promote multiple memory items in a single request.
 
@@ -200,6 +205,7 @@ async def bulk_promote_memory_items(
 )
 async def bulk_deprecate_memory_items(
     request: BulkDeprecateRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> BulkActionResponse:
     """Deprecate multiple memory items in a single request.
 
@@ -253,6 +259,7 @@ async def bulk_deprecate_memory_items(
 )
 async def merge_memory_items(
     request: MergeRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MergeResponse:
     """Merge two memory items using the specified strategy.
 
@@ -308,6 +315,7 @@ async def search_memory_items(
     ),
     limit: int = Query(default=50, ge=1, le=100),
     cursor: Optional[str] = Query(None),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> MemorySearchResponse:
     """Search memory items globally or by project."""
     try:
@@ -363,6 +371,7 @@ async def list_global_memory_items(
     cursor: Optional[str] = Query(None),
     sort_by: str = Query(default="created_at"),
     sort_order: str = Query(default="desc"),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> MemoryItemListResponse:
     """List memory items globally."""
     try:
@@ -408,6 +417,7 @@ async def list_global_memory_items(
 async def preview_memory_extraction(
     request: MemoryExtractionPreviewRequest,
     project_id: str = Query(..., description="Project ID for extraction scope"),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MemoryExtractionPreviewResponse:
     """Preview memory extraction candidates without persisting to database.
 
@@ -502,6 +512,7 @@ async def preview_memory_extraction(
 async def apply_memory_extraction(
     request: MemoryExtractionApplyRequest,
     project_id: str = Query(..., description="Project ID for extraction scope"),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MemoryExtractionApplyResponse:
     """Extract and persist candidate memory items to database.
 
@@ -633,6 +644,7 @@ async def list_memory_items(
     ),
     sort_by: str = Query(default="created_at", description="Field to sort by"),
     sort_order: str = Query(default="desc", description="Sort direction (asc or desc)"),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> MemoryItemListResponse:
     """List memory items with filtering and cursor-based pagination.
 
@@ -708,6 +720,7 @@ async def list_memory_items(
 async def create_memory_item(
     request: MemoryItemCreateRequest,
     project_id: str = Query(..., description="Project ID for the new memory item"),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MemoryItemResponse:
     """Create a new memory item with duplicate detection.
 
@@ -777,7 +790,10 @@ async def create_memory_item(
         500: {"description": "Internal server error"},
     },
 )
-async def get_memory_item(item_id: str) -> MemoryItemResponse:
+async def get_memory_item(
+    item_id: str,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> MemoryItemResponse:
     """Get a single memory item by ID.
 
     Access count is automatically incremented on each read.
@@ -822,6 +838,7 @@ async def get_memory_item(item_id: str) -> MemoryItemResponse:
 async def update_memory_item(
     item_id: str,
     request: MemoryItemUpdateRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MemoryItemResponse:
     """Update a memory item's fields.
 
@@ -899,7 +916,10 @@ async def update_memory_item(
         500: {"description": "Internal server error"},
     },
 )
-async def delete_memory_item(item_id: str) -> None:
+async def delete_memory_item(
+    item_id: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> None:
     """Delete a memory item.
 
     Args:
@@ -951,6 +971,7 @@ async def delete_memory_item(item_id: str) -> None:
 async def promote_memory_item(
     item_id: str,
     request: PromoteRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MemoryItemResponse:
     """Promote a memory item to the next lifecycle stage.
 
@@ -998,6 +1019,7 @@ async def promote_memory_item(
 async def deprecate_memory_item(
     item_id: str,
     request: DeprecateRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MemoryItemResponse:
     """Deprecate a memory item.
 

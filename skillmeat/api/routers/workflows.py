@@ -12,6 +12,8 @@ from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from skillmeat.api.dependencies import get_auth_context, require_auth
 from pydantic import BaseModel
 
 from skillmeat.api.config import APISettings, get_settings
@@ -22,6 +24,7 @@ from skillmeat.core.workflow.exceptions import (
     WorkflowValidationError,
 )
 from skillmeat.core.workflow.service import WorkflowService
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +181,7 @@ async def list_workflows(
     ),
     skip: int = Query(0, ge=0, description="Number of records to skip."),
     limit: int = Query(50, ge=1, le=200, description="Maximum records to return."),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> List[Dict[str, Any]]:
     """List workflows with optional project filter and offset pagination.
 
@@ -210,6 +214,7 @@ async def list_workflows(
 )
 async def create_workflow(
     request: WorkflowCreateRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> Dict[str, Any]:
     """Create a new workflow from a YAML definition string.
 
@@ -259,6 +264,7 @@ async def create_workflow(
 )
 async def batch_delete_workflows(
     request: BatchDeleteRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> BatchDeleteResponse:
     """Batch delete workflows by ID.
 
@@ -296,7 +302,10 @@ async def batch_delete_workflows(
     description="Retrieve a single workflow definition by ID.",
     status_code=status.HTTP_200_OK,
 )
-async def get_workflow(workflow_id: str) -> Dict[str, Any]:
+async def get_workflow(
+    workflow_id: str,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> Dict[str, Any]:
     """Retrieve a workflow by its primary key.
 
     Args:
@@ -339,6 +348,7 @@ async def get_workflow(workflow_id: str) -> Dict[str, Any]:
 async def update_workflow(
     workflow_id: str,
     request: WorkflowUpdateRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> Dict[str, Any]:
     """Update an existing workflow with a new YAML definition.
 
@@ -387,7 +397,10 @@ async def update_workflow(
     status_code=status.HTTP_204_NO_CONTENT,
     response_model=None,
 )
-async def delete_workflow(workflow_id: str) -> None:
+async def delete_workflow(
+    workflow_id: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> None:
     """Delete a workflow by ID.
 
     Args:
@@ -428,6 +441,7 @@ async def delete_workflow(workflow_id: str) -> None:
 async def duplicate_workflow(
     workflow_id: str,
     request: Optional[WorkflowDuplicateRequest] = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> Dict[str, Any]:
     """Duplicate an existing workflow.
 
@@ -479,6 +493,7 @@ async def duplicate_workflow(
 async def validate_workflow(
     workflow_id: str,
     request: Optional[WorkflowValidateRequest] = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> Dict[str, Any]:
     """Validate a persisted workflow through all static analysis passes.
 
@@ -533,6 +548,7 @@ async def validate_workflow(
 async def plan_workflow(
     workflow_id: str,
     request: Optional[WorkflowPlanRequest] = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> Dict[str, Any]:
     """Generate a static execution plan for a persisted workflow.
 

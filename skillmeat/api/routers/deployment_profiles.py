@@ -13,6 +13,8 @@ from skillmeat.api.dependencies import (
     DeploymentProfileRepoDep,
     ProjectRepoDep,
     verify_api_key,
+    get_auth_context,
+    require_auth,
 )
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse
@@ -22,6 +24,7 @@ from skillmeat.api.schemas.deployment_profiles import (
     DeploymentProfileUpdate,
 )
 from skillmeat.core.interfaces.repositories import IProjectRepository
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +101,7 @@ async def create_profile(
     token: TokenDep,
     repo: DeploymentProfileRepoDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> DeploymentProfileRead:
     resolved_project_id = _resolve_project_db_id(project_id, project_repo)
     try:
@@ -132,6 +136,7 @@ async def list_profiles(
     token: TokenDep,
     repo: DeploymentProfileRepoDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> List[DeploymentProfileRead]:
     resolved_project_id = _resolve_project_db_id(project_id, project_repo)
     return [
@@ -150,6 +155,7 @@ async def get_profile(
     token: TokenDep,
     repo: DeploymentProfileRepoDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> DeploymentProfileRead:
     resolved_project_id = _resolve_project_db_id(project_id, project_repo)
     profile = repo.read_by_project_and_profile_id(resolved_project_id, profile_id)
@@ -173,6 +179,7 @@ async def update_profile(
     token: TokenDep,
     repo: DeploymentProfileRepoDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> DeploymentProfileRead:
     resolved_project_id = _resolve_project_db_id(project_id, project_repo)
     updated = repo.update(
@@ -206,6 +213,7 @@ async def delete_profile(
     token: TokenDep,
     repo: DeploymentProfileRepoDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     resolved_project_id = _resolve_project_db_id(project_id, project_repo)
     deleted = repo.delete(resolved_project_id, profile_id)

@@ -11,7 +11,13 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
-from skillmeat.api.dependencies import MarketplaceSourceRepoDep, verify_api_key
+from skillmeat.api.dependencies import (
+    MarketplaceSourceRepoDep,
+    verify_api_key,
+    get_auth_context,
+    require_auth,
+)
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.middleware.auth import OptionalTokenDep, TokenDep
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.marketplace import (
@@ -138,6 +144,7 @@ async def list_listings(
         le=100,
         description="Items per page (max 100)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ListingsPageResponse:
     """Browse marketplace listings with filtering and pagination.
 
@@ -338,6 +345,7 @@ async def get_listing_detail(
     request: Request,
     response: Response,
     token: OptionalTokenDep = None,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ListingDetailResponse:
     """Get detailed information for a specific listing.
 
@@ -459,6 +467,7 @@ async def install_listing(
     install_req: InstallRequest,
     token: TokenDep,
     repo: MarketplaceSourceRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> InstallResponse:
     """Install a marketplace listing.
 
@@ -716,6 +725,7 @@ async def install_listing(
 async def publish_bundle(
     publish_req: PublishRequest,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> PublishResponse:
     """Publish a bundle to the marketplace.
 
@@ -824,7 +834,9 @@ async def publish_bundle(
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
-async def list_brokers() -> BrokerListResponse:
+async def list_brokers(
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> BrokerListResponse:
     """List all available marketplace brokers.
 
     This is a public endpoint that shows all configured brokers
@@ -899,6 +911,7 @@ async def list_brokers() -> BrokerListResponse:
 async def compliance_scan(
     bundle_path: str,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ):
     """Scan bundle for license compliance.
 
@@ -970,6 +983,7 @@ async def compliance_checklist(
     bundle_id: str,
     license: str,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ):
     """Generate compliance checklist for bundle.
 
@@ -1022,6 +1036,7 @@ async def compliance_consent(
     publisher_email: str,
     consents: dict,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ):
     """Record publisher consent to compliance checklist.
 
@@ -1077,6 +1092,7 @@ async def compliance_history(
         None, description="Filter by publisher email"
     ),
     token: TokenDep = None,
+    auth_context: AuthContext = Depends(get_auth_context),
 ):
     """Get compliance consent history.
 

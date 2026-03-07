@@ -8,9 +8,14 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Tuple
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from skillmeat.api.dependencies import ArtifactManagerDep, CollectionManagerDep
+from skillmeat.api.dependencies import (
+    ArtifactManagerDep,
+    CollectionManagerDep,
+    get_auth_context,
+    require_auth,
+)
 from skillmeat.api.schemas.match import (
     MatchedArtifact,
     MatchResponse,
@@ -19,6 +24,7 @@ from skillmeat.api.schemas.match import (
 from skillmeat.core.artifact import ArtifactMetadata
 from skillmeat.core.scoring.service import ScoringService
 from skillmeat.observability.tracing import trace_operation
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +84,7 @@ async def match_artifacts(
         False,
         description="Include detailed score breakdown for each match",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> MatchResponse:
     """Match artifacts against search query.
 

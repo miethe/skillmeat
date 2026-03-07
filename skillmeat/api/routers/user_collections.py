@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Body, HTTPException, Query, status
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
@@ -21,6 +21,8 @@ from skillmeat.api.dependencies import (
     DbUserCollectionRepoDep,
     GroupRepoDep,
     ProjectRepoDep,
+    get_auth_context,
+    require_auth,
 )
 from skillmeat.core.interfaces.dtos import UserCollectionDTO
 from skillmeat.core.interfaces.repositories import (
@@ -30,6 +32,7 @@ from skillmeat.core.interfaces.repositories import (
     IProjectRepository,
 )
 from skillmeat.api.middleware.auth import TokenDep
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.collections import (
     RefreshModeEnum,
     RefreshRequest,
@@ -861,6 +864,7 @@ async def migrate_to_default_collection(
     artifact_repo_ca: DbCollectionArtifactRepoDep,
     project_repo: ProjectRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> dict:
     """Migrate all artifacts to the default collection.
 
@@ -1099,6 +1103,7 @@ async def refresh_all_collections_cache(
     collection_repo: DbUserCollectionRepoDep,
     artifact_repo_ca: DbCollectionArtifactRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> dict:
     """Refresh CollectionArtifact metadata cache across all DB collections.
 
@@ -1249,6 +1254,7 @@ async def list_user_collections(
         default=None,
         description="Filter by collection type (e.g., 'context')",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> UserCollectionListResponse:
     """List all user collections with cursor-based pagination.
 
@@ -1357,6 +1363,7 @@ async def create_user_collection(
     request: UserCollectionCreateRequest,
     collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> UserCollectionResponse:
     """Create a new user collection.
 
@@ -1419,6 +1426,7 @@ async def get_user_collection(
     collection_repo: DbUserCollectionRepoDep,
     group_repo: GroupRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> UserCollectionWithGroupsResponse:
     """Get details for a specific user collection.
 
@@ -1479,6 +1487,7 @@ async def update_user_collection(
     request: UserCollectionUpdateRequest,
     collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> UserCollectionResponse:
     """Update a user collection.
 
@@ -1583,6 +1592,7 @@ async def delete_user_collection(
     collection_id: str,
     collection_repo: DbUserCollectionRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> None:
     """Delete a user collection.
 
@@ -1656,6 +1666,7 @@ async def list_collection_artifacts(
         default=False,
         description="Include group memberships for each artifact in the response",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> CollectionArtifactsResponse:
     """List artifacts in a collection with pagination.
 
@@ -2033,6 +2044,7 @@ async def add_artifacts_to_collection(
     session: DbSessionDep,
     artifact_repo: ArtifactRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> dict:
     """Add artifacts to a collection.
 
@@ -2175,6 +2187,7 @@ async def remove_artifact_from_collection(
     artifact_repo_ca: DbCollectionArtifactRepoDep,
     artifact_repo: ArtifactRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> None:
     """Remove an artifact from a collection.
 
@@ -2277,6 +2290,7 @@ async def add_entity_to_collection(
     artifact_repo_ca: DbCollectionArtifactRepoDep,
     artifact_repo: ArtifactRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> dict:
     """Add a context entity to a collection.
 
@@ -2385,6 +2399,7 @@ async def remove_entity_from_collection(
     artifact_repo_ca: DbCollectionArtifactRepoDep,
     artifact_repo: ArtifactRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> None:
     """Remove a context entity from a collection.
 
@@ -2470,6 +2485,7 @@ async def list_collection_entities(
     token: TokenDep,
     limit: int = Query(default=20, ge=1, le=100),
     after: Optional[str] = Query(default=None),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> CollectionArtifactsResponse:
     """List context entities in a collection with pagination.
 
@@ -2610,6 +2626,7 @@ async def refresh_collection_cache(
     collection_repo: DbUserCollectionRepoDep,
     artifact_repo_ca: DbCollectionArtifactRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> dict:
     """Refresh CollectionArtifact metadata cache for a specific DB collection.
 
@@ -2731,6 +2748,7 @@ async def refresh_collection(
     mode: Optional[RefreshModeEnum] = Query(
         None, description="Override request body mode"
     ),
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ):
     """Refresh artifact metadata for a collection from upstream GitHub sources.
 
@@ -2891,6 +2909,7 @@ async def get_cache_stats(
         description="Filter stats to a specific collection ID. "
         "If not provided, stats are for all collections.",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> dict:
     """Get statistics about artifact metadata cache health.
 

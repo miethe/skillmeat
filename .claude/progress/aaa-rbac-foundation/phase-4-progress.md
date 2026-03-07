@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 18
-completed_tasks: 4
+completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -68,7 +68,7 @@ tasks:
 - id: API-001
   description: Add require_auth to critical routers (artifacts, collections, projects)
     - Batch 1
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -78,7 +78,7 @@ tasks:
 - id: ENT-001
   description: Secure-by-default route protection — protected_router vs public_router
     pattern
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -89,7 +89,7 @@ tasks:
 - id: API-002
   description: Add require_auth to supporting routers (deployments, groups, tags,
     versions, bundles) - Batch 2
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -99,7 +99,7 @@ tasks:
 - id: API-005
   description: Update all router function signatures to accept AuthContext and thread
     to services
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -287,7 +287,7 @@ files_modified:
 - skillmeat/api/openapi.json
 - skillmeat/api/tests/test_auth_api.py
 - skillmeat/api/tests/test_auth_providers.py
-progress: 22
+progress: 44
 updated: '2026-03-07'
 ---
 

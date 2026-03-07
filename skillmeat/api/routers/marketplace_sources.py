@@ -49,7 +49,7 @@ if TYPE_CHECKING:
         MergeResult,
     )
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
@@ -58,7 +58,10 @@ from skillmeat.api.dependencies import (
     MarketplaceSourceConcreteRepoDep,
     MarketplaceSourceRepoDep,
     MarketplaceTransactionHandlerDep,
+    get_auth_context,
+    require_auth,
 )
+from skillmeat.api.schemas.auth import AuthContext
 # ORM model imports — used for CONSTRUCTION of new objects in the scan pipeline,
 # not for direct session queries (all session access is via repository methods).
 from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
@@ -2059,6 +2062,7 @@ async def create_source(
     source_repo: MarketplaceSourceConcreteRepoDep,
     catalog_repo: MarketplaceCatalogRepoDep,
     transaction_handler: MarketplaceTransactionHandlerDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> SourceResponse:
     """Create a new GitHub repository source.
 
@@ -2279,6 +2283,7 @@ async def list_sources(
     search: Optional[str] = Query(
         None, description="Search in repo name, description, tags"
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> SourceListResponse:
     """List all marketplace sources with pagination and filtering.
 
@@ -2471,6 +2476,7 @@ async def get_source(
     source_id: str,
     source_repo: MarketplaceSourceConcreteRepoDep,
     catalog_repo: MarketplaceCatalogRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> SourceResponse:
     """Get a marketplace source by ID.
 
@@ -2567,6 +2573,7 @@ async def update_source(
     source_id: str,
     request: UpdateSourceRequest,
     source_repo: MarketplaceSourceConcreteRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> SourceResponse:
     """Update a marketplace source.
 
@@ -2824,6 +2831,7 @@ async def update_source(
 async def delete_source(
     source_id: str,
     source_repo: MarketplaceSourceConcreteRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> None:
     """Delete a marketplace source.
 
@@ -2925,6 +2933,7 @@ async def rescan_source(
     catalog_repo: MarketplaceCatalogRepoDep,
     transaction_handler: MarketplaceTransactionHandlerDep,
     request: ScanRequest = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> ScanResultDTO:
     """Trigger a rescan of a marketplace source.
 
@@ -3018,6 +3027,7 @@ async def sync_imported_artifacts(
     collection_mgr: CollectionManagerDep,
     source_repo: MarketplaceSourceConcreteRepoDep,
     catalog_repo: MarketplaceCatalogRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> BulkSyncResponse:
     """Sync imported artifacts from a marketplace source with upstream.
 
@@ -3374,6 +3384,7 @@ async def list_artifacts(
         None, description="Cursor for pagination (from previous response)"
     ),
     collection_mgr: CollectionManagerDep = None,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> CatalogListResponse:
     """List artifacts from a source with optional filters and sorting.
 
@@ -3597,6 +3608,7 @@ async def update_catalog_entry_name(
     source_repo: MarketplaceSourceConcreteRepoDep,
     catalog_repo: MarketplaceCatalogRepoDep,
     collection_mgr: CollectionManagerDep = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> CatalogEntryResponse:
     """Update the name for a catalog entry."""
     collection_keys = (
@@ -4013,6 +4025,7 @@ async def import_artifacts(
     source_repo: MarketplaceSourceConcreteRepoDep,
     catalog_repo: MarketplaceCatalogRepoDep,
     transaction_handler: MarketplaceTransactionHandlerDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> ImportResultDTO:
     """Import catalog entries to local collection.
 
@@ -4442,6 +4455,7 @@ async def reimport_catalog_entry(
     source_repo: MarketplaceSourceConcreteRepoDep,
     catalog_repo: MarketplaceCatalogRepoDep,
     transaction_handler: MarketplaceTransactionHandlerDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> ReimportResponse:
     """Force re-import a catalog entry from upstream.
 
@@ -4734,6 +4748,7 @@ async def exclude_artifact(
     request: ExcludeArtifactRequest,
     source_repo: MarketplaceSourceRepoDep,
     collection_mgr: CollectionManagerDep = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> CatalogEntryResponse:
     """Mark or restore a catalog entry as excluded.
 
@@ -4858,6 +4873,7 @@ async def restore_excluded_artifact(
     entry_id: str,
     source_repo: MarketplaceSourceRepoDep,
     collection_mgr: CollectionManagerDep = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> CatalogEntryResponse:
     """Restore an excluded catalog entry to the catalog.
 
@@ -4968,6 +4984,7 @@ async def get_path_tags(
     source_id: str,
     entry_id: str,
     source_repo: MarketplaceSourceRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> PathSegmentsResponse:
     """Get extracted path segments for a catalog entry.
 
@@ -5103,6 +5120,7 @@ async def update_path_tag_status(
     request: UpdateSegmentStatusRequest,
     source_repo: MarketplaceSourceRepoDep,
     collection_mgr: CollectionManagerDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> UpdateSegmentStatusResponse:
     """Update approval status of a single path segment.
 
@@ -5340,6 +5358,7 @@ async def get_artifact_file_tree(
     source_id: str,
     artifact_path: str,
     source_repo: MarketplaceSourceConcreteRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> FileTreeResponse:
     """Get file tree for a marketplace artifact.
 
@@ -5560,6 +5579,7 @@ async def get_artifact_file_content(
     artifact_path: str,
     file_path: str,
     source_repo: MarketplaceSourceConcreteRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> FileContentResponse:
     """Get content of a file within a marketplace artifact.
 
@@ -5770,6 +5790,7 @@ async def get_artifact_file_content(
 async def get_source_auto_tags(
     source_id: str,
     source_repo: MarketplaceSourceConcreteRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> AutoTagsResponse:
     """Get auto-tag suggestions for a marketplace source.
 
@@ -5852,6 +5873,7 @@ async def update_source_auto_tag(
     request: UpdateAutoTagRequest,
     source_repo: MarketplaceSourceRepoDep,
     concrete_source_repo: MarketplaceSourceConcreteRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> UpdateAutoTagResponse:
     """Update approval status of an auto-tag.
 
@@ -6052,6 +6074,7 @@ def _refresh_auto_tags_for_source(
 async def refresh_source_auto_tags(
     source_id: str,
     source_repo: MarketplaceSourceConcreteRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> AutoTagRefreshResponse:
     """Refresh auto-tags by fetching GitHub topics for the source.
 
@@ -6149,6 +6172,7 @@ async def refresh_source_auto_tags(
 async def bulk_refresh_auto_tags(
     request: BulkAutoTagRefreshRequest,
     source_repo: MarketplaceSourceConcreteRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> BulkAutoTagRefreshResponse:
     """Refresh auto-tags for multiple sources.
 

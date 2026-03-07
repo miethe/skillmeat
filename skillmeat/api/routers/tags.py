@@ -21,14 +21,17 @@ import base64
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import (
     CollectionManagerDep,
     CollectionRepoDep,
     DbSessionDep,
+    get_auth_context,
+    require_auth,
 )
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.schemas.tags import (
     TagCreateRequest,
@@ -137,6 +140,7 @@ async def create_tag(
     request: TagCreateRequest,
     collection_repo: CollectionRepoDep,
     db_session: DbSessionDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> TagResponse:
     """Create a new tag.
 
@@ -217,6 +221,7 @@ async def list_tags(
         default=None,
         description="Cursor for pagination (next page)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> TagListResponse:
     """List all tags with cursor-based pagination.
 
@@ -287,6 +292,7 @@ async def search_tags(
         le=100,
         description="Maximum number of results",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> List[TagResponse]:
     """Search tags by name.
 
@@ -338,7 +344,10 @@ async def search_tags(
         500: {"description": "Internal server error"},
     },
 )
-async def get_tag(tag_id: str) -> TagResponse:
+async def get_tag(
+    tag_id: str,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> TagResponse:
     """Get tag by ID.
 
     Args:
@@ -394,7 +403,10 @@ async def get_tag(tag_id: str) -> TagResponse:
         500: {"description": "Internal server error"},
     },
 )
-async def get_tag_by_slug(slug: str) -> TagResponse:
+async def get_tag_by_slug(
+    slug: str,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> TagResponse:
     """Get tag by slug.
 
     Args:
@@ -462,6 +474,7 @@ async def update_tag(
     collection_mgr: CollectionManagerDep,
     collection_repo: CollectionRepoDep,
     db_session: DbSessionDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> TagResponse:
     """Update tag metadata.
 
@@ -582,6 +595,7 @@ async def delete_tag(
     collection_mgr: CollectionManagerDep,
     collection_repo: CollectionRepoDep,
     db_session: DbSessionDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Delete tag by ID.
 
