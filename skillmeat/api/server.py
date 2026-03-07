@@ -25,6 +25,7 @@ from skillmeat import __version__ as skillmeat_version
 
 from .config import APISettings, get_settings
 from .dependencies import app_state, require_auth, set_auth_provider
+from .openapi import generate_openapi_spec
 from .middleware.tenant_context import set_tenant_context_dep
 from .routers import (
     analytics,
@@ -654,6 +655,13 @@ def create_app(settings: APISettings = None) -> FastAPI:
             "api_version": settings.api_version,
             "environment": settings.env.value,
         }
+
+    # Wire the custom OpenAPI generator so /docs and app.openapi() include
+    # BearerAuth scheme, scope/role documentation, and per-operation security.
+    def _custom_openapi():
+        return generate_openapi_spec(app, api_version=settings.api_version)
+
+    app.openapi = _custom_openapi
 
     logger.info(
         f"FastAPI application created: {settings.api_title} v{skillmeat_version}"
