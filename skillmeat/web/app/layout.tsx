@@ -4,6 +4,7 @@ import './globals.css';
 import { Header } from '@/components/header';
 import { Navigation } from '@/components/navigation';
 import { Providers } from '@/components/providers';
+import { AuthWrapper } from '@/lib/auth';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -54,15 +55,17 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
-        <Providers>
-          <div className="flex h-screen flex-col overflow-hidden">
-            <Header />
-            <div className="flex flex-1 overflow-hidden">
-              <Navigation />
-              <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <AuthWrapper>
+          <Providers>
+            <div className="flex h-screen flex-col overflow-hidden">
+              <Header />
+              <div className="flex flex-1 overflow-hidden">
+                <Navigation />
+                <main className="flex-1 overflow-y-auto p-6">{children}</main>
+              </div>
             </div>
-          </div>
-        </Providers>
+          </Providers>
+        </AuthWrapper>
       </body>
     </html>
   );
