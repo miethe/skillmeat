@@ -71,7 +71,7 @@ import hashlib
 import logging
 import uuid
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from datetime import datetime
 from typing import Dict, Generator, Generic, List, Optional, Type, TypeVar
 
@@ -136,6 +136,80 @@ def tenant_scope(tenant_id: uuid.UUID) -> Generator[None, None, None]:
         yield
     finally:
         TenantContext.reset(token)
+
+
+# ---------------------------------------------------------------------------
+# Imperative tenant context helpers (SVR-003)
+# ---------------------------------------------------------------------------
+
+def set_tenant_context(tenant_id: uuid.UUID) -> Token:
+    """Set the current tenant in ``TenantContext`` and return a reset token.
+
+    The returned token must be passed to :func:`clear_tenant_context` to
+    restore the previous value.  Prefer the :func:`tenant_scope` context
+    manager when possible — it handles cleanup automatically.
+
+    Parameters
+    ----------
+    tenant_id:
+        The UUID of the tenant to activate for the current execution context.
+
+    Returns
+    -------
+    contextvars.Token
+        Opaque token that can be passed to :func:`clear_tenant_context` to
+        undo this set operation.
+
+    Examples
+    --------
+    ::
+
+        token = set_tenant_context(my_tenant_id)
+        try:
+            ...
+        finally:
+            clear_tenant_context(token)
+    """
+    return TenantContext.set(tenant_id)
+
+
+def get_tenant_context() -> Optional[uuid.UUID]:
+    """Return the tenant UUID currently stored in ``TenantContext``.
+
+    Returns ``None`` when no tenant has been set for this execution context,
+    allowing callers to decide their own fallback behaviour (e.g. default to
+    ``DEFAULT_TENANT_ID`` for single-tenant mode, or raise for strict
+    multi-tenant enforcement).
+
+    Returns
+    -------
+    uuid.UUID or None
+        The active tenant UUID, or ``None`` if not set.
+    """
+    return TenantContext.get(None)
+
+
+def clear_tenant_context(token: Token) -> None:
+    """Reset ``TenantContext`` to the value it held before a :func:`set_tenant_context` call.
+
+    Parameters
+    ----------
+    token:
+        The token returned by the corresponding :func:`set_tenant_context`
+        call.  Passing any other token is undefined behaviour (mirrors the
+        underlying ``ContextVar.reset`` contract).
+
+    Examples
+    --------
+    ::
+
+        token = set_tenant_context(my_tenant_id)
+        try:
+            ...
+        finally:
+            clear_tenant_context(token)
+    """
+    TenantContext.reset(token)
 
 
 # ---------------------------------------------------------------------------
