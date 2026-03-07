@@ -41,7 +41,7 @@ import tempfile
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from skillmeat.cli.auth_flow import DeviceCodeResult
 
@@ -345,6 +345,91 @@ class CredentialStore:
         if creds is None:
             return False
         return not creds.is_expired
+
+    def refresh_if_needed(
+        self,
+        http_client: Any = None,
+    ) -> Optional[StoredCredentials]:
+        """Return valid credentials, refreshing the access token if necessary.
+
+        Loads current credentials and returns them unchanged when they are
+        still valid.  When the access token has expired *and* a
+        ``refresh_token`` is available, attempts a token refresh against the
+        configured OAuth token endpoint.  On success the new credentials are
+        persisted and returned.  On failure a warning is logged and ``None``
+        is returned — the caller should prompt the user to re-login.
+
+        When no credentials are stored at all, returns ``None`` immediately.
+
+        Args:
+            http_client: Optional ``httpx.Client``-compatible object used for
+                         the refresh request.  Pass a mock in tests to avoid
+                         real network calls.  When ``None`` a default
+                         ``httpx.Client`` with a 10-second timeout is used.
+
+        Returns:
+            :class:`StoredCredentials` (possibly refreshed), or ``None`` when
+            credentials are absent or the refresh attempt failed.
+        """
+        import httpx  # local import — optional at module level
+
+        from skillmeat.cli.auth_flow import AuthConfig
+
+        creds = self.load()
+        if creds is None:
+            return None
+
+        if not creds.is_expired:
+            # Still valid — nothing to do.
+            return creds
+
+        if not creds.refresh_token:
+            logger.debug("Access token expired but no refresh_token available.")
+            return None
+
+        config = AuthConfig()
+        if not config.is_configured():
+            logger.warning(
+                "Access token expired but auth is not configured "
+                "(SKILLMEAT_AUTH_ISSUER_URL / SKILLMEAT_AUTH_CLIENT_ID not set). "
+                "Please run 'skillmeat auth login' again."
+            )
+            return None
+
+        client = http_client or httpx.Client(timeout=10.0)
+        try:
+            response = client.post(
+                config.token_endpoint,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": creds.refresh_token,
+                    "client_id": config.client_id,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+        except Exception as exc:
+            logger.warning(
+                "Token refresh failed (%s). Please run 'skillmeat auth login' again.",
+                exc,
+            )
+            return None
+
+        now = time.time()
+        expires_in = data.get("expires_in")
+        new_creds = StoredCredentials(
+            access_token=data["access_token"],
+            # Prefer a new refresh_token if the server rotated it; otherwise
+            # keep the existing one.
+            refresh_token=data.get("refresh_token") or creds.refresh_token,
+            token_type=data.get("token_type", creds.token_type),
+            id_token=data.get("id_token", creds.id_token),
+            expires_at=(now + float(expires_in)) if expires_in is not None else None,
+            stored_at=now,
+        )
+        self._backend.save(new_creds)
+        logger.debug("Access token refreshed and persisted via %s backend.", self._backend_name)
+        return new_creds
 
     @property
     def backend_name(self) -> str:
