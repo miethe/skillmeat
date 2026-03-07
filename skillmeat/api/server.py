@@ -25,6 +25,7 @@ from skillmeat import __version__ as skillmeat_version
 
 from .config import APISettings, get_settings
 from .dependencies import app_state, require_auth, set_auth_provider
+from .middleware.tenant_context import set_tenant_context_dep
 from .routers import (
     analytics,
     artifact_history,
@@ -392,7 +393,10 @@ def create_app(settings: APISettings = None) -> FastAPI:
     # Blanket auth dependency applied to every protected router.
     # Excluded: health (load-balancer probes), cache (internal ops),
     # settings (read-only app config) — these remain publicly accessible.
-    _auth_deps = [Depends(require_auth())]
+    # set_tenant_context_dep runs after require_auth() and propagates
+    # AuthContext.tenant_id into the TenantContext ContextVar so that
+    # enterprise repository implementations can scope queries implicitly.
+    _auth_deps = [Depends(require_auth()), Depends(set_tenant_context_dep)]
 
     # Include routers
     # Health check router (no API prefix, for load balancers) — public
