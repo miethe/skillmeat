@@ -11,13 +11,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Settings, Github, MonitorCog, Layers, Plus, Info, Palette, ListTree } from 'lucide-react';
+import { Settings, Github, MonitorCog, Layers, Plus, Info, Palette, ListTree, UserCircle } from 'lucide-react';
 import { GitHubSettings } from '@/components/settings/github-settings';
 import { PlatformDefaultsSettings } from '@/components/settings/platform-defaults-settings';
 import { CustomContextSettings } from '@/components/settings/custom-context-settings';
 import { AppearanceSettings } from '@/app/settings/components/appearance-settings';
 import { EntityTypeConfigList } from '@/app/settings/components/entity-type-config-list';
 import { ContextCategoriesSettings } from '@/app/settings/components/context-categories-settings';
+import { UserProfile } from '@/components/auth/user-profile';
 import { CreateProfileForm } from '@/components/profiles';
 import { useCreateDeploymentProfile } from '@/hooks';
 import { useToast } from '@/hooks';
@@ -70,6 +71,10 @@ export default function SettingsPage() {
 
       <Tabs defaultValue="general">
         <TabsList className="mb-4">
+          <TabsTrigger value="account" className="flex items-center gap-2">
+            <UserCircle className="h-4 w-4" />
+            Account
+          </TabsTrigger>
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             General
@@ -97,6 +102,11 @@ export default function SettingsPage() {
             </TabsTrigger>
           )}
         </TabsList>
+
+        {/* Account Tab */}
+        <TabsContent value="account" className="space-y-4">
+          <UserProfile />
+        </TabsContent>
 
         {/* General Tab */}
         <TabsContent value="general" className="space-y-4">
