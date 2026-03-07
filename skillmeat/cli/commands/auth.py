@@ -3,6 +3,8 @@
 Provides the ``skillmeat auth`` subcommand tree.  Currently exposes:
 
     skillmeat auth login [--no-browser] [--timeout SECONDS]
+    skillmeat auth token <PAT>
+    skillmeat auth logout
 
 The ``login`` command runs the OAuth 2.0 Device Authorization Grant (RFC 8628)
 against a configured Clerk issuer.  In local (zero-auth) mode it prints an
@@ -17,7 +19,6 @@ no keyring backend is available.
 
 from __future__ import annotations
 
-import os
 import sys
 import webbrowser
 from typing import Optional
@@ -35,6 +36,7 @@ from skillmeat.cli.auth_flow import (
     DeviceCodeTimeoutError,
     DeviceCodeFlowError,
 )
+from skillmeat.cli.auth_utils import is_local_mode as _is_local_mode
 from skillmeat.cli.credential_store import CredentialStore
 
 console = Console(force_terminal=True, legacy_windows=False)
@@ -43,36 +45,6 @@ console = Console(force_terminal=True, legacy_windows=False)
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _is_local_mode() -> bool:
-    """Return True when SkillMeat is running in zero-auth (local) mode.
-
-    Checks the ``SKILLMEAT_AUTH_MODE`` environment variable first (explicit
-    override), then falls back to reading ``APISettings`` if available.
-
-    Returns:
-        True when no authentication provider is configured.
-    """
-    auth_mode = os.environ.get("SKILLMEAT_AUTH_MODE", "").strip().lower()
-    if auth_mode == "local":
-        return True
-    if auth_mode and auth_mode != "clerk":
-        # Unknown explicit mode — treat as local to be safe.
-        return True
-
-    # No explicit override — consult API settings if reachable.
-    try:
-        from skillmeat.api.config import get_settings
-
-        settings = get_settings()
-        return not settings.auth_enabled or settings.auth_provider == "local"
-    except Exception:
-        # API settings unavailable (e.g. running without API installed).
-        # Fall back to env-var based detection.
-        issuer = os.environ.get("SKILLMEAT_AUTH_ISSUER_URL", "").strip()
-        client_id = os.environ.get("SKILLMEAT_AUTH_CLIENT_ID", "").strip()
-        return not (issuer and client_id)
 
 
 # ---------------------------------------------------------------------------
@@ -262,3 +234,106 @@ def _run_device_code_flow(
         console.print(
             f"[dim]Access token expires in {result.expires_in} seconds.[/dim]"
         )
+
+
+# ---------------------------------------------------------------------------
+# token sub-command (PAT)
+# ---------------------------------------------------------------------------
+
+
+@auth_cli.command("token")
+@click.argument("pat")
+@click.option(
+    "--validate",
+    is_flag=True,
+    default=False,
+    help="Attempt a test API call to verify the PAT works before storing it.",
+)
+def token(pat: str, validate: bool) -> None:
+    """Store a Personal Access Token (PAT) for SkillMeat authentication.
+
+    PAT is stored using the same secure credential backend as the device-code
+    flow (system keyring when available, ``~/.skillmeat/credentials.json``
+    otherwise).  PATs do not expire via OAuth, so no ``expires_in`` is set.
+
+    \b
+    Examples:
+      skillmeat auth token sk_live_abc123
+      skillmeat auth token sk_live_abc123 --validate
+    """
+    if _is_local_mode():
+        console.print(
+            Panel(
+                "[bold cyan]SkillMeat is running in local (zero-auth) mode.[/bold cyan]\n\n"
+                "No authentication is required.  Storing a PAT has no effect in "
+                "this mode.\n\n"
+                "To enable authentication, set [bold]SKILLMEAT_AUTH_MODE=clerk[/bold] "
+                "and configure [bold]SKILLMEAT_AUTH_ISSUER_URL[/bold] and "
+                "[bold]SKILLMEAT_AUTH_CLIENT_ID[/bold].",
+                title="[green]Auth not required[/green]",
+                expand=False,
+            )
+        )
+        return
+
+    if validate:
+        console.print(
+            "[yellow]Warning:[/yellow] PAT validation is not yet implemented. "
+            "The token will be stored without verification."
+        )
+
+    from skillmeat.cli.auth_flow import DeviceCodeResult
+
+    result = DeviceCodeResult(
+        access_token=pat,
+        refresh_token=None,
+        expires_in=None,
+        token_type="Bearer",
+        id_token=None,
+    )
+
+    store = CredentialStore()
+    store.store(result)
+
+    backend_note = (
+        "Credentials stored in system keyring."
+        if store.backend_name == "keyring"
+        else "Credentials stored in ~/.skillmeat/credentials.json (mode 0600)."
+    )
+    console.print(
+        Panel(
+            "[bold green]Personal Access Token stored successfully![/bold green]\n\n"
+            f"[dim]{backend_note}[/dim]",
+            title="[green]Token stored[/green]",
+            expand=False,
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# logout sub-command
+# ---------------------------------------------------------------------------
+
+
+@auth_cli.command("logout")
+def logout() -> None:
+    """Remove stored SkillMeat credentials.
+
+    Clears any access token, refresh token, and associated metadata from the
+    active credential backend (system keyring or file).  Safe to call even
+    when no credentials are currently stored.
+
+    \b
+    Example:
+      skillmeat auth logout
+    """
+    store = CredentialStore()
+    store.clear()
+    console.print(
+        Panel(
+            "[bold green]Logged out successfully.[/bold green]\n\n"
+            "[dim]All stored credentials have been cleared.[/dim]",
+            title="[green]Logout[/green]",
+            expand=False,
+        )
+    )
