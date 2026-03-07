@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 3
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -53,7 +53,7 @@ tasks:
 - id: SVR-004
   description: Update IArtifactRepository, ICollectionRepository interfaces with optional
     auth_context param
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   - backend-architect
@@ -93,7 +93,7 @@ tasks:
   priority: high
 - id: SVR-008
   description: Add owner_id, owner_type, visibility to request/response DTOs
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -149,7 +149,7 @@ files_modified:
 - skillmeat/core/services/collection_service.py
 - skillmeat/api/schemas/artifacts.py
 - skillmeat/api/schemas/collections.py
-progress: 37
+progress: 62
 updated: '2026-03-06'
 ---
 

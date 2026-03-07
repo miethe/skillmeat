@@ -32,9 +32,12 @@ Usage::
 from __future__ import annotations
 
 import abc
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
     ArtifactVersionDTO,
@@ -96,6 +99,7 @@ class IArtifactRepository(abc.ABC):
         self,
         id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> ArtifactDTO | None:
         """Return the artifact with the given ``type:name`` primary key.
 
@@ -103,6 +107,9 @@ class IArtifactRepository(abc.ABC):
             id: Artifact primary key in ``"type:name"`` format
                 (e.g. ``"skill:frontend-design"``).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             An :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO` when the
@@ -115,6 +122,7 @@ class IArtifactRepository(abc.ABC):
         self,
         uuid: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> ArtifactDTO | None:
         """Return the artifact identified by its stable UUID.
 
@@ -123,6 +131,9 @@ class IArtifactRepository(abc.ABC):
         Args:
             uuid: 32-char hex UUID string.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             An :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO` when
@@ -141,6 +152,7 @@ class IArtifactRepository(abc.ABC):
         offset: int = 0,
         limit: int = 50,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[ArtifactDTO]:
         """Return a page of artifacts matching optional filter criteria.
 
@@ -152,6 +164,9 @@ class IArtifactRepository(abc.ABC):
             offset: Zero-based record offset for pagination.
             limit: Maximum number of records to return.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             A (possibly empty) list of
@@ -164,6 +179,7 @@ class IArtifactRepository(abc.ABC):
         self,
         filters: dict[str, Any] | None = None,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> int:
         """Return the total number of artifacts matching optional filter criteria.
 
@@ -172,6 +188,9 @@ class IArtifactRepository(abc.ABC):
         Args:
             filters: Same filter map accepted by :meth:`list`.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             Non-negative integer count.
@@ -184,6 +203,7 @@ class IArtifactRepository(abc.ABC):
         query: str,
         filters: dict[str, Any] | None = None,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[ArtifactDTO]:
         """Full-text / fuzzy search across artifact names and metadata.
 
@@ -192,6 +212,9 @@ class IArtifactRepository(abc.ABC):
             filters: Optional additional filter constraints applied on top
                 of the text match.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             Ranked list of matching
@@ -208,6 +231,7 @@ class IArtifactRepository(abc.ABC):
         self,
         dto: ArtifactDTO,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> ArtifactDTO:
         """Persist a new artifact record and return the stored representation.
 
@@ -215,6 +239,9 @@ class IArtifactRepository(abc.ABC):
             dto: Fully populated artifact data.  The implementation may
                 ignore ``created_at`` / ``updated_at`` and set them itself.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             The persisted :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
@@ -229,6 +256,7 @@ class IArtifactRepository(abc.ABC):
         id: str,
         updates: dict[str, Any],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> ArtifactDTO:
         """Apply a partial update to an existing artifact.
 
@@ -237,6 +265,9 @@ class IArtifactRepository(abc.ABC):
             updates: Map of field names to new values.  Only provided
                 fields are changed; others remain untouched.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             The updated :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`.
@@ -251,12 +282,16 @@ class IArtifactRepository(abc.ABC):
         self,
         id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> bool:
         """Delete an artifact and all its associated records.
 
         Args:
             id: Artifact primary key (``"type:name"``).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             ``True`` when the artifact was found and deleted, ``False`` when
@@ -273,12 +308,16 @@ class IArtifactRepository(abc.ABC):
         self,
         id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> str:
         """Return the raw text content of an artifact's primary file.
 
         Args:
             id: Artifact primary key (``"type:name"``).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             File content as a UTF-8 string.
@@ -295,6 +334,7 @@ class IArtifactRepository(abc.ABC):
         id: str,
         content: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> bool:
         """Overwrite the primary file content of an artifact.
 
@@ -302,6 +342,9 @@ class IArtifactRepository(abc.ABC):
             id: Artifact primary key (``"type:name"``).
             content: New file content (UTF-8 string).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             ``True`` on success.
@@ -320,12 +363,16 @@ class IArtifactRepository(abc.ABC):
         self,
         id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[TagDTO]:
         """Return all tags currently assigned to an artifact.
 
         Args:
             id: Artifact primary key (``"type:name"``).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             List of :class:`~skillmeat.core.interfaces.dtos.TagDTO` objects.
@@ -338,6 +385,7 @@ class IArtifactRepository(abc.ABC):
         id: str,
         tag_ids: list[str],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> bool:
         """Replace the complete tag set for an artifact.
 
@@ -346,6 +394,9 @@ class IArtifactRepository(abc.ABC):
             tag_ids: New complete list of tag IDs.  Any previous tags not
                 present in this list are removed.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             ``True`` on success.
@@ -362,6 +413,7 @@ class IArtifactRepository(abc.ABC):
         artifact_type: str,
         name: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> str | None:
         """Resolve the stable UUID for an artifact identified by type and name.
 
@@ -369,6 +421,9 @@ class IArtifactRepository(abc.ABC):
             artifact_type: Artifact type string (e.g. ``"skill"``).
             name: Artifact name string.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             32-char hex UUID string when found, ``None`` otherwise.
@@ -380,6 +435,7 @@ class IArtifactRepository(abc.ABC):
         self,
         uuids: list[str],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> dict[str, str]:
         """Batch-map artifact UUIDs to their ``type:name`` ID strings.
 
@@ -390,6 +446,9 @@ class IArtifactRepository(abc.ABC):
         Args:
             uuids: List of 32-char hex UUID strings to look up.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             Dict mapping each UUID to its ``"type:name"`` artifact ID string.
@@ -402,6 +461,7 @@ class IArtifactRepository(abc.ABC):
         self,
         artifacts: list[tuple[str, str]],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> dict[tuple[str, str], str]:
         """Batch-resolve UUIDs for multiple ``(artifact_type, name)`` pairs.
 
@@ -412,6 +472,9 @@ class IArtifactRepository(abc.ABC):
         Args:
             artifacts: List of ``(artifact_type, name)`` tuples.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             Dict mapping each ``(artifact_type, name)`` tuple to its 32-char
@@ -428,6 +491,7 @@ class IArtifactRepository(abc.ABC):
         self,
         uuid: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> ArtifactDTO | None:
         """Return an artifact with enriched collection-membership context.
 
@@ -438,6 +502,9 @@ class IArtifactRepository(abc.ABC):
         Args:
             uuid: Stable artifact UUID (32-char hex).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             An :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO` when
@@ -451,12 +518,16 @@ class IArtifactRepository(abc.ABC):
         self,
         uuid: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[CollectionMembershipDTO]:
         """Return all collections that contain the artifact identified by *uuid*.
 
         Args:
             uuid: Stable artifact UUID (32-char hex).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             List of :class:`~skillmeat.core.interfaces.dtos.CollectionMembershipDTO`
@@ -470,6 +541,7 @@ class IArtifactRepository(abc.ABC):
         self,
         uuid: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> str | None:
         """Return the collection-level description for an artifact.
 
@@ -480,6 +552,9 @@ class IArtifactRepository(abc.ABC):
         Args:
             uuid: Stable artifact UUID (32-char hex).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             Collection-level description string, or ``None`` when not set
@@ -496,6 +571,7 @@ class IArtifactRepository(abc.ABC):
         self,
         cluster_id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[ArtifactDTO]:
         """Return all artifacts that belong to the given deduplication cluster.
 
@@ -505,6 +581,9 @@ class IArtifactRepository(abc.ABC):
         Args:
             cluster_id: Opaque cluster identifier (implementation-defined).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             List of :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
@@ -522,6 +601,7 @@ class IArtifactRepository(abc.ABC):
         self,
         uuid: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> bool:
         """Check whether an artifact with the given UUID exists.
 
@@ -531,6 +611,9 @@ class IArtifactRepository(abc.ABC):
         Args:
             uuid: Stable artifact UUID (32-char hex).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             ``True`` when an artifact with *uuid* exists, ``False`` otherwise.
@@ -542,6 +625,7 @@ class IArtifactRepository(abc.ABC):
         self,
         artifact_type: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[ArtifactDTO]:
         """Return all artifacts of the specified type.
 
@@ -551,6 +635,9 @@ class IArtifactRepository(abc.ABC):
         Args:
             artifact_type: Artifact type string (e.g. ``"skill"``, ``"command"``).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             List of :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
@@ -568,6 +655,7 @@ class IArtifactRepository(abc.ABC):
         uuid: str,
         tags: list[str],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Replace the collection-level tags for an artifact.
 
@@ -580,6 +668,9 @@ class IArtifactRepository(abc.ABC):
             tags: New complete list of tag name strings.  Replaces any
                 previously set collection-level tags.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Raises:
             KeyError: If no artifact with *uuid* exists.
@@ -791,11 +882,15 @@ class ICollectionRepository(abc.ABC):
     def get(
         self,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> CollectionDTO | None:
         """Return the active collection metadata.
 
         Args:
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             A :class:`~skillmeat.core.interfaces.dtos.CollectionDTO` when a
@@ -808,12 +903,16 @@ class ICollectionRepository(abc.ABC):
         self,
         id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> CollectionDTO | None:
         """Return a specific collection by its identifier.
 
         Args:
             id: Collection unique identifier (usually the collection name).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             A :class:`~skillmeat.core.interfaces.dtos.CollectionDTO` when
@@ -825,11 +924,15 @@ class ICollectionRepository(abc.ABC):
     def list(
         self,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[CollectionDTO]:
         """Return all known collections.
 
         Args:
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             List of :class:`~skillmeat.core.interfaces.dtos.CollectionDTO`
@@ -841,6 +944,7 @@ class ICollectionRepository(abc.ABC):
     def get_stats(
         self,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> dict[str, Any]:
         """Return aggregate statistics for the active collection.
 
@@ -849,6 +953,9 @@ class ICollectionRepository(abc.ABC):
 
         Args:
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             Plain dictionary of stat key/value pairs.
@@ -859,11 +966,15 @@ class ICollectionRepository(abc.ABC):
     def refresh(
         self,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> CollectionDTO:
         """Re-scan the filesystem and rebuild the collection cache.
 
         Args:
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             The refreshed :class:`~skillmeat.core.interfaces.dtos.CollectionDTO`.
@@ -878,6 +989,7 @@ class ICollectionRepository(abc.ABC):
         offset: int = 0,
         limit: int = 50,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[ArtifactDTO]:
         """Return the artifacts that belong to a collection.
 
@@ -887,6 +999,9 @@ class ICollectionRepository(abc.ABC):
             offset: Zero-based pagination offset.
             limit: Maximum number of records to return.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             List of :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
@@ -904,6 +1019,7 @@ class ICollectionRepository(abc.ABC):
         name: str,
         description: str | None = None,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> CollectionDTO:
         """Create a new collection.
 
@@ -912,6 +1028,9 @@ class ICollectionRepository(abc.ABC):
                 unique within the storage backend.
             description: Optional description text.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             The created :class:`~skillmeat.core.interfaces.dtos.CollectionDTO`.
@@ -927,6 +1046,7 @@ class ICollectionRepository(abc.ABC):
         collection_id: str,
         updates: dict[str, Any],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> CollectionDTO:
         """Apply a partial update to an existing collection.
 
@@ -934,6 +1054,9 @@ class ICollectionRepository(abc.ABC):
             collection_id: Collection unique identifier.
             updates: Map of field names to new values (e.g. ``{"name": "new-name"}``).
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             The updated :class:`~skillmeat.core.interfaces.dtos.CollectionDTO`.
@@ -948,6 +1071,7 @@ class ICollectionRepository(abc.ABC):
         self,
         collection_id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Delete a collection and remove all its membership records.
 
@@ -957,6 +1081,9 @@ class ICollectionRepository(abc.ABC):
         Args:
             collection_id: Collection unique identifier.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Raises:
             KeyError: If no collection with *collection_id* exists.
@@ -969,6 +1096,7 @@ class ICollectionRepository(abc.ABC):
         collection_id: str,
         artifact_uuids: list[str],
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Add one or more artifacts to a collection by UUID.
 
@@ -979,6 +1107,9 @@ class ICollectionRepository(abc.ABC):
             artifact_uuids: List of stable artifact UUIDs (32-char hex
                 strings) to add to the collection.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Raises:
             KeyError: If *collection_id* does not exist.
@@ -993,6 +1124,7 @@ class ICollectionRepository(abc.ABC):
         collection_id: str,
         artifact_uuid: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Remove a single artifact from a collection.
 
@@ -1000,6 +1132,9 @@ class ICollectionRepository(abc.ABC):
             collection_id: Collection unique identifier.
             artifact_uuid: Stable artifact UUID (32-char hex) to remove.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Raises:
             KeyError: If *collection_id* does not exist or *artifact_uuid* is
@@ -1017,6 +1152,7 @@ class ICollectionRepository(abc.ABC):
         collection_id: str,
         entity_type: str | None = None,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> list[Any]:
         """Return entities belonging to a collection, optionally filtered by type.
 
@@ -1026,6 +1162,9 @@ class ICollectionRepository(abc.ABC):
                 (e.g. ``"workflow"``, ``"dataset"``).  When ``None``, all
                 entity types are returned.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Returns:
             List of entity records.  The exact element type is
@@ -1041,6 +1180,7 @@ class ICollectionRepository(abc.ABC):
         entity_type: str,
         entity_id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Associate an entity with a collection.
 
@@ -1049,6 +1189,9 @@ class ICollectionRepository(abc.ABC):
             entity_type: Entity type string (e.g. ``"workflow"``).
             entity_id: Unique identifier of the entity to associate.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Raises:
             KeyError: If *collection_id* does not exist.
@@ -1064,6 +1207,7 @@ class ICollectionRepository(abc.ABC):
         entity_type: str,
         entity_id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Remove an entity association from a collection.
 
@@ -1072,6 +1216,9 @@ class ICollectionRepository(abc.ABC):
             entity_type: Entity type string (e.g. ``"workflow"``).
             entity_id: Unique identifier of the entity to disassociate.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Raises:
             KeyError: If *collection_id* does not exist or the entity is not
@@ -1084,6 +1231,7 @@ class ICollectionRepository(abc.ABC):
         self,
         collection_id: str,
         ctx: RequestContext | None = None,
+        auth_context: AuthContext | None = None,
     ) -> None:
         """Migrate a collection's artifacts and entities to the default collection.
 
@@ -1095,6 +1243,9 @@ class ICollectionRepository(abc.ABC):
             collection_id: Collection unique identifier of the source collection
                 to migrate away from.
             ctx: Optional per-request metadata.
+            auth_context: Optional authentication and authorisation context.
+                When ``None`` the operation is performed without tenant
+                scoping (local zero-auth mode).
 
         Raises:
             KeyError: If *collection_id* does not exist.
