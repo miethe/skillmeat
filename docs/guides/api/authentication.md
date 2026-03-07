@@ -383,15 +383,33 @@ All other routes under `/api/v1` are protected when `SKILLMEAT_AUTH_ENABLED=true
 
 ### Environment Variables
 
+**Core Authentication**:
+
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `SKILLMEAT_AUTH_ENABLED` | bool | `false` | Master enforcement switch. When `false`, local auth mode (LocalAuthProvider) is used. When `true`, external auth provider (e.g., Clerk) validates requests. |
 | `SKILLMEAT_AUTH_PROVIDER` | string | `local` | Provider selection: `local` (LocalAuthProvider) or `clerk` (Clerk.dev). |
+
+**Edition and Deployment**:
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `SKILLMEAT_EDITION` | string | `local` | Deployment edition: `local` (filesystem-backed, single-tenant) or `enterprise` (database-backed, multi-tenant). Controls repository implementation selection. |
 | `SKILLMEAT_ENV` | string | `development` | Environment: `development`, `production`, or `testing` |
-| `SKILLMEAT_EDITION` | string | `local` | Deployment edition: `local` or `enterprise` |
-| `SKILLMEAT_ENTERPRISE_PAT_SECRET` | string | (none) | Enterprise PAT token (canonical env var; legacy `ENTERPRISE_PAT_SECRET` still accepted) |
+
+**Clerk Provider** (when `auth_provider=clerk`):
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
 | `CLERK_JWKS_URL` | string | — | Clerk JWKS endpoint (required when `auth_provider=clerk`) |
 | `CLERK_ISSUER` | string | — | Expected JWT issuer (recommended when using Clerk) |
+| `CLERK_AUDIENCE` | string | — | Expected JWT audience (optional, for additional validation) |
+
+**Enterprise Edition**:
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `SKILLMEAT_ENTERPRISE_PAT_SECRET` | string | (none) | Enterprise PAT token for service-to-service auth (canonical env var; legacy `ENTERPRISE_PAT_SECRET` still accepted) |
 
 ### Example Configurations
 
@@ -528,7 +546,56 @@ SkillMeat uses an authentication provider pattern that decouples the API from sp
 
 The provider must implement the `AuthProvider` abstract interface to validate requests and return `AuthContext`.
 
+## Enterprise Edition Visibility Model
+
+When deployed in enterprise edition (`SKILLMEAT_EDITION=enterprise`), SkillMeat enforces row-level visibility controls on all artifact and collection read operations.
+
+### Visibility Levels
+
+Resources have three visibility levels controlling who can access them:
+
+| Visibility | Access | Use Case |
+|---|---|---|
+| `private` | Owner + system_admin only | Sensitive, personal artifacts |
+| `team` | Team members + system_admin | Team-specific artifacts |
+| `public` | All authenticated users in tenant | Shared artifacts |
+
+### Access Rules
+
+**For Owners**:
+```bash
+# Owner can always read their own artifact
+curl -H "Authorization: Bearer $owner-token" \
+  http://localhost:8080/api/v1/artifacts/{owner-artifact-id}
+# Response: 200 OK
+```
+
+**For Non-Owners (private artifact)**:
+```bash
+# Non-owner cannot read another user's private artifact
+curl -H "Authorization: Bearer $other-user-token" \
+  http://localhost:8080/api/v1/artifacts/{owner-private-artifact-id}
+# Response: 404 Not Found (no existence disclosure)
+```
+
+**For System Admin**:
+```bash
+# System admin can read any artifact in tenant
+curl -H "Authorization: Bearer $admin-token" \
+  http://localhost:8080/api/v1/artifacts/{any-artifact-id}
+# Response: 200 OK
+```
+
+### Error Semantics
+
+When a non-owner attempts to access a private resource they don't own, the API returns **404 Not Found** rather than 403 Forbidden. This prevents disclosing whether a resource exists to unauthorized users in multi-tenant environments.
+
+### Local Edition Behavior
+
+In local edition (`SKILLMEAT_EDITION=local`, the default), visibility controls are not enforced. All authenticated users (which defaults to `local_admin`) have full access to all artifacts and collections.
+
 ## See Also
 
 - [API Reference](/docs/api/endpoints.md) — Endpoint documentation
 - [Repository Architecture](/docs/guides/api/repository-architecture.md) — How authentication integrates with data access
+- [Auth Rollout Guide](/docs/guides/deployment/auth-rollout.md) — Enterprise edition deployment patterns

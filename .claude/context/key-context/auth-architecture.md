@@ -123,6 +123,29 @@ Never compare `uuid.UUID` directly to a string column — use `str_owner_id()`.
 - Do not skip `str_owner_id()` when filtering by owner — direct UUID-to-String comparison silently returns nothing.
 - Do not attach `TenantContextDep` before `require_auth` resolves — it depends on `AuthContext` being present.
 
+## Edition Configuration
+
+| `SKILLMEAT_EDITION` | Behavior | Repository Layer |
+|---|---|---|
+| `local` (default) | Single-tenant, filesystem-backed | Artifact/Collection repos use `LocalArtifactRepository`, `LocalCollectionRepository` |
+| `enterprise` | Multi-tenant, database-backed | Artifact/Collection repos use `EnterpriseArtifactRepository`, `EnterpriseCollectionRepository` |
+
+Enterprise edition uses DB-backed SQLAlchemy repositories. Unsupported providers (project, deployment, tag, etc.) return 503 with actionable messaging.
+
+## Visibility Model (Enterprise Edition)
+
+Enterprise repositories enforce row-level visibility on all read paths via `apply_visibility_filter_stmt`:
+
+| Visibility | Owner Type | Access |
+|---|---|---|
+| `private` | User | Owner only + system_admin |
+| `public` | User or Team | All users in tenant |
+| `team` | Team | Team members + system_admin |
+
+**Admin bypass**: `system_admin` role can read all artifacts/collections in tenant regardless of visibility.
+
+**Ownership error semantics**: Non-owners receive 404 (not disclosed as 403) when attempting to access private resources they don't own.
+
 ## Excluded Paths (no auth required)
 
 `/health`, `/docs`, `/redoc`, `/openapi.json`, `/`, `/api/v1/version`

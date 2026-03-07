@@ -23,8 +23,141 @@ SkillMeat provides a suite of operational tools for:
 - **Database Migrations**: Schema evolution via Alembic
 - **Health Monitoring**: Health check endpoints for observability
 - **Snapshot Management**: Backup and rollback capabilities
+- **Authentication & Edition Configuration**: Environment-based auth provider and edition selection (local vs. enterprise)
 
 **Target Audience**: Developers and operators running SkillMeat locally or in production.
+
+### Deployment Modes
+
+SkillMeat supports two distinct deployment editions controlled via `SKILLMEAT_EDITION`:
+
+| Edition | Backend | Deployment | Auth |
+|---|---|---|---|
+| **local** (default) | Filesystem + SQLite cache | Single-user, local development, self-hosted | LocalAuthProvider (no enforcement) or Clerk JWT |
+| **enterprise** | SQLAlchemy DB-backed | Multi-tenant, production SaaS | Clerk JWT or Enterprise PAT |
+
+Each edition has separate configuration, visibility enforcement, and repository implementations. See "Edition Configuration" below for details.
+
+---
+
+## Edition Configuration
+
+SkillMeat's deployment edition is controlled by the `SKILLMEAT_EDITION` environment variable and determines which repository implementations are used throughout the application.
+
+### Local Edition (Default)
+
+**Configuration**:
+```bash
+export SKILLMEAT_EDITION=local
+export SKILLMEAT_AUTH_ENABLED=false  # or true for Clerk JWT
+```
+
+**Behavior**:
+- Artifacts/collections stored on filesystem
+- Single-tenant architecture
+- `get_artifact_repository()` and `get_collection_repository()` return local implementations
+- No visibility enforcement (all authenticated users see all resources)
+- Suitable for personal use, development, self-hosted deployments
+
+**Repository Implementations**:
+- `LocalArtifactRepository` (filesystem + in-memory)
+- `LocalCollectionRepository` (filesystem + in-memory)
+- All other repos (`project`, `deployment`, `tag`, etc.) use local implementations
+
+### Enterprise Edition
+
+**Configuration**:
+```bash
+export SKILLMEAT_EDITION=enterprise
+export SKILLMEAT_AUTH_ENABLED=true
+export SKILLMEAT_AUTH_PROVIDER=clerk  # or enterprise PAT
+export SKILLMEAT_ENTERPRISE_PAT_SECRET="your-shared-secret"  # for service accounts
+```
+
+**Behavior**:
+- Artifacts/collections stored in SQLAlchemy-backed database
+- Multi-tenant architecture with tenant isolation
+- `get_artifact_repository()` and `get_collection_repository()` return enterprise implementations
+- Row-level visibility enforcement: private (owner only), team (team members), public (all authenticated)
+- Non-owners receive 404 (not 403) when accessing private resources they don't own — no existence disclosure
+- Supported: artifact, collection
+- Unsupported (return 503): project, deployment, tag, settings, group, context_entity, marketplace_source, project_template
+
+**Repository Implementations**:
+- `EnterpriseArtifactRepository` (SQLAlchemy + visibility filtering)
+- `EnterpriseCollectionRepository` (SQLAlchemy + visibility filtering)
+- Unsupported repos return HTTP 503 with message listing supported providers
+
+### Switching Editions
+
+To switch from local to enterprise (or vice versa):
+
+1. **Set environment variable**:
+```bash
+export SKILLMEAT_EDITION=enterprise
+```
+
+2. **Ensure database is initialized** (for enterprise):
+```bash
+# Alembic migrations must be run for enterprise DB schema
+alembic upgrade head
+```
+
+3. **Restart API server**:
+```bash
+# Docker
+docker restart skillmeat-api
+
+# Systemd
+sudo systemctl restart skillmeat-api
+
+# Kubernetes
+kubectl rollout restart deployment/skillmeat-api
+```
+
+4. **Verify edition is active**:
+```bash
+# Check startup logs for edition confirmation
+grep "SKILLMEAT_EDITION" /var/log/skillmeat/api.log
+
+# Or test via API: unsupported repos should return 503
+curl -H "Authorization: Bearer $token" \
+  http://localhost:8080/api/v1/projects | jq '.detail'
+# Expected (enterprise): "Enterprise edition does not yet support project..."
+```
+
+### Auth Provider Configuration
+
+**Local Edition with LocalAuthProvider** (default, no setup):
+```bash
+export SKILLMEAT_AUTH_ENABLED=false
+# All requests authorized as local_admin automatically
+```
+
+**Local Edition with Clerk JWT**:
+```bash
+export SKILLMEAT_AUTH_ENABLED=true
+export SKILLMEAT_AUTH_PROVIDER=clerk
+export CLERK_JWKS_URL=https://...
+export CLERK_ISSUER=https://...
+```
+
+**Enterprise Edition with Clerk JWT**:
+```bash
+export SKILLMEAT_EDITION=enterprise
+export SKILLMEAT_AUTH_ENABLED=true
+export SKILLMEAT_AUTH_PROVIDER=clerk
+export CLERK_JWKS_URL=https://...
+export CLERK_ISSUER=https://...
+```
+
+**Enterprise Edition with Static PAT**:
+```bash
+export SKILLMEAT_EDITION=enterprise
+export SKILLMEAT_AUTH_ENABLED=true
+export SKILLMEAT_ENTERPRISE_PAT_SECRET="your-static-secret"
+# Service-to-service: Authorization: Bearer <secret>
+```
 
 ---
 

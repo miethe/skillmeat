@@ -194,15 +194,38 @@ curl -s http://localhost:8080/health/live | jq '.status'
 
 All auth behavior is controlled by environment variables with the `SKILLMEAT_` prefix:
 
+### Core Authentication
+
 | Variable | Type | Default | Purpose |
 |---|---|---|---|
 | `SKILLMEAT_AUTH_ENABLED` | bool | `false` | Master enforcement switch. When `false`, `LocalAuthProvider` is used (all requests authorized as local admin, no credentials needed). When `true`, the configured auth provider is used. |
 | `SKILLMEAT_AUTH_PROVIDER` | string | `local` | Provider selection: `local` or `clerk`. |
+
+### Clerk Configuration (when `auth_provider=clerk`)
+
+| Variable | Type | Default | Purpose |
+|---|---|---|---|
 | `CLERK_JWKS_URL` | string | — | Clerk JWKS endpoint. Required when `auth_provider=clerk`. Also accepted as `SKILLMEAT_CLERK_JWKS_URL`. |
 | `CLERK_ISSUER` | string | — | Expected JWT `iss` claim. Optional but recommended. Also `SKILLMEAT_CLERK_ISSUER`. |
 | `CLERK_AUDIENCE` | string | — | Expected JWT `aud` claim. Optional. Also `SKILLMEAT_CLERK_AUDIENCE`. |
-| `SKILLMEAT_ENTERPRISE_PAT_SECRET` | string | — | Shared secret for enterprise PAT auth (enterprise edition only). |
-| `SKILLMEAT_EDITION` | string | `local` | Edition: `local` or `enterprise`. Controls repository implementation selection. |
+
+### Enterprise Edition Configuration
+
+| Variable | Type | Default | Purpose |
+|---|---|---|---|
+| `SKILLMEAT_EDITION` | string | `local` | Deployment edition: `local` (single-tenant, filesystem-backed) or `enterprise` (multi-tenant, DB-backed). Controls which repository implementations are used by the DI factories. |
+| `SKILLMEAT_ENTERPRISE_PAT_SECRET` | string | — | Shared secret for enterprise service-to-service auth. Required before exposing enterprise endpoints. Read from environment at request-time (can be rotated without restart). Legacy alias: `ENTERPRISE_PAT_SECRET` (deprecated, use `SKILLMEAT_ENTERPRISE_PAT_SECRET`). |
+
+**Enterprise Edition Details**:
+- When `edition="enterprise"`, `get_artifact_repository()` and `get_collection_repository()` return `EnterpriseArtifactRepository` and `EnterpriseCollectionRepository` (DB-backed via SQLAlchemy).
+- Unsupported enterprise providers (project, deployment, tag, settings, group, context_entity, marketplace_source, project_template) return HTTP 503 with actionable messaging.
+- Visibility filtering applied to all enterprise read paths: private resources visible only to owner + system_admin, team resources visible to team members + system_admin, public visible to all in tenant.
+- Non-owners receive 404 (not 403) when attempting to access private resources they don't own — no existence disclosure.
+
+### Performance and Monitoring
+
+| Variable | Type | Default | Purpose |
+|---|---|---|---|
 | `SKILLMEAT_RATE_LIMIT_ENABLED` | bool | `false` | Enable IP-based rate limiting. |
 | `SKILLMEAT_RATE_LIMIT_REQUESTS` | int | `100` | Max requests per minute per IP when rate limiting is enabled. |
 | `SKILLMEAT_LOG_LEVEL` | string | `INFO` | Set to `DEBUG` to log all auth decisions. |
@@ -562,9 +585,103 @@ Complete all applicable items before enabling a new auth mode.
 
 ---
 
-## Tenant Context and Enterprise Edition Notes
+## Enterprise Edition Deployment
 
-When `SKILLMEAT_EDITION=enterprise`, the `TenantContextDep` dependency can be added to enterprise routers to scope all database queries to the authenticated tenant.
+SkillMeat enterprise edition uses database-backed repositories and enforces visibility controls. This section details enterprise-specific configuration and behavior.
+
+### Edition Switching
+
+The `SKILLMEAT_EDITION` setting controls which repository implementations are used:
+
+**Local edition** (`SKILLMEAT_EDITION=local`, default):
+```bash
+export SKILLMEAT_EDITION=local
+# Repositories: LocalArtifactRepository, LocalCollectionRepository (filesystem-backed)
+```
+
+**Enterprise edition** (`SKILLMEAT_EDITION=enterprise`):
+```bash
+export SKILLMEAT_EDITION=enterprise
+# Repositories: EnterpriseArtifactRepository, EnterpriseCollectionRepository (SQLAlchemy DB-backed)
+```
+
+Switching editions does not require a code change — only an environment variable restart.
+
+### Supported Enterprise Providers
+
+Only artifact and collection repositories are available in enterprise edition:
+
+| Repository | Status | Details |
+|---|---|---|
+| `IArtifactRepository` | Supported | Uses `EnterpriseArtifactRepository` (DB-backed) |
+| `ICollectionRepository` | Supported | Uses `EnterpriseCollectionRepository` (DB-backed) |
+| `IProjectRepository`, `IDeploymentRepository`, `ITagRepository`, etc. | Unsupported | Return HTTP 503 with list of supported providers |
+
+Requesting an unsupported repository in enterprise mode returns:
+
+```json
+{
+  "detail": "Enterprise edition does not yet support project. Supported providers: artifact, collection."
+}
+```
+
+### Visibility Enforcement (Enterprise)
+
+Enterprise repositories enforce row-level visibility on all read paths. The visibility model is applied via `apply_visibility_filter_stmt`:
+
+**Visibility Levels**:
+- **private**: Owner only + system_admin can read
+- **public**: All tenants can read
+- **team**: Team members + system_admin can read
+
+**Ownership Error Semantics**:
+Non-owners attempting to read private resources they don't own receive **404 Not Found** (not 403 Forbidden). This prevents existence disclosure in multi-tenant environments.
+
+**Example**: User A tries to read User B's private artifact:
+```bash
+curl -H "Authorization: Bearer <user-a-token>" \
+  http://localhost:8080/api/v1/artifacts/{user-b-artifact-id}
+
+# Response: 404 Not Found
+# (No detail disclosed — appears as if the artifact doesn't exist)
+```
+
+Admin bypass: `system_admin` role can read all artifacts in the tenant regardless of visibility.
+
+### Enterprise PAT Authentication
+
+Enterprise edition supports static PAT authentication for service-to-service communication.
+
+**Configuration**:
+```bash
+export SKILLMEAT_ENTERPRISE_PAT_SECRET="your-static-shared-secret"
+export SKILLMEAT_EDITION=enterprise
+```
+
+**Usage** (service clients):
+```bash
+PAT="your-static-shared-secret"
+curl -H "Authorization: Bearer $PAT" \
+  http://localhost:8080/api/v1/artifacts
+```
+
+**Error Handling**:
+- Missing header: 401 Unauthorized
+- Invalid PAT: 403 Forbidden
+- Unconfigured PAT (secret not set): 403 Forbidden with message "Enterprise authentication is not configured on this server."
+
+**Notes**:
+- PAT is compared using constant-time comparison (prevents timing attacks)
+- PAT context carries `system_admin` role and full scope set
+- PAT is read from environment at request-time, allowing rotation without restart
+
+### Tenant Context (Enterprise)
+
+When `SKILLMEAT_EDITION=enterprise`, the `TenantContextDep` dependency can be added to enterprise routers to scope all database queries to the authenticated tenant:
+
+```python
+router = APIRouter(dependencies=[TenantContextDep])
+```
 
 The `set_tenant_context_dep` dependency:
 1. Runs `require_auth()` to obtain `AuthContext`.
@@ -573,8 +690,6 @@ The `set_tenant_context_dep` dependency:
 4. Clears it in a `finally` block after the handler returns (prevents tenant context leakage).
 
 In local mode (`tenant_id=None`), this dependency is a no-op — enterprise repositories fall back to `DEFAULT_TENANT_ID`.
-
-For enterprise rollouts, set `SKILLMEAT_ENTERPRISE_PAT_SECRET` before exposing enterprise download endpoints. The secret is read from the environment at call time (not import time), so it can be rotated without restarting the process.
 
 ---
 
