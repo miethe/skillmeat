@@ -80,6 +80,17 @@ _CLERK_NAMESPACE = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # URL name
 _SUPPORTED_ALGORITHMS = ["RS256", "RS384", "RS512"]
 
 #: Clerk org-role string → our Role enum value.
+#:
+#: ``system_admin`` is intentionally absent from this map.  That role is
+#: reserved for service accounts only:
+#:   - ``LocalAuthProvider``:  the local_admin user always receives system_admin.
+#:   - Enterprise PAT:         ``verify_enterprise_pat()`` grants system_admin.
+#:   - Clerk users:            maximum attainable role is ``team_admin``.
+#:
+#: Future path to elevate a Clerk user to system_admin (DES-003):
+#:   Option A — custom Clerk session claim ``skillmeat_role: system_admin``
+#:              checked before the org-role lookup below.
+#:   Option B — database-driven role override looked up by user UUID.
 _ORG_ROLE_MAP: dict[str, str] = {
     "org:admin": Role.team_admin.value,
     "org:member": Role.team_member.value,
@@ -380,6 +391,10 @@ class ClerkAuthProvider(AuthProvider):
         tenant_id: uuid.UUID | None = _str_to_uuid(org_id) if org_id else None
 
         # --- roles ------------------------------------------------------
+        # Clerk users are capped at team_admin.  system_admin is reserved for
+        # service accounts (local_admin via LocalAuthProvider, enterprise PAT
+        # via verify_enterprise_pat).  See _ORG_ROLE_MAP for the future
+        # upgrade path (DES-003 AuthorizationService).
         if org_id:
             org_role: str = claims.get("org_role", "")
             role_value = _ORG_ROLE_MAP.get(org_role, Role.team_member.value)

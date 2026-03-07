@@ -84,6 +84,7 @@ __all__ = [
     "Role",
     "Scope",
     "Visibility",
+    "str_owner_id",
 ]
 
 
@@ -173,6 +174,30 @@ class AuthContext:
             True when at least one scope is present (or admin wildcard held).
         """
         return any(self.has_scope(s) for s in scopes)
+
+
+# =============================================================================
+# Type conversion helpers
+# =============================================================================
+
+
+def str_owner_id(auth_context: AuthContext) -> str:
+    """Convert AuthContext.user_id (uuid.UUID) to a plain string for DB queries.
+
+    Type mismatch pattern: ``cache/models.py`` stores ``owner_id`` as
+    ``Column(String)``, while ``AuthContext.user_id`` is typed as
+    ``uuid.UUID`` (the API layer UUID).  Callers must not compare them
+    directly — always use this helper so the conversion is explicit and
+    centralised.
+
+    Args:
+        auth_context: The authenticated request context.
+
+    Returns:
+        String representation of ``auth_context.user_id`` (lowercase,
+        hyphenated UUID format, e.g. ``"550e8400-e29b-41d4-a716-446655440000"``).
+    """
+    return str(auth_context.user_id)
 
 
 # =============================================================================

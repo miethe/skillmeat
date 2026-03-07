@@ -802,6 +802,7 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             Ordered list of matching artifacts (may be empty).
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
 
         self._apply_auth_context(auth_context)
         stmt = self._tenant_select().order_by(
@@ -813,6 +814,11 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             stmt = stmt.where(
                 EnterpriseArtifact.name.ilike(f"%{name_contains}%")
             )
+        # ENT-002: Apply visibility-based access control when auth context is
+        # present.  Public and team items are visible to all tenant members;
+        # private items are restricted to their owner.
+        if auth_context is not None:
+            stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
         stmt = stmt.offset(offset).limit(limit)
         return list(self.session.execute(stmt).scalars().all())
 
