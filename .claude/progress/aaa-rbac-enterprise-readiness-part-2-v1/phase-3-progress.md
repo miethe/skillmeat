@@ -6,11 +6,12 @@ prd: aaa-rbac-enterprise-readiness-part-2
 feature_slug: aaa-rbac-enterprise-readiness-part-2
 phase: 3
 status: completed
-created: 2026-03-07
+created: '2026-03-07'
 updated: '2026-03-07'
 prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/aaa-rbac-enterprise-readiness-part-2-v1.md
-commit_refs: []
+commit_refs:
+- 6764f3a8
 pr_refs: []
 owners:
 - data-layer-expert
