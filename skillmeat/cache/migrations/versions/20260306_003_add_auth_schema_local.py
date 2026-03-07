@@ -71,6 +71,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import inspect as sa_inspect
 
 # ---------------------------------------------------------------------------
 # Revision identifiers
@@ -94,37 +95,44 @@ _OWNERSHIP_TABLES = ("artifacts", "collections", "projects", "groups")
 # ---------------------------------------------------------------------------
 
 
-def _add_ownership_columns(batch_op: object) -> None:
-    """Add owner_id, owner_type, visibility to a table via a batch op."""
-    batch_op.add_column(
-        sa.Column(
-            "owner_id",
-            sa.String(),
-            nullable=True,
-            comment=(
-                "String reference to the owning user (int PK as str) or team name; "
-                "NULL until the auth layer is active"
-            ),
+def _add_ownership_columns(batch_op: object, existing_cols: set) -> None:
+    """Add owner_id, owner_type, visibility to a table via a batch op.
+
+    Skips each column if it already exists (idempotent for DBs pre-populated
+    via ``Base.metadata.create_all()`` before Alembic ran).
+    """
+    if "owner_id" not in existing_cols:
+        batch_op.add_column(
+            sa.Column(
+                "owner_id",
+                sa.String(),
+                nullable=True,
+                comment=(
+                    "String reference to the owning user (int PK as str) or team name; "
+                    "NULL until the auth layer is active"
+                ),
+            )
         )
-    )
-    batch_op.add_column(
-        sa.Column(
-            "owner_type",
-            sa.String(50),
-            nullable=True,
-            server_default="user",
-            comment="Discriminator for owner_id: 'user' or 'team'",
+    if "owner_type" not in existing_cols:
+        batch_op.add_column(
+            sa.Column(
+                "owner_type",
+                sa.String(50),
+                nullable=True,
+                server_default="user",
+                comment="Discriminator for owner_id: 'user' or 'team'",
+            )
         )
-    )
-    batch_op.add_column(
-        sa.Column(
-            "visibility",
-            sa.String(50),
-            nullable=True,
-            server_default="private",
-            comment="Visibility scope: 'private', 'internal', or 'public'",
+    if "visibility" not in existing_cols:
+        batch_op.add_column(
+            sa.Column(
+                "visibility",
+                sa.String(50),
+                nullable=True,
+                server_default="private",
+                comment="Visibility scope: 'private', 'internal', or 'public'",
+            )
         )
-    )
 
 
 def _drop_ownership_columns(batch_op: object) -> None:
@@ -142,171 +150,196 @@ def _drop_ownership_columns(batch_op: object) -> None:
 def upgrade() -> None:
     """Create auth tables and add ownership columns to core entity tables."""
 
+    bind = op.get_bind()
+    inspector = sa_inspect(bind)
+    existing_tables = set(inspector.get_table_names())
+
+    def _existing_indexes(table_name: str) -> set:
+        """Return the set of index names already on *table_name*."""
+        return {idx["name"] for idx in inspector.get_indexes(table_name)}
+
     # ------------------------------------------------------------------
     # 1. users
     # ------------------------------------------------------------------
-    op.create_table(
-        "users",
-        sa.Column(
-            "id",
-            sa.Integer(),
-            primary_key=True,
-            autoincrement=True,
-            comment="Auto-increment integer primary key",
-        ),
-        sa.Column(
-            "external_id",
-            sa.String(255),
-            nullable=True,
-            unique=True,
-            comment="External identity provider ID (e.g. Clerk user_id); unique when set",
-        ),
-        sa.Column(
-            "email",
-            sa.String(320),
-            nullable=True,
-            comment="User email address; not enforced unique in local mode",
-        ),
-        sa.Column(
-            "display_name",
-            sa.String(255),
-            nullable=True,
-            comment="Human-readable display name shown in the UI",
-        ),
-        sa.Column(
-            "role",
-            sa.String(50),
-            nullable=False,
-            server_default="viewer",
-            comment=(
-                "System-wide role; one of viewer, team_member, team_admin, system_admin"
+    if "users" not in existing_tables:
+        op.create_table(
+            "users",
+            sa.Column(
+                "id",
+                sa.Integer(),
+                primary_key=True,
+                autoincrement=True,
+                comment="Auto-increment integer primary key",
             ),
-        ),
-        sa.Column(
-            "is_active",
-            sa.Boolean(),
-            nullable=False,
-            server_default="1",
-            comment="When False the account is disabled; row is retained for audit",
-        ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(),
-            nullable=False,
-            server_default=sa.text("CURRENT_TIMESTAMP"),
-            comment="UTC creation timestamp",
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(),
-            nullable=True,
-            comment="UTC last-modified timestamp; updated by app on every write",
-        ),
-    )
+            sa.Column(
+                "external_id",
+                sa.String(255),
+                nullable=True,
+                unique=True,
+                comment="External identity provider ID (e.g. Clerk user_id); unique when set",
+            ),
+            sa.Column(
+                "email",
+                sa.String(320),
+                nullable=True,
+                comment="User email address; not enforced unique in local mode",
+            ),
+            sa.Column(
+                "display_name",
+                sa.String(255),
+                nullable=True,
+                comment="Human-readable display name shown in the UI",
+            ),
+            sa.Column(
+                "role",
+                sa.String(50),
+                nullable=False,
+                server_default="viewer",
+                comment=(
+                    "System-wide role; one of viewer, team_member, team_admin, system_admin"
+                ),
+            ),
+            sa.Column(
+                "is_active",
+                sa.Boolean(),
+                nullable=False,
+                server_default="1",
+                comment="When False the account is disabled; row is retained for audit",
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+                comment="UTC creation timestamp",
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                nullable=True,
+                comment="UTC last-modified timestamp; updated by app on every write",
+            ),
+        )
+        # Refresh inspector after creating the table so index lookups below work.
+        existing_tables.add("users")
 
-    op.create_index("idx_users_external_id", "users", ["external_id"])
-    op.create_index("idx_users_email", "users", ["email"])
-    op.create_index("idx_users_role", "users", ["role"])
+    users_indexes = _existing_indexes("users")
+    if "idx_users_external_id" not in users_indexes:
+        op.create_index("idx_users_external_id", "users", ["external_id"])
+    if "idx_users_email" not in users_indexes:
+        op.create_index("idx_users_email", "users", ["email"])
+    if "idx_users_role" not in users_indexes:
+        op.create_index("idx_users_role", "users", ["role"])
 
     # ------------------------------------------------------------------
     # 2. teams
     # ------------------------------------------------------------------
-    op.create_table(
-        "teams",
-        sa.Column(
-            "id",
-            sa.Integer(),
-            primary_key=True,
-            autoincrement=True,
-            comment="Auto-increment integer primary key",
-        ),
-        sa.Column(
-            "name",
-            sa.String(255),
-            nullable=False,
-            unique=True,
-            comment="Unique human-readable team name",
-        ),
-        sa.Column(
-            "description",
-            sa.Text(),
-            nullable=True,
-            comment="Optional description of the team's purpose",
-        ),
-        sa.Column(
-            "is_active",
-            sa.Boolean(),
-            nullable=False,
-            server_default="1",
-            comment="When False the team is dissolved but rows are retained for audit",
-        ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(),
-            nullable=False,
-            server_default=sa.text("CURRENT_TIMESTAMP"),
-            comment="UTC creation timestamp",
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(),
-            nullable=True,
-            comment="UTC last-modified timestamp",
-        ),
-    )
+    if "teams" not in existing_tables:
+        op.create_table(
+            "teams",
+            sa.Column(
+                "id",
+                sa.Integer(),
+                primary_key=True,
+                autoincrement=True,
+                comment="Auto-increment integer primary key",
+            ),
+            sa.Column(
+                "name",
+                sa.String(255),
+                nullable=False,
+                unique=True,
+                comment="Unique human-readable team name",
+            ),
+            sa.Column(
+                "description",
+                sa.Text(),
+                nullable=True,
+                comment="Optional description of the team's purpose",
+            ),
+            sa.Column(
+                "is_active",
+                sa.Boolean(),
+                nullable=False,
+                server_default="1",
+                comment="When False the team is dissolved but rows are retained for audit",
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+                comment="UTC creation timestamp",
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                nullable=True,
+                comment="UTC last-modified timestamp",
+            ),
+        )
+        existing_tables.add("teams")
 
-    op.create_index("idx_teams_name", "teams", ["name"])
-    op.create_index("idx_teams_is_active", "teams", ["is_active"])
+    teams_indexes = _existing_indexes("teams")
+    if "idx_teams_name" not in teams_indexes:
+        op.create_index("idx_teams_name", "teams", ["name"])
+    if "idx_teams_is_active" not in teams_indexes:
+        op.create_index("idx_teams_is_active", "teams", ["is_active"])
 
     # ------------------------------------------------------------------
     # 3. team_members
     # ------------------------------------------------------------------
-    op.create_table(
-        "team_members",
-        sa.Column(
-            "id",
-            sa.Integer(),
-            primary_key=True,
-            autoincrement=True,
-            comment="Auto-increment integer primary key",
-        ),
-        sa.Column(
-            "team_id",
-            sa.Integer(),
-            sa.ForeignKey("teams.id", ondelete="CASCADE", name="fk_team_members_team_id"),
-            nullable=False,
-            comment="Parent team; cascade-deletes this membership when team is removed",
-        ),
-        sa.Column(
-            "user_id",
-            sa.Integer(),
-            sa.ForeignKey("users.id", ondelete="CASCADE", name="fk_team_members_user_id"),
-            nullable=False,
-            comment="Member user; cascade-deletes this membership when user is removed",
-        ),
-        sa.Column(
-            "role",
-            sa.String(50),
-            nullable=False,
-            server_default="team_member",
-            comment="Role within the team; one of team_admin, team_member",
-        ),
-        sa.Column(
-            "joined_at",
-            sa.DateTime(),
-            nullable=False,
-            server_default=sa.text("CURRENT_TIMESTAMP"),
-            comment="UTC timestamp when the user joined the team",
-        ),
-        sa.UniqueConstraint(
-            "team_id",
-            "user_id",
-            name="uq_team_members_team_user",
-        ),
-    )
+    if "team_members" not in existing_tables:
+        op.create_table(
+            "team_members",
+            sa.Column(
+                "id",
+                sa.Integer(),
+                primary_key=True,
+                autoincrement=True,
+                comment="Auto-increment integer primary key",
+            ),
+            sa.Column(
+                "team_id",
+                sa.Integer(),
+                sa.ForeignKey("teams.id", ondelete="CASCADE", name="fk_team_members_team_id"),
+                nullable=False,
+                comment="Parent team; cascade-deletes this membership when team is removed",
+            ),
+            sa.Column(
+                "user_id",
+                sa.Integer(),
+                sa.ForeignKey("users.id", ondelete="CASCADE", name="fk_team_members_user_id"),
+                nullable=False,
+                comment="Member user; cascade-deletes this membership when user is removed",
+            ),
+            sa.Column(
+                "role",
+                sa.String(50),
+                nullable=False,
+                server_default="team_member",
+                comment="Role within the team; one of team_admin, team_member",
+            ),
+            sa.Column(
+                "joined_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+                comment="UTC timestamp when the user joined the team",
+            ),
+            sa.UniqueConstraint(
+                "team_id",
+                "user_id",
+                name="uq_team_members_team_user",
+            ),
+        )
+        existing_tables.add("team_members")
 
-    op.create_index("idx_team_members_team_id", "team_members", ["team_id"])
-    op.create_index("idx_team_members_user_id", "team_members", ["user_id"])
+    tm_indexes = _existing_indexes("team_members")
+    if "idx_team_members_team_id" not in tm_indexes:
+        op.create_index("idx_team_members_team_id", "team_members", ["team_id"])
+    if "idx_team_members_user_id" not in tm_indexes:
+        op.create_index("idx_team_members_user_id", "team_members", ["user_id"])
 
     # ------------------------------------------------------------------
     # 4. Add ownership + visibility columns to existing tables.
@@ -317,8 +350,11 @@ def upgrade() -> None:
     # data volumes.
     # ------------------------------------------------------------------
     for table_name in _OWNERSHIP_TABLES:
+        existing_cols = {
+            col["name"] for col in inspector.get_columns(table_name)
+        }
         with op.batch_alter_table(table_name) as batch_op:
-            _add_ownership_columns(batch_op)
+            _add_ownership_columns(batch_op, existing_cols)
 
 
 # ---------------------------------------------------------------------------
