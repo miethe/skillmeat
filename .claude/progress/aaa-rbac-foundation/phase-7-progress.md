@@ -16,8 +16,8 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 9
-completed_tasks: 2
-in_progress_tasks: 6
+completed_tasks: 3
+in_progress_tasks: 5
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
@@ -76,7 +76,7 @@ tasks:
   priority: medium
 - id: TEST-007
   description: CLI auth integration tests (mocked device code flow, PAT, storage)
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -140,7 +140,7 @@ files_modified:
 - skillmeat/web/tests/auth.e2e.ts
 - skillmeat/cli/tests/test_auth_flow.py
 - skillmeat/tests/test_security_edge_cases.py
-progress: 22
+progress: 33
 updated: '2026-03-07'
 ---
 
