@@ -8,7 +8,7 @@ prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/aaa-rbac-foundation-v1.md
 phase: 6
 title: CLI Authentication - Device Code Flow & Credential Storage
-status: in_progress
+status: pending
 started: null
 completed: null
 commit_refs: []
@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 0
+completed_tasks: 7
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -26,7 +26,7 @@ contributors: []
 tasks:
 - id: CLI-001
   description: Implement OAuth device code flow for skillmeat login
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -34,7 +34,7 @@ tasks:
   priority: high
 - id: CLI-002
   description: Implement secure credential storage (keyring or encrypted file)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -43,7 +43,7 @@ tasks:
   priority: high
 - id: CLI-003
   description: Implement skillmeat auth --token <PAT> for headless environments
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -52,7 +52,7 @@ tasks:
   priority: high
 - id: CLI-004
   description: Implement token refresh for expired JWTs
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -61,7 +61,7 @@ tasks:
   priority: medium
 - id: CLI-005
   description: Update CLI HTTP client to inject auth token into requests
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -70,7 +70,7 @@ tasks:
   priority: high
 - id: CLI-006
   description: Implement skillmeat logout to clear stored credentials
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -79,7 +79,7 @@ tasks:
   priority: low
 - id: CLI-007
   description: Verify CLI works without login in local mode (SKILLMEAT_ENV=local)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -139,6 +139,7 @@ files_modified:
 - skillmeat/cli/http_client.py
 - skillmeat/cli.py
 updated: '2026-03-07'
+progress: 87
 ---
 
 # aaa-rbac-foundation - Phase 6: CLI Authentication - Device Code Flow & Credential Storage
