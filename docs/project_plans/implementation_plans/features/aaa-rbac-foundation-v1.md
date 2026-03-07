@@ -4,7 +4,7 @@ schema_version: 2
 doc_type: implementation_plan
 status: in-progress
 created: 2026-03-06
-updated: '2026-03-06'
+updated: '2026-03-07'
 feature_slug: aaa-rbac-foundation
 feature_version: v1
 prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
@@ -32,6 +32,7 @@ related_documents:
 - /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 - /.claude/context/key-context/tenant-scoping-strategy.md
 - /docs/project_plans/architecture/enterprise-db-schema-v1.md
+- /docs/project_plans/implementation_plans/features/aaa-rbac-foundation-v1-addendum-review-findings.md
 request_log_ids:
 - REQ-20260306-skillmeat
 ---
