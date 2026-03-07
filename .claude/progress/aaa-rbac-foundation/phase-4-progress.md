@@ -8,7 +8,7 @@ prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/aaa-rbac-foundation-v1.md
 phase: 4
 title: API Layer - Auth Injection & Endpoint Protection
-status: pending
+status: completed
 started: '2026-03-07'
 completed: null
 commit_refs: []
@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 18
-completed_tasks: 8
+completed_tasks: 18
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -108,7 +108,7 @@ tasks:
   priority: high
 - id: API-008
   description: Verify zero-auth local mode works without Authorization header
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -117,7 +117,7 @@ tasks:
   priority: critical
 - id: API-003
   description: Add require_auth to marketplace & content routers - Batch 3
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -126,7 +126,7 @@ tasks:
   priority: high
 - id: WIRE-002
   description: Register TenantContext dependency on enterprise routers via set_tenant_context_dep
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -136,7 +136,7 @@ tasks:
   source: addendum
 - id: API-004
   description: Ensure health & utility routers remain auth-free (public endpoints)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -145,7 +145,7 @@ tasks:
   priority: medium
 - id: ENT-002
   description: Visibility-based filtering in repositories (_apply_visibility_filter)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   - data-layer-expert
@@ -157,7 +157,7 @@ tasks:
 - id: DES-001
   description: Document and add str_owner_id helper for owner_id type mismatch (String
     vs UUID)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -166,7 +166,7 @@ tasks:
   source: addendum
 - id: DES-002
   description: Document system_admin assignment path for Clerk (decision + implementation)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -175,7 +175,7 @@ tasks:
   source: addendum
 - id: API-006
   description: Add auth requirements to OpenAPI schema; document scopes and roles
-  status: pending
+  status: completed
   assigned_to:
   - api-documenter
   dependencies:
@@ -185,7 +185,7 @@ tasks:
 - id: API-007
   description: Create integration tests for protected endpoints with valid/invalid
     auth and scopes
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -195,7 +195,7 @@ tasks:
 - id: ENT-003
   description: Integration test — end-to-end auth flow (provider -> require_auth ->
     service layer)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -287,7 +287,7 @@ files_modified:
 - skillmeat/api/openapi.json
 - skillmeat/api/tests/test_auth_api.py
 - skillmeat/api/tests/test_auth_providers.py
-progress: 44
+progress: 100
 updated: '2026-03-07'
 ---
 
