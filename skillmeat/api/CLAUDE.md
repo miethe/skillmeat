@@ -325,11 +325,13 @@ app.add_middleware(CORSMiddleware,
 
 ### Authentication
 
-**File**: `middleware/auth.py`
+**Files**: `middleware/auth.py` (legacy), `middleware/enterprise_auth.py`, `middleware/tenant_context.py`, `auth/` (provider implementations)
 
-- `APIKeyHeader` security scheme (optional)
-- Bearer token validation via `verify_api_key()`
-- Configurable via `api_key_enabled` and `auth_enabled` settings
+**Key invariant**: All `/api/v1/*` routes are protected by default via the registered `AuthProvider`. `LocalAuthProvider` must always remain as the default fallback (zero-config local dev + single-tenant mode).
+
+**New endpoints**: Use `AuthContextDep` / `require_auth()` from `dependencies.py` — not the legacy `TokenDep` from `middleware/auth.py`.
+
+**Full reference**: `.claude/context/key-context/auth-architecture.md` — provider selection, `AuthContext` fields, Role/Scope tables, tenant context, owner_id type mismatch, anti-patterns.
 
 ### Rate Limiting
 
@@ -556,6 +558,7 @@ async def create_artifact(
 
 | File | Load When |
 |------|-----------|
+| `.claude/context/key-context/auth-architecture.md` | Adding auth to endpoints, modifying auth middleware, debugging 401/403, working with RBAC/scopes |
 | `.claude/context/key-context/repository-architecture.md` | **NEW**: Adding endpoints, refactoring routers to repository DI, designing new storage backends |
 | `.claude/context/key-context/context-loading-playbook.md` | Select minimal context by task |
 | `.claude/context/key-context/api-contract-source-of-truth.md` | Endpoint/schema validation and drift checks |
