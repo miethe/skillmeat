@@ -10,11 +10,13 @@ audience: [operators, platform-engineers, sre]
 
 # Auth Rollout Deployment Guide
 
-This guide covers the gradual rollout of authentication for SkillMeat's API, from the default zero-auth local mode through full Clerk JWT enforcement. Follow the phases in order. Each phase is independently deployable and individually rollback-safe.
+This guide documents the authentication modes available in SkillMeat's API, from the default zero-auth local mode through full Clerk JWT enforcement. Choose the mode appropriate for your deployment. Operators running shared or production instances can enable these modes incrementally — see the Recommended Progression tip below.
 
 ## Overview
 
-SkillMeat's auth system is designed for incremental activation. The `SKILLMEAT_AUTH_ENABLED` flag and `SKILLMEAT_AUTH_PROVIDER` setting are the two primary levers controlling auth behavior at runtime. Toggling them does not require a code change — only an environment variable update and a process restart.
+SkillMeat's auth system is designed for flexible activation. The `SKILLMEAT_AUTH_ENABLED` flag and `SKILLMEAT_AUTH_PROVIDER` setting are the two primary levers controlling auth behavior at runtime. Switching between modes does not require a code change — only an environment variable update and a process restart.
+
+> **Recommended Progression:** For operators moving from a personal deployment to a shared or production environment, enabling modes incrementally is a safe approach: start with Zero-Auth Local Mode, validate Clerk connectivity in Write-Protected Mode, then advance to Full Enforcement Mode once all clients are issuing valid tokens. Each mode is independently deployable and individually rollback-safe.
 
 ### Auth Provider Summary
 
@@ -40,11 +42,11 @@ Clerk org-role mappings: `org:admin` → `team_admin`, `org:member` → `team_me
 
 ---
 
-## Rollout Phases
+## Authentication Modes
 
-### Phase 0: Baseline (Current Default)
+### Zero-Auth Local Mode (Default)
 
-Zero-auth mode. Auth system code is deployed but not enforced.
+No auth enforced. Every request succeeds as `local_admin`. This is the default configuration and requires no setup. Good for personal or local-only use.
 
 **Environment:**
 ```bash
@@ -70,13 +72,15 @@ curl -s http://localhost:8080/health | jq .
 
 ---
 
-### Phase 1: Auth Available, Not Enforced
+### Write-Protected Mode
 
-Auth is wired and configured but write enforcement is not yet active. This phase validates Clerk connectivity and JWT flow without user-facing impact.
+Auth required for write operations only. Read endpoints remain open. Good for shared instances where you want to protect mutations but keep browsing accessible without credentials.
+
+This mode validates Clerk connectivity and JWT flow before applying full enforcement. Write endpoints use `require_auth(scopes=["artifact:write"])` (and similar) so callers without the scope receive HTTP 403.
 
 **Environment:**
 ```bash
-SKILLMEAT_AUTH_ENABLED=false        # Still not enforcing
+SKILLMEAT_AUTH_ENABLED=true         # Enforcement begins
 SKILLMEAT_AUTH_PROVIDER=clerk
 CLERK_JWKS_URL=https://<your-clerk-frontend-api>/.well-known/jwks.json
 CLERK_ISSUER=https://<your-clerk-frontend-api>
@@ -86,12 +90,12 @@ SKILLMEAT_ENV=production
 
 **What happens:**
 - `ClerkAuthProvider` initializes and fetches JWKS keys at startup.
-- Auth is not enforced (`auth_enabled=false`) — requests still pass through.
-- Startup logs will confirm JWKS fetch success or failure.
+- `is_auth_enabled()` returns `True`.
+- `require_auth()` delegates to `ClerkAuthProvider.validate()` for every protected route.
+- Routes without `require_auth` (e.g., `/health`, `/docs`) remain open.
+- `POST`, `PUT`, `DELETE` endpoints with `artifact:write` / `collection:write` / `deployment:write` scopes begin rejecting unauthenticated or insufficiently-scoped requests.
 
-**Validation tests:**
-
-Confirm JWKS connectivity:
+Confirm JWKS connectivity at startup:
 ```bash
 # Check startup logs for this line
 grep "ClerkAuthProvider initialised" /var/log/skillmeat/api.log
@@ -100,52 +104,9 @@ grep "ClerkAuthProvider initialised" /var/log/skillmeat/api.log
 curl -s "$CLERK_JWKS_URL" | jq '.keys | length'
 ```
 
-Send a test request with a valid Clerk token — should succeed even though auth is not enforced:
+**Verification:**
 ```bash
-export CLERK_TOKEN="<valid-clerk-jwt>"
-
-curl -s http://localhost:8080/api/v1/artifacts \
-  -H "Authorization: Bearer $CLERK_TOKEN" | jq '.[] | length'
-```
-
-Send a request without a token — should still succeed (Phase 1 is non-enforcing):
-```bash
-curl -s http://localhost:8080/api/v1/artifacts | jq '.[] | length'
-```
-
-**Go/no-go criteria:**
-- [ ] API starts without errors
-- [ ] JWKS URL reachable from the server
-- [ ] `ClerkAuthProvider initialised` present in startup logs
-- [ ] Requests with and without tokens both succeed (non-enforcing mode)
-- [ ] No auth-related 401/403 errors in logs
-
----
-
-### Phase 2: Auth Required for Write Endpoints
-
-Enable auth enforcement. Read endpoints remain open; write operations require a valid Clerk JWT.
-
-This is the primary enforcement phase. Write endpoints use `require_auth(scopes=["artifact:write"])` (and similar) so callers without the scope receive HTTP 403.
-
-**Environment:**
-```bash
-SKILLMEAT_AUTH_ENABLED=true         # Enforcement begins
-SKILLMEAT_AUTH_PROVIDER=clerk
-CLERK_JWKS_URL=https://<your-clerk-frontend-api>/.well-known/jwks.json
-CLERK_ISSUER=https://<your-clerk-frontend-api>
-SKILLMEAT_ENV=production
-```
-
-**What happens:**
-- `is_auth_enabled()` returns `True`.
-- `require_auth()` delegates to `ClerkAuthProvider.validate()` for every protected route.
-- Routes without `require_auth` (e.g., `/health`, `/docs`) remain open.
-- `POST`, `PUT`, `DELETE` endpoints with `artifact:write` / `collection:write` / `deployment:write` scopes begin rejecting un-authenticated or insufficiently-scoped requests.
-
-**Validation tests:**
-```bash
-# Read endpoint — should return 200 with no token (Phase 2: reads still open)
+# Read endpoint — should return 200 with no token (reads still open)
 curl -s http://localhost:8080/api/v1/artifacts
 
 # Write endpoint — should return 401 with no token
@@ -168,7 +129,10 @@ curl -s -X POST http://localhost:8080/api/v1/artifacts \
 # Expected: message mentioning "artifact:write"
 ```
 
-**Go/no-go criteria:**
+**Verification checklist:**
+- [ ] API starts without errors
+- [ ] JWKS URL reachable from the server
+- [ ] `ClerkAuthProvider initialised` present in startup logs
 - [ ] Write endpoints return 401 with no token
 - [ ] Write endpoints return 403 with read-only token
 - [ ] Write endpoints return 2xx with valid write-scoped token
@@ -179,9 +143,9 @@ curl -s -X POST http://localhost:8080/api/v1/artifacts \
 
 ---
 
-### Phase 3: Auth Required for All Endpoints
+### Full Enforcement Mode
 
-Full enforcement. All `/api/v1` routes require a valid Clerk JWT. The `AuthMiddleware` path-protection list covers the entire API prefix.
+Auth required for all `/api/v1` endpoints. Health checks and documentation endpoints remain open. Good for production multi-user deployments where all clients are expected to hold valid Clerk tokens.
 
 **Environment:**
 ```bash
@@ -192,8 +156,8 @@ CLERK_ISSUER=https://<your-clerk-frontend-api>
 SKILLMEAT_ENV=production
 ```
 
-**What changes from Phase 2:**
-`AuthMiddleware` is initialized with `protected_paths=["/api/v1"]` (the default). Every sub-path under `/api/v1` is now guarded at the middleware layer in addition to the dependency layer. The excluded paths remain open:
+**What happens:**
+`AuthMiddleware` is initialized with `protected_paths=["/api/v1"]` (the default). Every sub-path under `/api/v1` is guarded at the middleware layer in addition to the dependency layer. The excluded paths remain open:
 - `/health`
 - `/docs`
 - `/redoc`
@@ -201,7 +165,7 @@ SKILLMEAT_ENV=production
 - `/`
 - `/api/v1/version`
 
-**Validation tests:**
+**Verification:**
 ```bash
 # Any read endpoint without token — should return 401
 curl -s http://localhost:8080/api/v1/artifacts | jq '.detail'
@@ -217,7 +181,7 @@ curl -s http://localhost:8080/health/ready | jq '.status'
 curl -s http://localhost:8080/health/live | jq '.status'
 ```
 
-**Go/no-go criteria:**
+**Verification checklist:**
 - [ ] All `/api/v1` routes return 401 without token
 - [ ] All `/api/v1` routes return 200/201 with valid token
 - [ ] Health checks remain unauthenticated
@@ -358,7 +322,7 @@ The following alerts cover the primary failure modes during and after rollout.
     description: "ClerkAuthProvider cannot reach the JWKS endpoint. All authenticated requests will fail. Verify CLERK_JWKS_URL is reachable from the API server."
 ```
 
-#### Alert: Spike in Unauthenticated Requests Post Phase-3
+#### Alert: Spike in Unauthenticated Requests (Full Enforcement)
 ```yaml
 - alert: SkillMeatUnexpected401Spike
   expr: |
@@ -481,19 +445,19 @@ grep "is_auth_enabled.*False\|Skip auth" /var/log/skillmeat/api.log
 
 **Expected time to recovery:** Under 60 seconds for most deployments.
 
-### Partial Rollback: Revert to Phase 1 or Phase 2
+### Partial Rollback: Revert from Full Enforcement to Write-Protected Mode
 
-If Phase 3 (full enforcement) is causing issues but Phase 2 (write-only enforcement) was stable, you can reduce scope without full rollback:
+If Full Enforcement Mode is causing issues but Write-Protected Mode was stable, you can reduce scope without a full rollback:
 
-- Phase 3 → Phase 2: The code-level enforcement difference between Phase 2 and Phase 3 lies in which routes use `require_auth`. In the current implementation, `AuthMiddleware` covers all `/api/v1` at the middleware layer. To revert to Phase 2 behavior while keeping `auth_enabled=true`, you need to modify the `AuthMiddleware` excluded path list or redeploy the previous artifact. The simplest production-safe option is to disable auth entirely (`auth_enabled=false`) and re-enable incrementally.
+- Full Enforcement → Write-Protected: The code-level enforcement difference between these modes lies in which routes use `require_auth`. In the current implementation, `AuthMiddleware` covers all `/api/v1` at the middleware layer. To revert to Write-Protected behavior while keeping `auth_enabled=true`, you need to modify the `AuthMiddleware` excluded path list or redeploy the previous artifact. The simplest production-safe option is to disable auth entirely (`auth_enabled=false`) and re-enable incrementally.
 
 ### Rollback Decision Triggers
 
-Consider rolling back when any of the following occur within 30 minutes of enabling a new phase:
+Consider rolling back when any of the following occur within 30 minutes of enabling a new mode:
 
 | Signal | Threshold | Action |
 |---|---|---|
-| Auth failure rate | >15% sustained for 5 min | Rollback to Phase N-1 |
+| Auth failure rate | >15% sustained for 5 min | Revert to previous auth mode |
 | 5xx error rate increase | >1% increase from baseline | Investigate before proceeding |
 | JWKS unavailable (503) | Any sustained outage >2 min | Rollback if Clerk unreachable |
 | p99 latency increase | >500ms increase from baseline | Investigate JWKS cache |
@@ -537,7 +501,7 @@ grep "ClerkAuthProvider initialised" /var/log/skillmeat/api.log | tail -1
 # Expected: {"timestamp": "...", "level": "INFO", "message": "ClerkAuthProvider initialised", ...}
 ```
 
-**Verify auth middleware is active (Phase 2+):**
+**Verify auth middleware is active (Write-Protected or Full Enforcement):**
 ```bash
 curl -s http://localhost:8080/api/v1/artifacts | jq '.detail'
 # When auth_enabled=true and no token: "Missing or invalid Authorization header"
@@ -548,9 +512,9 @@ curl -s http://localhost:8080/api/v1/artifacts | jq '.detail'
 
 ## Production Deployment Checklist
 
-Complete all items in order before advancing to the next phase.
+Complete all applicable items before enabling a new auth mode.
 
-### Pre-Deployment (All Phases)
+### Pre-Deployment (All Modes)
 
 - [ ] Verify Clerk application is configured and JWKS URL is accessible from the production server
 - [ ] Confirm `CLERK_JWKS_URL`, `CLERK_ISSUER` env vars are set and valid
@@ -559,20 +523,13 @@ Complete all items in order before advancing to the next phase.
 - [ ] Deploy Prometheus alert rules from the Alerting Setup section
 - [ ] Verify `/health` returns 200 on the target instance before any config change
 
-### Phase 1 Checklist (Auth Available, Not Enforced)
+### Write-Protected Mode Checklist
 
 - [ ] Set `SKILLMEAT_AUTH_PROVIDER=clerk` and all `CLERK_*` vars
-- [ ] Restart API server
-- [ ] Confirm `ClerkAuthProvider initialised` in startup logs
-- [ ] Confirm no 401/403 errors for any existing client traffic
-- [ ] Confirm JWKS URL is reachable: `curl -sf "$CLERK_JWKS_URL" | jq '.keys | length'`
-- [ ] Monitor for 30 minutes — auth failure rate should be 0%
-
-### Phase 2 Checklist (Write Enforcement)
-
-- [ ] Confirm Phase 1 is stable for at least 24 hours
 - [ ] Set `SKILLMEAT_AUTH_ENABLED=true`
 - [ ] Restart API server
+- [ ] Confirm `ClerkAuthProvider initialised` in startup logs
+- [ ] Confirm JWKS URL is reachable: `curl -sf "$CLERK_JWKS_URL" | jq '.keys | length'`
 - [ ] Verify write endpoints reject unauthenticated requests (expect 401)
 - [ ] Verify read endpoints still accept unauthenticated requests
 - [ ] Verify clients with valid tokens can write artifacts
@@ -580,9 +537,9 @@ Complete all items in order before advancing to the next phase.
 - [ ] Monitor for 1 hour — auth failure rate should be under 5% (accounting for expected unauthenticated clients)
 - [ ] Alert rules are firing only on genuine failures, not false positives
 
-### Phase 3 Checklist (Full Enforcement)
+### Full Enforcement Mode Checklist
 
-- [ ] Confirm Phase 2 is stable for at least 72 hours
+- [ ] Confirm Write-Protected Mode is stable for at least 72 hours
 - [ ] Confirm all client applications (web UI, CLI tools, integrations) are obtaining valid Clerk tokens
 - [ ] Confirm the frontend is configured with Clerk publishable key and token refresh logic
 - [ ] Canary deployment has been run for at least 24 hours (see Canary Deployment section)
