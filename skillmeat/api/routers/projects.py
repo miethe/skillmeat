@@ -19,11 +19,14 @@ from skillmeat.api.dependencies import (
     DeploymentProfileRepoDep,
     ProjectRepoDep,
     get_app_state,
+    get_auth_context,
     get_collection_manager,
+    require_auth,
     verify_api_key,
 )
 from skillmeat.core.interfaces.repositories import IProjectRepository
 from skillmeat.api.middleware.auth import TokenDep
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.artifacts import (
     DeploymentModificationStatus,
     ModificationCheckResponse,
@@ -391,6 +394,7 @@ async def list_projects(
     response: Response,
     token: TokenDep,
     cache_manager: CacheManagerDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     limit: int = Query(
         default=20,
         ge=1,
@@ -636,6 +640,7 @@ async def create_project(
     token: TokenDep,
     project_repo: ProjectRepoDep,
     cache_manager: CacheManagerDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ProjectCreateResponse:
     """Create a new project.
 
@@ -817,6 +822,7 @@ async def get_project(
     db_session: DbSessionDep,
     cache_manager: CacheManagerDep,
     response: Response,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ProjectDetail:
     """Get details for a specific project.
 
@@ -935,6 +941,7 @@ async def update_project(
     project_repo: ProjectRepoDep,
     profile_repo: DeploymentProfileRepoDep,
     db_session: DbSessionDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ProjectDetail:
     """Update project metadata.
 
@@ -1060,6 +1067,7 @@ async def delete_project(
     project_id: str,
     token: TokenDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     delete_files: bool = Query(
         default=False,
         description="If true, delete project files from disk (WARNING: destructive operation)",
@@ -1187,6 +1195,7 @@ async def remove_project_deployment(
     artifact_name: str,
     token: TokenDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     artifact_type: str = Query(
         description="Type of the artifact to remove",
         examples=["skill"],
@@ -1382,6 +1391,7 @@ async def check_project_modifications(
     project_id: str,
     token: TokenDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ModificationCheckResponse:
     """Check for modifications in all deployed artifacts.
 
@@ -1544,6 +1554,7 @@ async def get_modified_artifacts(
     project_id: str,
     token: TokenDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ModifiedArtifactsResponse:
     """Get list of all modified artifacts in a project.
 
@@ -1701,6 +1712,7 @@ async def get_project_context_map(
     project_id: str,
     token: TokenDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ContextMapResponse:
     """Discover context entities in a project's .claude/ directory.
 
@@ -2029,6 +2041,7 @@ async def get_project_drift_summary(
     project_id: str,
     token: TokenDep,
     project_repo: ProjectRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     collection_name: Optional[str] = Query(
         default=None,
         description="Collection name to compare against (defaults to deployed collection)",
@@ -2157,6 +2170,7 @@ async def get_project_drift_summary(
 async def clear_project_cache(
     token: TokenDep,
     cache_manager: CacheManagerDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> dict:
     """Clear persistent project cache and force rediscovery.
 
@@ -2231,7 +2245,10 @@ async def clear_project_cache(
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
-async def refresh_cache(token: TokenDep) -> dict:
+async def refresh_cache(
+    token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> dict:
     """Force refresh the project discovery cache.
 
     Triggers a full filesystem scan to update the cached project list.
@@ -2272,7 +2289,10 @@ async def refresh_cache(token: TokenDep) -> dict:
         401: {"model": ErrorResponse, "description": "Unauthorized"},
     },
 )
-async def get_cache_stats(token: TokenDep) -> dict:
+async def get_cache_stats(
+    token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> dict:
     """Get cache statistics for monitoring.
 
     Returns information about the cache state including number of entries,

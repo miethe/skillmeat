@@ -268,6 +268,34 @@ def require_auth(
 AuthContextDep = Annotated[AuthContext, Depends(require_auth())]
 
 
+async def get_auth_context(request: Request) -> AuthContext:
+    """Read AuthContext from request.state (set by router-level require_auth).
+
+    This lightweight dependency avoids a second provider round-trip for
+    handlers that are already protected by a router-level ``require_auth``
+    dependency (registered via ``dependencies=_auth_deps`` in server.py).
+    It simply reads the ``auth_context`` attribute that ``require_auth``
+    stores on ``request.state`` and returns it.
+
+    Args:
+        request: The current FastAPI request.
+
+    Returns:
+        The ``AuthContext`` stored by the router-level auth dependency.
+
+    Raises:
+        HTTPException 401: If ``request.state`` has no ``auth_context``
+            (should not happen when router-level auth is wired correctly).
+    """
+    auth_ctx = getattr(request.state, "auth_context", None)
+    if auth_ctx is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    return auth_ctx
+
+
 def get_app_state() -> AppState:
     """Get application state dependency.
 

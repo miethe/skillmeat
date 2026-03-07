@@ -6785,6 +6785,97 @@
         }
       }
     },
+    "/api/v1/artifacts/{artifact_id}/download": {
+      "get": {
+        "tags": [
+          "enterprise",
+          "enterprise"
+        ],
+        "summary": "Download enterprise artifact payload",
+        "description": "Return the complete file bundle for an enterprise artifact identified by UUID or name.  Use ``compress=true`` to receive a gzip-compressed payload instead of JSON.  Use ``version`` to pin to a specific version tag or content hash.",
+        "operationId": "download_artifact_api_v1_artifacts__artifact_id__download_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional version specifier: a version tag (e.g. ``v1.2.0``) or a 64-char SHA-256 content hash.  Omit to receive the latest version.",
+              "title": "Version"
+            },
+            "description": "Optional version specifier: a version tag (e.g. ``v1.2.0``) or a 64-char SHA-256 content hash.  Omit to receive the latest version."
+          },
+          {
+            "name": "compress",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, return gzip-compressed JSON bytes (Content-Type: application/gzip) instead of a JSON response.",
+              "default": false,
+              "title": "Compress"
+            },
+            "description": "When true, return gzip-compressed JSON bytes (Content-Type: application/gzip) instead of a JSON response."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artifact payload as JSON (default) or ``application/gzip`` bytes when ``compress=true``.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactDownloadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization header missing or not a Bearer token."
+          },
+          "403": {
+            "description": "Invalid enterprise PAT."
+          },
+          "404": {
+            "description": "Artifact or version not found for the current tenant."
+          },
+          "500": {
+            "description": "Filesystem error prevented bundle assembly."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analytics/summary": {
       "get": {
         "tags": [
@@ -23901,6 +23992,30 @@
             ],
             "title": "Description",
             "description": "Override description"
+          },
+          "owner_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Type",
+            "description": "Owner type: 'user' or 'team'. Defaults to 'user' when not provided."
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility",
+            "description": "Visibility: 'private', 'team', or 'public'. Defaults to 'private' when not provided."
           }
         },
         "type": "object",
@@ -23916,6 +24031,7 @@
           "collection": "default",
           "description": "Canvas design skill",
           "name": "canvas",
+          "owner_type": "user",
           "source": "anthropics/skills/canvas-design",
           "source_type": "github",
           "tags": [
@@ -23925,7 +24041,8 @@
           "target_platforms": [
             "claude_code",
             "codex"
-          ]
+          ],
+          "visibility": "private"
         }
       },
       "ArtifactCreateResponse": {
@@ -24259,6 +24376,102 @@
           }
         }
       },
+      "ArtifactDownloadResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "UUID identifying the artifact"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Resolved version tag, or \"unknown\" when no versions exist",
+            "examples": [
+              "v1.2.0",
+              "latest",
+              "unknown"
+            ]
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash",
+            "description": "SHA-256 hex digest of the artifact at the resolved version"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ArtifactMetadata",
+            "description": "Artifact metadata"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactFileEntry"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Ordered list of files comprising the artifact bundle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "metadata",
+          "files"
+        ],
+        "title": "ArtifactDownloadResponse",
+        "description": "Response payload for the enterprise artifact download endpoint.\n\nReturned by ``GET /api/v1/artifacts/{artifact_id}/download`` when\n``compress=False`` (default).  When ``compress=True`` the endpoint\nreturns raw ``application/gzip`` bytes instead.\n\nAttributes\n----------\nartifact_id:\n    UUID string identifying the artifact in the enterprise DB.\nversion:\n    Resolved version tag (e.g. ``\"v1.2.0\"``), or ``\"unknown\"`` when\n    no version rows exist.\ncontent_hash:\n    SHA-256 hex digest of the artifact files at the resolved version,\n    or an empty string when unavailable.\nmetadata:\n    Structured artifact metadata (name, type, source).\nfiles:\n    Ordered list of file entries comprising the artifact bundle."
+      },
+      "ArtifactFileEntry": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Relative POSIX path within the artifact directory"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "File contents (UTF-8 text or base64-encoded for binary files)"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size",
+            "description": "File size in bytes"
+          },
+          "encoding": {
+            "type": "string",
+            "title": "Encoding",
+            "description": "Content encoding: \"utf-8\" for text files, \"base64\" for binary",
+            "examples": [
+              "utf-8",
+              "base64"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "content",
+          "size",
+          "encoding"
+        ],
+        "title": "ArtifactFileEntry",
+        "description": "A single file within an artifact payload bundle.\n\nAttributes\n----------\npath:\n    Relative POSIX path of the file within the artifact directory.\ncontent:\n    File contents — UTF-8 text or base64-encoded bytes for binary files.\nsize:\n    File size in bytes.\nencoding:\n    ``\"utf-8\"`` for text files, ``\"base64\"`` for binary files."
+      },
       "ArtifactGroupMembership": {
         "properties": {
           "id": {
@@ -24541,6 +24754,45 @@
         ],
         "title": "ArtifactListResponse",
         "description": "Paginated response for artifact listings."
+      },
+      "ArtifactMetadata": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable artifact name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Artifact type (e.g. skill, command, agent, composite)",
+            "examples": [
+              "skill",
+              "command",
+              "agent",
+              "composite"
+            ]
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Upstream source URL or identifier, if available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "ArtifactMetadata",
+        "description": "Metadata describing an enterprise artifact.\n\nAttributes\n----------\nname:\n    Human-readable artifact name (e.g. ``\"canvas-design\"``).\ntype:\n    Artifact type string (e.g. ``\"skill\"``, ``\"command\"``).\nsource:\n    Optional upstream source URL or identifier."
       },
       "ArtifactMetadataResponse": {
         "properties": {
@@ -25060,6 +25312,43 @@
             ],
             "title": "Import Id",
             "description": "Marketplace import batch ID if imported from marketplace"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id",
+            "description": "UUID of the owning user or team"
+          },
+          "owner_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Type",
+            "description": "Owner type: 'user' or 'team'"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility",
+            "description": "Visibility level: 'private', 'team', or 'public'"
           }
         },
         "type": "object",
@@ -25512,6 +25801,30 @@
               }
             ],
             "description": "Artifact metadata to update"
+          },
+          "owner_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Type",
+            "description": "Owner type: 'user' or 'team'."
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility",
+            "description": "Visibility: 'private', 'team', or 'public'."
           }
         },
         "type": "object",
@@ -25526,11 +25839,13 @@
             ],
             "title": "Enhanced PDF Processor"
           },
+          "owner_type": "user",
           "tags": [
             "document",
             "pdf",
             "productivity"
-          ]
+          ],
+          "visibility": "private"
         }
       },
       "ArtifactUpstreamDiffResponse": {
@@ -30071,6 +30386,43 @@
             "format": "date-time",
             "title": "Updated",
             "description": "Last update timestamp"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id",
+            "description": "UUID of the owning user or team"
+          },
+          "owner_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Type",
+            "description": "Owner type: 'user' or 'team'"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility",
+            "description": "Visibility level: 'private', 'team', or 'public'"
           }
         },
         "type": "object",
@@ -30089,8 +30441,10 @@
           "created": "2024-11-16T12:00:00Z",
           "id": "default",
           "name": "default",
+          "owner_type": "user",
           "updated": "2024-11-16T15:30:00Z",
-          "version": "1.0.0"
+          "version": "1.0.0",
+          "visibility": "private"
         }
       },
       "ColorCreateRequest": {

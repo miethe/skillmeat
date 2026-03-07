@@ -16,7 +16,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse
 from skillmeat import __version__ as skillmeat_version
 
 from .config import APISettings, get_settings
-from .dependencies import app_state, set_auth_provider
+from .dependencies import app_state, require_auth, set_auth_provider
 from .routers import (
     analytics,
     artifact_history,
@@ -389,102 +389,225 @@ def create_app(settings: APISettings = None) -> FastAPI:
     except ImportError:
         logger.warning("prometheus_client not installed, metrics endpoint disabled")
 
+    # Blanket auth dependency applied to every protected router.
+    # Excluded: health (load-balancer probes), cache (internal ops),
+    # settings (read-only app config) — these remain publicly accessible.
+    _auth_deps = [Depends(require_auth())]
+
     # Include routers
-    # Health check router (no API prefix, for load balancers)
+    # Health check router (no API prefix, for load balancers) — public
     app.include_router(health.router)
 
     # API routers under API prefix
     app.include_router(
-        collections.router, prefix=settings.api_prefix, tags=["collections"]
+        collections.router,
+        prefix=settings.api_prefix,
+        tags=["collections"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        user_collections.router, prefix=settings.api_prefix, tags=["user-collections"]
+        user_collections.router,
+        prefix=settings.api_prefix,
+        tags=["user-collections"],
+        dependencies=_auth_deps,
     )
-    app.include_router(artifacts.router, prefix=settings.api_prefix, tags=["artifacts"])
     app.include_router(
-        artifact_history.router, prefix=settings.api_prefix, tags=["artifacts"]
+        artifacts.router,
+        prefix=settings.api_prefix,
+        tags=["artifacts"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        enterprise_content.router, prefix=settings.api_prefix, tags=["enterprise"]
+        artifact_history.router,
+        prefix=settings.api_prefix,
+        tags=["artifacts"],
+        dependencies=_auth_deps,
     )
-    app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
-    app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])
+    app.include_router(
+        enterprise_content.router,
+        prefix=settings.api_prefix,
+        tags=["enterprise"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        analytics.router,
+        prefix=settings.api_prefix,
+        tags=["analytics"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        bundles.router,
+        prefix=settings.api_prefix,
+        tags=["bundles"],
+        dependencies=_auth_deps,
+    )
+    # cache router — public (internal cache management operations)
     app.include_router(cache.router, prefix=settings.api_prefix, tags=["cache"])
-    app.include_router(config.router, prefix=settings.api_prefix, tags=["config"])
     app.include_router(
-        context_entities.router, prefix=settings.api_prefix, tags=["context-entities"]
+        config.router,
+        prefix=settings.api_prefix,
+        tags=["config"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        context_modules.router, prefix=settings.api_prefix, tags=["context-modules"]
+        context_entities.router,
+        prefix=settings.api_prefix,
+        tags=["context-entities"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        context_packing.router, prefix=settings.api_prefix, tags=["context-packs"]
+        context_modules.router,
+        prefix=settings.api_prefix,
+        tags=["context-modules"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        context_sync.router, prefix=settings.api_prefix, tags=["context-sync"]
+        context_packing.router,
+        prefix=settings.api_prefix,
+        tags=["context-packs"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        context_sync.router,
+        prefix=settings.api_prefix,
+        tags=["context-sync"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         deployment_profiles.router,
         prefix=settings.api_prefix,
         tags=["deployment-profiles"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         deployment_sets.router,
         prefix=settings.api_prefix,
         tags=["deployment-sets"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        deployments.router, prefix=settings.api_prefix, tags=["deployments"]
+        deployments.router,
+        prefix=settings.api_prefix,
+        tags=["deployments"],
+        dependencies=_auth_deps,
     )
-    app.include_router(groups.router, prefix=settings.api_prefix, tags=["groups"])
     app.include_router(
-        composites.router, prefix=settings.api_prefix, tags=["composites"]
+        groups.router,
+        prefix=settings.api_prefix,
+        tags=["groups"],
+        dependencies=_auth_deps,
     )
-    app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
     app.include_router(
-        marketplace.router, prefix=settings.api_prefix, tags=["marketplace"]
+        composites.router,
+        prefix=settings.api_prefix,
+        tags=["composites"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        mcp.router,
+        prefix=settings.api_prefix,
+        tags=["mcp"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        marketplace.router,
+        prefix=settings.api_prefix,
+        tags=["marketplace"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         marketplace_catalog.router,
         prefix=settings.api_prefix,
         tags=["marketplace-catalog"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         marketplace_sources.router,
         prefix=settings.api_prefix,
         tags=["marketplace-sources"],
+        dependencies=_auth_deps,
     )
-    app.include_router(match.router, prefix=settings.api_prefix, tags=["match"])
     app.include_router(
-        memory_items.router, prefix=settings.api_prefix, tags=["memory-items"]
+        match.router,
+        prefix=settings.api_prefix,
+        tags=["match"],
+        dependencies=_auth_deps,
     )
-    app.include_router(merge.router, prefix=settings.api_prefix, tags=["merge"])
     app.include_router(
-        project_templates.router, prefix=settings.api_prefix, tags=["project-templates"]
+        memory_items.router,
+        prefix=settings.api_prefix,
+        tags=["memory-items"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        merge.router,
+        prefix=settings.api_prefix,
+        tags=["merge"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        project_templates.router,
+        prefix=settings.api_prefix,
+        tags=["project-templates"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         idp_integration.router,
         prefix=settings.api_prefix,
         tags=["integrations-idp"],
+        dependencies=_auth_deps,
     )
-    app.include_router(projects.router, prefix=settings.api_prefix, tags=["projects"])
-    app.include_router(ratings.router, prefix=settings.api_prefix, tags=["ratings"])
+    app.include_router(
+        projects.router,
+        prefix=settings.api_prefix,
+        tags=["projects"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        ratings.router,
+        prefix=settings.api_prefix,
+        tags=["ratings"],
+        dependencies=_auth_deps,
+    )
+    # settings router — public (read-only app configuration info)
     app.include_router(
         settings_router.router, prefix=settings.api_prefix, tags=["settings"]
     )
-    app.include_router(colors.router, prefix=settings.api_prefix, tags=["colors"])
     app.include_router(
-        icon_packs.router, prefix=settings.api_prefix, tags=["settings"]
+        colors.router,
+        prefix=settings.api_prefix,
+        tags=["colors"],
+        dependencies=_auth_deps,
     )
-    app.include_router(tags.router, prefix=settings.api_prefix, tags=["tags"])
-    app.include_router(versions.router, prefix=settings.api_prefix, tags=["versions"])
     app.include_router(
-        workflows.router, prefix=settings.api_prefix, tags=["workflows"]
+        icon_packs.router,
+        prefix=settings.api_prefix,
+        tags=["settings"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        tags.router,
+        prefix=settings.api_prefix,
+        tags=["tags"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        versions.router,
+        prefix=settings.api_prefix,
+        tags=["versions"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        workflows.router,
+        prefix=settings.api_prefix,
+        tags=["workflows"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         workflow_executions.router,
         prefix=settings.api_prefix,
         tags=["workflow-executions"],
+        dependencies=_auth_deps,
     )
 
     # Root endpoint

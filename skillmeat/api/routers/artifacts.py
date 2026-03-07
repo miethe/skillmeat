@@ -45,9 +45,12 @@ from skillmeat.api.dependencies import (
     SyncManagerDep,
     TagRepoDep,
     get_app_state,
+    get_auth_context,
+    require_auth,
     verify_api_key,
 )
 from skillmeat.api.middleware.auth import TokenDep
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.artifacts import (
     ArtifactCollectionInfo,
     ArtifactCreateRequest,
@@ -869,6 +872,7 @@ async def discover_artifacts(
     request: DiscoveryRequest,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
@@ -1014,6 +1018,7 @@ async def discover_project_artifacts(
     project_id: str = Path(..., description="URL-encoded project path"),
     collection_mgr: CollectionManagerDep = None,
     _token: TokenDep = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
@@ -1121,6 +1126,7 @@ async def bulk_import_artifacts(
     collection_mgr: CollectionManagerDep,
     session: DbSessionDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
@@ -1543,6 +1549,7 @@ async def confirm_duplicates(
     collection_mgr: CollectionManagerDep,
     artifact_mgr: ArtifactManagerDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
@@ -1742,6 +1749,7 @@ async def create_artifact(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ArtifactCreateResponse:
     """Create a new artifact from GitHub or local source.
 
@@ -2007,6 +2015,7 @@ async def list_artifacts(
     db_session: DbSessionDep,
     sync_mgr: SyncManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     limit: int = Query(
         default=20,
         ge=1,
@@ -2381,6 +2390,7 @@ async def get_artifact(
     collection_mgr: CollectionManagerDep,
     db_session: DbSessionDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -2523,6 +2533,7 @@ async def check_artifact_upstream(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -2698,6 +2709,7 @@ async def update_artifact(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -2884,6 +2896,7 @@ async def update_artifact_parameters(
     artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -3156,6 +3169,7 @@ async def delete_artifact(
     db_session: DbSessionDep,
     catalog_repo: MarketplaceCatalogRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -3312,6 +3326,7 @@ async def deploy_artifact(
     collection_mgr: CollectionManagerDep,
     settings: SettingsDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
@@ -3802,6 +3817,7 @@ async def sync_artifact(
     artifact_mgr: ArtifactManagerDep,
     settings: SettingsDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
@@ -4047,6 +4063,7 @@ async def undeploy_artifact(
     _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     project_path: str = Body(..., embed=True, description="Project path"),
     _collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
@@ -4155,6 +4172,7 @@ async def get_version_graph(
     _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     collection: Optional[str] = Query(
         default=None,
         description="Filter to specific collection",
@@ -4290,6 +4308,7 @@ async def get_artifact_diff(
     collection_mgr: CollectionManagerDep,
     settings: SettingsDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     project_path: str = Query(
         ...,
         description="Path to project for comparison",
@@ -4712,6 +4731,7 @@ async def get_artifact_upstream_diff(
     collection_mgr: CollectionManagerDep,
     settings: SettingsDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -5164,6 +5184,7 @@ async def get_artifact_source_project_diff(
     collection_mgr: CollectionManagerDep,
     settings: SettingsDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     project_path: str = Query(
         ...,
         description="Path to project deployment directory",
@@ -5608,6 +5629,7 @@ async def list_artifact_files(
     _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -5829,6 +5851,7 @@ async def get_artifact_file_content(
     _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -6075,6 +6098,7 @@ async def update_artifact_file_content(
     _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -6337,6 +6361,7 @@ async def create_artifact_file(
     _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -6605,6 +6630,7 @@ async def delete_artifact_file(
     _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
@@ -6805,6 +6831,7 @@ async def fetch_github_metadata(
     source: str = Query(..., description="GitHub source: user/repo/path[@version]"),
     request: Request = None,
     config_mgr: ConfigManagerDep = None,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> MetadataFetchResponse:
     """Fetch metadata from GitHub for a given source.
 
@@ -7051,6 +7078,7 @@ async def add_skip_preference(
     project_id: str = Path(..., description="URL-encoded project path"),
     request: SkipPreferenceAddRequest = Body(...),
     _token: TokenDep = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> SkipPreferenceResponse:
     """Add a skip preference for an artifact in a project.
 
@@ -7140,6 +7168,7 @@ async def remove_skip_preference(
         ..., description="Artifact key to remove (e.g., 'skill:canvas')"
     ),
     _token: TokenDep = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> SkipClearResponse:
     """Remove a single skip preference by artifact key.
 
@@ -7221,6 +7250,7 @@ async def remove_skip_preference(
 async def clear_skip_preferences(
     project_id: str = Path(..., description="URL-encoded project path"),
     _token: TokenDep = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> SkipClearResponse:
     """Clear all skip preferences for a project.
 
@@ -7301,6 +7331,7 @@ async def clear_skip_preferences(
 async def list_skip_preferences(
     project_id: str = Path(..., description="URL-encoded project path"),
     _token: TokenDep = None,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> SkipPreferenceListResponse:
     """List all skip preferences for a project.
 
@@ -7378,6 +7409,7 @@ async def list_skip_preferences(
 async def get_artifact_tags(
     artifact_id: str,
     artifact_repo: ArtifactRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> List[TagResponse]:
     """Get all tags assigned to a specific artifact.
 
@@ -7441,6 +7473,7 @@ async def update_artifact_tags(
     artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (uses default if not specified)",
@@ -7557,6 +7590,7 @@ async def add_tag_to_artifact(
     artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> dict[str, str]:
     """Add a tag to an artifact.
 
@@ -7634,6 +7668,7 @@ async def remove_tag_from_artifact(
     artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Remove a tag from an artifact.
 
@@ -7722,6 +7757,7 @@ async def create_linked_artifact(
     request: CreateLinkedArtifactRequest,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (uses default if not specified)",
@@ -7918,6 +7954,7 @@ async def delete_linked_artifact(
     target_artifact_id: str,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (uses default if not specified)",
@@ -8042,6 +8079,7 @@ async def list_linked_artifacts(
     artifact_id: str,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     link_type: Optional[str] = Query(
         default=None,
         description="Filter by link type (requires, enables, related)",
@@ -8181,6 +8219,7 @@ async def get_unlinked_references(
     artifact_id: str,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (uses default if not specified)",
@@ -8283,6 +8322,7 @@ async def get_skill_sync_diff(
     collection_mgr: CollectionManagerDep,
     db_session: DbSessionDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (uses active collection if omitted)",
@@ -8405,6 +8445,7 @@ async def get_artifact_associations(
     collection_mgr: CollectionManagerDep,
     db_user_coll_repo: DbUserCollectionRepoDep,
     _token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     include_parents: bool = Query(
         default=True,
         description="Include composites that contain this artifact as a child",
@@ -8681,6 +8722,7 @@ async def get_artifact_associations(
 async def get_consolidation_clusters(
     db_session: DbSessionDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     min_score: float = Query(
         default=0.5,
         ge=0.0,
@@ -8791,6 +8833,7 @@ async def ignore_duplicate_pair(
     pair_id: str,
     pair_repo: DuplicatePairRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> dict:
     """Mark a DuplicatePair as ignored (consolidation skip action).
 
@@ -8857,6 +8900,7 @@ async def unignore_duplicate_pair(
     pair_id: str,
     pair_repo: DuplicatePairRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> dict:
     """Clear the ignored flag on a DuplicatePair (undo consolidation skip).
 
@@ -8925,6 +8969,7 @@ async def get_similar_artifacts(
     db_session: DbSessionDep,
     token: TokenDep,
     response: Response,
+    auth_context: AuthContext = Depends(get_auth_context),
     limit: int = Query(
         default=10,
         ge=1,
@@ -9317,6 +9362,7 @@ async def merge_consolidation_cluster(
     db_session: DbSessionDep,
     pair_repo: DuplicatePairRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ConsolidationActionResponse:
     """Merge secondary artifacts into the primary for a consolidation cluster.
 
@@ -9509,6 +9555,7 @@ async def replace_consolidation_cluster(
     db_session: DbSessionDep,
     pair_repo: DuplicatePairRepoDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ConsolidationActionResponse:
     """Keep the primary artifact and discard all secondaries in the cluster.
 
