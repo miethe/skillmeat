@@ -193,12 +193,16 @@ class ClerkAuthProvider(AuthProvider):
         self,
         jwks_url: str | None = None,
         lifespan_in_seconds: int = 300,
+        audience: str | None = None,
+        issuer: str | None = None,
     ) -> None:
         if jwks_url is None:
             jwks_url = _resolve_jwks_url()
 
         self._jwks_url = jwks_url
         self._lifespan_in_seconds = lifespan_in_seconds
+        self._expected_audience = audience
+        self._expected_issuer = issuer
 
         # Initialise the JWKS client immediately so misconfiguration is caught
         # at startup rather than at the first authenticated request.
@@ -209,7 +213,11 @@ class ClerkAuthProvider(AuthProvider):
 
         logger.info(
             "ClerkAuthProvider initialised",
-            extra={"jwks_url": self._jwks_url},
+            extra={
+                "jwks_url": self._jwks_url,
+                "audience_configured": self._expected_audience is not None,
+                "issuer_configured": self._expected_issuer is not None,
+            },
         )
 
     # ------------------------------------------------------------------
@@ -304,12 +312,28 @@ class ClerkAuthProvider(AuthProvider):
                 detail="Invalid token: unable to resolve signing key",
             ) from exc
 
+        # Build the list of required claims dynamically: audience and issuer
+        # validation are only enforced when the values are explicitly configured.
+        required_claims = ["sub", "exp", "iat"]
+        if self._expected_audience is not None:
+            required_claims.append("aud")
+        if self._expected_issuer is not None:
+            required_claims.append("iss")
+
+        decode_kwargs: dict[str, Any] = {
+            "algorithms": _SUPPORTED_ALGORITHMS,
+            "options": {"require": required_claims},
+        }
+        if self._expected_audience is not None:
+            decode_kwargs["audience"] = self._expected_audience
+        if self._expected_issuer is not None:
+            decode_kwargs["issuer"] = self._expected_issuer
+
         try:
             payload: dict[str, Any] = jwt.decode(
                 raw_token,
                 signing_key.key,
-                algorithms=_SUPPORTED_ALGORITHMS,
-                options={"require": ["sub", "exp", "iat"]},
+                **decode_kwargs,
             )
         except jwt.ExpiredSignatureError as exc:
             logger.debug("Rejected expired JWT")

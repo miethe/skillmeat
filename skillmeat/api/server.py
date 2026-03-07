@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse
 from skillmeat import __version__ as skillmeat_version
 
 from .config import APISettings, get_settings
-from .dependencies import app_state
+from .dependencies import app_state, set_auth_provider
 from .routers import (
     analytics,
     artifact_history,
@@ -104,6 +104,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         "Authentication: %s",
         "enabled (Bearer tokens required)" if settings.auth_enabled else "disabled",
     )
+
+    # Instantiate and register the authentication provider
+    _provider_name = settings.auth_provider.lower()
+    if _provider_name == "local":
+        from skillmeat.api.auth.local_provider import LocalAuthProvider
+
+        _auth_provider = LocalAuthProvider()
+    elif _provider_name == "clerk":
+        from skillmeat.api.auth.clerk_provider import ClerkAuthProvider
+
+        if not settings.clerk_jwks_url:
+            raise RuntimeError(
+                "CLERK_JWKS_URL (or SKILLMEAT_CLERK_JWKS_URL) must be set "
+                "when auth_provider='clerk'."
+            )
+        _auth_provider = ClerkAuthProvider(
+            jwks_url=settings.clerk_jwks_url,
+            audience=settings.clerk_audience,
+            issuer=settings.clerk_issuer,
+        )
+    else:
+        raise RuntimeError(
+            f"Unknown auth_provider '{settings.auth_provider}'. "
+            "Valid values are 'local' and 'clerk'."
+        )
+    set_auth_provider(_auth_provider)
+    logger.info("Auth provider: %s", settings.auth_provider)
 
     # Configure logging
     settings.configure_logging()

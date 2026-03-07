@@ -241,6 +241,10 @@ def require_auth(
         provider = get_auth_provider()
         auth_context = await provider.validate(request)
 
+        # Expose auth context on request state so middleware and downstream
+        # handlers can access it without repeating the provider lookup.
+        request.state.auth_context = auth_context
+
         if scopes:
             missing = [s for s in scopes if not auth_context.has_scope(s)]
             if missing:

@@ -192,6 +192,16 @@ class APISettings(BaseSettings):
         ),
     )
 
+    clerk_audience: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("CLERK_AUDIENCE", "SKILLMEAT_CLERK_AUDIENCE"),
+        description=(
+            "Expected JWT audience claim for Clerk tokens. "
+            "When set, the aud claim in incoming JWTs must match this value. "
+            "Configurable via CLERK_AUDIENCE or SKILLMEAT_CLERK_AUDIENCE env var."
+        ),
+    )
+
     # Enterprise PAT authentication (ENT-3.4)
     enterprise_pat_secret: Optional[str] = Field(
         default=None,

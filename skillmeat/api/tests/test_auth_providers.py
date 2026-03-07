@@ -461,6 +461,120 @@ class TestClerkAuthProvider:
 
         assert result.has_role(Role.team_member)
 
+    # ------------------------------------------------------------------
+    # SEC-001: Audience claim validation
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_clerk_provider_rejects_wrong_audience(self, mock_jwks_client):
+        """validate() raises 401 when the token aud claim does not match the configured audience."""
+        import jwt as pyjwt
+
+        provider = ClerkAuthProvider(
+            jwks_url="https://example.clerk.dev/.well-known/jwks.json",
+            audience="https://expected-app.example.com",
+        )
+        mock_jwks_client.get_signing_key_from_jwt.return_value = _make_mock_signing_key()
+
+        with patch("skillmeat.api.auth.clerk_provider.jwt.decode") as mock_decode:
+            mock_decode.side_effect = pyjwt.InvalidAudienceError("audience mismatch")
+            request = _make_request(headers={"Authorization": "Bearer valid.jwt.token"})
+            with pytest.raises(HTTPException) as exc_info:
+                await provider.validate(request)
+
+        assert exc_info.value.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_clerk_provider_passes_audience_to_decode(self, mock_jwks_client):
+        """jwt.decode is called with the configured audience value."""
+        provider = ClerkAuthProvider(
+            jwks_url="https://example.clerk.dev/.well-known/jwks.json",
+            audience="https://my-audience.example.com",
+        )
+        mock_jwks_client.get_signing_key_from_jwt.return_value = _make_mock_signing_key()
+        claims = _minimal_valid_claims()
+
+        with patch("skillmeat.api.auth.clerk_provider.jwt.decode", return_value=claims) as mock_decode:
+            request = _make_request(headers={"Authorization": "Bearer valid.jwt"})
+            await provider.validate(request)
+
+        call_kwargs = mock_decode.call_args.kwargs
+        assert call_kwargs.get("audience") == "https://my-audience.example.com"
+        assert "aud" in call_kwargs["options"]["require"]
+
+    @pytest.mark.asyncio
+    async def test_clerk_provider_no_audience_configured_skips_aud_require(
+        self, provider, mock_jwks_client
+    ):
+        """When no audience is configured aud is not added to required claims."""
+        mock_jwks_client.get_signing_key_from_jwt.return_value = _make_mock_signing_key()
+        claims = _minimal_valid_claims()
+
+        with patch("skillmeat.api.auth.clerk_provider.jwt.decode", return_value=claims) as mock_decode:
+            request = _make_request(headers={"Authorization": "Bearer valid.jwt"})
+            await provider.validate(request)
+
+        call_kwargs = mock_decode.call_args.kwargs
+        assert "audience" not in call_kwargs
+        assert "aud" not in call_kwargs["options"]["require"]
+
+    # ------------------------------------------------------------------
+    # SEC-002: Issuer claim validation
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_clerk_provider_rejects_wrong_issuer(self, mock_jwks_client):
+        """validate() raises 401 when the token iss claim does not match the configured issuer."""
+        import jwt as pyjwt
+
+        provider = ClerkAuthProvider(
+            jwks_url="https://example.clerk.dev/.well-known/jwks.json",
+            issuer="https://clerk.expected-app.example.com",
+        )
+        mock_jwks_client.get_signing_key_from_jwt.return_value = _make_mock_signing_key()
+
+        with patch("skillmeat.api.auth.clerk_provider.jwt.decode") as mock_decode:
+            mock_decode.side_effect = pyjwt.InvalidIssuerError("issuer mismatch")
+            request = _make_request(headers={"Authorization": "Bearer valid.jwt.token"})
+            with pytest.raises(HTTPException) as exc_info:
+                await provider.validate(request)
+
+        assert exc_info.value.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_clerk_provider_passes_issuer_to_decode(self, mock_jwks_client):
+        """jwt.decode is called with the configured issuer value."""
+        provider = ClerkAuthProvider(
+            jwks_url="https://example.clerk.dev/.well-known/jwks.json",
+            issuer="https://clerk.my-app.example.com",
+        )
+        mock_jwks_client.get_signing_key_from_jwt.return_value = _make_mock_signing_key()
+        claims = _minimal_valid_claims()
+
+        with patch("skillmeat.api.auth.clerk_provider.jwt.decode", return_value=claims) as mock_decode:
+            request = _make_request(headers={"Authorization": "Bearer valid.jwt"})
+            await provider.validate(request)
+
+        call_kwargs = mock_decode.call_args.kwargs
+        assert call_kwargs.get("issuer") == "https://clerk.my-app.example.com"
+        assert "iss" in call_kwargs["options"]["require"]
+
+    @pytest.mark.asyncio
+    async def test_clerk_provider_no_issuer_configured_skips_iss_require(
+        self, provider, mock_jwks_client
+    ):
+        """When no issuer is configured iss is not added to required claims."""
+        mock_jwks_client.get_signing_key_from_jwt.return_value = _make_mock_signing_key()
+        claims = _minimal_valid_claims()
+
+        with patch("skillmeat.api.auth.clerk_provider.jwt.decode", return_value=claims) as mock_decode:
+            request = _make_request(headers={"Authorization": "Bearer valid.jwt"})
+            await provider.validate(request)
+
+        call_kwargs = mock_decode.call_args.kwargs
+        assert "issuer" not in call_kwargs
+        assert "iss" not in call_kwargs["options"]["require"]
+
 
 # ---------------------------------------------------------------------------
 # ClerkAuthProvider construction tests
@@ -489,6 +603,24 @@ class TestClerkAuthProviderConstruction:
         with patch("skillmeat.api.auth.clerk_provider.jwt.PyJWKClient"):
             with pytest.raises(RuntimeError, match="CLERK_JWKS_URL"):
                 ClerkAuthProvider()
+
+    def test_construction_stores_audience_and_issuer(self):
+        """audience and issuer parameters are stored on the instance."""
+        with patch("skillmeat.api.auth.clerk_provider.jwt.PyJWKClient"):
+            provider = ClerkAuthProvider(
+                jwks_url="https://example.com/jwks.json",
+                audience="https://my-app.example.com",
+                issuer="https://clerk.my-app.example.com",
+            )
+        assert provider._expected_audience == "https://my-app.example.com"
+        assert provider._expected_issuer == "https://clerk.my-app.example.com"
+
+    def test_construction_defaults_audience_and_issuer_to_none(self):
+        """audience and issuer default to None when not supplied."""
+        with patch("skillmeat.api.auth.clerk_provider.jwt.PyJWKClient"):
+            provider = ClerkAuthProvider(jwks_url="https://example.com/jwks.json")
+        assert provider._expected_audience is None
+        assert provider._expected_issuer is None
 
 
 # ---------------------------------------------------------------------------
@@ -732,6 +864,44 @@ class TestRequireAuth:
         client = TestClient(mock_app, raise_server_exceptions=False)
         response = client.post("/write-only")
         assert response.status_code == 403
+
+    # ------------------------------------------------------------------
+    # WIRE-003: request.state.auth_context is populated
+    # ------------------------------------------------------------------
+
+    def test_require_auth_sets_request_state_auth_context(self):
+        """require_auth stores the AuthContext on request.state.auth_context."""
+        from skillmeat.api.auth.provider import AuthProvider
+        from skillmeat.api.dependencies import require_auth, set_auth_provider
+
+        expected_ctx = AuthContext(
+            user_id=uuid.uuid4(),
+            tenant_id=None,
+            roles=[Role.team_member.value],
+            scopes=[Scope.artifact_read.value],
+        )
+        captured: dict = {}
+
+        class _CapturingProvider(AuthProvider):
+            async def validate(self, request: Request) -> AuthContext:
+                return expected_ctx
+
+        set_auth_provider(_CapturingProvider())
+        state_app = FastAPI()
+
+        @state_app.get("/check-state")
+        async def check_state(
+            request: Request,
+            auth: AuthContext = pytest.importorskip("fastapi").Depends(require_auth()),
+        ):
+            # Capture whatever was stored on request.state
+            captured["auth_context"] = getattr(request.state, "auth_context", None)
+            return {"user_id": str(auth.user_id)}
+
+        client = TestClient(state_app, raise_server_exceptions=False)
+        response = client.get("/check-state")
+        assert response.status_code == 200
+        assert captured["auth_context"] is expected_ctx
 
 
 # ---------------------------------------------------------------------------
