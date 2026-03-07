@@ -1,6 +1,6 @@
 ---
 title: Auth Rollout Deployment Guide
-description: Step-by-step guide for safely rolling out authentication in SkillMeat, from zero-auth local mode through full Clerk JWT enforcement.
+description: Step-by-step guide for safely rolling out authentication in SkillMeat, from local auth mode through full Clerk JWT enforcement.
 category: deployment
 tags: [auth, deployment, rollout, operations, clerk, rbac]
 status: active
@@ -10,21 +10,21 @@ audience: [operators, platform-engineers, sre]
 
 # Auth Rollout Deployment Guide
 
-This guide documents the authentication modes available in SkillMeat's API, from the default zero-auth local mode through full Clerk JWT enforcement. Choose the mode appropriate for your deployment. Operators running shared or production instances can enable these modes incrementally — see the Recommended Progression tip below.
+This guide documents the authentication modes available in SkillMeat's API, from the default local auth mode (using LocalAuthProvider) through full Clerk JWT enforcement. Choose the mode appropriate for your deployment. Operators running shared or production instances can enable these modes incrementally — see the Recommended Progression tip below.
 
 ## Overview
 
 SkillMeat's auth system is designed for flexible activation. The `SKILLMEAT_AUTH_ENABLED` flag and `SKILLMEAT_AUTH_PROVIDER` setting are the two primary levers controlling auth behavior at runtime. Switching between modes does not require a code change — only an environment variable update and a process restart.
 
-> **Recommended Progression:** For operators moving from a personal deployment to a shared or production environment, enabling modes incrementally is a safe approach: start with Zero-Auth Local Mode, validate Clerk connectivity in Write-Protected Mode, then advance to Full Enforcement Mode once all clients are issuing valid tokens. Each mode is independently deployable and individually rollback-safe.
+> **Recommended Progression:** For operators moving from a personal deployment to a shared or production environment, enabling modes incrementally is a safe approach: start with Local Auth Mode, validate Clerk connectivity in Write-Protected Mode, then advance to Full Enforcement Mode once all clients are issuing valid tokens. Each mode is independently deployable and individually rollback-safe.
 
 ### Auth Provider Summary
 
 | Provider | When Active | Behavior |
 |---|---|---|
-| `local` (default) | `auth_enabled=false` or `auth_provider=local` | Every request succeeds as `local_admin` with `system_admin` role and all scopes. No token inspected. |
-| `clerk` | `auth_enabled=true`, `auth_provider=clerk` | JWT extracted from `Authorization: Bearer` header, validated against Clerk JWKS, mapped to `AuthContext`. |
-| Enterprise PAT | Enterprise edition, `ENTERPRISE_PAT_SECRET` set | Static shared secret via `Authorization: Bearer`. Grants `system_admin` with stable service-account UUID. |
+| `local` (default) | `SKILLMEAT_AUTH_ENABLED=false` or `auth_provider=local` | Every request succeeds as `local_admin` with `system_admin` role and all scopes. No token inspected. |
+| `clerk` | `SKILLMEAT_AUTH_ENABLED=true`, `auth_provider=clerk` | JWT extracted from `Authorization: Bearer` header, validated against Clerk JWKS, mapped to `AuthContext`. |
+| Enterprise PAT | Enterprise edition, `SKILLMEAT_ENTERPRISE_PAT_SECRET` set | Static shared secret via `Authorization: Bearer`. Grants `system_admin` with stable service-account UUID. |
 
 ### Role and Scope Hierarchy
 
@@ -44,9 +44,9 @@ Clerk org-role mappings: `org:admin` → `team_admin`, `org:member` → `team_me
 
 ## Authentication Modes
 
-### Zero-Auth Local Mode (Default)
+### Local Auth Mode (Default)
 
-No auth enforced. Every request succeeds as `local_admin`. This is the default configuration and requires no setup. Good for personal or local-only use.
+No external auth enforced. The `LocalAuthProvider` automatically authorizes every request as `local_admin`. This is the default configuration and requires no setup. Good for personal or local-only use.
 
 **Environment:**
 ```bash
@@ -56,8 +56,8 @@ SKILLMEAT_ENV=production
 ```
 
 **What happens:**
+- `LocalAuthProvider` is selected at startup (logged as "local auth mode (auth_enabled=false — LocalAuthProvider selected)").
 - `require_auth()` dependency returns `LOCAL_ADMIN_CONTEXT` for every request.
-- `AuthMiddleware.dispatch()` calls `is_auth_enabled()` → `False`, passes all requests through immediately.
 - No `Authorization` header is required or inspected.
 - All endpoints respond normally.
 
@@ -89,8 +89,8 @@ SKILLMEAT_ENV=production
 ```
 
 **What happens:**
+- `ClerkAuthProvider` is selected at startup (replacing the default `LocalAuthProvider`).
 - `ClerkAuthProvider` initializes and fetches JWKS keys at startup.
-- `is_auth_enabled()` returns `True`.
 - `require_auth()` delegates to `ClerkAuthProvider.validate()` for every protected route.
 - Routes without `require_auth` (e.g., `/health`, `/docs`) remain open.
 - `POST`, `PUT`, `DELETE` endpoints with `artifact:write` / `collection:write` / `deployment:write` scopes begin rejecting unauthenticated or insufficiently-scoped requests.
@@ -157,7 +157,7 @@ SKILLMEAT_ENV=production
 ```
 
 **What happens:**
-`AuthMiddleware` is initialized with `protected_paths=["/api/v1"]` (the default). Every sub-path under `/api/v1` is guarded at the middleware layer in addition to the dependency layer. The excluded paths remain open:
+`ClerkAuthProvider` is selected at startup and validates all `/api/v1` requests. `AuthMiddleware` is initialized with `protected_paths=["/api/v1"]` (the default). Every sub-path under `/api/v1` is guarded at the middleware layer in addition to the dependency layer. The excluded paths remain open:
 - `/health`
 - `/docs`
 - `/redoc`
@@ -196,7 +196,7 @@ All auth behavior is controlled by environment variables with the `SKILLMEAT_` p
 
 | Variable | Type | Default | Purpose |
 |---|---|---|---|
-| `SKILLMEAT_AUTH_ENABLED` | bool | `false` | Master enforcement switch. When `false`, `is_auth_enabled()` returns `False` and all auth checks are bypassed. |
+| `SKILLMEAT_AUTH_ENABLED` | bool | `false` | Master enforcement switch. When `false`, `LocalAuthProvider` is used (all requests authorized as local admin, no credentials needed). When `true`, the configured auth provider is used. |
 | `SKILLMEAT_AUTH_PROVIDER` | string | `local` | Provider selection: `local` or `clerk`. |
 | `CLERK_JWKS_URL` | string | — | Clerk JWKS endpoint. Required when `auth_provider=clerk`. Also accepted as `SKILLMEAT_CLERK_JWKS_URL`. |
 | `CLERK_ISSUER` | string | — | Expected JWT `iss` claim. Optional but recommended. Also `SKILLMEAT_CLERK_ISSUER`. |
@@ -207,14 +207,14 @@ All auth behavior is controlled by environment variables with the `SKILLMEAT_` p
 | `SKILLMEAT_RATE_LIMIT_REQUESTS` | int | `100` | Max requests per minute per IP when rate limiting is enabled. |
 | `SKILLMEAT_LOG_LEVEL` | string | `INFO` | Set to `DEBUG` to log all auth decisions. |
 
-### Disabling Auth Instantly
+### Switching to Local Auth Mode Instantly
 
-To disable auth enforcement without a code deploy, set one environment variable and restart:
+To switch to local auth mode (no external auth enforcement) without a code deploy, set one environment variable and restart:
 ```bash
 SKILLMEAT_AUTH_ENABLED=false
 ```
 
-The `is_auth_enabled()` function reads from settings at call time, so the change takes effect on the next request after process restart.
+This will select `LocalAuthProvider`, which automatically authorizes all requests with local admin context. The change takes effect on process restart.
 
 ---
 
@@ -434,13 +434,13 @@ kubectl rollout restart deployment/skillmeat-api
 kill -HUP $(pgrep -f "uvicorn skillmeat")
 ```
 
-**Step 3: Verify auth is disabled.**
+**Step 3: Verify local auth mode is active.**
 ```bash
 # Should return 200 without any Authorization header
 curl -s http://localhost:8080/api/v1/artifacts | jq '.[] | length'
 
-# Check logs confirm bypass
-grep "is_auth_enabled.*False\|Skip auth" /var/log/skillmeat/api.log
+# Check logs confirm LocalAuthProvider is selected
+grep "local auth mode.*LocalAuthProvider selected" /var/log/skillmeat/api.log
 ```
 
 **Expected time to recovery:** Under 60 seconds for most deployments.
@@ -449,7 +449,7 @@ grep "is_auth_enabled.*False\|Skip auth" /var/log/skillmeat/api.log
 
 If Full Enforcement Mode is causing issues but Write-Protected Mode was stable, you can reduce scope without a full rollback:
 
-- Full Enforcement → Write-Protected: The code-level enforcement difference between these modes lies in which routes use `require_auth`. In the current implementation, `AuthMiddleware` covers all `/api/v1` at the middleware layer. To revert to Write-Protected behavior while keeping `auth_enabled=true`, you need to modify the `AuthMiddleware` excluded path list or redeploy the previous artifact. The simplest production-safe option is to disable auth entirely (`auth_enabled=false`) and re-enable incrementally.
+- Full Enforcement → Write-Protected or Local Auth: The code-level enforcement difference between these modes lies in which routes use `require_auth`. In the current implementation, `AuthMiddleware` covers all `/api/v1` at the middleware layer. To revert while keeping `SKILLMEAT_AUTH_ENABLED=true`, you need to modify the `AuthMiddleware` excluded path list or redeploy the previous artifact. The simplest production-safe option is to switch to local auth mode (`SKILLMEAT_AUTH_ENABLED=false`) and re-enable incrementally.
 
 ### Rollback Decision Triggers
 
@@ -557,7 +557,7 @@ Complete all applicable items before enabling a new auth mode.
 - [ ] No `skillmeat_api_requests_total{status="503"}` (JWKS unavailable)
 - [ ] p99 latency has not increased by more than 200ms from pre-auth baseline
 - [ ] Application logs show `Clerk JWT mapped to AuthContext` for authenticated requests
-- [ ] No `ENTERPRISE_PAT_SECRET is not configured` errors (if enterprise edition)
+- [ ] No `SKILLMEAT_ENTERPRISE_PAT_SECRET is not configured` errors (if enterprise edition)
 - [ ] Rollback procedure has been rehearsed in staging
 
 ---
@@ -585,9 +585,9 @@ For enterprise rollouts, set `SKILLMEAT_ENTERPRISE_PAT_SECRET` before exposing e
 | All requests return 401 after enabling auth | Clients not sending `Authorization: Bearer` header | Check client configuration; confirm token issuance in Clerk dashboard |
 | API starts but logs show JWKS fetch error | `CLERK_JWKS_URL` unreachable from server | Check network egress rules; verify URL is correct for your Clerk instance |
 | 403 on write endpoint with valid token | Token has only read scopes | Verify Clerk organization role for user (`org:member` gets write scopes by default) |
-| 503 on authenticated endpoints | JWKS endpoint down or rate-limited | Disable auth temporarily (`auth_enabled=false`), investigate Clerk status |
+| 503 on authenticated endpoints | JWKS endpoint down or rate-limited | Switch to local auth mode temporarily (`SKILLMEAT_AUTH_ENABLED=false`), investigate Clerk status |
 | `InvalidTokenError` in logs | Token audience/issuer mismatch | Verify `CLERK_AUDIENCE` and `CLERK_ISSUER` match actual token claims |
-| Enterprise PAT returns 403 | `ENTERPRISE_PAT_SECRET` not set on server | Set the environment variable and restart |
+| Enterprise PAT returns 403 | `SKILLMEAT_ENTERPRISE_PAT_SECRET` not set on server | Set the environment variable and restart |
 | `ClerkAuthProvider initialised` missing from startup logs | `auth_provider` is still `local` | Set `SKILLMEAT_AUTH_PROVIDER=clerk` and restart |
 | Auth works in staging but not production | Environment variable not set in production secrets | Audit all `SKILLMEAT_*` and `CLERK_*` env vars in the production environment |
 
@@ -599,7 +599,7 @@ For enterprise rollouts, set `SKILLMEAT_ENTERPRISE_PAT_SECRET` before exposing e
 - `skillmeat/api/middleware/enterprise_auth.py` — `verify_enterprise_pat()`, `EnterprisePATDep`
 - `skillmeat/api/middleware/tenant_context.py` — `set_tenant_context_dep`, `TenantContextDep`
 - `skillmeat/api/auth/clerk_provider.py` — `ClerkAuthProvider`, JWKS caching, claim mapping
-- `skillmeat/api/auth/local_provider.py` — `LocalAuthProvider` (zero-auth)
+- `skillmeat/api/auth/local_provider.py` — `LocalAuthProvider` (default in local auth mode)
 - `skillmeat/api/schemas/auth.py` — `AuthContext`, `Role`, `Scope`, `LOCAL_ADMIN_CONTEXT`
 - `skillmeat/api/config.py` — `APISettings`, all auth-related env vars
 - `skillmeat/api/tests/test_auth_integration.py` — Integration test reference for auth behavior

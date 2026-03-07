@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # PRD 2: AAA & RBAC Foundation (Individual & Team)
 
 **Author**: Gemini

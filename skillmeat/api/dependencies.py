@@ -203,6 +203,20 @@ def require_auth(
 ) -> Callable[..., Coroutine[Any, Any, AuthContext]]:
     """FastAPI dependency factory that validates authentication and optional scopes.
 
+    # Auth Bypass Contract (CP-001)
+    # -----------------------------------------------------------------------
+    # auth_enabled=false → server.py lifespan registers LocalAuthProvider.
+    #                      LocalAuthProvider.validate() always returns
+    #                      LOCAL_ADMIN_CONTEXT (user_id="local", role=system_admin,
+    #                      all scopes).  No credentials are inspected; auth
+    #                      always succeeds.
+    # auth_enabled=true  → lifespan registers the configured provider (e.g.
+    #                      ClerkAuthProvider).  Every request is validated
+    #                      against real credentials.
+    # This function has NO awareness of auth_enabled.  The provider selection
+    # at startup is the single enforcement decision point.
+    # -----------------------------------------------------------------------
+
     Supports two usage patterns::
 
         # No scope check — just authenticate
@@ -488,19 +502,28 @@ def require_memory_context_enabled(
 
 # ---------------------------------------------------------------------------
 # Repository factory providers (hexagonal architecture)
+#
+# Enterprise Edition Provider Support (ENT2-002/003)
+# Supported:   artifact, collection
+# Unsupported: project, deployment, tag, settings, group, context_entity,
+#              marketplace_source, project_template
 # ---------------------------------------------------------------------------
 
 
 def get_artifact_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IArtifactRepository:
     """Get IArtifactRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IArtifactRepository implementation for the configured edition
+        IArtifactRepository implementation for the configured edition.
+        Local edition returns ``LocalArtifactRepository``; enterprise edition
+        returns ``EnterpriseArtifactRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -509,10 +532,16 @@ def get_artifact_repository(
     if edition == "local":
         from skillmeat.core.repositories import LocalArtifactRepository
 
-        return LocalArtifactRepository(
+        return LocalArtifactRepository(  # type: ignore[return-value]
             artifact_manager=state.artifact_manager,
             path_resolver=state.path_resolver,
         )
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseArtifactRepository,
+        )
+
+        return EnterpriseArtifactRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail=f"Unsupported edition: {edition}",
@@ -543,20 +572,27 @@ def get_project_repository(
         )
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support project. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
 def get_collection_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> ICollectionRepository:
     """Get ICollectionRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        ICollectionRepository implementation for the configured edition
+        ICollectionRepository implementation for the configured edition.
+        Local edition returns ``LocalCollectionRepository``; enterprise edition
+        returns ``EnterpriseCollectionRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -565,10 +601,16 @@ def get_collection_repository(
     if edition == "local":
         from skillmeat.core.repositories import LocalCollectionRepository
 
-        return LocalCollectionRepository(
+        return LocalCollectionRepository(  # type: ignore[return-value]
             collection_manager=state.collection_manager,
             path_resolver=state.path_resolver,
         )
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseCollectionRepository,
+        )
+
+        return EnterpriseCollectionRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail=f"Unsupported edition: {edition}",
@@ -601,7 +643,10 @@ def get_deployment_repository(
         )
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support deployment. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -626,7 +671,10 @@ def get_tag_repository(
         return LocalTagRepository()
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support tag. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -654,7 +702,10 @@ def get_settings_repository(
         )
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support settings. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -679,7 +730,10 @@ def get_group_repository(
         return LocalGroupRepository()
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support group. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -704,7 +758,10 @@ def get_context_entity_repository(
         return LocalContextEntityRepository()
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support context_entity. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -729,7 +786,10 @@ def get_marketplace_source_repository(
         return LocalMarketplaceSourceRepository()
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support marketplace_source. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -754,7 +814,10 @@ def get_project_template_repository(
         return LocalProjectTemplateRepository()
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support project_template. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 

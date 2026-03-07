@@ -104,35 +104,61 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Host: {settings.host}:{settings.port}")
     logger.info(
         "Authentication: %s",
-        "enabled (Bearer tokens required)" if settings.auth_enabled else "disabled",
+        (
+            f"enabled (provider={settings.auth_provider})"
+            if settings.auth_enabled
+            else "local auth mode (auth_enabled=false — LocalAuthProvider selected)"
+        ),
     )
 
-    # Instantiate and register the authentication provider
-    _provider_name = settings.auth_provider.lower()
-    if _provider_name == "local":
+    # Instantiate and register the authentication provider.
+    #
+    # Auth Bypass Contract (CP-001):
+    #   auth_enabled=false  → LocalAuthProvider is always used, regardless of
+    #                         the auth_provider setting.  LocalAuthProvider
+    #                         never raises; it returns LOCAL_ADMIN_CONTEXT on
+    #                         every request.  This is the single decision point
+    #                         for bypass semantics — require_auth() itself has
+    #                         no auth_enabled awareness.
+    #   auth_enabled=true   → The configured auth_provider is used (e.g. clerk).
+    #                         require_auth() validates every request via that
+    #                         provider.
+    if not settings.auth_enabled:
         from skillmeat.api.auth.local_provider import LocalAuthProvider
 
         _auth_provider = LocalAuthProvider()
-    elif _provider_name == "clerk":
-        from skillmeat.api.auth.clerk_provider import ClerkAuthProvider
-
-        if not settings.clerk_jwks_url:
-            raise RuntimeError(
-                "CLERK_JWKS_URL (or SKILLMEAT_CLERK_JWKS_URL) must be set "
-                "when auth_provider='clerk'."
-            )
-        _auth_provider = ClerkAuthProvider(
-            jwks_url=settings.clerk_jwks_url,
-            audience=settings.clerk_audience,
-            issuer=settings.clerk_issuer,
+        logger.info(
+            "Auth provider: local (auth_enabled=false — all requests granted local-admin context)"
         )
     else:
-        raise RuntimeError(
-            f"Unknown auth_provider '{settings.auth_provider}'. "
-            "Valid values are 'local' and 'clerk'."
+        _provider_name = settings.auth_provider.lower()
+        if _provider_name == "local":
+            from skillmeat.api.auth.local_provider import LocalAuthProvider
+
+            _auth_provider = LocalAuthProvider()
+        elif _provider_name == "clerk":
+            from skillmeat.api.auth.clerk_provider import ClerkAuthProvider
+
+            if not settings.clerk_jwks_url:
+                raise RuntimeError(
+                    "CLERK_JWKS_URL (or SKILLMEAT_CLERK_JWKS_URL) must be set "
+                    "when auth_provider='clerk'."
+                )
+            _auth_provider = ClerkAuthProvider(
+                jwks_url=settings.clerk_jwks_url,
+                audience=settings.clerk_audience,
+                issuer=settings.clerk_issuer,
+            )
+        else:
+            raise RuntimeError(
+                f"Unknown auth_provider '{settings.auth_provider}'. "
+                "Valid values are 'local' and 'clerk'."
+            )
+        logger.info(
+            "Auth provider: %s (auth_enabled=true — requests require valid credentials)",
+            settings.auth_provider,
         )
     set_auth_provider(_auth_provider)
-    logger.info("Auth provider: %s", settings.auth_provider)
 
     # Configure logging
     settings.configure_logging()
@@ -394,9 +420,24 @@ def create_app(settings: APISettings = None) -> FastAPI:
     # Blanket auth dependency applied to every protected router.
     # Excluded: health (load-balancer probes), cache (internal ops),
     # settings (read-only app config) — these remain publicly accessible.
-    # set_tenant_context_dep runs after require_auth() and propagates
-    # AuthContext.tenant_id into the TenantContext ContextVar so that
-    # enterprise repository implementations can scope queries implicitly.
+    #
+    # ENT2-004: Validated — tenant context lifecycle is correct:
+    # 1. ORDERING: set_tenant_context_dep declares `Depends(require_auth())` in
+    #    its own signature, so FastAPI resolves require_auth() first and passes the
+    #    AuthContext into set_tenant_context_dep.  The outer Depends(require_auth())
+    #    in this list is deduplicated by FastAPI's dependency cache, so both
+    #    references share the same AuthContext for the request.
+    # 2. SESSION: get_db_session() (session.py) calls SessionLocal() each request,
+    #    yields a fresh Session, and closes it in a finally block — strictly
+    #    request-scoped.  Enterprise repos receive this injected Session and never
+    #    create their own.
+    # 3. CONTEXVAR LEAKAGE: set_tenant_context_dep is an async generator dependency.
+    #    It calls TenantContext.set() before yield and TenantContext.reset(token) in
+    #    a finally block, guaranteeing the ContextVar is cleared even on exceptions
+    #    and preventing tenant identity from leaking across reused async tasks.
+    # 4. AUTH → TENANT PROPAGATION: set_tenant_context_dep reads AuthContext.tenant_id
+    #    and is a no-op when tenant_id is None (local/single-tenant mode), falling
+    #    back to DEFAULT_TENANT_ID inside the enterprise repository base class.
     _auth_deps = [Depends(require_auth()), Depends(set_tenant_context_dep)]
 
     # Include routers

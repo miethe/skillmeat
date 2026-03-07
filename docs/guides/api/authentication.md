@@ -12,22 +12,22 @@ The SkillMeat API supports multiple authentication modes depending on your deplo
 
 SkillMeat provides flexible authentication to support both local development and multi-tenant enterprise deployments:
 
-- **Local Mode (Default)** — Zero-auth mode for single-user development. No authentication required.
-- **Bearer Token Mode** — Production-ready JWT validation via authentication providers (e.g., Clerk).
+- **Local Auth Mode (Default)** — Uses `LocalAuthProvider` for single-user development. No credentials required; all requests authorized as local admin.
+- **Bearer Token Mode** — Production-ready JWT validation via external providers (e.g., Clerk). Requires valid Bearer tokens.
 - **Enterprise PAT Mode** — Static API key validation for enterprise deployments.
 
-### Authentication is Configurable
+### Authentication Modes are Configurable
 
-Authentication is disabled by default in development. Enable it via environment variables or configuration files.
+Local auth mode is the default (requires no setup for development). Enable external auth via environment variables (`SKILLMEAT_AUTH_ENABLED=true`) when moving to production.
 
 ## Authentication Methods
 
-### 1. Local Mode (Zero-Auth)
+### 1. Local Auth Mode (Default)
 
-In local (single-user) development, no authentication is required.
+In local (single-user) development using `LocalAuthProvider`, no authentication is required. The API automatically authorizes all requests with local admin context.
 
 ```bash
-# Start API in local mode (default)
+# Start API in local auth mode (default)
 skillmeat web dev --api-only
 
 # All requests succeed without an Authorization header
@@ -87,7 +87,7 @@ The API validates tokens using an authentication provider. Token validation incl
 
 ### 3. Enterprise PAT (Personal Access Token)
 
-For enterprise deployments, use a static API token stored in `ENTERPRISE_PAT_SECRET`.
+For enterprise deployments, use a static API token stored in `SKILLMEAT_ENTERPRISE_PAT_SECRET`.
 
 #### Header Format
 
@@ -107,8 +107,9 @@ curl -H "Authorization: Bearer $PAT" \
 #### Enable Enterprise PAT Auth
 
 ```bash
-export ENTERPRISE_PAT_SECRET="your-static-api-token"
+export SKILLMEAT_ENTERPRISE_PAT_SECRET="your-static-api-token"
 export SKILLMEAT_EDITION=enterprise
+export SKILLMEAT_AUTH_ENABLED=true
 
 # Restart the API server
 uvicorn skillmeat.api.server:app --host 0.0.0.0 --port 8080
@@ -384,21 +385,25 @@ All other routes under `/api/v1` are protected when `SKILLMEAT_AUTH_ENABLED=true
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `SKILLMEAT_AUTH_ENABLED` | bool | `false` | Require Bearer token authentication |
+| `SKILLMEAT_AUTH_ENABLED` | bool | `false` | Master enforcement switch. When `false`, local auth mode (LocalAuthProvider) is used. When `true`, external auth provider (e.g., Clerk) validates requests. |
+| `SKILLMEAT_AUTH_PROVIDER` | string | `local` | Provider selection: `local` (LocalAuthProvider) or `clerk` (Clerk.dev). |
 | `SKILLMEAT_ENV` | string | `development` | Environment: `development`, `production`, or `testing` |
 | `SKILLMEAT_EDITION` | string | `local` | Deployment edition: `local` or `enterprise` |
-| `ENTERPRISE_PAT_SECRET` | string | (none) | Enterprise PAT token (required if edition is enterprise) |
+| `SKILLMEAT_ENTERPRISE_PAT_SECRET` | string | (none) | Enterprise PAT token (canonical env var; legacy `ENTERPRISE_PAT_SECRET` still accepted) |
+| `CLERK_JWKS_URL` | string | — | Clerk JWKS endpoint (required when `auth_provider=clerk`) |
+| `CLERK_ISSUER` | string | — | Expected JWT issuer (recommended when using Clerk) |
 
 ### Example Configurations
 
-**Development (zero-auth)**:
+**Development (local auth mode — default)**:
 
 ```bash
 export SKILLMEAT_ENV=development
 export SKILLMEAT_AUTH_ENABLED=false
+# All requests authorized as local admin automatically
 ```
 
-**Production (Bearer token)**:
+**Production (Bearer token with Clerk)**:
 
 ```bash
 export SKILLMEAT_ENV=production
@@ -411,7 +416,8 @@ export SKILLMEAT_AUTH_ENABLED=true
 ```bash
 export SKILLMEAT_ENV=production
 export SKILLMEAT_EDITION=enterprise
-export ENTERPRISE_PAT_SECRET="your-secret-token"
+export SKILLMEAT_AUTH_ENABLED=true
+export SKILLMEAT_ENTERPRISE_PAT_SECRET="your-secret-token"
 ```
 
 ## Authentication Dependency Injection

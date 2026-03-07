@@ -6404,11 +6404,11 @@
               "type": "number",
               "maximum": 1.0,
               "minimum": 0.0,
-              "description": "Minimum similarity score threshold (0.0\u20131.0, default 0.5)",
+              "description": "Minimum similarity score threshold (0.0–1.0, default 0.5)",
               "default": 0.5,
               "title": "Min Score"
             },
-            "description": "Minimum similarity score threshold (0.0\u20131.0, default 0.5)"
+            "description": "Minimum similarity score threshold (0.0–1.0, default 0.5)"
           },
           {
             "name": "limit",
@@ -6418,11 +6418,11 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
-              "description": "Maximum number of clusters to return per page (1\u2013100, default 20)",
+              "description": "Maximum number of clusters to return per page (1–100, default 20)",
               "default": 20,
               "title": "Limit"
             },
-            "description": "Maximum number of clusters to return per page (1\u2013100, default 20)"
+            "description": "Maximum number of clusters to return per page (1–100, default 20)"
           },
           {
             "name": "cursor",
@@ -6690,11 +6690,11 @@
               "type": "number",
               "maximum": 1.0,
               "minimum": 0.0,
-              "description": "Minimum composite similarity score threshold (0.0\u20131.0)",
+              "description": "Minimum composite similarity score threshold (0.0–1.0)",
               "default": 0.1,
               "title": "Min Score"
             },
-            "description": "Minimum composite similarity score threshold (0.0\u20131.0)"
+            "description": "Minimum composite similarity score threshold (0.0–1.0)"
           },
           {
             "name": "source",
@@ -6767,7 +6767,7 @@
           "artifacts"
         ],
         "summary": "Merge consolidation cluster (secondary into primary)",
-        "description": "Merges all secondary artifacts in the cluster into the primary artifact, then removes the secondaries from the collection.  An auto-snapshot is always created before any data is modified.  If the snapshot step fails the action is aborted and a 500 is returned \u2014 the collection is never modified without a confirmed snapshot.",
+        "description": "Merges all secondary artifacts in the cluster into the primary artifact, then removes the secondaries from the collection.  An auto-snapshot is always created before any data is modified.  If the snapshot step fails the action is aborted and a 500 is returned — the collection is never modified without a confirmed snapshot.",
         "operationId": "merge_consolidation_cluster_api_v1_artifacts_consolidation_clusters__cluster_id__merge_post",
         "security": [
           {
@@ -6865,7 +6865,7 @@
           "artifacts"
         ],
         "summary": "Replace consolidation cluster (keep primary, discard secondaries)",
-        "description": "Keeps the primary artifact unchanged and discards all secondary artifacts in the cluster.  An auto-snapshot is always created before any data is modified.  If the snapshot step fails the action is aborted and a 500 is returned \u2014 the collection is never modified without a confirmed snapshot.",
+        "description": "Keeps the primary artifact unchanged and discards all secondary artifacts in the cluster.  An auto-snapshot is always created before any data is modified.  If the snapshot step fails the action is aborted and a 500 is returned — the collection is never modified without a confirmed snapshot.",
         "operationId": "replace_consolidation_cluster_api_v1_artifacts_consolidation_clusters__cluster_id__replace_post",
         "security": [
           {
@@ -10302,7 +10302,7 @@
           "context-modules"
         ],
         "summary": "Update a context module",
-        "description": "Update an existing context module. All fields are optional \u2014 only\n    provided fields will be updated. Updated selectors are validated.",
+        "description": "Update an existing context module. All fields are optional — only\n    provided fields will be updated. Updated selectors are validated.",
         "operationId": "update_context_module_api_v1_context_modules__module_id__put",
         "parameters": [
           {
@@ -12113,7 +12113,7 @@
           "deployment-sets"
         ],
         "summary": "Resolve a deployment set to its flat artifact list",
-        "description": "Recursively resolve a deployment set into an ordered, deduplicated list\nof artifact UUIDs.\n\nTraversal is depth-first: artifact members are emitted directly, group\nmembers are expanded in position order, and nested set members are\nrecursed into.  The first occurrence of each UUID is kept; duplicates are\nsilently dropped.\n\nArgs:\n    set_id: Primary key of the root deployment set to resolve.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n    artifact_repo: IArtifactRepository dependency (UUID \u2192 name/type lookup).\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    Resolution result including the flat artifact list and traversal metadata.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the resolution depth limit is exceeded.",
+        "description": "Recursively resolve a deployment set into an ordered, deduplicated list\nof artifact UUIDs.\n\nTraversal is depth-first: artifact members are emitted directly, group\nmembers are expanded in position order, and nested set members are\nrecursed into.  The first occurrence of each UUID is kept; duplicates are\nsilently dropped.\n\nArgs:\n    set_id: Primary key of the root deployment set to resolve.\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n    artifact_repo: IArtifactRepository dependency (UUID → name/type lookup).\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    Resolution result including the flat artifact list and traversal metadata.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the resolution depth limit is exceeded.",
         "operationId": "resolve_deployment_set_api_v1_deployment_sets__set_id__resolve_get",
         "parameters": [
           {
@@ -12168,7 +12168,7 @@
           "deployment-sets"
         ],
         "summary": "Batch-deploy all artifacts in a deployment set",
-        "description": "Resolve the deployment set and deploy every artifact to the target project.\n\nEach artifact is deployed independently; per-artifact errors are captured\nand returned in the results list so a single failure does not abort the\nentire batch.\n\nArgs:\n    set_id: Primary key of the deployment set to deploy.\n    request: Batch deploy payload (project_path, dry_run).\n    settings: API settings.\n    artifact_mgr: ArtifactManager dependency.\n    repo: DeploymentSetRepository dependency.\n    artifact_repo: IArtifactRepository dependency (UUID \u2192 name/type lookup).\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    Batch deployment result with per-artifact outcomes.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the project path is invalid or resolution fails.",
+        "description": "Resolve the deployment set and deploy every artifact to the target project.\n\nEach artifact is deployed independently; per-artifact errors are captured\nand returned in the results list so a single failure does not abort the\nentire batch.\n\nArgs:\n    set_id: Primary key of the deployment set to deploy.\n    request: Batch deploy payload (project_path, dry_run).\n    settings: API settings.\n    artifact_mgr: ArtifactManager dependency.\n    repo: DeploymentSetRepository dependency.\n    artifact_repo: IArtifactRepository dependency (UUID → name/type lookup).\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    Batch deployment result with per-artifact outcomes.\n\nRaises:\n    HTTPException 404: If the set does not exist.\n    HTTPException 422: If the project path is invalid or resolution fails.",
         "operationId": "batch_deploy_api_v1_deployment_sets__set_id__deploy_post",
         "parameters": [
           {
@@ -13693,7 +13693,7 @@
           "composites"
         ],
         "summary": "Remove member from composite",
-        "description": "Remove a child artifact membership by child artifact UUID.  The child Artifact row is NOT deleted \u2014 only the membership edge is removed.",
+        "description": "Remove a child artifact membership by child artifact UUID.  The child Artifact row is NOT deleted — only the membership edge is removed.",
         "operationId": "remove_composite_member_api_v1_composites__composite_id__members__member_uuid__delete",
         "parameters": [
           {
@@ -21867,7 +21867,7 @@
           "settings"
         ],
         "summary": "Get similarity score thresholds",
-        "description": "Returns the score band thresholds used to classify a similarity score into\n    high / partial / low / (hidden below floor) bands.\n\n    Default values:\n    - high   \u2265 0.80\n    - partial \u2265 0.55\n    - low    \u2265 0.35\n    - floor  \u2265 0.20  (scores below this are not displayed)",
+        "description": "Returns the score band thresholds used to classify a similarity score into\n    high / partial / low / (hidden below floor) bands.\n\n    Default values:\n    - high   ≥ 0.80\n    - partial ≥ 0.55\n    - low    ≥ 0.35\n    - floor  ≥ 0.20  (scores below this are not displayed)",
         "operationId": "get_similarity_thresholds_api_v1_settings_similarity_thresholds_get",
         "responses": {
           "200": {
@@ -26521,7 +26521,7 @@
           "encoding"
         ],
         "title": "ArtifactFileEntry",
-        "description": "A single file within an artifact payload bundle.\n\nAttributes\n----------\npath:\n    Relative POSIX path of the file within the artifact directory.\ncontent:\n    File contents \u2014 UTF-8 text or base64-encoded bytes for binary files.\nsize:\n    File size in bytes.\nencoding:\n    ``\"utf-8\"`` for text files, ``\"base64\"`` for binary files."
+        "description": "A single file within an artifact payload bundle.\n\nAttributes\n----------\npath:\n    Relative POSIX path of the file within the artifact directory.\ncontent:\n    File contents — UTF-8 text or base64-encoded bytes for binary files.\nsize:\n    File size in bytes.\nencoding:\n    ``\"utf-8\"`` for text files, ``\"base64\"`` for binary files."
       },
       "ArtifactGroupMembership": {
         "properties": {
@@ -32946,7 +32946,7 @@
         },
         "type": "object",
         "title": "CompositeUpdateRequest",
-        "description": "Request schema for updating a composite artifact.\n\nAll fields are optional \u2014 only provided fields are updated."
+        "description": "Request schema for updating a composite artifact.\n\nAll fields are optional — only provided fields are updated."
       },
       "ConfirmDuplicatesRequest": {
         "properties": {
@@ -36302,7 +36302,7 @@
             "title": "Icon",
             "description": "Optional icon identifier or emoji",
             "examples": [
-              "\ud83d\udee0\ufe0f",
+              "🛠️",
               "code"
             ]
           },
@@ -36353,7 +36353,7 @@
         "example": {
           "color": "#3b82f6",
           "description": "Skills and commands for backend development",
-          "icon": "\ud83d\udee0\ufe0f",
+          "icon": "🛠️",
           "name": "My Dev Setup",
           "tags": [
             "backend",
@@ -36489,7 +36489,7 @@
           "color": "#3b82f6",
           "created_at": "2026-02-24T10:00:00Z",
           "description": "Skills and commands for backend development",
-          "icon": "\ud83d\udee0\ufe0f",
+          "icon": "🛠️",
           "id": 1,
           "member_count": 5,
           "name": "My Dev Setup",
@@ -36545,7 +36545,7 @@
             "title": "Icon",
             "description": "Updated icon identifier or emoji",
             "examples": [
-              "\ud83d\ude80"
+              "🚀"
             ]
           },
           "color": {
@@ -38584,7 +38584,7 @@
           "label"
         ],
         "title": "EntityTypeConfigCreateRequest",
-        "description": "Request schema for creating a new entity type configuration.\n\nAttributes:\n    slug: Machine-readable unique identifier for the new type.\n          Must match ``^[a-z][a-z0-9_]{0,63}$``.  Reserved built-in\n          slugs (``skill``, ``command``, ``agent``, ``mcp_server``,\n          ``hook``) are rejected with a validation error.\n    label: Human-readable display name shown in the UI.\n    description: Optional long-form description of this entity type.\n    icon: Optional icon identifier for UI rendering.\n    color: Optional hex color code for card indicators\n           (e.g. ``'#3B82F6'``).  ``None`` uses default theme colors.\n    path_prefix: Default filesystem path prefix for this type.\n    required_frontmatter_keys: Frontmatter keys that MUST be present.\n    example_path: An example path illustrating this entity type.\n    content_template: Default Markdown template for new entities.\n    applicable_platforms: Optional list of platform slugs this type\n        applies to.  ``None`` (the default) means all platforms.\n    frontmatter_schema: Optional JSON Schema subset for validating\n        custom type frontmatter.  Accepted keys: ``required`` (list of\n        strings) and ``properties`` (dict of key \u2192 type descriptor)."
+        "description": "Request schema for creating a new entity type configuration.\n\nAttributes:\n    slug: Machine-readable unique identifier for the new type.\n          Must match ``^[a-z][a-z0-9_]{0,63}$``.  Reserved built-in\n          slugs (``skill``, ``command``, ``agent``, ``mcp_server``,\n          ``hook``) are rejected with a validation error.\n    label: Human-readable display name shown in the UI.\n    description: Optional long-form description of this entity type.\n    icon: Optional icon identifier for UI rendering.\n    color: Optional hex color code for card indicators\n           (e.g. ``'#3B82F6'``).  ``None`` uses default theme colors.\n    path_prefix: Default filesystem path prefix for this type.\n    required_frontmatter_keys: Frontmatter keys that MUST be present.\n    example_path: An example path illustrating this entity type.\n    content_template: Default Markdown template for new entities.\n    applicable_platforms: Optional list of platform slugs this type\n        applies to.  ``None`` (the default) means all platforms.\n    frontmatter_schema: Optional JSON Schema subset for validating\n        custom type frontmatter.  Accepted keys: ``required`` (list of\n        strings) and ``properties`` (dict of key → type descriptor)."
       },
       "EntityTypeConfigResponse": {
         "properties": {
@@ -42801,7 +42801,7 @@
           "position"
         ],
         "title": "MemberPositionUpdate",
-        "description": "A single artifact \u2192 position entry for bulk reorder requests."
+        "description": "A single artifact → position entry for bulk reorder requests."
       },
       "MemberResponse": {
         "properties": {
@@ -42989,7 +42989,7 @@
             "type": "array",
             "minItems": 1,
             "title": "Members",
-            "description": "List of artifact_id \u2192 position mappings."
+            "description": "List of artifact_id → position mappings."
           }
         },
         "type": "object",
@@ -47995,7 +47995,7 @@
           "floor"
         ],
         "title": "SimilarityThresholdsResponse",
-        "description": "Current similarity score band thresholds.\n\nEach value is a float in [0.0, 1.0] representing the *minimum* cosine\nsimilarity score required to fall into that band.  The floor threshold\nacts as a lower cutoff \u2014 scores below it are not displayed.\n\nOrdering invariant: floor < low < partial < high."
+        "description": "Current similarity score band thresholds.\n\nEach value is a float in [0.0, 1.0] representing the *minimum* cosine\nsimilarity score required to fall into that band.  The floor threshold\nacts as a lower cutoff — scores below it are not displayed.\n\nOrdering invariant: floor < low < partial < high."
       },
       "SimilarityThresholdsUpdateRequest": {
         "properties": {
@@ -48608,7 +48608,7 @@
               }
             ],
             "title": "Manual Map",
-            "description": "Manual directory-to-type mappings (directory path \u2192 artifact_type). None if no manual mapping configured.",
+            "description": "Manual directory-to-type mappings (directory path → artifact_type). None if no manual mapping configured.",
             "examples": [
               {
                 "commands/dev": "command",
@@ -50375,7 +50375,7 @@
               }
             ],
             "title": "Manual Map",
-            "description": "Manual directory-to-type mappings (directory path \u2192 artifact_type). Example: {\"path/to/dir\": \"skill\", \"other/path\": \"command\"}",
+            "description": "Manual directory-to-type mappings (directory path → artifact_type). Example: {\"path/to/dir\": \"skill\", \"other/path\": \"command\"}",
             "examples": [
               {
                 "commands/dev": "command",
@@ -52327,7 +52327,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "\nJWT Bearer token authentication. Send the token in the `Authorization: Bearer <token>` header.\n\n**Supported providers**: `local` (SkillMeat-issued PATs) and `clerk` (Clerk.dev JWTs).\n\n### Available Scopes\n\n| Scope | Description |\n|-------|-------------|\n| `artifact:read` | Read artifact data |\n| `artifact:write` | Create, update, and delete artifacts |\n| `collection:read` | Read collection data |\n| `collection:write` | Create, update, and delete collections |\n| `deployment:read` | Read deployment data |\n| `deployment:write` | Create, update, and delete deployments |\n| `admin:*` | Full administrative access (wildcard \u2014 grants all scopes) |\n\n### Roles\n\n| Role | Description |\n|------|-------------|\n| `system_admin` | Full system access (service accounts only) |\n| `team_admin` | Team administration |\n| `team_member` | Standard team member |\n| `viewer` | Read-only access |\n\n### Auth Bypass\n\nWhen `auth_enabled=false` (development default), the server accepts all requests\nwithout credentials. Set `SKILLMEAT_AUTH_ENABLED=true` to enforce authentication.\n"
+        "description": "\nJWT Bearer token authentication. Send the token in the `Authorization: Bearer <token>` header.\n\n**Authentication Modes**:\n\n- **Local Auth Mode** (`SKILLMEAT_AUTH_ENABLED=false`, default): `LocalAuthProvider` is used. All requests are authorized as local admin with `system_admin` role and all scopes. No credentials required.\n- **External Auth Mode** (`SKILLMEAT_AUTH_ENABLED=true`): The configured provider (e.g., `clerk`) validates all requests. Bearer tokens with valid credentials required.\n\n**Supported providers**: `local` (LocalAuthProvider in local auth mode), `clerk` (Clerk.dev JWTs in external auth mode), and enterprise PAT (static secret in external auth mode).\n\n### Available Scopes\n\n| Scope | Description |\n|-------|-------------|\n| `artifact:read` | Read artifact data |\n| `artifact:write` | Create, update, and delete artifacts |\n| `collection:read` | Read collection data |\n| `collection:write` | Create, update, and delete collections |\n| `deployment:read` | Read deployment data |\n| `deployment:write` | Create, update, and delete deployments |\n| `admin:*` | Full administrative access (wildcard — grants all scopes) |\n\n### Roles\n\n| Role | Description |\n|------|-------------|\n| `system_admin` | Full system access (service accounts only) |\n| `team_admin` | Team administration |\n| `team_member` | Standard team member |\n| `viewer` | Read-only access |\n\n### Local Auth Mode\n\nWhen `SKILLMEAT_AUTH_ENABLED=false` (development default), the server uses `LocalAuthProvider`. All requests are automatically authorized with local admin context—no credentials needed. All endpoints respond normally.\n\n### External Auth Mode\n\nWhen `SKILLMEAT_AUTH_ENABLED=true`, the server validates all requests through the configured auth provider (e.g., Clerk). Bearer tokens with valid credentials are required in the `Authorization` header.\n"
       },
       "APIKeyAuth": {
         "type": "apiKey",
