@@ -11,7 +11,10 @@ title: Repository & Service Layer - Auth Context Definition & Propagation
 status: completed
 started: null
 completed: null
-commit_refs: []
+commit_refs:
+- "b2f2a65a"
+- "c16f6adf"
+- "83097043"
 pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
