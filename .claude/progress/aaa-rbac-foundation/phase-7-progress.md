@@ -8,7 +8,7 @@ prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/aaa-rbac-foundation-v1.md
 phase: 7
 title: Testing & Validation - Auth & RBAC Coverage
-status: in_progress
+status: pending
 started: null
 completed: null
 commit_refs: []
@@ -16,8 +16,8 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 9
-completed_tasks: 6
-in_progress_tasks: 2
+completed_tasks: 8
+in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
@@ -84,7 +84,7 @@ tasks:
   priority: medium
 - id: TEST-008
   description: Security edge cases (invalid tokens, expired tokens, scope bypass attempts)
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -92,7 +92,7 @@ tasks:
   priority: critical
 - id: TEST-009
   description: Zero-auth regression tests (local mode works without auth header)
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -140,7 +140,7 @@ files_modified:
 - skillmeat/web/tests/auth.e2e.ts
 - skillmeat/cli/tests/test_auth_flow.py
 - skillmeat/tests/test_security_edge_cases.py
-progress: 66
+progress: 88
 updated: '2026-03-07'
 ---
 
