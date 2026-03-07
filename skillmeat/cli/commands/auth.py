@@ -8,8 +8,11 @@ The ``login`` command runs the OAuth 2.0 Device Authorization Grant (RFC 8628)
 against a configured Clerk issuer.  In local (zero-auth) mode it prints an
 informative message instead of initiating the flow.
 
-Credential storage is intentionally out of scope for this module — CLI-002
-will add a ``TokenStore`` that persists the tokens returned here.
+Tokens returned by the flow are persisted via
+:class:`~skillmeat.cli.credential_store.CredentialStore`, which uses the
+platform keyring (macOS Keychain, Windows Credential Locker, Linux Secret
+Service) and falls back to ``~/.skillmeat/credentials.json`` (mode 0600) when
+no keyring backend is available.
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from __future__ import annotations
 import os
 import sys
 import webbrowser
+from typing import Optional
 
 import click
 from rich.console import Console
@@ -31,6 +35,7 @@ from skillmeat.cli.auth_flow import (
     DeviceCodeTimeoutError,
     DeviceCodeFlowError,
 )
+from skillmeat.cli.credential_store import CredentialStore
 
 console = Console(force_terminal=True, legacy_windows=False)
 
@@ -173,21 +178,27 @@ def _run_device_code_flow(
     *,
     no_browser: bool = False,
     timeout: int = 300,
+    credential_store: Optional[CredentialStore] = None,
 ) -> None:
-    """Run the device-code flow and print the result.
+    """Run the device-code flow, persist credentials, and print the result.
 
     This function is separated from the Click command so that tests can call
     it directly with a mock ``AuthConfig`` (and a mock HTTP client injected
     into ``DeviceCodeFlow``).
 
     Args:
-        config:     Populated :class:`~skillmeat.cli.auth_flow.AuthConfig`.
-        no_browser: When True, skip the automatic ``webbrowser.open()`` call.
-        timeout:    Maximum seconds to wait for authorization.
+        config:           Populated :class:`~skillmeat.cli.auth_flow.AuthConfig`.
+        no_browser:       When True, skip the automatic ``webbrowser.open()`` call.
+        timeout:          Maximum seconds to wait for authorization.
+        credential_store: Optional :class:`~skillmeat.cli.credential_store.CredentialStore`
+                          to use for persisting tokens.  Defaults to a new
+                          :class:`~skillmeat.cli.credential_store.CredentialStore`
+                          with auto-detected backend.
 
     Raises:
         Any exception raised by :class:`~skillmeat.cli.auth_flow.DeviceCodeFlow`.
     """
+    store = credential_store or CredentialStore()
     flow = DeviceCodeFlow(config)
 
     # Step 1 — Initiate the device-code request.
@@ -229,13 +240,19 @@ def _run_device_code_flow(
     console.print("[dim]Waiting for authorization...[/dim]")
     result = flow.poll(device_auth, timeout=float(timeout))
 
-    # Step 5 — Report success.
-    # NOTE: CLI-002 will persist result.access_token / result.refresh_token here.
+    # Step 5 — Persist credentials.
+    store.store(result)
+
+    # Step 6 — Report success.
+    backend_note = (
+        "Credentials stored in system keyring."
+        if store.backend_name == "keyring"
+        else "Credentials stored in ~/.skillmeat/credentials.json (mode 0600)."
+    )
     console.print(
         Panel(
             "[bold green]Successfully logged in![/bold green]\n\n"
-            "[dim]Tokens have been received but are not yet persisted "
-            "(credential storage is implemented in CLI-002).[/dim]",
+            f"[dim]{backend_note}[/dim]",
             title="[green]Login successful[/green]",
             expand=False,
         )
