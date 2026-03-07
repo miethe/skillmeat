@@ -14,3 +14,6 @@ export { NoopAuthWrapper, noopAuthProvider } from './noop-provider';
 
 // Re-export the wrapper component for use in layout.tsx
 export { AuthWrapper } from './wrapper';
+
+// Auth-aware fetch utility for use in hooks and components
+export { useAuthFetch } from './api-helpers';
