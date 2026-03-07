@@ -54,8 +54,12 @@ def _get_content_service(session: DbSessionDep) -> EnterpriseContentService:
     Tenant isolation is controlled via ``TenantContext`` (a ContextVar in
     ``skillmeat.cache.enterprise_repositories``).  When ``TenantContext`` is
     not set, the repository falls back to ``DEFAULT_TENANT_ID`` automatically.
-    ENT-3.4 will set ``TenantContext`` via an authentication middleware before
-    this dependency runs, replacing the implicit default.
+
+    The router-level ``verify_enterprise_pat`` dependency (which now returns an
+    :class:`~skillmeat.api.schemas.auth.AuthContext`) runs before this function.
+    To wire ``TenantContext`` to the authenticated identity in a later phase,
+    inject ``auth: EnterprisePATDep`` here and call
+    ``TenantContext.set(auth.tenant_id)`` before constructing the repository.
 
     Parameters
     ----------
