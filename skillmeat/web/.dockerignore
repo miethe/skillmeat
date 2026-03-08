@@ -1,0 +1,19 @@
+# Dependencies
+node_modules
+
+# Build output
+.next
+
+# Environment and secrets
+.env*
+
+# Documentation
+*.md
+
+# Tests
+__tests__
+tests
+coverage
+
+# Storybook
+.storybook
