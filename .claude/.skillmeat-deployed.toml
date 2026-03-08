@@ -2029,8 +2029,42 @@ deployed_at = "2026-03-04T14:34:19.375271"
 artifact_path = "agents/content-curator.md"
 content_hash = "71fcaa5a22397018d2db8f38d36248a308e1d16c5a202fb00be8ae7d402d2ba2"
 local_modifications = false
+version_lineage = [
+    "71fcaa5a22397018d2db8f38d36248a308e1d16c5a202fb00be8ae7d402d2ba2",
+]
 merge_base_snapshot = "71fcaa5a22397018d2db8f38d36248a308e1d16c5a202fb00be8ae7d402d2ba2"
 deployment_profile_id = "claude_code"
 platform = "claude_code"
 profile_root_dir = ".claude"
 collection_sha = "71fcaa5a22397018d2db8f38d36248a308e1d16c5a202fb00be8ae7d402d2ba2"
+
+[[deployed]]
+artifact_name = "devops"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-03-08T16:19:35.238194"
+artifact_path = "skills/devops"
+content_hash = "93b640bc048b2c2a1a31830cec7b5f9d8ab2adfb2a396d4bfab8bafb61c144ca"
+local_modifications = false
+version_lineage = [
+    "93b640bc048b2c2a1a31830cec7b5f9d8ab2adfb2a396d4bfab8bafb61c144ca",
+]
+merge_base_snapshot = "93b640bc048b2c2a1a31830cec7b5f9d8ab2adfb2a396d4bfab8bafb61c144ca"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "93b640bc048b2c2a1a31830cec7b5f9d8ab2adfb2a396d4bfab8bafb61c144ca"
+
+[[deployed]]
+artifact_name = "generating-docker-compose-files"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-03-08T16:20:04.162393"
+artifact_path = "skills/generating-docker-compose-files"
+content_hash = "0771403df7570691f52435644874942d1e4914b9641a761a8d09820e6ff2c1be"
+local_modifications = false
+merge_base_snapshot = "0771403df7570691f52435644874942d1e4914b9641a761a8d09820e6ff2c1be"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "0771403df7570691f52435644874942d1e4914b9641a761a8d09820e6ff2c1be"
