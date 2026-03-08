@@ -27,13 +27,13 @@ This data drives daily decisions about prioritization, bug fixes, and feature co
 cd /path/to/skillmeat
 
 # Start observability stack
-docker-compose -f docker-compose.observability.yml up -d
+docker-compose -f docker-compose.monitoring.yml up -d
 
 # Wait for services to be ready (30 seconds)
 sleep 30
 
 # Verify all services running
-docker-compose -f docker-compose.observability.yml ps
+docker-compose -f docker-compose.monitoring.yml ps
 ```
 
 ### Access Grafana
@@ -349,26 +349,26 @@ Dashboard access is restricted to:
 
 ```bash
 # Check Prometheus is running
-docker-compose -f docker-compose.observability.yml ps prometheus
+docker-compose -f docker-compose.monitoring.yml ps prometheus
 
 # Check Prometheus targets
 curl http://localhost:9090/api/v1/targets
 
 # Restart Prometheus if needed
-docker-compose -f docker-compose.observability.yml restart prometheus
+docker-compose -f docker-compose.monitoring.yml restart prometheus
 ```
 
 ### No logs appearing in Loki
 
 ```bash
 # Check Loki is running
-docker-compose -f docker-compose.observability.yml ps loki
+docker-compose -f docker-compose.monitoring.yml ps loki
 
 # Check log files exist
 ls -la /var/log/skillmeat/
 
 # Restart log collection
-docker-compose -f docker-compose.observability.yml restart loki
+docker-compose -f docker-compose.monitoring.yml restart loki
 ```
 
 ### Dashboard is slow
@@ -378,7 +378,7 @@ docker-compose -f docker-compose.observability.yml restart loki
 docker stats grafana
 
 # If memory usage high, restart Grafana
-docker-compose -f docker-compose.observability.yml restart grafana
+docker-compose -f docker-compose.monitoring.yml restart grafana
 
 # Clean up old data
 docker exec prometheus promtool query instant 'up' | head -100

@@ -134,7 +134,7 @@ with trace_operation("bundle.export", bundle_id="abc123") as span:
 - `docker/grafana-dashboards.yml` - Dashboard provisioning
 - `docker/loki-config.yml` - Loki log aggregation config
 - `docker/promtail-config.yml` - Promtail log shipping config
-- `docker-compose.observability.yml` - Complete observability stack
+- `docker-compose.monitoring.yml` - Complete observability stack
 
 **Dashboard Panels**:
 1. API Request Rate - Request throughput
@@ -420,7 +420,7 @@ docker/
 ├── loki-config.yml                # Loki config
 └── promtail-config.yml            # Promtail config
 
-docker-compose.observability.yml   # Full stack definition
+docker-compose.monitoring.yml   # Full stack definition
 ```
 
 ### Documentation (6 files)

@@ -30,7 +30,7 @@ curl http://localhost:8000/metrics
 docker logs skillmeat-api 2>&1 | jq 'select(.trace_id == "TRACE_ID")'
 
 # Restart observability stack
-docker-compose -f docker-compose.observability.yml restart
+docker-compose -f docker-compose.monitoring.yml restart
 
 # View Prometheus targets
 curl http://localhost:9090/api/v1/targets

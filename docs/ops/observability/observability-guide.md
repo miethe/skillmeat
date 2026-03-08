@@ -51,10 +51,10 @@ The observability stack consists of four pillars:
 
 ```bash
 # Start Prometheus, Grafana, Loki, and Promtail
-docker-compose -f docker-compose.observability.yml up -d
+docker-compose -f docker-compose.monitoring.yml up -d
 
 # Check status
-docker-compose -f docker-compose.observability.yml ps
+docker-compose -f docker-compose.monitoring.yml ps
 ```
 
 ### 2. Access Dashboards
