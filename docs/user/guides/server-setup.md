@@ -486,7 +486,13 @@ psql $DATABASE_URL -c "SELECT count(*) FROM pg_stat_activity;"
 
 ## Configuration Reference
 
-For the complete list of all environment variables, see the [`.env.example`](../../../.env.example) file in the repository root.
+Environment profiles in the repository root provide ready-to-use templates:
+
+| Profile | Command | Use Case |
+|---------|---------|----------|
+| [`.env.example`](../../../.env.example) | `cp .env.example .env` | Local dev, zero-auth |
+| [`.env.local-auth.example`](../../../.env.local-auth.example) | `cp .env.local-auth.example .env` | Small teams, API key auth |
+| [`.env.enterprise.example`](../../../.env.enterprise.example) | `cp .env.enterprise.example .env` | Production, PostgreSQL + Clerk |
 
 Key categories:
 - **Server**: `SKILLMEAT_*`

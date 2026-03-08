@@ -837,4 +837,4 @@ psql -c "SELECT pg_catalog.pg_class.relname FROM pg_catalog.pg_class LEFT JOIN p
 - [Authentication Setup Guide](../guides/authentication-setup.md) — Configure auth modes (zero-auth, Clerk, enterprise PAT, API keys)
 - [Server Setup Guide](../guides/server-setup.md) — Database and deployment configuration
 - [CLI Authentication](../guides/cli/cli-authentication.md) — CLI-specific auth (device code flow, PATs)
-- [Environment Variables](../../../.env.example) — Complete configuration reference
+- Environment profiles: [`.env.example`](../../../.env.example) (local) · [`.env.local-auth.example`](../../../.env.local-auth.example) (local + auth) · [`.env.enterprise.example`](../../../.env.enterprise.example) (production)

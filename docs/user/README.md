@@ -30,7 +30,7 @@ tags:
 - [Authentication Setup](guides/authentication-setup.md) — Configure authentication and RBAC
 - [CLI Authentication](guides/cli/cli-authentication.md) — Device code flow, personal access tokens
 - [GitHub Authentication](guides/github-authentication.md) — GitHub PAT for marketplace and discovery
-- [Environment Variables](../../.env.example) — Complete `.env.example` reference
+- Environment profiles: [`.env.example`](../../.env.example) (local) · [`.env.local-auth.example`](../../.env.local-auth.example) (local + auth) · [`.env.enterprise.example`](../../.env.enterprise.example) (production)
 
 ## Migration
 
