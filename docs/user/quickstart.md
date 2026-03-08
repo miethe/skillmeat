@@ -1,6 +1,19 @@
+---
+title: "Quickstart Guide"
+description: "Get started with SkillMeat in 5 minutes: install, create a collection, add artifacts, and deploy to your project"
+domain: "getting-started"
+category: "quickstart"
+subcategory: "setup"
+created: 2025-12-20
+last_updated: 2026-03-08
+tags: ["quickstart", "setup", "installation", "getting-started"]
+---
+
 # SkillMeat Quickstart Guide
 
 Get started with SkillMeat in 5 minutes. This guide covers the essentials to create your first collection and deploy artifacts.
+
+> **This guide uses zero-auth local mode** — the default with no authentication required. For team or production deployments, see [Authentication Setup](guides/authentication-setup.md) and [Server Setup](guides/server-setup.md) after completing this quickstart.
 
 ## Installation
 
@@ -143,9 +156,10 @@ skillmeat snapshot "Before cleanup"
 
 ## Next Steps
 
-- Read the [Commands Reference](commands.md) for all available commands
-- Check out [Examples](examples.md) for real-world workflows
-- Learn about [Migration from skillman](migration.md) if you're upgrading
+- **[Server Setup Guide](guides/server-setup.md)** — Configure database, production deployment, and feature flags
+- **[Authentication Setup Guide](guides/authentication-setup.md)** — Enable auth for teams or production (Clerk JWT, API keys, enterprise PAT)
+- **[Commands Reference](guides/cli/commands.md)** — All available CLI commands
+- **[Examples](examples.md)** — Real-world workflows
 
 ## Configuration
 
@@ -262,7 +276,9 @@ You now know how to:
 
 ### Continue Learning
 
-- **[Commands Reference](commands.md)** - Complete list of all CLI commands
-- **[Web Interface Guide](web-guide.md)** - Using the visual interface
-- **[Integration Examples](examples.md)** - Real-world workflows
-- **[Troubleshooting Guide](troubleshooting.md)** - Common issues and solutions
+- **[Server Setup Guide](guides/server-setup.md)** — Local vs enterprise deployment, database configuration
+- **[Authentication Setup Guide](guides/authentication-setup.md)** — Enable authentication for teams or production
+- **[CLI Authentication Guide](guides/cli/cli-authentication.md)** — Device code flow and PATs for CLI
+- **[Commands Reference](guides/cli/commands.md)** — Complete list of all CLI commands
+- **[Web Interface Guide](guides/web-ui-guide.md)** — Using the visual interface
+- **[Integration Examples](examples.md)** — Real-world workflows

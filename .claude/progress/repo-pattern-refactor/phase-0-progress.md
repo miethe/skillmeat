@@ -69,7 +69,7 @@ tasks:
   estimate: 0.5 pts
 - id: TASK-0.8
   title: Run full test suite and document pre-existing failures
-  status: in_progress
+  status: completed
   assigned_to:
   - task-completion-validator
   dependencies:
@@ -98,7 +98,6 @@ in_progress_tasks: 1
 blocked_tasks: 0
 progress: 87
 ---
-
 # Phase 0: Test Scaffolding & Prerequisites — Progress
 
 ## Purpose

@@ -2,7 +2,7 @@
 title: "User Documentation Index"
 description: "Start here for user-facing guides, CLI references, and release notes."
 created: 2025-12-20
-updated: 2026-02-21
+updated: 2026-03-08
 status: published
 priority: high
 audience: users,developers
@@ -18,23 +18,36 @@ tags:
 
 ## Start Here
 
-- Quickstart: `docs/user/quickstart.md`
-- CLI commands: `docs/user/cli/commands.md`
-- Multi-platform deployment upgrade: `docs/migration/multi-platform-deployment-upgrade.md`
-- claudectl guide: `docs/claudectl-guide.md` (comprehensive reference for simplified CLI)
-- Web CLI commands: `docs/user/cli/web-commands.md`
+- [Quickstart](quickstart.md) — Get started in 5 minutes (local, zero-auth)
+- [Server Setup Guide](guides/server-setup.md) — Local vs enterprise deployment, database, production config
+- [Authentication Setup Guide](guides/authentication-setup.md) — Auth modes: zero-auth, Clerk JWT, enterprise PAT, API keys
+- [CLI Commands](guides/cli/commands.md) — Complete CLI reference
+- [Web CLI Commands](guides/cli/web-commands.md) — Web server commands
+
+## Setup & Deployment
+
+- [Server Setup](guides/server-setup.md) — Database, environment variables, production deployment
+- [Authentication Setup](guides/authentication-setup.md) — Configure authentication and RBAC
+- [CLI Authentication](guides/cli/cli-authentication.md) — Device code flow, personal access tokens
+- [GitHub Authentication](guides/github-authentication.md) — GitHub PAT for marketplace and discovery
+- [Environment Variables](../../.env.example) — Complete `.env.example` reference
+
+## Migration
+
+- [Zero-Auth to Authenticated](migration/zero-auth-to-authenticated.md) — Step-by-step auth migration
+- [Multi-Platform Deployment Upgrade](migration/multi-platform-deployment-upgrade.md) — Platform upgrade guide
 
 ## Guides and Reference
 
-- Guides: `docs/user/guides/`
-- Analytics & Insights guide: `docs/user/guides/using-analytics.md`
-- Memory & Context overview: `docs/user/guides/memory-context-system.md`
-- Memory Inbox guide: `docs/user/guides/memory-inbox.md`
-- Context Modules guide: `docs/user/guides/context-modules.md`
-- Workflow CLI Reference: `docs/user/guides/workflow-cli-reference.md`
-- Workflow Authoring Guide: `docs/user/guides/workflow-authoring.md`
+- [Web Interface Guide](guides/web-ui-guide.md) — Using the visual interface
+- [Analytics & Insights](guides/using-analytics.md) — Usage analytics
+- [Memory & Context](guides/memory-context-system.md) — Memory system overview
+- [Memory Inbox](guides/memory-inbox.md) — Memory inbox guide
+- [Context Modules](guides/context-modules.md) — Context module management
+- [Workflow CLI Reference](guides/workflow-cli-reference.md) — Workflow commands
+- [Workflow Authoring](guides/workflow-authoring.md) — Creating workflows
+- [Examples](examples.md) — Real-world workflows
 - Release notes: `docs/user/release-notes/`
-- Examples: `docs/user/examples.md`
 
 ## Programs and Assets
 

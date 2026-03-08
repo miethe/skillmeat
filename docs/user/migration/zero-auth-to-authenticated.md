@@ -1,13 +1,12 @@
 ---
 title: "Migration Guide: Zero-Auth to Authenticated Mode"
 description: "Step-by-step guide to upgrade SkillMeat from zero-authentication local mode to authenticated mode with user and team management."
-audience: "operators, platform engineers"
-tags: ["authentication", "rbac", "migration", "database", "deployment", "zero-auth", "bearer-auth", "clerk"]
+domain: "operations"
+category: "migration"
+subcategory: "authentication"
 created: 2026-03-07
-updated: 2026-03-07
-category: "operations"
-status: "published"
-related: ["docs/architecture/authentication-rbac.md", "docs/api/auth-endpoints.md", "skillmeat/api/config.py"]
+last_updated: 2026-03-08
+tags: ["authentication", "rbac", "migration", "database", "deployment", "zero-auth", "bearer-auth", "clerk"]
 ---
 
 # Migration Guide: Zero-Auth to Authenticated Mode
@@ -654,7 +653,7 @@ alembic current
 2. Test with `auth_enabled=false` (new schema, old behavior)
 3. Enable `auth_enabled=true` when ready (all endpoints protected)
 
-As a workaround, you can temporarily expose specific endpoints by modifying `excluded_paths` in `AuthMiddleware` (see `skillmeat/api/middleware/auth.py`).
+As a workaround, you can temporarily expose specific endpoints by modifying the `excluded_paths` list in the auth middleware configuration and restarting the server.
 
 ### Q: What happens to API keys after migration?
 
@@ -670,7 +669,7 @@ Both can be enabled simultaneously. Choose the one that fits your deployment.
 - **Local** (`"local"`): Simple bearer token validation; suitable for development and internal deployments
 - **Clerk** (`"clerk"`): OAuth/OIDC integration; recommended for production and multi-user deployments
 
-If neither fits, you can extend SkillMeat with a custom provider (see `skillmeat/core/auth/providers.py`).
+If neither fits, you can implement a custom authentication provider (see the developer documentation for details).
 
 ### Q: Can I migrate from local mode to enterprise mode later?
 
@@ -776,7 +775,7 @@ After successful migration:
 4. **Train users** on the new auth requirement and how to obtain tokens
 5. **Monitor artifact visibility** — ensure sensitive artifacts aren't unintentionally public
 
-For multi-tenant enterprise deployments, continue with PRD-2 Phase 2 (TeamContext dependency injection for multi-tenant isolation).
+For multi-tenant enterprise deployments, multi-tenant isolation features are planned for a future release.
 
 ---
 
@@ -833,12 +832,9 @@ psql -c "SELECT pg_catalog.pg_class.relname FROM pg_catalog.pg_class LEFT JOIN p
 
 ---
 
-## Contacts and Resources
+## Related Guides
 
-For issues, questions, or contributions:
-
-- **GitHub Issues:** [SkillMeat Issues](https://github.com/anthropics/skillmeat/issues)
-- **Documentation:** [SkillMeat Docs](https://github.com/anthropics/skillmeat/tree/main/docs)
-- **Configuration Reference:** `skillmeat/api/config.py`
-- **Auth Provider Code:** `skillmeat/core/auth/`
-- **Migration Files:** `skillmeat/cache/migrations/versions/`
+- [Authentication Setup Guide](../guides/authentication-setup.md) — Configure auth modes (zero-auth, Clerk, enterprise PAT, API keys)
+- [Server Setup Guide](../guides/server-setup.md) — Database and deployment configuration
+- [CLI Authentication](../guides/cli/cli-authentication.md) — CLI-specific auth (device code flow, PATs)
+- [Environment Variables](../../../.env.example) — Complete configuration reference
