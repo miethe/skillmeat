@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
+from skillmeat import __version__ as SKILLMEAT_VERSION
 from skillmeat.core.deployment import DeploymentManager
 from skillmeat.core.sync import SyncManager
 from skillmeat.core.artifact import Artifact, ArtifactMetadata, ArtifactType
@@ -60,11 +61,11 @@ class TestSyncVersionCapture:
 
         # Create deployment metadata
         metadata_file = claude_dir / ".skillmeat-deployed.toml"
-        metadata_file.write_text("""
+        metadata_file.write_text(f"""
 [deployment]
 collection = "default"
 deployed-at = "2024-01-01T00:00:00Z"
-skillmeat-version = "0.3.0"
+skillmeat-version = "{SKILLMEAT_VERSION}"
 
 [[artifacts]]
 name = "test-skill"
@@ -112,11 +113,11 @@ deployed-from = "/tmp/collection"
 
         # Create deployment metadata
         metadata_file = claude_dir / ".skillmeat-deployed.toml"
-        metadata_file.write_text("""
+        metadata_file.write_text(f"""
 [deployment]
 collection = "default"
 deployed-at = "2024-01-01T00:00:00Z"
-skillmeat-version = "0.3.0"
+skillmeat-version = "{SKILLMEAT_VERSION}"
 """)
 
         # Mock deployment record with from_collection attribute
@@ -195,11 +196,11 @@ skillmeat-version = "0.3.0"
         claude_dir.mkdir()
 
         metadata_file = claude_dir / ".skillmeat-deployed.toml"
-        metadata_file.write_text("""
+        metadata_file.write_text(f"""
 [deployment]
 collection = "default"
 deployed-at = "2024-01-01T00:00:00Z"
-skillmeat-version = "0.3.0"
+skillmeat-version = "{SKILLMEAT_VERSION}"
 """)
 
         # Create the artifact path so it exists for pullable detection

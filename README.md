@@ -1,6 +1,6 @@
 <!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
 <!-- GENERATED: 2026-03-01T17:59:42.251Z -->
-<!-- VERSION: 0.3.0-beta -->
+<!-- VERSION: 0.9.0 -->
 
 <!-- BEGIN:hero -->
 # SkillMeat

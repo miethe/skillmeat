@@ -141,7 +141,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Version</span>
                   <span className="text-sm text-muted-foreground">
-                    {process.env.NEXT_PUBLIC_APP_VERSION || '0.3.0-alpha'}
+                    {process.env.NEXT_PUBLIC_APP_VERSION || '0.9.0'}
                   </span>
                 </div>
               </div>

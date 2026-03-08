@@ -1,6 +1,6 @@
 {
   "$schema": "./features.schema.json",
-  "version": "0.3.0-beta",
+  "version": "0.9.0",
   "lastUpdated": "2026-02-25",
   "categories": [
     {
@@ -81,7 +81,7 @@
           "shortDescription": "Profile-aware deploy",
           "cliCommand": "skillmeat deploy --profile codex",
           "webPage": "/deployments",
-          "since": "0.3.0"
+          "since": "0.7.0"
         },
         {
           "id": "project-management",
@@ -113,7 +113,7 @@
           "description": "Create named sets of artifacts, groups, and nested sets for reusable deployment bundles",
           "shortDescription": "Composable deployment bundles",
           "webPage": "/deployment-sets",
-          "since": "0.3.0",
+          "since": "0.7.0",
           "highlight": true
         },
         {
@@ -122,7 +122,7 @@
           "description": "Sets can contain individual artifacts, groups, and other sets with circular-reference detection",
           "shortDescription": "Sets within sets",
           "webPage": "/deployment-sets",
-          "since": "0.3.0"
+          "since": "0.7.0"
         },
         {
           "id": "batch-deploy",
@@ -130,7 +130,7 @@
           "description": "Deploy all resolved artifacts from a set to a project and profile in a single action",
           "shortDescription": "One-click set deployment",
           "webPage": "/deployment-sets",
-          "since": "0.3.0",
+          "since": "0.7.0",
           "highlight": true
         },
         {
@@ -139,7 +139,7 @@
           "description": "Tabbed modal with Overview and Members tabs, inline editing, colored tags, and member management",
           "shortDescription": "Rich modal-based management",
           "webPage": "/deployment-sets",
-          "since": "0.3.0"
+          "since": "0.7.0"
         },
         {
           "id": "minified-member-cards",
@@ -147,7 +147,7 @@
           "description": "Compact artifact cards with already-selected state for quick member browsing and selection",
           "shortDescription": "Compact member preview",
           "webPage": "/deployment-sets",
-          "since": "0.3.0"
+          "since": "0.7.0"
         }
       ]
     },
@@ -223,7 +223,7 @@
           "description": "Browse repository artifacts in an intuitive folder tree with README previews",
           "shortDescription": "Browse folder structure",
           "webPage": "/marketplace/sources/[id]",
-          "since": "0.3.0",
+          "since": "0.5.0",
           "screenshot": "marketplace-source-detail.png"
         },
         {
@@ -339,7 +339,7 @@
           "shortDescription": "Intelligent scoring",
           "cliCommand": "skillmeat similar",
           "webPage": "/collection/[id]",
-          "since": "0.3.0",
+          "since": "0.8.0",
           "highlight": true
         },
         {
@@ -348,7 +348,7 @@
           "description": "Similarity results pre-computed at sync time with FTS5 pre-filtering. Sub-200ms cached responses with X-Cache headers and cache-age indicators",
           "shortDescription": "Sub-200ms cached results",
           "webPage": "/collection/[id]",
-          "since": "0.3.0",
+          "since": "0.8.0",
           "highlight": true
         },
         {
@@ -356,7 +356,7 @@
           "name": "Optional Semantic Embeddings",
           "description": "Install sentence-transformers via pip install skillmeat[semantic] for cosine-similarity scoring with all-MiniLM-L6-v2 embeddings",
           "shortDescription": "Optional embeddings",
-          "since": "0.3.0"
+          "since": "0.8.0"
         },
         {
           "id": "collection-consolidation",
@@ -365,7 +365,7 @@
           "shortDescription": "Merge duplicates",
           "cliCommand": "skillmeat consolidate",
           "webPage": "/consolidation",
-          "since": "0.3.0"
+          "since": "0.8.0"
         },
         {
           "id": "similarity-score-tuning",
@@ -373,7 +373,7 @@
           "description": "Fine-tune similarity thresholds with --min-score and --limit options for precise deduplication",
           "shortDescription": "Tunable detection",
           "cliCommand": "skillmeat similar --min-score",
-          "since": "0.3.0"
+          "since": "0.8.0"
         }
       ]
     },
@@ -473,7 +473,7 @@
           "description": "Triage project-scoped memory items with keyboard-first review actions and lifecycle governance",
           "shortDescription": "Review project memory",
           "webPage": "/projects/[id]/memory",
-          "since": "0.4.0",
+          "since": "0.7.0",
           "highlight": true
         },
         {
@@ -482,7 +482,7 @@
           "description": "Create reusable selector-based modules to curate memory for specific workflows",
           "shortDescription": "Reusable context modules",
           "webPage": "/projects/[id]/memory",
-          "since": "0.4.0"
+          "since": "0.7.0"
         },
         {
           "id": "context-pack-preview",
@@ -490,7 +490,7 @@
           "description": "Preview and generate token-budgeted context packs before agent execution",
           "shortDescription": "Budgeted context packs",
           "webPage": "/projects/[id]/memory",
-          "since": "0.4.0"
+          "since": "0.7.0"
         },
         {
           "id": "entity-type-configuration",
@@ -498,7 +498,7 @@
           "description": "Configure entity types in Settings with customizable path patterns, required frontmatter, and content templates",
           "shortDescription": "Configurable entity types",
           "webPage": "/settings/entity-types",
-          "since": "0.4.0",
+          "since": "0.8.0",
           "highlight": true
         },
         {
@@ -507,7 +507,7 @@
           "description": "Create custom entity types without code changes—define path patterns, frontmatter requirements, and content templates in Settings",
           "shortDescription": "User-defined types",
           "webPage": "/settings/entity-types",
-          "since": "0.4.0"
+          "since": "0.8.0"
         },
         {
           "id": "enhanced-creation-form",
@@ -515,7 +515,7 @@
           "description": "Create context entities with platform-aware path patterns, inline validation hints, auto-injected templates, and multi-select categories",
           "shortDescription": "Smart entity creation",
           "webPage": "/context-entities",
-          "since": "0.4.0",
+          "since": "0.8.0",
           "highlight": true
         },
         {
@@ -524,14 +524,14 @@
           "description": "Assign multiple categories to entities with inline category creation for flexible organization and discovery",
           "shortDescription": "Flexible categorization",
           "webPage": "/context-entities",
-          "since": "0.4.0"
+          "since": "0.8.0"
         },
         {
           "id": "platform-aware-deployment",
           "name": "Platform-Aware Deployment",
           "description": "Deploy context entities to multiple platforms with automatic path and frontmatter adaptation per platform",
           "shortDescription": "Multi-platform assembly",
-          "since": "0.4.0"
+          "since": "0.8.0"
         }
       ]
     },
@@ -581,7 +581,7 @@
           "shortDescription": "One-click plugin import",
           "cliCommand": "skillmeat add",
           "webPage": "/collection",
-          "since": "0.4.0",
+          "since": "0.7.0",
           "highlight": true
         },
         {
@@ -589,14 +589,14 @@
           "name": "Composite Detection",
           "description": "Automatically detect plugin roots in repositories via plugin.json manifests or heuristic scanning",
           "shortDescription": "Auto-detect plugins",
-          "since": "0.4.0"
+          "since": "0.7.0"
         },
         {
           "id": "deduplication",
           "name": "Hash-Based Deduplication",
           "description": "SHA-256 content hashing prevents duplicate artifacts when importing plugins that share children",
           "shortDescription": "Smart dedup",
-          "since": "0.4.0"
+          "since": "0.7.0"
         },
         {
           "id": "relationship-browsing",
@@ -604,7 +604,7 @@
           "description": "Browse parent-child relationships with Contains tab and Part of section on artifact detail pages",
           "shortDescription": "Navigate relationships",
           "webPage": "/collection/[id]",
-          "since": "0.4.0"
+          "since": "0.7.0"
         },
         {
           "id": "plugin-deployment",
@@ -612,7 +612,7 @@
           "description": "Deploy entire plugins to projects with version conflict detection and resolution",
           "shortDescription": "Deploy plugins",
           "cliCommand": "skillmeat deploy",
-          "since": "0.4.0"
+          "since": "0.7.0"
         },
         {
           "id": "bundle-export",
@@ -620,7 +620,7 @@
           "description": "Export composite artifacts as shareable bundles including all children",
           "shortDescription": "Export as bundle",
           "cliCommand": "skillmeat export",
-          "since": "0.4.0"
+          "since": "0.7.0"
         }
       ]
     },
@@ -637,7 +637,7 @@
           "shortDescription": "Visual workflow design",
           "cliCommand": "skillmeat workflow create",
           "webPage": "/workflows/builder",
-          "since": "0.5.0",
+          "since": "0.8.0",
           "highlight": true
         },
         {
@@ -646,7 +646,7 @@
           "description": "Validate workflow schemas, detect cycles, and check agent/MCP compatibility before execution",
           "shortDescription": "Schema & cycle validation",
           "cliCommand": "skillmeat workflow validate",
-          "since": "0.5.0"
+          "since": "0.8.0"
         },
         {
           "id": "workflow-planning",
@@ -654,7 +654,7 @@
           "description": "Generate optimized execution plans with dependency resolution, parallelization strategy, and resource estimation",
           "shortDescription": "Smart execution planning",
           "cliCommand": "skillmeat workflow plan",
-          "since": "0.5.0"
+          "since": "0.8.0"
         },
         {
           "id": "workflow-execution",
@@ -662,7 +662,7 @@
           "description": "Execute workflows with real-time execution tracking, variable interpolation, and conditional branching",
           "shortDescription": "Execute with tracking",
           "cliCommand": "skillmeat workflow run",
-          "since": "0.5.0",
+          "since": "0.8.0",
           "highlight": true
         },
         {
@@ -671,7 +671,7 @@
           "description": "Real-time execution monitoring with timeline visualization, live logs, and execution metrics",
           "shortDescription": "Real-time monitoring",
           "webPage": "/executions",
-          "since": "0.5.0"
+          "since": "0.8.0"
         },
         {
           "id": "workflow-library",
@@ -679,7 +679,7 @@
           "description": "Browse, search, and manage saved workflows with version history and sharing support",
           "shortDescription": "Saved workflows browser",
           "webPage": "/workflows",
-          "since": "0.5.0",
+          "since": "0.8.0",
           "highlight": true
         },
         {
@@ -688,7 +688,7 @@
           "description": "Version control for workflows with snapshots, comparisons, and rollback capabilities",
           "shortDescription": "Version history & rollback",
           "cliCommand": "skillmeat workflow show",
-          "since": "0.5.0"
+          "since": "0.8.0"
         },
         {
           "id": "workflow-export",
@@ -696,7 +696,7 @@
           "description": "Export workflows as YAML, JSON, or packaged bundles for sharing and distribution",
           "shortDescription": "Export as YAML/JSON",
           "cliCommand": "skillmeat workflow export",
-          "since": "0.5.0"
+          "since": "0.8.0"
         }
       ]
     },

@@ -5,7 +5,7 @@ across multiple projects with intelligent collection management, upstream tracki
 and flexible deployment strategies.
 """
 
-__version__ = "0.1.0-alpha"
+__version__ = "0.9.0"
 __author__ = "SkillMeat Contributors"
 __license__ = "MIT"
 

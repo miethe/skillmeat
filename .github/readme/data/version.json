@@ -1,20 +1,50 @@
 {
-  "current": "0.3.0-beta",
-  "releaseDate": "2026-01-29",
+  "current": "0.9.0",
+  "releaseDate": "2026-03-08",
   "previousVersions": [
     {
-      "version": "0.2.0-alpha",
-      "releaseDate": "2025-12-15",
-      "highlights": ["Intelligence & Sync features", "Analytics", "Marketplace integration"]
+      "version": "0.8.0",
+      "releaseDate": "2026-03-06",
+      "highlights": ["Enterprise DB storage (PostgreSQL)", "Repository pattern refactor", "Workflow orchestration"]
+    },
+    {
+      "version": "0.7.0",
+      "releaseDate": "2026-02-19",
+      "highlights": ["Composite artifacts", "Memory system v2", "Multi-platform deployments"]
+    },
+    {
+      "version": "0.6.0",
+      "releaseDate": "2026-02-05",
+      "highlights": ["Unified sync workflow", "Data-flow standardization", "Metadata cache"]
+    },
+    {
+      "version": "0.5.0",
+      "releaseDate": "2026-01-28",
+      "highlights": ["Entity consolidation", "Cross-source search", "Marketplace enhancements"]
+    },
+    {
+      "version": "0.4.0",
+      "releaseDate": "2025-12-19",
+      "highlights": ["Marketplace ingestion", "Versioning/merge v1.5", "Collections navigation"]
+    },
+    {
+      "version": "0.3.0",
+      "releaseDate": "2025-11-25",
+      "highlights": ["Entity lifecycle", "Frontend UI", "Web UI consolidation"]
+    },
+    {
+      "version": "0.2.0",
+      "releaseDate": "2025-11-16",
+      "highlights": ["Intelligence & Sync", "Diff/merge engine", "Similarity search"]
     },
     {
       "version": "0.1.0",
-      "releaseDate": "2025-11-01",
+      "releaseDate": "2025-11-08",
       "highlights": ["Initial release", "Collection management", "GitHub integration"]
     }
   ],
   "upcoming": {
-    "version": "0.4.0",
-    "plannedFeatures": ["Enhanced marketplace", "Team sharing", "Collection sync across machines"]
+    "version": "1.0.0",
+    "plannedFeatures": ["Enterprise edition validation", "Production auth/RBAC testing", "Performance benchmarks at scale"]
   }
 }

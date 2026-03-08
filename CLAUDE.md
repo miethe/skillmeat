@@ -384,7 +384,7 @@ SkillMeat's memory system stores project-level development knowledge (patterns, 
 
 ## Architecture Overview
 
-**Full-Stack Web Application** (v0.3.0-beta)
+**Full-Stack Web Application** (v0.9.0)
 
 ```
 skillmeat/
@@ -658,6 +658,9 @@ Never use PyGithub directly; always go through the wrapper.
 - `.claude/context/api-endpoint-mapping.md` - Full API reference
 - `.claude/context/symbol-usage-guide.md` - Symbol query patterns
 - `.claude/context/stub-patterns.md` - Frontend stubs catalog
+
+**Specs** (load for specific procedures):
+- `.claude/specs/version-bump-spec.md` - Version bump procedure, all locations, validation checklist
 
 **Staleness Hook**: `.claude/hooks/check-context-staleness.sh` (pre-commit warning)
 

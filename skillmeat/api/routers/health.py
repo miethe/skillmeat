@@ -42,7 +42,7 @@ class HealthStatus(BaseModel):
     )
     version: str = Field(
         description="SkillMeat version",
-        examples=["0.1.0-alpha"],
+        examples=[skillmeat_version],
     )
     environment: str = Field(
         description="Application environment",

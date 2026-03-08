@@ -227,7 +227,7 @@ EOF
 
 ```bash
 # After merge commit exists on main:
-git tag -a v0.9.0 <merge-commit-sha> -m "v0.9.0: AAA/RBAC foundation - auth providers, tenant isolation, RBAC scopes"
+git tag -a v0.9.0 95326e22fe70305a6b1c34c90c455552c39eb0d6 -m "v0.9.0: AAA/RBAC foundation - auth providers, tenant isolation, RBAC scopes"
 git push origin v0.9.0
 
 gh release create v0.9.0 --title "v0.9.0: AAA/RBAC Foundation" --notes "$(cat <<'EOF'

@@ -15,11 +15,13 @@ def test_import_skillmeat():
 
 
 def test_version():
-    """Test that version is defined and correct."""
+    """Test that version is defined and follows semver format."""
+    import re
     import skillmeat
 
-    assert skillmeat.__version__ == "0.1.0-alpha"
-    assert skillmeat.VERSION == "0.1.0-alpha"
+    assert skillmeat.__version__ is not None
+    assert skillmeat.VERSION == skillmeat.__version__
+    assert re.match(r"^\d+\.\d+\.\d+", skillmeat.__version__)
 
 
 def test_cli_entry_point():
@@ -73,7 +75,8 @@ def test_cli_version():
     result = runner.invoke(main, ["--version"])
 
     assert result.exit_code == 0
-    assert "0.1.0-alpha" in result.output
+    import skillmeat
+    assert skillmeat.__version__ in result.output
 
 
 def test_cli_init_placeholder():

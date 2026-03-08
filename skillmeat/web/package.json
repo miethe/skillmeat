@@ -1,6 +1,6 @@
 {
   "name": "skillmeat-web",
-  "version": "0.3.0-alpha",
+  "version": "0.9.0",
   "description": "SkillMeat Web Interface - Collection browser and management dashboard",
   "private": true,
   "scripts": {

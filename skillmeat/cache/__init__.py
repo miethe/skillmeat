@@ -39,7 +39,7 @@ Example:
     >>> job.start_scheduler()
 """
 
-__version__ = "0.1.0"
+from skillmeat import __version__
 
 from skillmeat.cache.collection_cache import (
     CollectionCountCache,

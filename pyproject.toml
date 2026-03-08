@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skillmeat"
-version = "0.3.0-beta"
+version = "0.9.0"
 description = "Personal collection manager for Claude Code artifacts (Skills, Commands, Agents, MCP, Hooks)"
 readme = "README.md"
 license = {file = "LICENSE"}

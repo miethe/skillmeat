@@ -74,7 +74,7 @@ export class SkillMeatClient {
   ) {
     this.request = new HttpRequest({
       BASE: config?.BASE ?? 'http://localhost:8080',
-      VERSION: config?.VERSION ?? '0.1.0-alpha',
+      VERSION: config?.VERSION ?? '0.9.0',
       WITH_CREDENTIALS: config?.WITH_CREDENTIALS ?? false,
       CREDENTIALS: config?.CREDENTIALS ?? 'include',
       TOKEN: config?.TOKEN,

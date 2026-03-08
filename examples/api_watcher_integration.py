@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 app = FastAPI(
     title="SkillMeat API",
     description="Personal collection manager for Claude Code artifacts",
-    version="0.3.0-beta",
+    version="0.9.0",
     lifespan=lifespan,
 )
 
@@ -113,7 +113,7 @@ async def health_check() -> dict:
     return {
         "status": "healthy",
         "service": "skillmeat-api",
-        "version": "0.3.0-beta",
+        "version": "0.9.0",
         "cache": {
             "repository": "active" if cache_repo else "inactive",
             "watcher": watcher_status,

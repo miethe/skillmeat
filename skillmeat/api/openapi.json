@@ -3,9 +3,9 @@
   "info": {
     "title": "SkillMeat API",
     "description": "REST API for SkillMeat collection manager",
-    "version": "0.1.0-alpha",
+    "version": "0.9.0",
     "x-api-version": "v1",
-    "x-package-version": "0.1.0-alpha"
+    "x-package-version": "0.9.0"
   },
   "paths": {
     "/health": {
@@ -36864,7 +36864,7 @@
             "title": "Version",
             "description": "SkillMeat version",
             "examples": [
-              "0.1.0-alpha"
+              "0.9.0"
             ]
           },
           "environment": {
@@ -40712,7 +40712,7 @@
             "title": "Version",
             "description": "SkillMeat version",
             "examples": [
-              "0.1.0-alpha"
+              "0.9.0"
             ]
           },
           "environment": {
