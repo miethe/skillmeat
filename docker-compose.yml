@@ -1,0 +1,143 @@
+# Docker Compose configuration for SkillMeat
+#
+# Three profiles cover local development through enterprise deployment:
+#
+#   local        -- API + Web with SQLite backend (zero-config)
+#   local-auth   -- API + Web with SQLite + Clerk authentication
+#   enterprise   -- API + Web + PostgreSQL with full auth
+#
+# QUICK START
+#   1. Copy the appropriate env example:
+#        cp .env.local.example .env        # local profile
+#        cp .env.local-auth.example .env   # local-auth profile
+#        cp .env.enterprise.example .env   # enterprise profile
+#
+#   2. Start services:
+#        docker compose --profile local up
+#        docker compose --profile local-auth up
+#        docker compose --profile enterprise up
+#
+#   3. Tear down (preserve volumes):
+#        docker compose down
+#
+#   4. Tear down + wipe data:
+#        docker compose down -v
+
+services:
+  # ===================================================================
+  # SKILLMEAT-API -- FastAPI Backend
+  # ===================================================================
+  skillmeat-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles:
+      - local
+      - local-auth
+      - enterprise
+    ports:
+      - "${SKILLMEAT_API_PORT:-8080}:8080"
+    env_file:
+      - .env
+    environment:
+      - SKILLMEAT_HOST=0.0.0.0
+      - SKILLMEAT_PORT=8080
+    volumes:
+      - skillmeat-data:/home/app/.skillmeat
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ===================================================================
+  # SKILLMEAT-WEB -- Next.js Frontend
+  # ===================================================================
+  skillmeat-web:
+    build:
+      context: skillmeat/web
+      dockerfile: Dockerfile
+    profiles:
+      - local
+      - local-auth
+      - enterprise
+    ports:
+      - "${SKILLMEAT_WEB_PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      # Internal service-to-service URL (SSR / server components)
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://skillmeat-api:8080}
+      - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      skillmeat-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ===================================================================
+  # POSTGRES -- PostgreSQL Database (enterprise profile only)
+  # ===================================================================
+  postgres:
+    image: postgres:16-alpine
+    profiles:
+      - enterprise
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_USER=skillmeat
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-skillmeat}
+      - POSTGRES_DB=skillmeat
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skillmeat -d skillmeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+# ===================================================================
+# VOLUMES
+# ===================================================================
+volumes:
+  skillmeat-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+# ===================================================================
+# USAGE REFERENCE
+# ===================================================================
+# Local development (SQLite, no auth):
+#   docker compose --profile local up
+#
+# Local with Clerk auth:
+#   docker compose --profile local-auth up
+#
+# Enterprise (Postgres + auth):
+#   docker compose --profile enterprise up
+#
+# Build and start fresh:
+#   docker compose --profile local up --build
+#
+# View logs for a single service:
+#   docker compose logs -f skillmeat-api
+#
+# Override ports:
+#   SKILLMEAT_API_PORT=9080 SKILLMEAT_WEB_PORT=4000 \
+#     docker compose --profile local up
+#
+# Stop all services (data preserved):
+#   docker compose down
+#
+# Stop and wipe all data:
+#   docker compose down -v
