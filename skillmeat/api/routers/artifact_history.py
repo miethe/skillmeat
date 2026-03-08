@@ -18,8 +18,11 @@ from skillmeat.api.dependencies import (
     ConfigManagerDep,
     DbArtifactHistoryRepoDep,
     verify_api_key,
+    get_auth_context,
+    require_auth,
 )
 from skillmeat.api.middleware.auth import TokenDep
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.artifacts import (
     ArtifactHistoryEventResponse,
     ArtifactHistoryResponse,
@@ -421,6 +424,7 @@ async def get_artifact_history(
         le=2000,
         description="Maximum number of events returned",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ArtifactHistoryResponse:
     """Get unified artifact history timeline for modal History tabs."""
     artifact_type, artifact_name, artifact_uuid = _parse_artifact_id(artifact_id)

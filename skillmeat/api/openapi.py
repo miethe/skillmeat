@@ -17,6 +17,58 @@ from skillmeat import __version__ as skillmeat_version
 logger = logging.getLogger(__name__)
 
 
+_BEARER_AUTH_DESCRIPTION = """
+JWT Bearer token authentication. Send the token in the `Authorization: Bearer <token>` header.
+
+**Supported providers**: `local` (SkillMeat-issued PATs) and `clerk` (Clerk.dev JWTs).
+
+### Available Scopes
+
+| Scope | Description |
+|-------|-------------|
+| `artifact:read` | Read artifact data |
+| `artifact:write` | Create, update, and delete artifacts |
+| `collection:read` | Read collection data |
+| `collection:write` | Create, update, and delete collections |
+| `deployment:read` | Read deployment data |
+| `deployment:write` | Create, update, and delete deployments |
+| `admin:*` | Full administrative access (wildcard — grants all scopes) |
+
+### Roles
+
+| Role | Description |
+|------|-------------|
+| `system_admin` | Full system access (service accounts only) |
+| `team_admin` | Team administration |
+| `team_member` | Standard team member |
+| `viewer` | Read-only access |
+
+### Auth Bypass
+
+When `auth_enabled=false` (development default), the server accepts all requests
+without credentials. Set `SKILLMEAT_AUTH_ENABLED=true` to enforce authentication.
+"""
+
+#: Routers that are intentionally public (no Bearer token required).
+_PUBLIC_PATH_PREFIXES = (
+    "/health",
+    "/api/v1/settings",
+    "/api/v1/cache",
+    "/metrics",
+    "/",
+    "/docs",
+    "/redoc",
+)
+
+
+def _is_public_path(path: str) -> bool:
+    """Return True when *path* is explicitly excluded from auth requirements."""
+    return any(
+        path == prefix or path.startswith(prefix + "/")
+        for prefix in _PUBLIC_PATH_PREFIXES
+    )
+
+
 def generate_openapi_spec(app, api_version: str = "v1") -> Dict:
     """Generate OpenAPI specification from FastAPI app.
 
@@ -54,19 +106,57 @@ def generate_openapi_spec(app, api_version: str = "v1") -> Dict:
         },
     ]
 
-    # Add security schemes if not already present
+    # Ensure components section exists
     if "components" not in openapi_schema:
         openapi_schema["components"] = {}
 
+    # Merge security schemes: preserve any FastAPI-generated schemes (APIKeyHeader,
+    # HTTPBearer) and add/overwrite BearerAuth with full scope+role documentation.
     if "securitySchemes" not in openapi_schema["components"]:
-        openapi_schema["components"]["securitySchemes"] = {
-            "BearerAuth": {
-                "type": "http",
-                "scheme": "bearer",
-                "bearerFormat": "JWT",
-                "description": "JWT Bearer token authentication",
-            }
+        openapi_schema["components"]["securitySchemes"] = {}
+
+    openapi_schema["components"]["securitySchemes"]["BearerAuth"] = {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": _BEARER_AUTH_DESCRIPTION,
+    }
+
+    # Also document the legacy API key scheme for routers that still use it.
+    if "APIKeyAuth" not in openapi_schema["components"]["securitySchemes"]:
+        openapi_schema["components"]["securitySchemes"]["APIKeyAuth"] = {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key",
+            "description": (
+                "Legacy API key authentication. "
+                "Prefer Bearer tokens for new integrations."
+            ),
         }
+
+    # Apply BearerAuth security requirement to all protected paths.
+    # Public paths (health, settings, cache, metrics, docs) are left unchanged.
+    bearer_security = [{"BearerAuth": []}]
+    for path, path_item in openapi_schema.get("paths", {}).items():
+        if _is_public_path(path):
+            continue
+        for method, operation in path_item.items():
+            if method not in {"get", "post", "put", "patch", "delete"}:
+                continue
+            if isinstance(operation, dict):
+                # Set security if not already declared at the operation level
+                if "security" not in operation:
+                    operation["security"] = bearer_security
+                # Ensure 401 and 403 responses are documented
+                responses = operation.setdefault("responses", {})
+                if "401" not in responses:
+                    responses["401"] = {
+                        "description": "Missing or invalid authentication credentials."
+                    }
+                if "403" not in responses:
+                    responses["403"] = {
+                        "description": "Authenticated but lacking required scope."
+                    }
 
     # Add common error responses
     if "components" not in openapi_schema:

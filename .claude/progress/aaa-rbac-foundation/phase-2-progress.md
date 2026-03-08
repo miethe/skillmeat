@@ -2,122 +2,158 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "aaa-rbac-foundation"
-feature_slug: "aaa-rbac-foundation"
+prd: aaa-rbac-foundation
+feature_slug: aaa-rbac-foundation
 prd_ref: /docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/aaa-rbac-foundation-v1.md
 phase: 2
-title: "Repository & Service Layer - Auth Context Definition & Propagation"
-status: "planning"
+title: Repository & Service Layer - Auth Context Definition & Propagation
+status: completed
 started: null
 completed: null
-commit_refs: []
+commit_refs:
+- "b2f2a65a"
+- "c16f6adf"
+- "83097043"
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 0
+completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
-contributors: ["backend-architect", "data-layer-expert"]
-
+owners:
+- python-backend-engineer
+contributors:
+- backend-architect
+- data-layer-expert
 tasks:
-  - id: "SVR-001"
-    description: "Create AuthContext frozen dataclass (user_id, tenant_id, roles, scopes)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1 pt"
-    priority: "critical"
-
-  - id: "SVR-002"
-    description: "Define RBAC Role enum and Scope enum constants"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "SVR-003"
-    description: "Create TenantContext ContextVar with set_tenant_context() helper"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "SVR-004"
-    description: "Update IArtifactRepository, ICollectionRepository interfaces with optional auth_context param"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "backend-architect"]
-    dependencies: ["SVR-001"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SVR-005"
-    description: "Update local repository implementations with owner_id validation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVR-004"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SVR-006"
-    description: "Update enterprise repository implementations with tenant_id + owner_id enforcement"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "data-layer-expert"]
-    dependencies: ["SVR-004"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SVR-007"
-    description: "Update artifact/collection services to accept and thread AuthContext"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["SVR-001", "SVR-004"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SVR-008"
-    description: "Add owner_id, owner_type, visibility to request/response DTOs"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVR-001"]
-    estimated_effort: "2 pts"
-    priority: "medium"
-
+- id: SVR-001
+  description: Create AuthContext frozen dataclass (user_id, tenant_id, roles, scopes)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1 pt
+  priority: critical
+- id: SVR-002
+  description: Define RBAC Role enum and Scope enum constants
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1 pt
+  priority: high
+- id: SVR-003
+  description: Create TenantContext ContextVar with set_tenant_context() helper
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 1 pt
+  priority: high
+- id: SVR-004
+  description: Update IArtifactRepository, ICollectionRepository interfaces with optional
+    auth_context param
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  - backend-architect
+  dependencies:
+  - SVR-001
+  estimated_effort: 2 pts
+  priority: high
+- id: SVR-005
+  description: Update local repository implementations with owner_id validation
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVR-004
+  estimated_effort: 2 pts
+  priority: high
+- id: SVR-006
+  description: Update enterprise repository implementations with tenant_id + owner_id
+    enforcement
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  - data-layer-expert
+  dependencies:
+  - SVR-004
+  estimated_effort: 2 pts
+  priority: high
+- id: SVR-007
+  description: Update artifact/collection services to accept and thread AuthContext
+  status: completed
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVR-001
+  - SVR-004
+  estimated_effort: 2 pts
+  priority: high
+- id: SVR-008
+  description: Add owner_id, owner_type, visibility to request/response DTOs
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVR-001
+  estimated_effort: 2 pts
+  priority: medium
 parallelization:
-  batch_1: ["SVR-001", "SVR-002", "SVR-003"]
-  batch_2: ["SVR-004", "SVR-008"]
-  batch_3: ["SVR-005", "SVR-006", "SVR-007"]
-  critical_path: ["SVR-001", "SVR-004", "SVR-005"]
-  estimated_total_time: "5 days"
-
+  batch_1:
+  - SVR-001
+  - SVR-002
+  - SVR-003
+  batch_2:
+  - SVR-004
+  - SVR-008
+  batch_3:
+  - SVR-005
+  - SVR-006
+  - SVR-007
+  critical_path:
+  - SVR-001
+  - SVR-004
+  - SVR-005
+  estimated_total_time: 5 days
 blockers: []
-
 success_criteria:
-  - { id: "SC-1", description: "AuthContext dataclass compiles and validates", status: "pending" }
-  - { id: "SC-2", description: "RBAC enums define all required roles and scopes", status: "pending" }
-  - { id: "SC-3", description: "TenantContext ContextVar threads through enterprise repos", status: "pending" }
-  - { id: "SC-4", description: "Repository interfaces updated with auth_context param", status: "pending" }
-  - { id: "SC-5", description: "Service layer accepts and propagates auth_context", status: "pending" }
-  - { id: "SC-6", description: "DTOs include new fields with validation", status: "pending" }
-  - { id: "SC-7", description: "Zero-auth local mode still works without auth_context", status: "pending" }
-
+- id: SC-1
+  description: AuthContext dataclass compiles and validates
+  status: pending
+- id: SC-2
+  description: RBAC enums define all required roles and scopes
+  status: pending
+- id: SC-3
+  description: TenantContext ContextVar threads through enterprise repos
+  status: pending
+- id: SC-4
+  description: Repository interfaces updated with auth_context param
+  status: pending
+- id: SC-5
+  description: Service layer accepts and propagates auth_context
+  status: pending
+- id: SC-6
+  description: DTOs include new fields with validation
+  status: pending
+- id: SC-7
+  description: Zero-auth local mode still works without auth_context
+  status: pending
 files_modified:
-  - "skillmeat/api/schemas/auth.py"
-  - "skillmeat/cache/enterprise_repositories.py"
-  - "skillmeat/core/interfaces/repositories.py"
-  - "skillmeat/core/repositories/local_*.py"
-  - "skillmeat/core/services/artifact_service.py"
-  - "skillmeat/core/services/collection_service.py"
-  - "skillmeat/api/schemas/artifacts.py"
-  - "skillmeat/api/schemas/collections.py"
+- skillmeat/api/schemas/auth.py
+- skillmeat/cache/enterprise_repositories.py
+- skillmeat/core/interfaces/repositories.py
+- skillmeat/core/repositories/local_*.py
+- skillmeat/core/services/artifact_service.py
+- skillmeat/core/services/collection_service.py
+- skillmeat/api/schemas/artifacts.py
+- skillmeat/api/schemas/collections.py
+progress: 100
+updated: '2026-03-06'
 ---
 
 # aaa-rbac-foundation - Phase 2: Repository & Service Layer - Auth Context Definition & Propagation

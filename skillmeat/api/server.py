@@ -16,7 +16,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -24,7 +24,9 @@ from fastapi.responses import JSONResponse
 from skillmeat import __version__ as skillmeat_version
 
 from .config import APISettings, get_settings
-from .dependencies import app_state
+from .dependencies import app_state, require_auth, set_auth_provider
+from .openapi import generate_openapi_spec
+from .middleware.tenant_context import set_tenant_context_dep
 from .routers import (
     analytics,
     artifact_history,
@@ -102,8 +104,61 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Host: {settings.host}:{settings.port}")
     logger.info(
         "Authentication: %s",
-        "enabled (Bearer tokens required)" if settings.auth_enabled else "disabled",
+        (
+            f"enabled (provider={settings.auth_provider})"
+            if settings.auth_enabled
+            else "local auth mode (auth_enabled=false — LocalAuthProvider selected)"
+        ),
     )
+
+    # Instantiate and register the authentication provider.
+    #
+    # Auth Bypass Contract (CP-001):
+    #   auth_enabled=false  → LocalAuthProvider is always used, regardless of
+    #                         the auth_provider setting.  LocalAuthProvider
+    #                         never raises; it returns LOCAL_ADMIN_CONTEXT on
+    #                         every request.  This is the single decision point
+    #                         for bypass semantics — require_auth() itself has
+    #                         no auth_enabled awareness.
+    #   auth_enabled=true   → The configured auth_provider is used (e.g. clerk).
+    #                         require_auth() validates every request via that
+    #                         provider.
+    if not settings.auth_enabled:
+        from skillmeat.api.auth.local_provider import LocalAuthProvider
+
+        _auth_provider = LocalAuthProvider()
+        logger.info(
+            "Auth provider: local (auth_enabled=false — all requests granted local-admin context)"
+        )
+    else:
+        _provider_name = settings.auth_provider.lower()
+        if _provider_name == "local":
+            from skillmeat.api.auth.local_provider import LocalAuthProvider
+
+            _auth_provider = LocalAuthProvider()
+        elif _provider_name == "clerk":
+            from skillmeat.api.auth.clerk_provider import ClerkAuthProvider
+
+            if not settings.clerk_jwks_url:
+                raise RuntimeError(
+                    "CLERK_JWKS_URL (or SKILLMEAT_CLERK_JWKS_URL) must be set "
+                    "when auth_provider='clerk'."
+                )
+            _auth_provider = ClerkAuthProvider(
+                jwks_url=settings.clerk_jwks_url,
+                audience=settings.clerk_audience,
+                issuer=settings.clerk_issuer,
+            )
+        else:
+            raise RuntimeError(
+                f"Unknown auth_provider '{settings.auth_provider}'. "
+                "Valid values are 'local' and 'clerk'."
+            )
+        logger.info(
+            "Auth provider: %s (auth_enabled=true — requests require valid credentials)",
+            settings.auth_provider,
+        )
+    set_auth_provider(_auth_provider)
 
     # Configure logging
     settings.configure_logging()
@@ -362,102 +417,243 @@ def create_app(settings: APISettings = None) -> FastAPI:
     except ImportError:
         logger.warning("prometheus_client not installed, metrics endpoint disabled")
 
+    # Blanket auth dependency applied to every protected router.
+    # Excluded: health (load-balancer probes), cache (internal ops),
+    # settings (read-only app config) — these remain publicly accessible.
+    #
+    # ENT2-004: Validated — tenant context lifecycle is correct:
+    # 1. ORDERING: set_tenant_context_dep declares `Depends(require_auth())` in
+    #    its own signature, so FastAPI resolves require_auth() first and passes the
+    #    AuthContext into set_tenant_context_dep.  The outer Depends(require_auth())
+    #    in this list is deduplicated by FastAPI's dependency cache, so both
+    #    references share the same AuthContext for the request.
+    # 2. SESSION: get_db_session() (session.py) calls SessionLocal() each request,
+    #    yields a fresh Session, and closes it in a finally block — strictly
+    #    request-scoped.  Enterprise repos receive this injected Session and never
+    #    create their own.
+    # 3. CONTEXVAR LEAKAGE: set_tenant_context_dep is an async generator dependency.
+    #    It calls TenantContext.set() before yield and TenantContext.reset(token) in
+    #    a finally block, guaranteeing the ContextVar is cleared even on exceptions
+    #    and preventing tenant identity from leaking across reused async tasks.
+    # 4. AUTH → TENANT PROPAGATION: set_tenant_context_dep reads AuthContext.tenant_id
+    #    and is a no-op when tenant_id is None (local/single-tenant mode), falling
+    #    back to DEFAULT_TENANT_ID inside the enterprise repository base class.
+    _auth_deps = [Depends(require_auth()), Depends(set_tenant_context_dep)]
+
     # Include routers
-    # Health check router (no API prefix, for load balancers)
+    # Health check router (no API prefix, for load balancers) — public
     app.include_router(health.router)
 
     # API routers under API prefix
     app.include_router(
-        collections.router, prefix=settings.api_prefix, tags=["collections"]
+        collections.router,
+        prefix=settings.api_prefix,
+        tags=["collections"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        user_collections.router, prefix=settings.api_prefix, tags=["user-collections"]
+        user_collections.router,
+        prefix=settings.api_prefix,
+        tags=["user-collections"],
+        dependencies=_auth_deps,
     )
-    app.include_router(artifacts.router, prefix=settings.api_prefix, tags=["artifacts"])
     app.include_router(
-        artifact_history.router, prefix=settings.api_prefix, tags=["artifacts"]
+        artifacts.router,
+        prefix=settings.api_prefix,
+        tags=["artifacts"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        enterprise_content.router, prefix=settings.api_prefix, tags=["enterprise"]
+        artifact_history.router,
+        prefix=settings.api_prefix,
+        tags=["artifacts"],
+        dependencies=_auth_deps,
     )
-    app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
-    app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])
+    app.include_router(
+        enterprise_content.router,
+        prefix=settings.api_prefix,
+        tags=["enterprise"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        analytics.router,
+        prefix=settings.api_prefix,
+        tags=["analytics"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        bundles.router,
+        prefix=settings.api_prefix,
+        tags=["bundles"],
+        dependencies=_auth_deps,
+    )
+    # cache router — public (internal cache management operations)
     app.include_router(cache.router, prefix=settings.api_prefix, tags=["cache"])
-    app.include_router(config.router, prefix=settings.api_prefix, tags=["config"])
     app.include_router(
-        context_entities.router, prefix=settings.api_prefix, tags=["context-entities"]
+        config.router,
+        prefix=settings.api_prefix,
+        tags=["config"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        context_modules.router, prefix=settings.api_prefix, tags=["context-modules"]
+        context_entities.router,
+        prefix=settings.api_prefix,
+        tags=["context-entities"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        context_packing.router, prefix=settings.api_prefix, tags=["context-packs"]
+        context_modules.router,
+        prefix=settings.api_prefix,
+        tags=["context-modules"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        context_sync.router, prefix=settings.api_prefix, tags=["context-sync"]
+        context_packing.router,
+        prefix=settings.api_prefix,
+        tags=["context-packs"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        context_sync.router,
+        prefix=settings.api_prefix,
+        tags=["context-sync"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         deployment_profiles.router,
         prefix=settings.api_prefix,
         tags=["deployment-profiles"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         deployment_sets.router,
         prefix=settings.api_prefix,
         tags=["deployment-sets"],
+        dependencies=_auth_deps,
     )
     app.include_router(
-        deployments.router, prefix=settings.api_prefix, tags=["deployments"]
+        deployments.router,
+        prefix=settings.api_prefix,
+        tags=["deployments"],
+        dependencies=_auth_deps,
     )
-    app.include_router(groups.router, prefix=settings.api_prefix, tags=["groups"])
     app.include_router(
-        composites.router, prefix=settings.api_prefix, tags=["composites"]
+        groups.router,
+        prefix=settings.api_prefix,
+        tags=["groups"],
+        dependencies=_auth_deps,
     )
-    app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
     app.include_router(
-        marketplace.router, prefix=settings.api_prefix, tags=["marketplace"]
+        composites.router,
+        prefix=settings.api_prefix,
+        tags=["composites"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        mcp.router,
+        prefix=settings.api_prefix,
+        tags=["mcp"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        marketplace.router,
+        prefix=settings.api_prefix,
+        tags=["marketplace"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         marketplace_catalog.router,
         prefix=settings.api_prefix,
         tags=["marketplace-catalog"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         marketplace_sources.router,
         prefix=settings.api_prefix,
         tags=["marketplace-sources"],
+        dependencies=_auth_deps,
     )
-    app.include_router(match.router, prefix=settings.api_prefix, tags=["match"])
     app.include_router(
-        memory_items.router, prefix=settings.api_prefix, tags=["memory-items"]
+        match.router,
+        prefix=settings.api_prefix,
+        tags=["match"],
+        dependencies=_auth_deps,
     )
-    app.include_router(merge.router, prefix=settings.api_prefix, tags=["merge"])
     app.include_router(
-        project_templates.router, prefix=settings.api_prefix, tags=["project-templates"]
+        memory_items.router,
+        prefix=settings.api_prefix,
+        tags=["memory-items"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        merge.router,
+        prefix=settings.api_prefix,
+        tags=["merge"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        project_templates.router,
+        prefix=settings.api_prefix,
+        tags=["project-templates"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         idp_integration.router,
         prefix=settings.api_prefix,
         tags=["integrations-idp"],
+        dependencies=_auth_deps,
     )
-    app.include_router(projects.router, prefix=settings.api_prefix, tags=["projects"])
-    app.include_router(ratings.router, prefix=settings.api_prefix, tags=["ratings"])
+    app.include_router(
+        projects.router,
+        prefix=settings.api_prefix,
+        tags=["projects"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        ratings.router,
+        prefix=settings.api_prefix,
+        tags=["ratings"],
+        dependencies=_auth_deps,
+    )
+    # settings router — public (read-only app configuration info)
     app.include_router(
         settings_router.router, prefix=settings.api_prefix, tags=["settings"]
     )
-    app.include_router(colors.router, prefix=settings.api_prefix, tags=["colors"])
     app.include_router(
-        icon_packs.router, prefix=settings.api_prefix, tags=["settings"]
+        colors.router,
+        prefix=settings.api_prefix,
+        tags=["colors"],
+        dependencies=_auth_deps,
     )
-    app.include_router(tags.router, prefix=settings.api_prefix, tags=["tags"])
-    app.include_router(versions.router, prefix=settings.api_prefix, tags=["versions"])
     app.include_router(
-        workflows.router, prefix=settings.api_prefix, tags=["workflows"]
+        icon_packs.router,
+        prefix=settings.api_prefix,
+        tags=["settings"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        tags.router,
+        prefix=settings.api_prefix,
+        tags=["tags"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        versions.router,
+        prefix=settings.api_prefix,
+        tags=["versions"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        workflows.router,
+        prefix=settings.api_prefix,
+        tags=["workflows"],
+        dependencies=_auth_deps,
     )
     app.include_router(
         workflow_executions.router,
         prefix=settings.api_prefix,
         tags=["workflow-executions"],
+        dependencies=_auth_deps,
     )
 
     # Root endpoint
@@ -500,6 +696,13 @@ def create_app(settings: APISettings = None) -> FastAPI:
             "api_version": settings.api_version,
             "environment": settings.env.value,
         }
+
+    # Wire the custom OpenAPI generator so /docs and app.openapi() include
+    # BearerAuth scheme, scope/role documentation, and per-operation security.
+    def _custom_openapi():
+        return generate_openapi_spec(app, api_version=settings.api_version)
+
+    app.openapi = _custom_openapi
 
     logger.info(
         f"FastAPI application created: {settings.api_title} v{skillmeat_version}"

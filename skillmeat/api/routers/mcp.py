@@ -13,6 +13,8 @@ from skillmeat.api.dependencies import (
     CollectionManagerDep,
     ConfigManagerDep,
     verify_api_key,
+    get_auth_context,
+    require_auth,
 )
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse
@@ -30,6 +32,7 @@ from skillmeat.api.schemas.mcp import (
 from skillmeat.core.mcp.deployment import MCPDeploymentManager
 from skillmeat.core.mcp.health import MCPHealthChecker, HealthStatus
 from skillmeat.core.mcp.metadata import MCPServerMetadata, MCPServerStatus
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +84,7 @@ async def list_mcp_servers(
         default=None,
         description="Collection name (uses default if not specified)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> MCPServerListResponse:
     """List all MCP servers in collection.
 
@@ -149,6 +153,7 @@ async def get_mcp_server(
         default=None,
         description="Collection name (uses default if not specified)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> MCPServerResponse:
     """Get details for a specific MCP server.
 
@@ -221,6 +226,7 @@ async def create_mcp_server(
         default=None,
         description="Collection name (uses default if not specified)",
     ),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MCPServerResponse:
     """Create a new MCP server in the collection.
 
@@ -323,6 +329,7 @@ async def update_mcp_server(
         default=None,
         description="Collection name (uses default if not specified)",
     ),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MCPServerResponse:
     """Update an existing MCP server.
 
@@ -419,6 +426,7 @@ async def delete_mcp_server(
         default=None,
         description="Collection name (uses default if not specified)",
     ),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Delete an MCP server from the collection.
 
@@ -493,6 +501,7 @@ async def deploy_mcp_server(
         default=None,
         description="Collection name (uses default if not specified)",
     ),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> DeploymentResponse:
     """Deploy MCP server to Claude Desktop.
 
@@ -607,6 +616,7 @@ async def undeploy_mcp_server(
         default=None,
         description="Collection name (uses default if not specified)",
     ),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> DeploymentResponse:
     """Undeploy MCP server from Claude Desktop.
 
@@ -698,6 +708,7 @@ async def get_deployment_status(
     name: str,
     config_mgr: ConfigManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> DeploymentStatusResponse:
     """Get deployment status for an MCP server.
 
@@ -784,6 +795,7 @@ async def get_server_health(
         default=True,
         description="Use cached results (30 second TTL)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> HealthCheckResponse:
     """Get health status for a specific MCP server.
 
@@ -856,6 +868,7 @@ async def get_all_servers_health(
         default=True,
         description="Use cached results (30 second TTL)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> AllServersHealthResponse:
     """Get health status for all deployed MCP servers.
 

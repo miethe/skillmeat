@@ -6,11 +6,12 @@ Supports both development and production environments with secure defaults.
 
 import logging
 import os
+import warnings
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,6 +38,7 @@ class APISettings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        populate_by_name=True,
     )
 
     # Environment
@@ -159,14 +161,63 @@ class APISettings(BaseSettings):
         description="Require bearer token authentication for API routes",
     )
 
+    # Auth provider selection (AUTH-007)
+    # Valid values: "local" (LocalAuthProvider) or "clerk" (ClerkAuthProvider)
+    auth_provider: str = Field(
+        default="local",
+        description=(
+            "Authentication provider to use. "
+            "Valid values: 'local' (default, LocalAuthProvider) or "
+            "'clerk' (ClerkAuthProvider, requires CLERK_JWKS_URL and CLERK_ISSUER). "
+            "Configurable via SKILLMEAT_AUTH_PROVIDER env var."
+        ),
+    )
+
+    # Clerk authentication config (only required when auth_provider="clerk")
+    clerk_jwks_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("CLERK_JWKS_URL", "SKILLMEAT_CLERK_JWKS_URL"),
+        description=(
+            "Clerk JWKS endpoint URL for JWT public key discovery. "
+            "Required when auth_provider='clerk'. "
+            "Configurable via CLERK_JWKS_URL env var."
+        ),
+    )
+
+    clerk_issuer: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("CLERK_ISSUER", "SKILLMEAT_CLERK_ISSUER"),
+        description=(
+            "Expected JWT issuer claim for Clerk tokens. "
+            "Required when auth_provider='clerk'. "
+            "Configurable via CLERK_ISSUER env var."
+        ),
+    )
+
+    clerk_audience: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("CLERK_AUDIENCE", "SKILLMEAT_CLERK_AUDIENCE"),
+        description=(
+            "Expected JWT audience claim for Clerk tokens. "
+            "When set, the aud claim in incoming JWTs must match this value. "
+            "Configurable via CLERK_AUDIENCE or SKILLMEAT_CLERK_AUDIENCE env var."
+        ),
+    )
+
     # Enterprise PAT authentication (ENT-3.4)
     enterprise_pat_secret: Optional[str] = Field(
         default=None,
+        validation_alias=AliasChoices(
+            "SKILLMEAT_ENTERPRISE_PAT_SECRET",
+            "ENTERPRISE_PAT_SECRET",
+        ),
         description=(
             "Shared secret used to authenticate enterprise clients via "
             "``Authorization: Bearer <token>``.  Must be set before the "
             "enterprise download endpoint will accept requests.  "
-            "Configurable via the SKILLMEAT_ENTERPRISE_PAT_SECRET env var."
+            "Primary env var: ``SKILLMEAT_ENTERPRISE_PAT_SECRET``.  "
+            "Legacy alias ``ENTERPRISE_PAT_SECRET`` is also accepted for "
+            "backward compatibility but will emit a deprecation warning."
         ),
     )
 
@@ -274,6 +325,27 @@ class APISettings(BaseSettings):
         "Files inside these directories are skipped during collection/project/upstream diff comparisons. "
         "Add patterns like 'vendor' or '.cache' for your environment.",
     )
+
+    @model_validator(mode="after")
+    def _warn_legacy_enterprise_pat_env(self) -> "APISettings":
+        """Emit a deprecation warning when the legacy ENTERPRISE_PAT_SECRET env var is used.
+
+        Pydantic resolves ``validation_alias=AliasChoices(...)`` by trying each
+        alias in order, so ``SKILLMEAT_ENTERPRISE_PAT_SECRET`` takes priority.
+        This validator detects when only the legacy name is set and warns the
+        operator to migrate.
+        """
+        primary = os.environ.get("SKILLMEAT_ENTERPRISE_PAT_SECRET")
+        legacy = os.environ.get("ENTERPRISE_PAT_SECRET")
+        if legacy and not primary:
+            warnings.warn(
+                "The ENTERPRISE_PAT_SECRET environment variable is deprecated. "
+                "Please use SKILLMEAT_ENTERPRISE_PAT_SECRET instead. "
+                "Support for the legacy name may be removed in a future release.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        return self
 
     @field_validator("log_level")
     @classmethod

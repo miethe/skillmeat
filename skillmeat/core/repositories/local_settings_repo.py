@@ -25,10 +25,13 @@ from __future__ import annotations
 import logging
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from skillmeat.config import ConfigManager
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import CategoryDTO, EntityTypeConfigDTO, SettingsDTO
 from skillmeat.core.interfaces.repositories import ISettingsRepository
 from skillmeat.core.path_resolver import ProjectPathResolver
@@ -159,6 +162,7 @@ class LocalSettingsRepository(ISettingsRepository):
     def get(
         self,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> SettingsDTO:
         """Return the current application settings snapshot.
 
@@ -178,6 +182,7 @@ class LocalSettingsRepository(ISettingsRepository):
         self,
         updates: Dict[str, Any],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> SettingsDTO:
         """Apply a partial update to the application settings.
 
@@ -225,6 +230,7 @@ class LocalSettingsRepository(ISettingsRepository):
         self,
         token: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Validate a GitHub Personal Access Token against the GitHub API.
 
@@ -276,6 +282,7 @@ class LocalSettingsRepository(ISettingsRepository):
     def list_entity_type_configs(
         self,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[EntityTypeConfigDTO]:
         """Return all registered entity type configurations from the DB cache.
 
@@ -311,6 +318,7 @@ class LocalSettingsRepository(ISettingsRepository):
         icon: Optional[str] = None,
         color: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> EntityTypeConfigDTO:
         """Create a new user-defined entity type configuration.
 
@@ -369,6 +377,7 @@ class LocalSettingsRepository(ISettingsRepository):
         config_id: str,
         updates: Dict[str, Any],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> EntityTypeConfigDTO:
         """Apply a partial update to an existing entity type configuration.
 
@@ -421,6 +430,7 @@ class LocalSettingsRepository(ISettingsRepository):
         self,
         config_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Delete a user-defined entity type configuration.
 
@@ -459,6 +469,7 @@ class LocalSettingsRepository(ISettingsRepository):
         entity_type: Optional[str] = None,
         platform: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[CategoryDTO]:
         """Return all categories from the DB cache, optionally filtered by entity type
         and platform.
@@ -501,6 +512,7 @@ class LocalSettingsRepository(ISettingsRepository):
         platform: Optional[str] = None,
         sort_order: Optional[int] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> CategoryDTO:
         """Create a new category in the DB cache.
 
@@ -568,6 +580,7 @@ class LocalSettingsRepository(ISettingsRepository):
         category_id: int,
         updates: Dict[str, Any],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> CategoryDTO:
         """Apply a partial update to an existing category.
 
@@ -617,6 +630,7 @@ class LocalSettingsRepository(ISettingsRepository):
         self,
         category_id: int,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Delete a category by integer primary key.
 

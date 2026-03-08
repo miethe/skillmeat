@@ -38,7 +38,28 @@ function trace(event: string, detail: Record<string, unknown>) {
   console.info(`[api-trace] ${timestamp} ${event}`, detail);
 }
 
-export function buildApiHeaders(extra?: HeadersInit): HeadersInit {
+/**
+ * Build standard API request headers.
+ *
+ * @param extra     - Additional headers merged last (highest precedence).
+ * @param authToken - Optional runtime auth token (e.g. from useAuth().getToken()).
+ *                    When provided it overrides NEXT_PUBLIC_API_TOKEN.
+ *                    In zero-auth mode pass null/undefined — no Authorization
+ *                    header is set unless NEXT_PUBLIC_API_TOKEN is configured.
+ *
+ * How to use auth-aware API calls in hooks:
+ *
+ *   // Option A — via useAuthFetch (returns a full fetch wrapper):
+ *   import { useAuthFetch } from '@/lib/auth';
+ *   const fetchWithAuth = useAuthFetch();
+ *
+ *   // Option B — inject token directly into buildApiHeaders:
+ *   import { useAuth } from '@/lib/auth';
+ *   const auth = useAuth();
+ *   const token = await auth.getToken();
+ *   const headers = buildApiHeaders(undefined, token);
+ */
+export function buildApiHeaders(extra?: HeadersInit, authToken?: string | null): HeadersInit {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -49,8 +70,10 @@ export function buildApiHeaders(extra?: HeadersInit): HeadersInit {
       ? Object.fromEntries(extra.entries())
       : (extra as Record<string, string> | undefined);
 
-  if (API_TOKEN) {
-    headers['Authorization'] = `Bearer ${API_TOKEN}`;
+  // Runtime auth token takes precedence over the static env-var token.
+  const resolvedToken = authToken ?? API_TOKEN;
+  if (resolvedToken) {
+    headers['Authorization'] = `Bearer ${resolvedToken}`;
   }
 
   if (API_KEY) {

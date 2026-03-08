@@ -20,7 +20,10 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from skillmeat.api.dependencies import get_auth_context, require_auth
+from skillmeat.api.schemas.auth import AuthContext
 
 from skillmeat.api.schemas.composites import (
     CompositeCreateRequest,
@@ -129,6 +132,7 @@ async def list_composites(
         description="ID of the collection to list composites for.",
         examples=["default"],
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> CompositeListResponse:
     """List all composite artifacts in the given collection.
 
@@ -172,6 +176,7 @@ async def list_composites(
 )
 async def create_composite(
     request: CompositeCreateRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> CompositeResponse:
     """Create a new composite artifact.
 
@@ -239,6 +244,7 @@ async def create_composite(
 )
 async def get_composite(
     composite_id: str,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> CompositeResponse:
     """Retrieve a single composite artifact by its ``type:name`` id.
 
@@ -287,6 +293,7 @@ async def get_composite(
 async def update_composite(
     composite_id: str,
     request: CompositeUpdateRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> CompositeResponse:
     """Update a composite artifact's mutable fields.
 
@@ -349,6 +356,7 @@ async def delete_composite(
             "this composite.  Defaults to false (only membership edges are removed)."
         ),
     ),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Delete a composite artifact.
 
@@ -413,6 +421,7 @@ async def add_composite_member(
         description="Owning collection ID.  Must match the composite's collection.",
         examples=["default"],
     ),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MembershipResponse:
     """Add a child artifact to a composite.
 
@@ -511,6 +520,7 @@ async def add_composite_member(
 async def remove_composite_member(
     composite_id: str,
     member_uuid: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Remove a child artifact from a composite by UUID.
 
@@ -579,6 +589,7 @@ async def remove_composite_member(
 async def reorder_composite_members(
     composite_id: str,
     request: MembershipReorderRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> List[MembershipResponse]:
     """Reorder child members within a composite.
 

@@ -56,6 +56,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from skillmeat.core.clone_target import CloneTarget
 
+from skillmeat.cache.auth_types import OwnerType, Visibility
+
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -162,6 +164,15 @@ class Project(Base):
         server_default="active",
     )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Ownership and visibility
+    owner_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=OwnerType.user.value
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=Visibility.private.value
+    )
 
     # Relationships
     artifacts: Mapped[List["Artifact"]] = relationship(
@@ -311,6 +322,15 @@ class Artifact(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Ownership and visibility
+    owner_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=OwnerType.user.value
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=Visibility.private.value
     )
 
     # Relationships
@@ -821,6 +841,15 @@ class Collection(Base):
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
+    # Ownership and visibility
+    owner_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=OwnerType.user.value
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=Visibility.private.value
+    )
+
     # Relationships
     groups: Mapped[List["Group"]] = relationship(
         "Group",
@@ -950,6 +979,15 @@ class Group(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Ownership and visibility
+    owner_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=OwnerType.user.value
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=Visibility.private.value
     )
 
     # Relationships
@@ -4570,6 +4608,304 @@ class ContextEntityCategory(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+# =============================================================================
+# Auth / RBAC Models  (AAA/RBAC Foundation — PRD-2, DB-001)
+# =============================================================================
+
+
+class User(Base):
+    """Local-mode user account.
+
+    In single-user local deployments the row is created automatically at
+    startup with ``id = LOCAL_ADMIN_USER_ID`` (see ``skillmeat/cache/constants.py``).
+    The ``external_id`` column stores the Clerk user_id when the web UI is
+    connected to a Clerk-backed authentication provider.
+
+    Attributes:
+        id:           Auto-increment integer primary key.
+        external_id:  Optional external identity (e.g. Clerk ``user_id``); unique.
+        email:        Optional user email address.
+        display_name: Optional human-readable display name.
+        role:         System-wide role string; stores a ``UserRole`` enum value.
+                      Defaults to ``"viewer"``; set to ``"system_admin"`` for the
+                      implicit local admin.
+        is_active:    Soft-delete flag; ``False`` prevents login without deleting
+                      the row.
+        created_at:   UTC creation timestamp (server default).
+        updated_at:   UTC last-modified timestamp (app-managed on write).
+        team_memberships: Back-reference to all ``TeamMember`` rows for this user.
+
+    Constraints:
+        uq_users_external_id: UNIQUE (external_id) — one account per external ID.
+
+    Indexes:
+        idx_users_external_id: Fast Clerk user_id lookup.
+        idx_users_email: Fast email lookup.
+        idx_users_role: Filter by system role.
+    """
+
+    __tablename__ = "users"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # External identity — maps to Clerk user_id when web auth is enabled
+    external_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        unique=True,
+        comment="External identity provider ID (e.g. Clerk user_id); unique when set",
+    )
+
+    # Contact
+    email: Mapped[Optional[str]] = mapped_column(
+        String(320),
+        nullable=True,
+        comment="User email address; not enforced unique in local mode",
+    )
+    display_name: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Human-readable display name shown in the UI",
+    )
+
+    # System-wide role — stores UserRole enum value as a plain string
+    role: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="viewer",
+        server_default="viewer",
+        comment="System-wide role; one of UserRole enum values (viewer, team_member, team_admin, system_admin)",
+    )
+
+    # Soft-delete
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="1",
+        comment="When False the account is disabled; row is retained for audit",
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default="CURRENT_TIMESTAMP",
+        comment="UTC creation timestamp",
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        comment="UTC last-modified timestamp; updated by app on every write",
+    )
+
+    # Relationships
+    team_memberships: Mapped[List["TeamMember"]] = relationship(
+        "TeamMember",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        Index("idx_users_external_id", "external_id"),
+        Index("idx_users_email", "email"),
+        Index("idx_users_role", "role"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of User."""
+        return (
+            f"<User(id={self.id!r}, external_id={self.external_id!r}, "
+            f"email={self.email!r}, role={self.role!r}, is_active={self.is_active!r})>"
+        )
+
+
+class Team(Base):
+    """Named group of users for collaborative artifact management.
+
+    Teams allow multiple users to share ownership of artifacts and deployment
+    sets.  In local single-user mode no teams are created by default.
+
+    Attributes:
+        id:          Auto-increment integer primary key.
+        name:        Unique team name (human-readable, e.g. "platform-eng").
+        description: Optional description of the team's purpose.
+        is_active:   Soft-delete flag.
+        created_at:  UTC creation timestamp.
+        updated_at:  UTC last-modified timestamp.
+        members:     Back-reference to all ``TeamMember`` rows for this team.
+
+    Constraints:
+        uq_teams_name: UNIQUE (name)
+
+    Indexes:
+        idx_teams_name: Fast lookup by name.
+        idx_teams_is_active: Filter active teams.
+    """
+
+    __tablename__ = "teams"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Identity
+    name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        unique=True,
+        comment="Unique human-readable team name",
+    )
+    description: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Optional description of the team's purpose",
+    )
+
+    # Soft-delete
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="1",
+        comment="When False the team is dissolved but rows are retained for audit",
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default="CURRENT_TIMESTAMP",
+        comment="UTC creation timestamp",
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        comment="UTC last-modified timestamp",
+    )
+
+    # Relationships
+    members: Mapped[List["TeamMember"]] = relationship(
+        "TeamMember",
+        back_populates="team",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_teams_name", "name"),
+        Index("idx_teams_is_active", "is_active"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of Team."""
+        return (
+            f"<Team(id={self.id!r}, name={self.name!r}, "
+            f"is_active={self.is_active!r})>"
+        )
+
+
+class TeamMember(Base):
+    """Junction table recording a user's membership in a team.
+
+    Each row grants one user access to one team at a specific team-level role.
+    The ``role`` column stores a ``UserRole`` enum value restricted to
+    ``team_admin`` or ``team_member`` (system-level roles are on ``User.role``).
+
+    Attributes:
+        id:        Auto-increment integer primary key.
+        team_id:   FK → teams.id (CASCADE on delete).
+        user_id:   FK → users.id (CASCADE on delete).
+        role:      Team-level role; one of ``UserRole`` values.
+                   Defaults to ``"team_member"``.
+        joined_at: UTC timestamp when the user joined the team.
+
+    Constraints:
+        uq_team_members_team_user: UNIQUE (team_id, user_id) — one membership
+            row per (team, user) pair.
+
+    Indexes:
+        idx_team_members_team_id: Fast member listing per team.
+        idx_team_members_user_id: Reverse lookup — which teams is a user in?
+    """
+
+    __tablename__ = "team_members"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Foreign keys
+    team_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="Parent team; cascade-deletes this membership when team is removed",
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="Member user; cascade-deletes this membership when user is removed",
+    )
+
+    # Team-level role
+    role: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="team_member",
+        server_default="team_member",
+        comment="Role within the team; one of team_admin, team_member",
+    )
+
+    # Join timestamp — intentionally not an onupdate column (join date is immutable)
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default="CURRENT_TIMESTAMP",
+        comment="UTC timestamp when the user joined the team",
+    )
+
+    # Relationships
+    team: Mapped["Team"] = relationship(
+        "Team",
+        back_populates="members",
+        lazy="joined",
+    )
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="team_memberships",
+        lazy="joined",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        UniqueConstraint(
+            "team_id",
+            "user_id",
+            name="uq_team_members_team_user",
+        ),
+        Index("idx_team_members_team_id", "team_id"),
+        Index("idx_team_members_user_id", "user_id"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of TeamMember."""
+        return (
+            f"<TeamMember(id={self.id!r}, team_id={self.team_id!r}, "
+            f"user_id={self.user_id!r}, role={self.role!r})>"
+        )
 
 
 # =============================================================================

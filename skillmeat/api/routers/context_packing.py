@@ -17,7 +17,9 @@ API Endpoints:
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from skillmeat.api.dependencies import get_auth_context, require_auth
 from skillmeat.api.schemas.context_module import (
     ContextPackGenerateRequest,
     ContextPackGenerateResponse,
@@ -25,6 +27,7 @@ from skillmeat.api.schemas.context_module import (
     ContextPackPreviewResponse,
 )
 from skillmeat.core.services.context_packer_service import ContextPackerService
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +74,7 @@ def _get_service() -> ContextPackerService:
 async def preview_context_pack(
     request: ContextPackPreviewRequest,
     project_id: str = Query(..., description="Project ID to build pack for"),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ContextPackPreviewResponse:
     """Preview what a context pack would contain.
 
@@ -129,6 +133,7 @@ async def preview_context_pack(
 async def generate_context_pack(
     request: ContextPackGenerateRequest,
     project_id: str = Query(..., description="Project ID to build pack for"),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ContextPackGenerateResponse:
     """Generate a full context pack with markdown.
 

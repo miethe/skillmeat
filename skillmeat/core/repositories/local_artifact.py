@@ -28,10 +28,13 @@ Design notes
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 from skillmeat.core.artifact import ArtifactManager, ArtifactType
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import ArtifactDTO, CollectionMembershipDTO, TagDTO
 from skillmeat.core.interfaces.repositories import IArtifactRepository
 from skillmeat.core.path_resolver import ProjectPathResolver
@@ -331,12 +334,14 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[ArtifactDTO]:
         """Return the artifact with the given ``"type:name"`` primary key.
 
         Args:
             id: Artifact primary key.
             ctx: Optional per-request metadata (unused in this implementation).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             :class:`ArtifactDTO` when found, ``None`` otherwise.
@@ -373,6 +378,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         uuid: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[ArtifactDTO]:
         """Return the artifact identified by its stable UUID.
 
@@ -383,6 +389,7 @@ class LocalArtifactRepository(IArtifactRepository):
         Args:
             uuid: 32-char hex UUID string.
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             :class:`ArtifactDTO` when found, ``None`` otherwise.
@@ -431,6 +438,7 @@ class LocalArtifactRepository(IArtifactRepository):
         offset: int = 0,
         limit: int = 50,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[ArtifactDTO]:
         """Return a page of artifacts matching optional filter criteria.
 
@@ -443,6 +451,7 @@ class LocalArtifactRepository(IArtifactRepository):
             offset: Zero-based pagination offset.
             limit: Maximum records to return.
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             List of matching :class:`ArtifactDTO` objects.
@@ -493,12 +502,14 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         filters: Optional[dict[str, Any]] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> int:
         """Return the total number of artifacts matching optional filters.
 
         Args:
             filters: Same filter map accepted by :meth:`list`.
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             Non-negative integer count.
@@ -531,6 +542,7 @@ class LocalArtifactRepository(IArtifactRepository):
         query: str,
         filters: Optional[dict[str, Any]] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[ArtifactDTO]:
         """In-memory fuzzy search over artifact names and descriptions.
 
@@ -542,6 +554,7 @@ class LocalArtifactRepository(IArtifactRepository):
             query: Free-form search string.
             filters: Optional additional filter constraints.
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             Matching :class:`ArtifactDTO` objects (no relevance ranking).
@@ -604,6 +617,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         dto: ArtifactDTO,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> ArtifactDTO:
         """Persist a new artifact record from a local path.
 
@@ -615,6 +629,7 @@ class LocalArtifactRepository(IArtifactRepository):
             dto: Fully populated artifact data.  ``content_path`` must point
                 to an existing filesystem path.
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             The persisted :class:`ArtifactDTO`.
@@ -650,6 +665,7 @@ class LocalArtifactRepository(IArtifactRepository):
         id: str,
         updates: dict[str, Any],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> ArtifactDTO:
         """Apply a partial update to an existing artifact.
 
@@ -661,6 +677,7 @@ class LocalArtifactRepository(IArtifactRepository):
             id: Artifact primary key (``"type:name"``).
             updates: Map of field names to new values.
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             The updated :class:`ArtifactDTO`.
@@ -718,12 +735,14 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Delete an artifact from the collection.
 
         Args:
             id: Artifact primary key (``"type:name"``).
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             ``True`` when the artifact was found and deleted, ``False`` when
@@ -769,6 +788,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> str:
         """Return the raw text content of an artifact's primary file.
 
@@ -779,6 +799,7 @@ class LocalArtifactRepository(IArtifactRepository):
         Args:
             id: Artifact primary key (``"type:name"``).
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             File content as a UTF-8 string.
@@ -851,6 +872,7 @@ class LocalArtifactRepository(IArtifactRepository):
         id: str,
         content: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Overwrite the primary file content of an artifact.
 
@@ -858,6 +880,7 @@ class LocalArtifactRepository(IArtifactRepository):
             id: Artifact primary key (``"type:name"``).
             content: New file content (UTF-8 string).
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             ``True`` on success.
@@ -937,6 +960,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[TagDTO]:
         """Return all tags currently assigned to an artifact.
 
@@ -946,6 +970,7 @@ class LocalArtifactRepository(IArtifactRepository):
         Args:
             id: Artifact primary key (``"type:name"``).
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             List of :class:`TagDTO` objects.  The DTOs carry only ``name``
@@ -976,6 +1001,7 @@ class LocalArtifactRepository(IArtifactRepository):
         id: str,
         tag_ids: List[str],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Replace the complete tag set for an artifact.
 
@@ -987,6 +1013,7 @@ class LocalArtifactRepository(IArtifactRepository):
             id: Artifact primary key (``"type:name"``).
             tag_ids: New complete list of tag name strings.
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             ``True`` on success.
@@ -1009,6 +1036,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         uuids: List[str],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> dict[str, str]:
         """Batch-map artifact UUIDs to their ``type:name`` ID strings.
 
@@ -1052,6 +1080,7 @@ class LocalArtifactRepository(IArtifactRepository):
         artifact_type: str,
         name: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[str]:
         """Resolve the stable UUID for an artifact identified by type and name.
 
@@ -1072,6 +1101,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         artifacts: List[tuple],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> dict:
         """Batch-resolve UUIDs for multiple ``(artifact_type, name)`` pairs.
 
@@ -1101,6 +1131,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         uuid: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[ArtifactDTO]:
         """Return an artifact with enriched collection-membership context.
 
@@ -1111,6 +1142,7 @@ class LocalArtifactRepository(IArtifactRepository):
         Args:
             uuid: Stable artifact UUID (32-char hex).
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             An :class:`ArtifactDTO` with collection context populated where
@@ -1173,6 +1205,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         uuid: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[CollectionMembershipDTO]:
         """Return all collections that contain the artifact identified by *uuid*.
 
@@ -1182,6 +1215,7 @@ class LocalArtifactRepository(IArtifactRepository):
         Args:
             uuid: Stable artifact UUID (32-char hex).
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             List of :class:`CollectionMembershipDTO` objects, one per
@@ -1245,6 +1279,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         uuid: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[str]:
         """Return the collection-level description for an artifact.
 
@@ -1254,6 +1289,7 @@ class LocalArtifactRepository(IArtifactRepository):
         Args:
             uuid: Stable artifact UUID (32-char hex).
             ctx: Optional per-request metadata (unused).
+            auth_context: Optional authentication context (unused in local zero-auth mode).
 
         Returns:
             Collection-level description string, or ``None`` when not set
@@ -1296,6 +1332,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         cluster_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[ArtifactDTO]:
         """Return all artifacts that belong to the given deduplication cluster.
 
@@ -1396,6 +1433,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         uuid: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Check whether an artifact with the given UUID exists.
 
@@ -1441,6 +1479,7 @@ class LocalArtifactRepository(IArtifactRepository):
         self,
         artifact_type: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[ArtifactDTO]:
         """Return all artifacts of the specified type.
 
@@ -1470,6 +1509,7 @@ class LocalArtifactRepository(IArtifactRepository):
         uuid: str,
         tags: List[str],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Replace the collection-level tags for an artifact.
 

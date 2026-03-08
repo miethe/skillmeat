@@ -1,0 +1,339 @@
+"""Click command group for SkillMeat authentication.
+
+Provides the ``skillmeat auth`` subcommand tree.  Currently exposes:
+
+    skillmeat auth login [--no-browser] [--timeout SECONDS]
+    skillmeat auth token <PAT>
+    skillmeat auth logout
+
+The ``login`` command runs the OAuth 2.0 Device Authorization Grant (RFC 8628)
+against a configured Clerk issuer.  In local (zero-auth) mode it prints an
+informative message instead of initiating the flow.
+
+Tokens returned by the flow are persisted via
+:class:`~skillmeat.cli.credential_store.CredentialStore`, which uses the
+platform keyring (macOS Keychain, Windows Credential Locker, Linux Secret
+Service) and falls back to ``~/.skillmeat/credentials.json`` (mode 0600) when
+no keyring backend is available.
+"""
+
+from __future__ import annotations
+
+import sys
+import webbrowser
+from typing import Optional
+
+import click
+from rich.console import Console
+from rich.panel import Panel
+
+from skillmeat.cli.auth_flow import (
+    AuthConfig,
+    DeviceCodeFlow,
+    DeviceCodeAccessDeniedError,
+    DeviceCodeConfigError,
+    DeviceCodeExpiredError,
+    DeviceCodeTimeoutError,
+    DeviceCodeFlowError,
+)
+from skillmeat.cli.auth_utils import is_local_mode as _is_local_mode
+from skillmeat.cli.credential_store import CredentialStore
+
+console = Console(force_terminal=True, legacy_windows=False)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# auth group
+# ---------------------------------------------------------------------------
+
+
+@click.group("auth")
+def auth_cli() -> None:
+    """Authentication commands for SkillMeat."""
+
+
+# ---------------------------------------------------------------------------
+# login sub-command
+# ---------------------------------------------------------------------------
+
+
+@auth_cli.command("login")
+@click.option(
+    "--no-browser",
+    is_flag=True,
+    default=False,
+    help="Do not attempt to open the verification URL in a browser automatically.",
+)
+@click.option(
+    "--timeout",
+    "timeout",
+    default=300,
+    show_default=True,
+    metavar="SECONDS",
+    help="Maximum time (in seconds) to wait for the user to authorize the device.",
+)
+def login(no_browser: bool, timeout: int) -> None:
+    """Log in to SkillMeat using the OAuth device code flow.
+
+    Opens a browser window and prompts you to authorize this device.  The
+    command polls for authorization until the device code expires or the
+    optional timeout is reached.
+
+    In local (zero-auth) mode this command prints an informational message
+    and exits without making any network requests.
+
+    \b
+    Examples:
+      skillmeat auth login
+      skillmeat auth login --no-browser
+      skillmeat auth login --timeout 600
+    """
+    # ------------------------------------------------------------------
+    # Local-mode guard
+    # ------------------------------------------------------------------
+    if _is_local_mode():
+        console.print(
+            Panel(
+                "[bold cyan]SkillMeat is running in local (zero-auth) mode.[/bold cyan]\n\n"
+                "No authentication is required.  All API endpoints are accessible "
+                "without credentials.\n\n"
+                "To enable authentication, set [bold]SKILLMEAT_AUTH_MODE=clerk[/bold] "
+                "and configure [bold]SKILLMEAT_AUTH_ISSUER_URL[/bold] and "
+                "[bold]SKILLMEAT_AUTH_CLIENT_ID[/bold].",
+                title="[green]Auth not required[/green]",
+                expand=False,
+            )
+        )
+        return
+
+    # ------------------------------------------------------------------
+    # Build config from environment
+    # ------------------------------------------------------------------
+    config = AuthConfig()
+
+    try:
+        _run_device_code_flow(config, no_browser=no_browser, timeout=timeout)
+    except DeviceCodeConfigError as exc:
+        raise click.ClickException(str(exc)) from exc
+    except DeviceCodeAccessDeniedError:
+        console.print("[bold red]Authorization denied.[/bold red] The request was cancelled.")
+        sys.exit(1)
+    except DeviceCodeExpiredError:
+        console.print(
+            "[bold red]Device code expired.[/bold red] "
+            "Please run [bold]skillmeat auth login[/bold] again."
+        )
+        sys.exit(1)
+    except DeviceCodeTimeoutError:
+        console.print(
+            f"[bold red]Timed out[/bold red] after {timeout} seconds waiting for authorization."
+        )
+        sys.exit(1)
+    except DeviceCodeFlowError as exc:
+        raise click.ClickException(f"Authentication error: {exc}") from exc
+    except Exception as exc:  # pragma: no cover — unexpected errors
+        raise click.ClickException(f"Unexpected error during login: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Internal flow orchestration (separated for testability)
+# ---------------------------------------------------------------------------
+
+
+def _run_device_code_flow(
+    config: AuthConfig,
+    *,
+    no_browser: bool = False,
+    timeout: int = 300,
+    credential_store: Optional[CredentialStore] = None,
+) -> None:
+    """Run the device-code flow, persist credentials, and print the result.
+
+    This function is separated from the Click command so that tests can call
+    it directly with a mock ``AuthConfig`` (and a mock HTTP client injected
+    into ``DeviceCodeFlow``).
+
+    Args:
+        config:           Populated :class:`~skillmeat.cli.auth_flow.AuthConfig`.
+        no_browser:       When True, skip the automatic ``webbrowser.open()`` call.
+        timeout:          Maximum seconds to wait for authorization.
+        credential_store: Optional :class:`~skillmeat.cli.credential_store.CredentialStore`
+                          to use for persisting tokens.  Defaults to a new
+                          :class:`~skillmeat.cli.credential_store.CredentialStore`
+                          with auto-detected backend.
+
+    Raises:
+        Any exception raised by :class:`~skillmeat.cli.auth_flow.DeviceCodeFlow`.
+    """
+    store = credential_store or CredentialStore()
+    flow = DeviceCodeFlow(config)
+
+    # Step 1 — Initiate the device-code request.
+    console.print("[dim]Requesting device code...[/dim]")
+    device_auth = flow.start()
+
+    # Step 2 — Display instructions to the user.
+    verification_url = (
+        device_auth.verification_uri_complete or device_auth.verification_uri
+    )
+    console.print(
+        Panel(
+            f"[bold]To log in, visit:[/bold]\n\n"
+            f"  [bold cyan]{device_auth.verification_uri}[/bold cyan]\n\n"
+            f"[bold]Enter code:[/bold]\n\n"
+            f"  [bold yellow]{device_auth.user_code}[/bold yellow]\n\n"
+            f"[dim]The code expires in {device_auth.expires_in} seconds.[/dim]",
+            title="[green]Authorize SkillMeat[/green]",
+            expand=False,
+        )
+    )
+
+    # Step 3 — Optionally open the browser.
+    if not no_browser:
+        opened = False
+        try:
+            opened = webbrowser.open(verification_url)
+        except Exception:  # pragma: no cover
+            pass
+        if opened:
+            console.print("[dim]Browser opened automatically.[/dim]")
+        else:
+            console.print(
+                "[dim]Could not open browser automatically. "
+                "Please visit the URL above manually.[/dim]"
+            )
+
+    # Step 4 — Poll until authorized.
+    console.print("[dim]Waiting for authorization...[/dim]")
+    result = flow.poll(device_auth, timeout=float(timeout))
+
+    # Step 5 — Persist credentials.
+    store.store(result)
+
+    # Step 6 — Report success.
+    backend_note = (
+        "Credentials stored in system keyring."
+        if store.backend_name == "keyring"
+        else "Credentials stored in ~/.skillmeat/credentials.json (mode 0600)."
+    )
+    console.print(
+        Panel(
+            "[bold green]Successfully logged in![/bold green]\n\n"
+            f"[dim]{backend_note}[/dim]",
+            title="[green]Login successful[/green]",
+            expand=False,
+        )
+    )
+
+    if result.expires_in is not None:
+        console.print(
+            f"[dim]Access token expires in {result.expires_in} seconds.[/dim]"
+        )
+
+
+# ---------------------------------------------------------------------------
+# token sub-command (PAT)
+# ---------------------------------------------------------------------------
+
+
+@auth_cli.command("token")
+@click.argument("pat")
+@click.option(
+    "--validate",
+    is_flag=True,
+    default=False,
+    help="Attempt a test API call to verify the PAT works before storing it.",
+)
+def token(pat: str, validate: bool) -> None:
+    """Store a Personal Access Token (PAT) for SkillMeat authentication.
+
+    PAT is stored using the same secure credential backend as the device-code
+    flow (system keyring when available, ``~/.skillmeat/credentials.json``
+    otherwise).  PATs do not expire via OAuth, so no ``expires_in`` is set.
+
+    \b
+    Examples:
+      skillmeat auth token sk_live_abc123
+      skillmeat auth token sk_live_abc123 --validate
+    """
+    if _is_local_mode():
+        console.print(
+            Panel(
+                "[bold cyan]SkillMeat is running in local (zero-auth) mode.[/bold cyan]\n\n"
+                "No authentication is required.  Storing a PAT has no effect in "
+                "this mode.\n\n"
+                "To enable authentication, set [bold]SKILLMEAT_AUTH_MODE=clerk[/bold] "
+                "and configure [bold]SKILLMEAT_AUTH_ISSUER_URL[/bold] and "
+                "[bold]SKILLMEAT_AUTH_CLIENT_ID[/bold].",
+                title="[green]Auth not required[/green]",
+                expand=False,
+            )
+        )
+        return
+
+    if validate:
+        console.print(
+            "[yellow]Warning:[/yellow] PAT validation is not yet implemented. "
+            "The token will be stored without verification."
+        )
+
+    from skillmeat.cli.auth_flow import DeviceCodeResult
+
+    result = DeviceCodeResult(
+        access_token=pat,
+        refresh_token=None,
+        expires_in=None,
+        token_type="Bearer",
+        id_token=None,
+    )
+
+    store = CredentialStore()
+    store.store(result)
+
+    backend_note = (
+        "Credentials stored in system keyring."
+        if store.backend_name == "keyring"
+        else "Credentials stored in ~/.skillmeat/credentials.json (mode 0600)."
+    )
+    console.print(
+        Panel(
+            "[bold green]Personal Access Token stored successfully![/bold green]\n\n"
+            f"[dim]{backend_note}[/dim]",
+            title="[green]Token stored[/green]",
+            expand=False,
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# logout sub-command
+# ---------------------------------------------------------------------------
+
+
+@auth_cli.command("logout")
+def logout() -> None:
+    """Remove stored SkillMeat credentials.
+
+    Clears any access token, refresh token, and associated metadata from the
+    active credential backend (system keyring or file).  Safe to call even
+    when no credentials are currently stored.
+
+    \b
+    Example:
+      skillmeat auth logout
+    """
+    store = CredentialStore()
+    store.clear()
+    console.print(
+        Panel(
+            "[bold green]Logged out successfully.[/bold green]\n\n"
+            "[dim]All stored credentials have been cleared.[/dim]",
+            title="[green]Logout[/green]",
+            expand=False,
+        )
+    )

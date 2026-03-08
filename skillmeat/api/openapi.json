@@ -195,6 +195,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -277,6 +280,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -409,6 +415,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -444,6 +453,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -485,6 +500,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -618,6 +639,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -694,6 +721,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -763,6 +796,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -860,6 +899,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -920,6 +965,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -1065,6 +1116,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -1157,6 +1214,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -1228,6 +1291,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -1321,6 +1390,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -1390,6 +1465,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -1487,6 +1568,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -1559,6 +1646,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -1687,6 +1780,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -1756,8 +1855,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/artifacts/discover": {
@@ -1857,6 +1967,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -1969,6 +2082,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -2088,6 +2204,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -2190,6 +2309,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -2291,6 +2413,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -2540,6 +2665,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -2652,6 +2780,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -2770,6 +2901,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -2871,6 +3005,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -2971,6 +3108,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -3091,6 +3231,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -3201,6 +3344,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -3311,6 +3460,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -3411,6 +3566,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -3520,6 +3681,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -3683,6 +3847,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -3835,6 +4002,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -3998,6 +4168,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -4108,6 +4281,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -4227,6 +4403,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -4354,6 +4533,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -4481,6 +4663,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -4591,6 +4776,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -4642,6 +4830,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -4665,6 +4859,12 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -4693,6 +4893,12 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -4802,6 +5008,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -4894,6 +5103,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -4986,6 +5198,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -5091,6 +5306,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -5144,6 +5362,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -5262,6 +5486,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -5327,6 +5554,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -5379,6 +5612,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -5509,6 +5748,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -5630,6 +5872,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -5732,6 +5977,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -5839,6 +6087,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -5965,6 +6216,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -6117,6 +6371,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -6216,6 +6473,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -6290,6 +6553,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -6362,6 +6631,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -6475,6 +6750,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -6567,6 +6848,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -6659,6 +6946,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -6781,6 +7074,100 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}/download": {
+      "get": {
+        "tags": [
+          "enterprise",
+          "enterprise"
+        ],
+        "summary": "Download enterprise artifact payload",
+        "description": "Return the complete file bundle for an enterprise artifact identified by UUID or name.  Use ``compress=true`` to receive a gzip-compressed payload instead of JSON.  Use ``version`` to pin to a specific version tag or content hash.",
+        "operationId": "download_artifact_api_v1_artifacts__artifact_id__download_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional version specifier: a version tag (e.g. ``v1.2.0``) or a 64-char SHA-256 content hash.  Omit to receive the latest version.",
+              "title": "Version"
+            },
+            "description": "Optional version specifier: a version tag (e.g. ``v1.2.0``) or a 64-char SHA-256 content hash.  Omit to receive the latest version."
+          },
+          {
+            "name": "compress",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, return gzip-compressed JSON bytes (Content-Type: application/gzip) instead of a JSON response.",
+              "default": false,
+              "title": "Compress"
+            },
+            "description": "When true, return gzip-compressed JSON bytes (Content-Type: application/gzip) instead of a JSON response."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artifact payload as JSON (default) or ``application/gzip`` bytes when ``compress=true``.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactDownloadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization header missing or not a Bearer token."
+          },
+          "403": {
+            "description": "Invalid enterprise PAT."
+          },
+          "404": {
+            "description": "Artifact or version not found for the current tenant."
+          },
+          "500": {
+            "description": "Filesystem error prevented bundle assembly."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -6824,6 +7211,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -6875,6 +7265,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -7050,6 +7443,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -7149,6 +7545,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -7224,6 +7623,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -7337,6 +7739,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -7426,6 +7831,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -7499,6 +7907,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -7577,6 +7988,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -7655,6 +8069,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -7733,6 +8150,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -7814,6 +8234,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -7893,6 +8316,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -7970,6 +8396,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -8049,6 +8478,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -8148,6 +8580,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -8235,6 +8670,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -8996,8 +9434,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/config/feature-flags": {
@@ -9019,8 +9468,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-entities": {
@@ -9164,8 +9624,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -9204,8 +9675,19 @@
           },
           "500": {
             "description": "Internal server error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-entities/batch/delete": {
@@ -9247,8 +9729,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-entities/{entity_id}": {
@@ -9297,8 +9790,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -9351,8 +9855,19 @@
           },
           "500": {
             "description": "Internal server error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -9392,8 +9907,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-entities/{entity_id}/deploy": {
@@ -9458,8 +9984,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-entities/{entity_id}/content": {
@@ -9506,8 +10043,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-modules": {
@@ -9590,8 +10138,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -9650,8 +10209,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-modules/{module_id}": {
@@ -9712,8 +10282,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -9773,8 +10354,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -9814,8 +10406,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-modules/{module_id}/memories": {
@@ -9874,8 +10477,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -9941,8 +10555,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-modules/{module_id}/memories/{memory_id}": {
@@ -9993,8 +10618,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-packs/preview": {
@@ -10055,8 +10691,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-packs/generate": {
@@ -10117,8 +10764,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/context-sync/pull": {
@@ -10192,6 +10850,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -10273,6 +10937,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -10356,6 +11026,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -10421,6 +11097,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -10497,6 +11179,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -10550,6 +11238,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -10620,6 +11314,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -10698,6 +11398,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -10759,6 +11465,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -10802,8 +11514,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -10898,8 +11621,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/deployment-sets/{set_id}": {
@@ -10942,8 +11676,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -10994,8 +11739,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -11029,8 +11785,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/deployment-sets/{set_id}/clone": {
@@ -11073,8 +11840,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/deployment-sets/{set_id}/members": {
@@ -11121,8 +11899,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -11173,8 +11962,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/deployment-sets/{set_id}/members/{member_id}": {
@@ -11219,8 +12019,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -11280,8 +12091,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/deployment-sets/{set_id}/resolve": {
@@ -11324,8 +12146,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/deployment-sets/{set_id}/deploy": {
@@ -11378,8 +12211,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/deploy": {
@@ -11469,6 +12313,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -11566,6 +12413,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -11649,6 +12499,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -11700,8 +12553,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -11780,8 +12644,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/groups/{group_id}": {
@@ -11824,8 +12699,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -11876,8 +12762,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -11911,8 +12808,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/groups/{group_id}/copy": {
@@ -11965,8 +12873,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/groups/reorder": {
@@ -12008,8 +12927,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/groups/{group_id}/artifacts": {
@@ -12062,8 +12992,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/groups/{group_id}/artifacts/{artifact_id}": {
@@ -12108,8 +13049,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -12169,8 +13121,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/groups/{group_id}/reorder-artifacts": {
@@ -12223,8 +13186,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/composites": {
@@ -12275,8 +13249,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -12325,8 +13310,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/composites/{composite_id}": {
@@ -12375,8 +13371,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -12433,8 +13440,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -12486,8 +13504,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/composites/{composite_id}/members": {
@@ -12566,8 +13595,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -12631,8 +13671,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/composites/{composite_id}/members/{member_uuid}": {
@@ -12683,8 +13734,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/mcp/servers": {
@@ -12764,6 +13826,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -12873,6 +13938,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -12973,6 +14041,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -13091,6 +14162,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -13182,6 +14256,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -13302,6 +14379,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -13402,6 +14482,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -13474,6 +14557,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -13558,6 +14644,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -13633,6 +14722,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -13850,6 +14942,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -13939,6 +15037,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -14032,6 +15136,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -14133,6 +15240,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -14174,8 +15284,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/compliance/scan": {
@@ -14244,6 +15365,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -14323,6 +15450,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -14423,6 +15556,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -14502,6 +15641,9 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
           }
         }
       }
@@ -14678,8 +15820,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/infer-url": {
@@ -14721,8 +15874,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources": {
@@ -14766,8 +15930,19 @@
           },
           "500": {
             "description": "Internal server error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -14906,8 +16081,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}": {
@@ -14956,8 +16142,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -15010,8 +16207,19 @@
           },
           "500": {
             "description": "Internal server error - GitHub API failure or database error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -15045,8 +16253,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/rescan": {
@@ -15104,8 +16323,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/sync-imported": {
@@ -15158,8 +16388,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/artifacts": {
@@ -15392,8 +16633,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/artifacts/{entry_id}": {
@@ -15455,8 +16707,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/import": {
@@ -15509,8 +16772,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/entries/{entry_id}/reimport": {
@@ -15578,8 +16852,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/artifacts/{entry_id}/exclude": {
@@ -15641,8 +16926,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -15692,8 +16988,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/catalog/{entry_id}/path-tags": {
@@ -15751,8 +17058,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -15821,8 +17139,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/artifacts/{artifact_path}/files": {
@@ -15874,8 +17203,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/artifacts/{artifact_path}/files/{file_path}": {
@@ -15936,8 +17276,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/auto-tags": {
@@ -15980,8 +17331,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -16032,8 +17394,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/{source_id}/refresh-auto-tags": {
@@ -16076,8 +17449,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/marketplace/sources/bulk-refresh-auto-tags": {
@@ -16119,8 +17503,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/match/": {
@@ -16215,8 +17610,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/count": {
@@ -16305,8 +17711,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/bulk-promote": {
@@ -16351,8 +17768,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/bulk-deprecate": {
@@ -16397,8 +17825,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/merge": {
@@ -16449,8 +17888,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/search": {
@@ -16596,8 +18046,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/global": {
@@ -16879,8 +18340,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/extract/preview": {
@@ -16935,8 +18407,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/extract/apply": {
@@ -16991,8 +18474,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items": {
@@ -17299,8 +18793,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -17362,8 +18867,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/{item_id}": {
@@ -17412,8 +18928,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -17473,8 +19000,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -17514,8 +19052,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/{item_id}/promote": {
@@ -17577,8 +19126,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/memory-items/{item_id}/deprecate": {
@@ -17640,8 +19200,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/merge/analyze": {
@@ -17723,6 +19294,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -17814,6 +19388,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -17915,6 +19492,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -18006,6 +19586,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -18076,8 +19659,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -18113,8 +19707,19 @@
           },
           "422": {
             "description": "Validation error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/project-templates/batch/delete": {
@@ -18156,8 +19761,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/project-templates/{template_id}": {
@@ -18203,8 +19819,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -18261,8 +19888,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -18299,8 +19937,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/project-templates/{template_id}/deploy": {
@@ -18359,8 +20008,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/integrations/idp/scaffold": {
@@ -18401,6 +20061,12 @@
           },
           "500": {
             "description": "Internal rendering error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -18445,6 +20111,12 @@
           },
           "500": {
             "description": "Internal error persisting the deployment record"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -18557,6 +20229,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -18636,6 +20311,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -18718,6 +20396,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -18818,6 +20499,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -18910,6 +20594,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -19037,6 +20724,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -19119,6 +20809,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -19201,6 +20894,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -19283,6 +20979,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -19383,6 +21082,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -19411,6 +21113,12 @@
           },
           "500": {
             "description": "Cache manager not available"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -19464,6 +21172,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -19507,6 +21218,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -19575,8 +21289,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -19629,8 +21354,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/ratings/artifacts/{artifact_id}/scores": {
@@ -19715,8 +21451,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/settings/github-token": {
@@ -20625,8 +22372,19 @@
           },
           "500": {
             "description": "Internal server error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -20662,8 +22420,19 @@
           },
           "500": {
             "description": "Internal server error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/colors/{color_id}": {
@@ -20715,8 +22484,19 @@
           },
           "500": {
             "description": "Internal server error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -20756,8 +22536,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/settings/icon-packs": {
@@ -20987,8 +22778,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -21058,8 +22860,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/tags/search": {
@@ -21130,8 +22943,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/tags/{tag_id}": {
@@ -21180,8 +23004,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -21244,8 +23079,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -21285,8 +23131,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/tags/slug/{slug}": {
@@ -21335,8 +23192,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/versions/snapshots": {
@@ -21448,6 +23316,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -21527,6 +23398,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -21627,6 +23501,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       },
@@ -21718,6 +23595,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -21818,6 +23698,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -21910,6 +23793,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         }
       }
@@ -21983,6 +23869,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
         },
         "security": [
@@ -22076,8 +23965,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -22119,8 +24019,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflows/batch/delete": {
@@ -22162,8 +24073,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflows/{workflow_id}": {
@@ -22208,8 +24130,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -22262,8 +24195,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -22297,8 +24241,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflows/{workflow_id}/duplicate": {
@@ -22360,8 +24315,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflows/{workflow_id}/validate": {
@@ -22423,8 +24389,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflows/{workflow_id}/plan": {
@@ -22486,8 +24463,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions": {
@@ -22531,8 +24519,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -22632,8 +24631,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/by-workflow/{workflow_id}": {
@@ -22708,8 +24718,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/batch/pause": {
@@ -22751,8 +24772,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/batch/resume": {
@@ -22794,8 +24826,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/batch/cancel": {
@@ -22837,8 +24880,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/{execution_id}": {
@@ -22883,8 +24937,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/{execution_id}/stream": {
@@ -22925,8 +24990,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/{execution_id}/pause": {
@@ -22971,8 +25047,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/{execution_id}/resume": {
@@ -23017,8 +25104,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/{execution_id}/cancel": {
@@ -23063,8 +25161,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/{execution_id}/gates/{stage_id}/approve": {
@@ -23118,8 +25227,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/workflow-executions/{execution_id}/gates/{stage_id}/reject": {
@@ -23190,8 +25310,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/": {
@@ -23238,8 +25369,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials."
+          },
+          "403": {
+            "description": "Authenticated but lacking required scope."
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     }
   },
@@ -23901,6 +26043,30 @@
             ],
             "title": "Description",
             "description": "Override description"
+          },
+          "owner_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Type",
+            "description": "Owner type: 'user' or 'team'. Defaults to 'user' when not provided."
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility",
+            "description": "Visibility: 'private', 'team', or 'public'. Defaults to 'private' when not provided."
           }
         },
         "type": "object",
@@ -23916,6 +26082,7 @@
           "collection": "default",
           "description": "Canvas design skill",
           "name": "canvas",
+          "owner_type": "user",
           "source": "anthropics/skills/canvas-design",
           "source_type": "github",
           "tags": [
@@ -23925,7 +26092,8 @@
           "target_platforms": [
             "claude_code",
             "codex"
-          ]
+          ],
+          "visibility": "private"
         }
       },
       "ArtifactCreateResponse": {
@@ -24259,6 +26427,102 @@
           }
         }
       },
+      "ArtifactDownloadResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "UUID identifying the artifact"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Resolved version tag, or \"unknown\" when no versions exist",
+            "examples": [
+              "v1.2.0",
+              "latest",
+              "unknown"
+            ]
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash",
+            "description": "SHA-256 hex digest of the artifact at the resolved version"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ArtifactMetadata",
+            "description": "Artifact metadata"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactFileEntry"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Ordered list of files comprising the artifact bundle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "metadata",
+          "files"
+        ],
+        "title": "ArtifactDownloadResponse",
+        "description": "Response payload for the enterprise artifact download endpoint.\n\nReturned by ``GET /api/v1/artifacts/{artifact_id}/download`` when\n``compress=False`` (default).  When ``compress=True`` the endpoint\nreturns raw ``application/gzip`` bytes instead.\n\nAttributes\n----------\nartifact_id:\n    UUID string identifying the artifact in the enterprise DB.\nversion:\n    Resolved version tag (e.g. ``\"v1.2.0\"``), or ``\"unknown\"`` when\n    no version rows exist.\ncontent_hash:\n    SHA-256 hex digest of the artifact files at the resolved version,\n    or an empty string when unavailable.\nmetadata:\n    Structured artifact metadata (name, type, source).\nfiles:\n    Ordered list of file entries comprising the artifact bundle."
+      },
+      "ArtifactFileEntry": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Relative POSIX path within the artifact directory"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "File contents (UTF-8 text or base64-encoded for binary files)"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size",
+            "description": "File size in bytes"
+          },
+          "encoding": {
+            "type": "string",
+            "title": "Encoding",
+            "description": "Content encoding: \"utf-8\" for text files, \"base64\" for binary",
+            "examples": [
+              "utf-8",
+              "base64"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "content",
+          "size",
+          "encoding"
+        ],
+        "title": "ArtifactFileEntry",
+        "description": "A single file within an artifact payload bundle.\n\nAttributes\n----------\npath:\n    Relative POSIX path of the file within the artifact directory.\ncontent:\n    File contents — UTF-8 text or base64-encoded bytes for binary files.\nsize:\n    File size in bytes.\nencoding:\n    ``\"utf-8\"`` for text files, ``\"base64\"`` for binary files."
+      },
       "ArtifactGroupMembership": {
         "properties": {
           "id": {
@@ -24541,6 +26805,45 @@
         ],
         "title": "ArtifactListResponse",
         "description": "Paginated response for artifact listings."
+      },
+      "ArtifactMetadata": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable artifact name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Artifact type (e.g. skill, command, agent, composite)",
+            "examples": [
+              "skill",
+              "command",
+              "agent",
+              "composite"
+            ]
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Upstream source URL or identifier, if available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "ArtifactMetadata",
+        "description": "Metadata describing an enterprise artifact.\n\nAttributes\n----------\nname:\n    Human-readable artifact name (e.g. ``\"canvas-design\"``).\ntype:\n    Artifact type string (e.g. ``\"skill\"``, ``\"command\"``).\nsource:\n    Optional upstream source URL or identifier."
       },
       "ArtifactMetadataResponse": {
         "properties": {
@@ -25060,6 +27363,43 @@
             ],
             "title": "Import Id",
             "description": "Marketplace import batch ID if imported from marketplace"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id",
+            "description": "UUID of the owning user or team"
+          },
+          "owner_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Type",
+            "description": "Owner type: 'user' or 'team'"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility",
+            "description": "Visibility level: 'private', 'team', or 'public'"
           }
         },
         "type": "object",
@@ -25512,6 +27852,30 @@
               }
             ],
             "description": "Artifact metadata to update"
+          },
+          "owner_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Type",
+            "description": "Owner type: 'user' or 'team'."
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility",
+            "description": "Visibility: 'private', 'team', or 'public'."
           }
         },
         "type": "object",
@@ -25526,11 +27890,13 @@
             ],
             "title": "Enhanced PDF Processor"
           },
+          "owner_type": "user",
           "tags": [
             "document",
             "pdf",
             "productivity"
-          ]
+          ],
+          "visibility": "private"
         }
       },
       "ArtifactUpstreamDiffResponse": {
@@ -30071,6 +32437,43 @@
             "format": "date-time",
             "title": "Updated",
             "description": "Last update timestamp"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id",
+            "description": "UUID of the owning user or team"
+          },
+          "owner_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Type",
+            "description": "Owner type: 'user' or 'team'"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility",
+            "description": "Visibility level: 'private', 'team', or 'public'"
           }
         },
         "type": "object",
@@ -30089,8 +32492,10 @@
           "created": "2024-11-16T12:00:00Z",
           "id": "default",
           "name": "default",
+          "owner_type": "user",
           "updated": "2024-11-16T15:30:00Z",
-          "version": "1.0.0"
+          "version": "1.0.0",
+          "visibility": "private"
         }
       },
       "ColorCreateRequest": {
@@ -49917,6 +52322,18 @@
       "HTTPBearer": {
         "type": "http",
         "scheme": "bearer"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "\nJWT Bearer token authentication. Send the token in the `Authorization: Bearer <token>` header.\n\n**Supported providers**: `local` (SkillMeat-issued PATs) and `clerk` (Clerk.dev JWTs).\n\n### Available Scopes\n\n| Scope | Description |\n|-------|-------------|\n| `artifact:read` | Read artifact data |\n| `artifact:write` | Create, update, and delete artifacts |\n| `collection:read` | Read collection data |\n| `collection:write` | Create, update, and delete collections |\n| `deployment:read` | Read deployment data |\n| `deployment:write` | Create, update, and delete deployments |\n| `admin:*` | Full administrative access (wildcard — grants all scopes) |\n\n### Roles\n\n| Role | Description |\n|------|-------------|\n| `system_admin` | Full system access (service accounts only) |\n| `team_admin` | Team administration |\n| `team_member` | Standard team member |\n| `viewer` | Read-only access |\n\n### Auth Bypass\n\nWhen `auth_enabled=false` (development default), the server accepts all requests\nwithout credentials. Set `SKILLMEAT_AUTH_ENABLED=true` to enforce authentication.\n"
+      },
+      "APIKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Legacy API key authentication. Prefer Bearer tokens for new integrations."
       }
     }
   },

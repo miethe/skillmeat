@@ -2,7 +2,7 @@
 schema_version: 2
 doc_type: prd
 title: 'PRD: Storage Abstraction & Repository Pattern Refactor'
-status: in-progress
+status: inferred_complete
 created: 2026-03-01
 updated: '2026-03-04'
 feature_slug: repo-pattern-refactor

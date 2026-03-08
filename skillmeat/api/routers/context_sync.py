@@ -16,7 +16,12 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from skillmeat.api.dependencies import ContextSyncServiceDep, verify_api_key
+from skillmeat.api.dependencies import (
+    ContextSyncServiceDep,
+    verify_api_key,
+    get_auth_context,
+    require_auth,
+)
 from skillmeat.api.schemas.context_sync import (
     SyncConflictResponse,
     SyncPullRequest,
@@ -26,6 +31,7 @@ from skillmeat.api.schemas.context_sync import (
     SyncStatusResponse,
 )
 from skillmeat.core.services.context_sync import ContextSyncService, SyncConflict
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +82,7 @@ router = APIRouter(
 async def pull_changes(
     request: SyncPullRequest,
     sync_service: ContextSyncServiceDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> List[SyncResultResponse]:
     """Pull changes from project to collection.
 
@@ -180,6 +187,7 @@ async def pull_changes(
 async def push_changes(
     request: SyncPushRequest,
     sync_service: ContextSyncServiceDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> List[SyncResultResponse]:
     """Push collection changes to project.
 
@@ -281,6 +289,7 @@ async def push_changes(
 async def get_sync_status(
     sync_service: ContextSyncServiceDep,
     project_path: str = Query(..., description="Absolute path to project directory"),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> SyncStatusResponse:
     """Get sync status for a project.
 
@@ -396,6 +405,7 @@ async def get_sync_status(
 async def resolve_conflict(
     request: SyncResolveRequest,
     sync_service: ContextSyncServiceDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> SyncResultResponse:
     """Resolve sync conflict.
 

@@ -12,9 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from skillmeat.api.dependencies import (
     CollectionManagerDep,
     DeploymentRepoDep,
+    get_auth_context,
+    require_auth,
     verify_api_key,
 )
 from skillmeat.api.middleware.auth import TokenDep
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.common import ErrorResponse
 from skillmeat.api.schemas.deployments import (
     DeploymentInfo,
@@ -118,6 +121,7 @@ async def deploy_artifact(
     deployment_mgr: DeploymentManager = Depends(get_deployment_manager),
     token: TokenDep = None,
     deployment_repo: DeploymentRepoDep = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> DeploymentResponse:
     """Deploy an artifact to a project.
 
@@ -328,6 +332,7 @@ async def undeploy_artifact(
     deployment_mgr: DeploymentManager = Depends(get_deployment_manager),
     token: TokenDep = None,
     deployment_repo: DeploymentRepoDep = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> UndeployResponse:
     """Remove a deployed artifact from a project.
 
@@ -456,6 +461,7 @@ async def list_deployments(
         default=None,
         description="Optional deployment profile ID filter",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> DeploymentListResponse:
     """List all deployed artifacts in a project.
 

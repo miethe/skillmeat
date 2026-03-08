@@ -14955,6 +14955,16 @@ main.add_command(enterprise_cli, name="enterprise")
 
 
 # ====================
+# Auth Command Group
+# ====================
+
+
+from skillmeat.cli.commands.auth import auth_cli  # noqa: E402
+
+main.add_command(auth_cli, name="auth")
+
+
+# ====================
 # Entry Point
 # ====================
 

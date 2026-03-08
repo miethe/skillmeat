@@ -23,6 +23,8 @@ from skillmeat.core.services.context_sync import (
     SyncConflict,
     SyncResult,
 )
+from skillmeat.core.services.artifact_service import ArtifactService
+from skillmeat.core.services.collection_service import CollectionService as CoreCollectionService
 from skillmeat.core.services.tag_service import TagService
 from skillmeat.core.services.tag_write_service import TagWriteService
 from skillmeat.core.services.context_module_service import ContextModuleService
@@ -56,6 +58,9 @@ __all__ = [
     "ContextSyncService",
     "SyncConflict",
     "SyncResult",
+    # Core repository-wrapping services (SVR-007)
+    "ArtifactService",
+    "CoreCollectionService",
     # Tag service
     "TagService",
     # Tag write service (filesystem persistence)

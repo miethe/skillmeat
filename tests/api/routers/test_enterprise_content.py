@@ -4,8 +4,9 @@ Covers:
     GET /api/v1/artifacts/{artifact_id}/download
 
 Authentication is performed via ``verify_enterprise_pat``; the test fixture
-sets ``ENTERPRISE_PAT_SECRET=test-secret`` in the environment and sends
-``Authorization: Bearer test-secret`` in all authorized requests.
+injects the PAT secret through ``app.dependency_overrides[get_settings]`` (the
+canonical path) and sends ``Authorization: Bearer test-secret`` in all
+authorized requests.
 
 The ``EnterpriseContentService`` dependency is overridden at the FastAPI
 dependency level so no real DB or filesystem access occurs.
@@ -15,7 +16,6 @@ from __future__ import annotations
 
 import gzip
 import json
-import os
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -71,14 +71,9 @@ _SAMPLE_PAYLOAD: Dict[str, Any] = {
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture(autouse=True)
-def set_enterprise_pat_secret(monkeypatch):
-    """Inject the ENTERPRISE_PAT_SECRET env var for every test in this module."""
-    monkeypatch.setenv("ENTERPRISE_PAT_SECRET", VALID_PAT)
-
-
 @pytest.fixture
 def test_settings():
+    """APISettings with the enterprise PAT secret pre-configured."""
     return APISettings(
         env=Environment.TESTING,
         host="127.0.0.1",
@@ -86,6 +81,7 @@ def test_settings():
         log_level="DEBUG",
         api_key_enabled=False,
         auth_enabled=False,
+        enterprise_pat_secret=VALID_PAT,
     )
 
 
@@ -339,14 +335,27 @@ class TestInvalidPAT:
         assert "detail" in body
 
     def test_403_when_enterprise_pat_secret_not_configured(
-        self, client: TestClient, monkeypatch
+        self, app, mock_service
     ):
-        """When ENTERPRISE_PAT_SECRET is unset the server fails closed with 403."""
-        monkeypatch.delenv("ENTERPRISE_PAT_SECRET", raising=False)
+        """When enterprise_pat_secret is absent the server fails closed with 403."""
+        from skillmeat.api.config import APISettings, Environment, get_settings
 
-        resp = client.get(
-            download_url(),
-            headers={"Authorization": "Bearer any-token"},
+        unconfigured_settings = APISettings(
+            env=Environment.TESTING,
+            host="127.0.0.1",
+            port=8000,
+            log_level="DEBUG",
+            api_key_enabled=False,
+            auth_enabled=False,
+            # enterprise_pat_secret intentionally omitted (defaults to None)
         )
+        app.dependency_overrides[get_settings] = lambda: unconfigured_settings
+        app.dependency_overrides[_get_content_service] = lambda: mock_service
+
+        with TestClient(app, raise_server_exceptions=True) as c:
+            resp = c.get(
+                download_url(),
+                headers={"Authorization": "Bearer any-token"},
+            )
 
         assert resp.status_code == 403

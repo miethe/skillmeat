@@ -12,14 +12,19 @@ import json
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from skillmeat.api.dependencies import MarketplaceCatalogRepoDep
+from skillmeat.api.dependencies import (
+    MarketplaceCatalogRepoDep,
+    get_auth_context,
+    require_auth,
+)
 from skillmeat.api.schemas.marketplace import (
     CatalogSearchResponse,
     CatalogSearchResult,
 )
 from skillmeat.cache.models import MarketplaceCatalogEntry
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +164,7 @@ async def search_catalog(
         description="Pagination cursor from previous response",
         examples=["95:cat_abc123"],
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> CatalogSearchResponse:
     """Search artifacts across all marketplace sources.
 

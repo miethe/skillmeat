@@ -25,9 +25,12 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import ArtifactDTO, CatalogItemDTO, MarketplaceSourceDTO
 from skillmeat.core.interfaces.repositories import IMarketplaceSourceRepository
 
@@ -292,6 +295,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         self,
         filters: Optional[Dict[str, Any]] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[MarketplaceSourceDTO]:
         """Return all configured marketplace sources.
 
@@ -322,6 +326,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         self,
         source_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[MarketplaceSourceDTO]:
         """Return a marketplace source by its identifier.
 
@@ -347,6 +352,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         description: Optional[str] = None,
         supports_publish: bool = False,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> MarketplaceSourceDTO:
         """Register a new marketplace source.
 
@@ -408,6 +414,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         source_id: str,
         updates: Dict[str, Any],
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> MarketplaceSourceDTO:
         """Apply a partial update to a marketplace source configuration.
 
@@ -473,6 +480,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         self,
         source_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Remove a marketplace source configuration.
 
@@ -500,6 +508,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         page: int = 1,
         limit: int = 50,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[CatalogItemDTO]:
         """Return paginated catalog listings from one or all sources.
 
@@ -577,6 +586,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         source_id: Optional[str] = None,
         strategy: str = "keep",
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[ArtifactDTO]:
         """Download and import a marketplace listing into the local collection.
 
@@ -724,6 +734,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         self,
         composite_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[ArtifactDTO]:
         """Return the child artifacts that make up a composite listing.
 
@@ -822,6 +833,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         entry_id: str,
         source_id: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[Any]:
         """Return the raw ORM ``MarketplaceCatalogEntry`` object.
 
@@ -849,6 +861,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         excluded: bool,
         reason: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Any:
         """Toggle exclusion status on a catalog entry.
 
@@ -880,6 +893,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         source_id: str,
         path_segments_json: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Any:
         """Persist updated ``path_segments`` JSON for a catalog entry.
 
@@ -909,6 +923,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         self,
         artifact_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[Any]:
         """Return the raw ORM ``Artifact`` row for the given ``type:name`` id.
 
@@ -941,6 +956,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
         child_artifact_ids: List[str],
         collection_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> int:
         """Create or update ``CompositeMembership`` rows.
 
@@ -1019,6 +1035,7 @@ class LocalMarketplaceSourceRepository(IMarketplaceSourceRepository):
     def commit_source_session(
         self,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> None:
         """Flush pending changes on the underlying source repository session.
 

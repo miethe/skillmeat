@@ -22,11 +22,14 @@ from __future__ import annotations
 import base64
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.deployment import Deployment, DeploymentManager
 from skillmeat.core.interfaces.context import RequestContext
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.interfaces.dtos import DeploymentDTO
 from skillmeat.core.interfaces.repositories import IDeploymentRepository
 from skillmeat.core.path_resolver import ProjectPathResolver
@@ -152,6 +155,7 @@ class LocalDeploymentRepository(IDeploymentRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> Optional[DeploymentDTO]:
         """Return a deployment record by its ``"type:name"`` identifier.
 
@@ -179,6 +183,7 @@ class LocalDeploymentRepository(IDeploymentRepository):
         self,
         filters: Optional[Dict[str, Any]] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[DeploymentDTO]:
         """Return deployment records matching optional filter criteria.
 
@@ -234,6 +239,7 @@ class LocalDeploymentRepository(IDeploymentRepository):
         project_id: str,
         options: Optional[Dict[str, Any]] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> DeploymentDTO:
         """Deploy an artifact to a project.
 
@@ -296,6 +302,7 @@ class LocalDeploymentRepository(IDeploymentRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Remove a deployed artifact from its project.
 
@@ -340,6 +347,7 @@ class LocalDeploymentRepository(IDeploymentRepository):
         self,
         id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> str:
         """Return the current deployment status for a deployment record.
 
@@ -362,6 +370,7 @@ class LocalDeploymentRepository(IDeploymentRepository):
         self,
         artifact_id: str,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> List[DeploymentDTO]:
         """Return all deployments for a given artifact.
 
@@ -386,6 +395,7 @@ class LocalDeploymentRepository(IDeploymentRepository):
         provisioned_by: str,
         description: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> tuple:
         """Idempotently create or update a DeploymentSet for an IDP registration.
 
@@ -473,6 +483,7 @@ class LocalDeploymentRepository(IDeploymentRepository):
         local_modifications: bool = False,
         platform: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Upsert a single deployment entry into the artifact cache.
 
@@ -535,6 +546,7 @@ class LocalDeploymentRepository(IDeploymentRepository):
         project_path: str,
         profile_id: Optional[str] = None,
         ctx: Optional[RequestContext] = None,
+        auth_context: Optional[AuthContext] = None,
     ) -> bool:
         """Remove a deployment entry from the artifact cache.
 

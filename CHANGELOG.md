@@ -9,6 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Authentication, Authorization & Accounting (AAA) with RBAC Foundation (2026-03-07)
+
+**Phase 1: Database Layer**
+- Authentication schema models: User, Team, TeamMember with support for multi-tenancy
+- RBAC enums: Role (Owner, Admin, Editor, Viewer), Scope (Personal, Team, System)
+- Owner tracking: owner_id, owner_type, and visibility fields added to all entities for tenant isolation
+- Alembic migrations for SQLite (local) and PostgreSQL (enterprise) with idempotency for existing databases
+- Supplementary indexes on owner_id and visibility fields for query performance
+
+**Phase 2: Service & Repository Layer**
+- AuthContext dataclass for representing authenticated user identity, roles, and tenant scope
+- TenantContext helpers for owner/team membership validation and visibility rules
+- Repository interfaces updated with auth_context parameter for all CRUD operations
+- Service layer becomes auth-context-aware; all mutations perform owner validation
+- DTOs now include ownership and visibility fields for client-side filtering
+
+**Phase 3: API Layer & Middleware**
+- Pluggable AuthProvider abstraction (LocalAuthProvider for development, ClerkAuthProvider for enterprise)
+- require_auth dependency for FastAPI route protection; secure-by-default route design
+- TenantContext middleware for automatic auth_context extraction and propagation
+- All API routers refactored to accept optional auth_context parameter
+- Visibility filtering on all queries; owner validation on all mutations
+- 34 integration tests validating auth provider behavior and route protection
+
+**Phase 4: Frontend - Authentication UI**
+- Pluggable auth provider abstraction for seamless provider swaps (Clerk SDK setup included)
+- Login/signup pages with OAuth device code flow support and PAT token fallback
+- Route protection middleware preventing unauthenticated access to protected pages
+- Workspace switcher component for switching between personal and team contexts
+- User profile section in settings page with identity and role display
+- Auth token injection in API client for authenticated requests
+- E2E tests for auth flows in both zero-auth and auth-enabled modes
+
+**Phase 5: CLI Authentication**
+- `skillmeat auth login` command with OAuth device code flow for interactive authentication
+- `skillmeat auth token` command for PAT token configuration
+- `skillmeat auth logout` command for credential removal
+- Secure credential storage using system keyring (macOS, Windows, Linux) with fallback to plaintext for headless environments
+- Token refresh mechanism and authenticated HTTP client for API requests
+- 8+ integration tests covering all auth flows including zero-auth regression tests
+
+**Phase 6: Comprehensive Testing & Documentation**
+- 102 unit and integration tests covering auth providers, TenantContext, and RBAC rules
+- RBAC scope validation tests ensuring only authorized users can access resources
+- Owner validation tests verifying mutations are protected against unauthorized modifications
+- Tenant isolation integration tests confirming data isolation between tenants
+- E2E Playwright tests for complete auth flows including login, signup, and workspace switching
+- Auth security edge case tests covering permission boundaries and elevation attempts
+- Zero-auth regression tests confirming backward compatibility with zero-auth mode
+- Architecture review addendum documenting AAA/RBAC design decisions
+- Auth provider swap guide for future customization
+
+**Key Capabilities:**
+- **Zero-Auth Mode Preserved**: Local development continues to work without authentication; auth is opt-in via config
+- **Multi-Tenancy**: Owner-based data isolation ensures team members only see their authorized data
+- **RBAC**: Role-based access control with scopes (Personal, Team, System) allows fine-grained permissions
+- **Visibility Filtering**: All queries automatically filter results based on user visibility rules
+- **Owner Validation**: All mutations verified against ownership before execution
+- **Secure Credential Storage**: Passwords and tokens stored via system keyring with secure fallbacks
+- **Provider Flexibility**: Swappable auth providers enable future integrations (SAML, custom SSO, etc.)
+
+---
+
 #### Hexagonal Architecture / Repository Pattern Refactor (2026-03-04)
 
 **Phase 1: Core Interfaces**

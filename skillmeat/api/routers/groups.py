@@ -21,12 +21,15 @@ API Endpoints:
 import logging
 from typing import TYPE_CHECKING, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from skillmeat.api.dependencies import (
     ArtifactRepoDep,
     GroupRepoDep,
+    get_auth_context,
+    require_auth,
 )
+from skillmeat.api.schemas.auth import AuthContext
 
 if TYPE_CHECKING:
     from skillmeat.core.interfaces.repositories import IArtifactRepository
@@ -162,6 +165,7 @@ def _build_group_with_artifacts_response(
 async def create_group(
     request: GroupCreateRequest,
     group_repo: GroupRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> GroupResponse:
     """Create a new group in a collection.
 
@@ -247,6 +251,7 @@ async def list_groups(
     artifact_id: Optional[str] = Query(
         None, description="Filter to groups containing this artifact"
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> GroupListResponse:
     """List all groups in a collection.
 
@@ -311,6 +316,7 @@ async def get_group(
     group_id: str,
     group_repo: GroupRepoDep,
     artifact_repo: ArtifactRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> GroupWithArtifactsResponse:
     """Get a single group with its artifacts.
 
@@ -364,6 +370,7 @@ async def update_group(
     group_id: str,
     request: GroupUpdateRequest,
     group_repo: GroupRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> GroupResponse:
     """Update a group's metadata.
 
@@ -431,6 +438,7 @@ async def update_group(
 async def delete_group(
     group_id: str,
     group_repo: GroupRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> None:
     """Delete a group.
 
@@ -481,6 +489,7 @@ async def copy_group(
     group_id: str,
     request: CopyGroupRequest,
     group_repo: GroupRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> GroupResponse:
     """Copy a group to another collection.
 
@@ -542,6 +551,7 @@ async def copy_group(
 async def reorder_groups(
     request: GroupReorderRequest,
     group_repo: GroupRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> GroupListResponse:
     """Bulk reorder groups by updating their positions.
 
@@ -646,6 +656,7 @@ async def add_artifacts_to_group(
     request: AddGroupArtifactsRequest,
     group_repo: GroupRepoDep,
     artifact_repo: ArtifactRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> GroupWithArtifactsResponse:
     """Add artifacts to a group.
 
@@ -774,6 +785,7 @@ async def remove_artifact_from_group(
     artifact_id: str,
     group_repo: GroupRepoDep,
     artifact_repo: ArtifactRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> None:
     """Remove an artifact from a group.
 
@@ -838,6 +850,7 @@ async def update_artifact_position(
     position_update: ArtifactPositionUpdate,
     group_repo: GroupRepoDep,
     artifact_repo: ArtifactRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> GroupArtifactResponse:
     """Update an artifact's position in a group.
 
@@ -933,6 +946,7 @@ async def reorder_artifacts_in_group(
     request: ReorderArtifactsRequest,
     group_repo: GroupRepoDep,
     artifact_repo: ArtifactRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> GroupWithArtifactsResponse:
     """Bulk reorder artifacts in a group.
 

@@ -83,6 +83,8 @@ uvicorn skillmeat.api.server:app --workers 4 --host 0.0.0.0 --port 8080
 
 **APISettings Class** (Pydantic BaseSettings):
 
+### Environment & Server
+
 | Field | Default | Description |
 |-------|---------|-------------|
 | `env` | `development` | Environment: development, production, testing |
@@ -90,21 +92,80 @@ uvicorn skillmeat.api.server:app --workers 4 --host 0.0.0.0 --port 8080
 | `port` | `8080` | Server port |
 | `reload` | `false` | Auto-reload on code changes |
 | `workers` | `1` | Worker processes |
+
+### Edition & Deployment
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `edition` | `local` | Deployment edition: `local` (filesystem, single-tenant) or `enterprise` (DB-backed, multi-tenant). Controls repository implementation selection in `dependencies.py` DI factories. |
+
+### Authentication
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `auth_enabled` | `false` | Master enforcement switch. When `false`, `LocalAuthProvider` is used (all requests authorized as local_admin, no credentials needed). When `true`, the configured `auth_provider` validates credentials. |
+| `auth_provider` | `local` | Provider selection: `local` (LocalAuthProvider) or `clerk` (ClerkAuthProvider). |
+| `clerk_jwks_url` | `null` | Clerk JWKS endpoint. Required when `auth_provider=clerk`. Env var: `CLERK_JWKS_URL` or `SKILLMEAT_CLERK_JWKS_URL`. |
+| `clerk_issuer` | `null` | Expected JWT `iss` claim. Optional but recommended. Env var: `CLERK_ISSUER` or `SKILLMEAT_CLERK_ISSUER`. |
+| `clerk_audience` | `null` | Expected JWT `aud` claim. Optional. Env var: `CLERK_AUDIENCE` or `SKILLMEAT_CLERK_AUDIENCE`. |
+| `enterprise_pat_secret` | `null` | Shared secret for enterprise PAT auth (enterprise edition only). Env var: `SKILLMEAT_ENTERPRISE_PAT_SECRET` (primary) or legacy `ENTERPRISE_PAT_SECRET` (deprecated). Read at request-time, allows rotation without restart. |
+
+### CORS
+
+| Field | Default | Description |
+|-------|---------|-------------|
 | `cors_enabled` | `true` | Enable CORS |
 | `cors_origins` | `["http://localhost:3000", "http://localhost:3001", ...]` | Allowed CORS origins |
-| `api_key_enabled` | `false` | Enable API key authentication |
+| `cors_allow_credentials` | `true` | Allow credentials in CORS requests |
+| `cors_allow_methods` | `["*"]` | Allowed HTTP methods for CORS |
+| `cors_allow_headers` | `["*"]` | Allowed headers for CORS |
+
+### API Keys (Legacy)
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `api_key_enabled` | `false` | Enable API key authentication (legacy, use Bearer tokens instead) |
 | `api_key` | `null` | API key value (if enabled) |
-| `auth_enabled` | `false` | Require bearer token auth |
-| `rate_limit_enabled` | `false` | Enable rate limiting |
-| `rate_limit_requests` | `100` | Max requests per minute |
+
+### Logging
+
+| Field | Default | Description |
+|-------|---------|-------------|
 | `log_level` | `INFO` | DEBUG, INFO, WARNING, ERROR, CRITICAL |
 | `log_format` | `json` | Log format: json or text |
+
+### Collection & Storage
+
+| Field | Default | Description |
+|-------|---------|-------------|
 | `collection_dir` | `~/.skillmeat/collections` | Override collection path |
-| `github_token` | `null` | GitHub PAT for higher rate limits |
+
+### GitHub Integration
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `github_token` | `null` | GitHub PAT for higher API rate limits (5000/hr vs 60/hr) |
+
+### Feature Flags
+
+| Field | Default | Description |
+|-------|---------|-------------|
 | `enable_auto_discovery` | `true` | Artifact auto-discovery feature |
 | `enable_auto_population` | `true` | Auto-populate GitHub metadata |
 | `discovery_cache_ttl` | `3600` | Cache TTL in seconds |
+| `composite_artifacts_enabled` | `true` | Enable composite artifact detection during discovery |
+| `deployment_sets_enabled` | `true` | Enable deployment sets feature |
+| `memory_context_enabled` | `true` | Enable Memory & Context Intelligence System |
 | `workflow_engine_enabled` | `true` | Enable workflow orchestration engine |
+| `modular_content_architecture` | `false` | Enable Modular Content Architecture for context entities |
+| `memory_auto_extract` | `false` | Enable automatic memory extraction from conversations |
+
+### Rate Limiting
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `rate_limit_enabled` | `false` | Enable rate limiting |
+| `rate_limit_requests` | `100` | Max requests per minute |
 
 **Environment Variables** (prefix `SKILLMEAT_`):
 
@@ -325,11 +386,13 @@ app.add_middleware(CORSMiddleware,
 
 ### Authentication
 
-**File**: `middleware/auth.py`
+**Files**: `middleware/auth.py` (legacy), `middleware/enterprise_auth.py`, `middleware/tenant_context.py`, `auth/` (provider implementations)
 
-- `APIKeyHeader` security scheme (optional)
-- Bearer token validation via `verify_api_key()`
-- Configurable via `api_key_enabled` and `auth_enabled` settings
+**Key invariant**: All `/api/v1/*` routes are protected by default via the registered `AuthProvider`. `LocalAuthProvider` must always remain as the default fallback (zero-config local dev + single-tenant mode).
+
+**New endpoints**: Use `AuthContextDep` / `require_auth()` from `dependencies.py` — not the legacy `TokenDep` from `middleware/auth.py`.
+
+**Full reference**: `.claude/context/key-context/auth-architecture.md` — provider selection, `AuthContext` fields, Role/Scope tables, tenant context, owner_id type mismatch, anti-patterns.
 
 ### Rate Limiting
 
@@ -556,6 +619,7 @@ async def create_artifact(
 
 | File | Load When |
 |------|-----------|
+| `.claude/context/key-context/auth-architecture.md` | Adding auth to endpoints, modifying auth middleware, debugging 401/403, working with RBAC/scopes |
 | `.claude/context/key-context/repository-architecture.md` | **NEW**: Adding endpoints, refactoring routers to repository DI, designing new storage backends |
 | `.claude/context/key-context/context-loading-playbook.md` | Select minimal context by task |
 | `.claude/context/key-context/api-contract-source-of-truth.md` | Endpoint/schema validation and drift checks |

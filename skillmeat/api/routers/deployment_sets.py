@@ -22,7 +22,9 @@ API Endpoints:
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from skillmeat.api.dependencies import get_auth_context, require_auth
 
 from skillmeat.api.schemas.deployment_sets import (
     BatchDeployRequest,
@@ -42,6 +44,7 @@ from skillmeat.cache.models import DeploymentSet, DeploymentSetMember
 from skillmeat.cache.repositories import RepositoryError
 from skillmeat.core.deployment_sets import DeploymentSetService
 from skillmeat.core.exceptions import DeploymentSetCycleError, DeploymentSetResolutionError
+from skillmeat.api.schemas.auth import AuthContext
 
 from ..config import get_settings
 from ..dependencies import ArtifactManagerDep, ArtifactRepoDep, DbSessionDep, DeploymentSetRepoDep, SettingsDep
@@ -123,6 +126,7 @@ def create_deployment_set(
     request: DeploymentSetCreate,
     settings: SettingsDep,
     repo: DeploymentSetRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> DeploymentSetResponse:
     """Create a new named deployment set owned by the current user.
 
@@ -168,6 +172,7 @@ def list_deployment_sets(
     tag: Optional[str] = Query(default=None, description="Filter by tag"),
     limit: int = Query(default=50, ge=1, le=200, description="Page size"),
     offset: int = Query(default=0, ge=0, description="Pagination offset"),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> DeploymentSetListResponse:
     """List deployment sets owned by the current user, with optional filtering.
 
@@ -203,6 +208,7 @@ def get_deployment_set(
     set_id: str,
     settings: SettingsDep,
     repo: DeploymentSetRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> DeploymentSetResponse:
     """Fetch a single deployment set by its ID including its members.
 
@@ -241,6 +247,7 @@ def update_deployment_set(
     request: DeploymentSetUpdate,
     settings: SettingsDep,
     repo: DeploymentSetRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> DeploymentSetResponse:
     """Update mutable metadata fields on a deployment set.
 
@@ -298,6 +305,7 @@ def delete_deployment_set(
     set_id: str,
     settings: SettingsDep,
     repo: DeploymentSetRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Delete a deployment set and cascade-delete its member rows.
 
@@ -346,6 +354,7 @@ def clone_deployment_set(
     set_id: str,
     settings: SettingsDep,
     repo: DeploymentSetRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> DeploymentSetResponse:
     """Clone a deployment set and all its members.
 
@@ -425,6 +434,7 @@ def list_members(
     set_id: str,
     settings: SettingsDep,
     repo: DeploymentSetRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> List[MemberResponse]:
     """Return all members of a deployment set ordered by position.
 
@@ -464,6 +474,7 @@ def add_member(
     settings: SettingsDep,
     repo: DeploymentSetRepoDep,
     db: DbSessionDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MemberResponse:
     """Add an artifact, group, or nested deployment set as a member.
 
@@ -548,6 +559,7 @@ def remove_member(
     member_id: str,
     settings: SettingsDep,
     repo: DeploymentSetRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Remove a member row from a deployment set.
 
@@ -600,6 +612,7 @@ def update_member_position(
     request: MemberUpdatePosition,
     settings: SettingsDep,
     repo: DeploymentSetRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> MemberResponse:
     """Update the ordering position of a member within a deployment set.
 
@@ -663,6 +676,7 @@ def resolve_deployment_set(
     repo: DeploymentSetRepoDep,
     artifact_repo: ArtifactRepoDep,
     db: DbSessionDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ResolveResponse:
     """Recursively resolve a deployment set into an ordered, deduplicated list
     of artifact UUIDs.
@@ -753,6 +767,7 @@ def batch_deploy(
     repo: DeploymentSetRepoDep,
     artifact_repo: ArtifactRepoDep,
     db: DbSessionDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> BatchDeployResponse:
     """Resolve the deployment set and deploy every artifact to the target project.
 

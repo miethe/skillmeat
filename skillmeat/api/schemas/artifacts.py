@@ -1,5 +1,8 @@
 """Artifact API schemas for request and response models."""
 
+from __future__ import annotations
+
+from uuid import UUID as _UUID
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
@@ -8,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from skillmeat.core.enums import Platform
 
+from .auth import OwnerType, Visibility
 from .common import PaginatedResponse
 from .deployments import DeploymentSummary
 
@@ -37,6 +41,34 @@ class ArtifactCreateRequest(BaseModel):
         description="Optional deployment platform restrictions (null means deployable on all platforms)",
     )
     description: Optional[str] = Field(default=None, description="Override description")
+    owner_type: Optional[str] = Field(
+        default=None,
+        description="Owner type: 'user' or 'team'. Defaults to 'user' when not provided.",
+    )
+    visibility: Optional[str] = Field(
+        default=None,
+        description="Visibility: 'private', 'team', or 'public'. Defaults to 'private' when not provided.",
+    )
+
+    @field_validator("owner_type")
+    @classmethod
+    def validate_owner_type(cls, v: Optional[str]) -> Optional[str]:
+        """Validate owner_type matches OwnerType enum values when provided."""
+        if v is not None:
+            valid = {m.value for m in OwnerType}
+            if v not in valid:
+                raise ValueError(f"owner_type must be one of {sorted(valid)}, got '{v}'")
+        return v
+
+    @field_validator("visibility")
+    @classmethod
+    def validate_visibility(cls, v: Optional[str]) -> Optional[str]:
+        """Validate visibility matches Visibility enum values when provided."""
+        if v is not None:
+            valid = {m.value for m in Visibility}
+            if v not in valid:
+                raise ValueError(f"visibility must be one of {sorted(valid)}, got '{v}'")
+        return v
 
     class Config:
         """Pydantic model configuration."""
@@ -51,6 +83,8 @@ class ArtifactCreateRequest(BaseModel):
                 "tags": ["design", "canvas"],
                 "target_platforms": ["claude_code", "codex"],
                 "description": "Canvas design skill",
+                "owner_type": "user",
+                "visibility": "private",
             }
         }
 
@@ -342,6 +376,18 @@ class ArtifactResponse(BaseModel):
         default=None,
         description="Marketplace import batch ID if imported from marketplace",
     )
+    owner_id: Optional[_UUID] = Field(
+        default=None,
+        description="UUID of the owning user or team",
+    )
+    owner_type: Optional[str] = Field(
+        default=None,
+        description="Owner type: 'user' or 'team'",
+    )
+    visibility: Optional[str] = Field(
+        default=None,
+        description="Visibility level: 'private', 'team', or 'public'",
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -499,6 +545,34 @@ class ArtifactUpdateRequest(BaseModel):
         default=None,
         description="Artifact metadata to update",
     )
+    owner_type: Optional[str] = Field(
+        default=None,
+        description="Owner type: 'user' or 'team'.",
+    )
+    visibility: Optional[str] = Field(
+        default=None,
+        description="Visibility: 'private', 'team', or 'public'.",
+    )
+
+    @field_validator("owner_type")
+    @classmethod
+    def validate_owner_type(cls, v: Optional[str]) -> Optional[str]:
+        """Validate owner_type matches OwnerType enum values when provided."""
+        if v is not None:
+            valid = {m.value for m in OwnerType}
+            if v not in valid:
+                raise ValueError(f"owner_type must be one of {sorted(valid)}, got '{v}'")
+        return v
+
+    @field_validator("visibility")
+    @classmethod
+    def validate_visibility(cls, v: Optional[str]) -> Optional[str]:
+        """Validate visibility matches Visibility enum values when provided."""
+        if v is not None:
+            valid = {m.value for m in Visibility}
+            if v not in valid:
+                raise ValueError(f"visibility must be one of {sorted(valid)}, got '{v}'")
+        return v
 
     class Config:
         """Pydantic model configuration."""
@@ -511,6 +585,8 @@ class ArtifactUpdateRequest(BaseModel):
                     "description": "Advanced PDF extraction and analysis",
                     "tags": ["document", "pdf"],
                 },
+                "owner_type": "user",
+                "visibility": "private",
             }
         }
 

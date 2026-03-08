@@ -6,13 +6,19 @@ from .burst_detection import (
     SlidingWindowTracker,
     create_fingerprint,
 )
-from .enterprise_auth import EnterprisePATDep, verify_enterprise_pat
+from .enterprise_auth import (
+    ENTERPRISE_SERVICE_USER_ID,
+    EnterprisePATDep,
+    verify_enterprise_pat,
+)
 from .observability import ObservabilityMiddleware
 from .rate_limit import RateLimitMiddleware
+from .tenant_context import TenantContextDep, set_tenant_context_dep
 
 __all__ = [
     "AuthMiddleware",
     "get_token_manager",
+    "ENTERPRISE_SERVICE_USER_ID",
     "EnterprisePATDep",
     "verify_enterprise_pat",
     "RateLimitMiddleware",
@@ -20,4 +26,6 @@ __all__ = [
     "SlidingWindowTracker",
     "create_fingerprint",
     "ObservabilityMiddleware",
+    "TenantContextDep",
+    "set_tenant_context_dep",
 ]

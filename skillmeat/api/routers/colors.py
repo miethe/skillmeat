@@ -13,7 +13,10 @@ API Endpoints:
 import logging
 from typing import List
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from skillmeat.api.dependencies import get_auth_context, require_auth
+from skillmeat.api.schemas.auth import AuthContext
 
 from skillmeat.api.schemas.colors import (
     ColorCreateRequest,
@@ -52,7 +55,9 @@ router = APIRouter(
         500: {"description": "Internal server error"},
     },
 )
-async def list_colors() -> List[ColorResponse]:
+async def list_colors(
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> List[ColorResponse]:
     """List all custom colors.
 
     Returns:
@@ -92,7 +97,10 @@ async def list_colors() -> List[ColorResponse]:
         500: {"description": "Internal server error"},
     },
 )
-async def create_color(request: ColorCreateRequest) -> ColorResponse:
+async def create_color(
+    request: ColorCreateRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> ColorResponse:
     """Create a new custom color.
 
     Args:
@@ -145,6 +153,7 @@ async def create_color(request: ColorCreateRequest) -> ColorResponse:
 async def update_color(
     color_id: str,
     request: ColorUpdateRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ColorResponse:
     """Update an existing custom color.
 
@@ -201,7 +210,10 @@ async def update_color(
         500: {"description": "Internal server error"},
     },
 )
-async def delete_color(color_id: str) -> None:
+async def delete_color(
+    color_id: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> None:
     """Delete a custom color by ID.
 
     Args:

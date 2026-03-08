@@ -6,12 +6,15 @@ database connections, and configuration.
 """
 
 import logging
+from collections.abc import Callable, Coroutine
 from typing import Annotated, Any, Optional
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 
+from skillmeat.api.auth.provider import AuthProvider
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.config import ConfigManager
 from skillmeat.core.artifact import ArtifactManager
 from skillmeat.core.auth import TokenManager
@@ -150,6 +153,161 @@ class AppState:
 
 # Global application state (initialized in lifespan)
 app_state = AppState()
+
+# ---------------------------------------------------------------------------
+# Auth provider singleton
+# ---------------------------------------------------------------------------
+
+#: Module-level auth provider instance.  Set during app startup via
+#: ``set_auth_provider()``.  ``None`` until explicitly configured.
+_auth_provider: Optional[AuthProvider] = None
+
+
+def set_auth_provider(provider: AuthProvider) -> None:
+    """Register the application-wide authentication provider.
+
+    Call this once during startup (e.g. inside the lifespan function) before
+    any requests are handled.
+
+    Args:
+        provider: A concrete ``AuthProvider`` implementation.
+    """
+    global _auth_provider
+    _auth_provider = provider
+
+
+def get_auth_provider() -> AuthProvider:
+    """Return the configured authentication provider.
+
+    Returns:
+        The registered ``AuthProvider`` instance.
+
+    Raises:
+        HTTPException: 503 if no provider has been registered yet.
+    """
+    if _auth_provider is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication provider not configured",
+        )
+    return _auth_provider
+
+
+# ---------------------------------------------------------------------------
+# require_auth dependency
+# ---------------------------------------------------------------------------
+
+
+def require_auth(
+    scopes: list[str] | None = None,
+) -> Callable[..., Coroutine[Any, Any, AuthContext]]:
+    """FastAPI dependency factory that validates authentication and optional scopes.
+
+    # Auth Bypass Contract (CP-001)
+    # -----------------------------------------------------------------------
+    # auth_enabled=false → server.py lifespan registers LocalAuthProvider.
+    #                      LocalAuthProvider.validate() always returns
+    #                      LOCAL_ADMIN_CONTEXT (user_id="local", role=system_admin,
+    #                      all scopes).  No credentials are inspected; auth
+    #                      always succeeds.
+    # auth_enabled=true  → lifespan registers the configured provider (e.g.
+    #                      ClerkAuthProvider).  Every request is validated
+    #                      against real credentials.
+    # This function has NO awareness of auth_enabled.  The provider selection
+    # at startup is the single enforcement decision point.
+    # -----------------------------------------------------------------------
+
+    Supports two usage patterns::
+
+        # No scope check — just authenticate
+        @router.get("/items")
+        async def list_items(auth: AuthContext = Depends(require_auth)):
+            ...
+
+        # With scope check — 403 if any required scope is missing
+        @router.post("/items")
+        async def create_item(auth: AuthContext = Depends(require_auth(scopes=["artifact:write"]))):
+            ...
+
+    When used directly as ``Depends(require_auth)`` FastAPI calls ``require_auth``
+    with no arguments (its default signature), which returns an inner coroutine
+    that FastAPI then calls with the ``Request``.  When used as
+    ``Depends(require_auth(scopes=[...]))`` the outer call returns the same inner
+    coroutine type, so both forms are structurally identical to FastAPI.
+
+    Args:
+        scopes: Optional list of scope strings (e.g. ``["artifact:read"]``) that
+            the authenticated context must carry.  Uses ``AuthContext.has_scope``
+            which honours the ``admin:*`` wildcard automatically.
+
+    Returns:
+        An async dependency coroutine that resolves to the authenticated
+        ``AuthContext``.
+
+    Raises:
+        HTTPException 401: Propagated from the provider when credentials are
+            absent or invalid.
+        HTTPException 403: When one or more required scopes are missing.
+        HTTPException 503: When no auth provider has been registered.
+    """
+
+    async def _dependency(request: Request) -> AuthContext:
+        provider = get_auth_provider()
+        auth_context = await provider.validate(request)
+
+        # Expose auth context on request state so middleware and downstream
+        # handlers can access it without repeating the provider lookup.
+        request.state.auth_context = auth_context
+
+        if scopes:
+            missing = [s for s in scopes if not auth_context.has_scope(s)]
+            if missing:
+                logger.warning(
+                    "Auth scope check failed: user=%s missing=%s",
+                    auth_context.user_id,
+                    missing,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Missing required scopes: {missing}",
+                )
+
+        return auth_context
+
+    return _dependency
+
+
+#: Pre-built ``Annotated`` alias for routes that only need authentication
+#: without explicit scope enforcement.
+AuthContextDep = Annotated[AuthContext, Depends(require_auth())]
+
+
+async def get_auth_context(request: Request) -> AuthContext:
+    """Read AuthContext from request.state (set by router-level require_auth).
+
+    This lightweight dependency avoids a second provider round-trip for
+    handlers that are already protected by a router-level ``require_auth``
+    dependency (registered via ``dependencies=_auth_deps`` in server.py).
+    It simply reads the ``auth_context`` attribute that ``require_auth``
+    stores on ``request.state`` and returns it.
+
+    Args:
+        request: The current FastAPI request.
+
+    Returns:
+        The ``AuthContext`` stored by the router-level auth dependency.
+
+    Raises:
+        HTTPException 401: If ``request.state`` has no ``auth_context``
+            (should not happen when router-level auth is wired correctly).
+    """
+    auth_ctx = getattr(request.state, "auth_context", None)
+    if auth_ctx is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    return auth_ctx
 
 
 def get_app_state() -> AppState:
@@ -344,19 +502,28 @@ def require_memory_context_enabled(
 
 # ---------------------------------------------------------------------------
 # Repository factory providers (hexagonal architecture)
+#
+# Enterprise Edition Provider Support (ENT2-002/003)
+# Supported:   artifact, collection
+# Unsupported: project, deployment, tag, settings, group, context_entity,
+#              marketplace_source, project_template
 # ---------------------------------------------------------------------------
 
 
 def get_artifact_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IArtifactRepository:
     """Get IArtifactRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IArtifactRepository implementation for the configured edition
+        IArtifactRepository implementation for the configured edition.
+        Local edition returns ``LocalArtifactRepository``; enterprise edition
+        returns ``EnterpriseArtifactRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -365,10 +532,16 @@ def get_artifact_repository(
     if edition == "local":
         from skillmeat.core.repositories import LocalArtifactRepository
 
-        return LocalArtifactRepository(
+        return LocalArtifactRepository(  # type: ignore[return-value]
             artifact_manager=state.artifact_manager,
             path_resolver=state.path_resolver,
         )
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseArtifactRepository,
+        )
+
+        return EnterpriseArtifactRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail=f"Unsupported edition: {edition}",
@@ -399,20 +572,27 @@ def get_project_repository(
         )
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support project. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
 def get_collection_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> ICollectionRepository:
     """Get ICollectionRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        ICollectionRepository implementation for the configured edition
+        ICollectionRepository implementation for the configured edition.
+        Local edition returns ``LocalCollectionRepository``; enterprise edition
+        returns ``EnterpriseCollectionRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -421,10 +601,16 @@ def get_collection_repository(
     if edition == "local":
         from skillmeat.core.repositories import LocalCollectionRepository
 
-        return LocalCollectionRepository(
+        return LocalCollectionRepository(  # type: ignore[return-value]
             collection_manager=state.collection_manager,
             path_resolver=state.path_resolver,
         )
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseCollectionRepository,
+        )
+
+        return EnterpriseCollectionRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail=f"Unsupported edition: {edition}",
@@ -457,7 +643,10 @@ def get_deployment_repository(
         )
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support deployment. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -482,7 +671,10 @@ def get_tag_repository(
         return LocalTagRepository()
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support tag. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -510,7 +702,10 @@ def get_settings_repository(
         )
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support settings. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -535,7 +730,10 @@ def get_group_repository(
         return LocalGroupRepository()
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support group. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -560,7 +758,10 @@ def get_context_entity_repository(
         return LocalContextEntityRepository()
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support context_entity. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -585,7 +786,10 @@ def get_marketplace_source_repository(
         return LocalMarketplaceSourceRepository()
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support marketplace_source. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 
@@ -610,7 +814,10 @@ def get_project_template_repository(
         return LocalProjectTemplateRepository()
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=f"Unsupported edition: {edition}",
+        detail=(
+            f"Enterprise edition does not yet support project_template. "
+            f"Supported providers: artifact, collection."
+        ),
     )
 
 

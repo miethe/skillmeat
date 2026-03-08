@@ -17,9 +17,15 @@ API Endpoints:
 import logging
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from skillmeat.api.dependencies import DbSessionDep, ProjectTemplateRepoDep
+from skillmeat.api.dependencies import (
+    DbSessionDep,
+    ProjectTemplateRepoDep,
+    get_auth_context,
+    require_auth,
+)
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.common import (
     BatchDeleteRequest,
     BatchDeleteResponse,
@@ -111,6 +117,7 @@ async def list_templates(
         50, ge=1, le=100, description="Maximum number of templates to return"
     ),
     offset: int = Query(0, ge=0, description="Number of templates to skip"),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ProjectTemplateListResponse:
     """List all project templates with pagination.
 
@@ -163,6 +170,7 @@ async def list_templates(
 async def batch_delete_templates(
     request: BatchDeleteRequest,
     repo: ProjectTemplateRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> BatchDeleteResponse:
     """Batch delete project templates by ID.
 
@@ -207,6 +215,7 @@ async def batch_delete_templates(
 async def get_template(
     template_id: str,
     repo: ProjectTemplateRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ProjectTemplateResponse:
     """Get project template by ID with full entity details.
 
@@ -256,6 +265,7 @@ async def get_template(
 async def create_template(
     request: ProjectTemplateCreateRequest,
     repo: ProjectTemplateRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ProjectTemplateResponse:
     """Create new project template from entity list.
 
@@ -311,6 +321,7 @@ async def update_template(
     template_id: str,
     request: ProjectTemplateUpdateRequest,
     repo: ProjectTemplateRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ProjectTemplateResponse:
     """Update existing project template.
 
@@ -370,6 +381,7 @@ async def update_template(
 async def delete_template(
     template_id: str,
     repo: ProjectTemplateRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Delete project template and cascade to entity associations.
 
@@ -414,6 +426,7 @@ async def deploy_template_endpoint(
     request: DeployTemplateRequest,
     repo: ProjectTemplateRepoDep,
     session: DbSessionDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> DeployTemplateResponse:
     """Deploy project template to target project path with performance optimizations.
 

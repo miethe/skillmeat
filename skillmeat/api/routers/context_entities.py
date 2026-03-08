@@ -30,7 +30,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 
 from skillmeat.api.config import APISettings, get_settings
-from skillmeat.api.dependencies import ContextEntityRepoDep, DeploymentProfileRepoDep
+from skillmeat.api.dependencies import (
+    ContextEntityRepoDep,
+    DeploymentProfileRepoDep,
+    get_auth_context,
+    require_auth,
+)
 from skillmeat.api.schemas.context_entity import (
     ContextEntityCreateRequest,
     ContextEntityDeployRequest,
@@ -56,6 +61,7 @@ from skillmeat.core.validators.context_path_validator import (
     rewrite_path_for_profile,
     validate_context_path,
 )
+from skillmeat.api.schemas.auth import AuthContext
 
 # Type alias for injected settings dependency
 SettingsDep = Annotated[APISettings, Depends(get_settings)]
@@ -255,6 +261,7 @@ async def list_context_entities(
         default=None,
         description="Cursor for pagination (next page)",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ContextEntityListResponse:
     """List all context entities with filtering and pagination.
 
@@ -348,6 +355,7 @@ async def create_context_entity(
     request: ContextEntityCreateRequest,
     repo: ContextEntityRepoDep,
     settings: SettingsDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ContextEntityResponse:
     """Create a new context entity.
 
@@ -481,6 +489,7 @@ async def create_context_entity(
 async def batch_delete_context_entities(
     request: BatchDeleteRequest,
     repo: ContextEntityRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> BatchDeleteResponse:
     """Batch delete context entities by ID.
 
@@ -535,6 +544,7 @@ async def batch_delete_context_entities(
 async def get_context_entity(
     entity_id: str,
     repo: ContextEntityRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ContextEntityResponse:
     """Get a single context entity by ID.
 
@@ -594,6 +604,7 @@ async def update_context_entity(
     request: ContextEntityUpdateRequest,
     repo: ContextEntityRepoDep,
     settings: SettingsDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ContextEntityResponse:
     """Update a context entity's metadata and/or content.
 
@@ -748,6 +759,7 @@ async def update_context_entity(
 async def delete_context_entity(
     entity_id: str,
     repo: ContextEntityRepoDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Delete a context entity.
 
@@ -798,6 +810,7 @@ async def deploy_context_entity(
     repo: ContextEntityRepoDep,
     profile_repo: DeploymentProfileRepoDep,
     settings: SettingsDep,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ContextEntityDeployResponse:
     if request.all_profiles and request.deployment_profile_id:
         raise HTTPException(
@@ -991,6 +1004,7 @@ async def deploy_context_entity(
 async def get_context_entity_content(
     entity_id: str,
     repo: ContextEntityRepoDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> Response:
     """Get raw markdown content of a context entity.
 

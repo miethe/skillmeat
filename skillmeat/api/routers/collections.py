@@ -21,9 +21,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
     CollectionManagerDep,
+    get_auth_context,
     verify_api_key,
 )
 from skillmeat.api.middleware.auth import TokenDep
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.api.schemas.collections import (
     ArtifactSummary,
     CollectionArtifactsResponse,
@@ -109,6 +111,7 @@ async def list_collections(
     response: Response,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     limit: int = Query(
         default=20,
         ge=1,
@@ -223,6 +226,7 @@ async def get_collection(
     response: Response,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> CollectionResponse:
     """Get details for a specific collection.
 
@@ -294,6 +298,7 @@ async def list_collection_artifacts(
     response: Response,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
+    auth_context: AuthContext = Depends(get_auth_context),
     limit: int = Query(
         default=20,
         ge=1,

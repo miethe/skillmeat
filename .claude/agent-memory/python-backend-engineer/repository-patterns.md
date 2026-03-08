@@ -26,3 +26,22 @@ should return real DB UUIDs (like `bb14e35440cf4a9ca8574c6967baf0de`), not MD5 h
 
 **Graceful degradation**: When DB is unavailable (unit tests without DB), `_db_available=False`
 and all UUID lookups return `None` — no crash.
+
+## Artifact.uuid Column Type in SQLite Tests
+
+**Gotcha**: `Artifact.uuid` is declared as `Mapped[str]` (`String` column) in `skillmeat/cache/models.py`.
+When writing test fixtures that insert `Artifact` rows directly via ORM into SQLite, pass a plain
+string — NOT a `uuid.UUID` object — or SQLite raises:
+`sqlite3.ProgrammingError: Error binding parameter N: type 'UUID' is not supported`
+
+**Fix**:
+```python
+# Wrong — passes uuid.UUID object to a String column:
+Artifact(uuid=uuid.uuid4(), ...)
+
+# Correct — pass string representation:
+Artifact(uuid=str(uuid.uuid4()), ...)
+```
+
+**Why**: Even though `uuid.UUID` has a sensible `__str__`, SQLite's DBAPI adapter does not know
+how to bind a `uuid.UUID` object directly. `Mapped[str]` columns expect Python `str` values.

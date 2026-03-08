@@ -11,6 +11,9 @@ Tables defined here:
     - EnterpriseArtifactVersion    (artifact_versions, PG)            — ENT-1.3
     - EnterpriseCollection         (enterprise_collections)           — ENT-1.4
     - EnterpriseCollectionArtifact (enterprise_collection_artifacts)  — ENT-1.5
+    - EnterpriseUser               (enterprise_users)                 — DB-001
+    - EnterpriseTeam               (enterprise_teams)                 — DB-001
+    - EnterpriseTeamMember         (enterprise_team_members)          — DB-001
 
 Naming note (ENT-1.3):
     The local-mode SQLite schema (models.py) contains an ``ArtifactVersion``
@@ -32,6 +35,9 @@ Exports:
     EnterpriseArtifactVersion: Immutable content snapshot per artifact version.
     EnterpriseCollection: Named artifact grouping per tenant.
     EnterpriseCollectionArtifact: Junction table linking collections to artifacts.
+    EnterpriseUser: Enterprise user account scoped to a tenant.
+    EnterpriseTeam: Named user group scoped to a tenant.
+    EnterpriseTeamMember: Junction table linking users to teams.
 
 References:
     docs/project_plans/architecture/enterprise-db-schema-v1.md
@@ -259,6 +265,28 @@ class EnterpriseArtifact(EnterpriseBase):
     )
 
     # -------------------------------------------------------------------------
+    # Ownership and visibility  (DB-003)
+    # -------------------------------------------------------------------------
+
+    owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        comment="UUID of the user who owns this artifact; NULL = system/unowned",
+    )
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        default="user",
+        comment="Owner type; stores OwnerType enum value, e.g. 'user' or 'team'",
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        default="private",
+        comment="Visibility level; stores Visibility enum value, e.g. 'private', 'internal', 'public'",
+    )
+
+    # -------------------------------------------------------------------------
     # Relationships
     # -------------------------------------------------------------------------
 
@@ -348,6 +376,11 @@ class EnterpriseArtifact(EnterpriseBase):
         #       postgresql_where="source_url IS NOT NULL",
         #       postgresql_concurrently=True,
         #   )
+        # B-tree: owner lookup — find all artifacts owned by a given user (DB-003)
+        Index(
+            "ix_enterprise_artifacts_owner_id",
+            "owner_id",
+        ),
     )
 
     def __repr__(self) -> str:
@@ -737,6 +770,28 @@ class EnterpriseCollection(EnterpriseBase):
     )
 
     # -------------------------------------------------------------------------
+    # Ownership and visibility  (DB-003)
+    # -------------------------------------------------------------------------
+
+    owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        comment="UUID of the user who owns this collection; NULL = system/unowned",
+    )
+    owner_type: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        default="user",
+        comment="Owner type; stores OwnerType enum value, e.g. 'user' or 'team'",
+    )
+    visibility: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        default="private",
+        comment="Visibility level; stores Visibility enum value, e.g. 'private', 'internal', 'public'",
+    )
+
+    # -------------------------------------------------------------------------
     # Audit
     # -------------------------------------------------------------------------
 
@@ -806,6 +861,11 @@ class EnterpriseCollection(EnterpriseBase):
             "tenant_id",
             "is_default",
             postgresql_where=text("is_default = TRUE"),
+        ),
+        # B-tree: owner lookup — find all collections owned by a given user (DB-003)
+        Index(
+            "ix_enterprise_collections_owner_id",
+            "owner_id",
         ),
     )
 
@@ -987,5 +1047,551 @@ class EnterpriseCollectionArtifact(EnterpriseBase):
             f"collection_id={self.collection_id!r}, "
             f"artifact_id={self.artifact_id!r}, "
             f"order_index={self.order_index!r}"
+            f")>"
+        )
+
+
+# =============================================================================
+# EnterpriseUser model  (AAA/RBAC Foundation — PRD-2, DB-001)
+# =============================================================================
+
+
+class EnterpriseUser(EnterpriseBase):
+    """Enterprise user account scoped to a single tenant.
+
+    Stores the identity and system-level role for each user within a tenant.
+    The ``clerk_user_id`` column provides the mapping to the Clerk-managed
+    external identity; it is nullable so that service accounts and seed rows
+    can be created before Clerk integration is active.
+
+    Tenant isolation invariant:
+        Every query against this table MUST include a ``WHERE tenant_id = ?``
+        predicate.  The repository layer (PRD-2 AAA repositories) enforces this
+        structurally via a ``TenantScopedRepository`` base class.
+
+    Attributes:
+        id:            UUID PK, server-generated via gen_random_uuid().
+        tenant_id:     Tenant scope; every query MUST filter by this column.
+        clerk_user_id: External Clerk user identifier; unique within a tenant
+                       when set.
+        email:         User email address; unique within a tenant when set.
+        display_name:  Optional human-readable display name.
+        role:          System-wide role string; stores a ``UserRole`` enum value.
+                       Defaults to ``"viewer"``.
+        is_active:     Soft-delete flag.
+        created_at:    Timezone-aware creation timestamp (server default: now()).
+        updated_at:    Timezone-aware last-modified timestamp (app-managed).
+        created_by:    User ID or ``"system"``; NULL until AuthContext is fully
+                       wired.
+        team_memberships: Back-reference to ``EnterpriseTeamMember`` rows.
+
+    Constraints:
+        uq_enterprise_users_tenant_clerk: UNIQUE (tenant_id, clerk_user_id)
+        uq_enterprise_users_tenant_email: UNIQUE (tenant_id, email)
+
+    Indexes:
+        idx_enterprise_users_tenant_id:    (tenant_id)
+        idx_enterprise_users_tenant_clerk: (tenant_id, clerk_user_id)
+        idx_enterprise_users_tenant_email: (tenant_id, email)
+        idx_enterprise_users_tenant_role:  (tenant_id, role)
+
+    Schema reference:
+        docs/project_plans/architecture/enterprise-db-schema-v1.md §3 (PRD-2)
+    """
+
+    __tablename__ = "enterprise_users"
+
+    # -------------------------------------------------------------------------
+    # Identity
+    # -------------------------------------------------------------------------
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+        comment="Globally unique user identifier",
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=False,
+        comment="Tenant scope; every query MUST include WHERE tenant_id = ?",
+    )
+
+    # -------------------------------------------------------------------------
+    # External identity
+    # -------------------------------------------------------------------------
+
+    clerk_user_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        comment=(
+            "Clerk user_id for the external authentication provider. "
+            "NULL for service accounts or before Clerk integration is active. "
+            "Unique within a tenant (uq_enterprise_users_tenant_clerk)."
+        ),
+    )
+
+    # -------------------------------------------------------------------------
+    # Contact
+    # -------------------------------------------------------------------------
+
+    email: Mapped[Optional[str]] = mapped_column(
+        String(320),
+        nullable=True,
+        comment=(
+            "User email address. "
+            "Unique within a tenant (uq_enterprise_users_tenant_email) when set."
+        ),
+    )
+    display_name: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Human-readable display name shown in the UI",
+    )
+
+    # -------------------------------------------------------------------------
+    # Role
+    # -------------------------------------------------------------------------
+
+    role: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="viewer",
+        server_default=text("'viewer'"),
+        comment=(
+            "System-wide role; one of UserRole enum values "
+            "(viewer, team_member, team_admin, system_admin)"
+        ),
+    )
+
+    # -------------------------------------------------------------------------
+    # Soft-delete
+    # -------------------------------------------------------------------------
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+        comment="Soft-delete: False = account disabled, row retained for audit",
+    )
+
+    # -------------------------------------------------------------------------
+    # Audit
+    # -------------------------------------------------------------------------
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        comment="Timezone-aware creation timestamp; server-generated",
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=datetime.utcnow,
+        comment="Timezone-aware last-modified timestamp; updated by app on every write",
+    )
+    created_by: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="User ID or 'system'; NULL until PRD-2 AuthContext is fully wired",
+    )
+
+    # -------------------------------------------------------------------------
+    # Relationships
+    # -------------------------------------------------------------------------
+
+    team_memberships: Mapped[List["EnterpriseTeamMember"]] = relationship(
+        "EnterpriseTeamMember",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    # -------------------------------------------------------------------------
+    # Table-level constraints and indexes
+    # -------------------------------------------------------------------------
+
+    __table_args__ = (
+        # Unique: one account per Clerk user_id per tenant
+        UniqueConstraint(
+            "tenant_id",
+            "clerk_user_id",
+            name="uq_enterprise_users_tenant_clerk",
+        ),
+        # Unique: one account per email address per tenant
+        UniqueConstraint(
+            "tenant_id",
+            "email",
+            name="uq_enterprise_users_tenant_email",
+        ),
+        # B-tree: mandatory per-tenant filter (every query starts here)
+        Index(
+            "idx_enterprise_users_tenant_id",
+            "tenant_id",
+        ),
+        # B-tree: Clerk user_id lookup during authentication
+        Index(
+            "idx_enterprise_users_tenant_clerk",
+            "tenant_id",
+            "clerk_user_id",
+        ),
+        # B-tree: email lookup for invitation and login flows
+        Index(
+            "idx_enterprise_users_tenant_email",
+            "tenant_id",
+            "email",
+        ),
+        # B-tree: role-filtered listing (e.g. "show all system admins")
+        Index(
+            "idx_enterprise_users_tenant_role",
+            "tenant_id",
+            "role",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        """Return unambiguous string representation of EnterpriseUser."""
+        return (
+            f"<EnterpriseUser("
+            f"id={self.id!r}, "
+            f"tenant_id={self.tenant_id!r}, "
+            f"email={self.email!r}, "
+            f"role={self.role!r}, "
+            f"is_active={self.is_active!r}"
+            f")>"
+        )
+
+
+# =============================================================================
+# EnterpriseTeam model  (AAA/RBAC Foundation — PRD-2, DB-001)
+# =============================================================================
+
+
+class EnterpriseTeam(EnterpriseBase):
+    """Named group of enterprise users scoped to a single tenant.
+
+    Teams allow multiple users to share ownership of artifacts and deployment
+    sets within the same tenant.  One team name is unique per tenant.
+
+    Tenant isolation invariant:
+        Every query MUST include ``WHERE tenant_id = ?``.
+
+    Attributes:
+        id:          UUID PK, server-generated via gen_random_uuid().
+        tenant_id:   Tenant scope.
+        name:        Human-readable team name; unique within a tenant.
+        description: Optional free-text description.
+        is_active:   Soft-delete flag.
+        created_at:  Timezone-aware creation timestamp.
+        updated_at:  Timezone-aware last-modified timestamp.
+        created_by:  User ID or ``"system"``; NULL until AuthContext is wired.
+        members:     Back-reference to ``EnterpriseTeamMember`` rows.
+
+    Constraints:
+        uq_enterprise_teams_tenant_name: UNIQUE (tenant_id, name)
+
+    Indexes:
+        idx_enterprise_teams_tenant_id:   (tenant_id)
+        idx_enterprise_teams_tenant_name: (tenant_id, name)
+
+    Schema reference:
+        docs/project_plans/architecture/enterprise-db-schema-v1.md §3 (PRD-2)
+    """
+
+    __tablename__ = "enterprise_teams"
+
+    # -------------------------------------------------------------------------
+    # Identity
+    # -------------------------------------------------------------------------
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+        comment="Globally unique team identifier",
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=False,
+        comment="Tenant scope; every query MUST include WHERE tenant_id = ?",
+    )
+
+    # -------------------------------------------------------------------------
+    # Core metadata
+    # -------------------------------------------------------------------------
+
+    name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Human-readable team name; unique within a tenant",
+    )
+    description: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Optional free-text description of the team's purpose",
+    )
+
+    # -------------------------------------------------------------------------
+    # Soft-delete
+    # -------------------------------------------------------------------------
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+        comment="Soft-delete: False = team dissolved, row retained for audit",
+    )
+
+    # -------------------------------------------------------------------------
+    # Audit
+    # -------------------------------------------------------------------------
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        comment="Timezone-aware creation timestamp",
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=datetime.utcnow,
+        comment="Timezone-aware last-modified timestamp; updated on every write",
+    )
+    created_by: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="User ID or 'system'; NULL until PRD-2 AuthContext is fully wired",
+    )
+
+    # -------------------------------------------------------------------------
+    # Relationships
+    # -------------------------------------------------------------------------
+
+    members: Mapped[List["EnterpriseTeamMember"]] = relationship(
+        "EnterpriseTeamMember",
+        back_populates="team",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    # -------------------------------------------------------------------------
+    # Table-level constraints and indexes
+    # -------------------------------------------------------------------------
+
+    __table_args__ = (
+        # Unique: one team name per tenant
+        UniqueConstraint(
+            "tenant_id",
+            "name",
+            name="uq_enterprise_teams_tenant_name",
+        ),
+        # B-tree: mandatory per-tenant filter
+        Index(
+            "idx_enterprise_teams_tenant_id",
+            "tenant_id",
+        ),
+        # B-tree: name lookup within a tenant
+        Index(
+            "idx_enterprise_teams_tenant_name",
+            "tenant_id",
+            "name",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        """Return unambiguous string representation of EnterpriseTeam."""
+        return (
+            f"<EnterpriseTeam("
+            f"id={self.id!r}, "
+            f"tenant_id={self.tenant_id!r}, "
+            f"name={self.name!r}, "
+            f"is_active={self.is_active!r}"
+            f")>"
+        )
+
+
+# =============================================================================
+# EnterpriseTeamMember model  (AAA/RBAC Foundation — PRD-2, DB-001)
+# =============================================================================
+
+
+class EnterpriseTeamMember(EnterpriseBase):
+    """Junction table recording an enterprise user's membership in a team.
+
+    Each row grants one user membership in one team at a specific team-level
+    role.  Both ``team_id`` and ``user_id`` carry ``ON DELETE CASCADE`` foreign
+    keys so orphaned membership rows are automatically removed when either the
+    team or the user is deleted.
+
+    ``tenant_id`` is denormalized from the parent ``EnterpriseTeam`` row for
+    query performance — every cross-membership query can be filtered by tenant
+    without joining back to the teams table.
+
+    Tenant isolation invariant:
+        Every query MUST include ``WHERE tenant_id = ?``.
+
+    Attributes:
+        id:         UUID PK, server-generated via gen_random_uuid().
+        tenant_id:  Denormalized tenant scope for efficient querying.
+        team_id:    FK → enterprise_teams.id, CASCADE on delete.
+        user_id:    FK → enterprise_users.id, CASCADE on delete.
+        role:       Team-level role string; stores a ``UserRole`` enum value.
+                    Defaults to ``"team_member"``.
+        joined_at:  UTC timestamp when the user joined (immutable after insert).
+        created_by: User ID or ``"system"``; NULL until AuthContext is wired.
+        team:       Many-to-one back-reference to ``EnterpriseTeam``.
+        user:       Many-to-one back-reference to ``EnterpriseUser``.
+
+    Constraints:
+        uq_enterprise_team_members_tenant_team_user:
+            UNIQUE (tenant_id, team_id, user_id) — one membership per user per team
+            per tenant.
+
+    Indexes:
+        idx_enterprise_team_members_tenant_id:   (tenant_id)
+        idx_enterprise_team_members_team_id:     (team_id)
+        idx_enterprise_team_members_user_id:     (user_id)
+
+    Schema reference:
+        docs/project_plans/architecture/enterprise-db-schema-v1.md §3 (PRD-2)
+    """
+
+    __tablename__ = "enterprise_team_members"
+
+    # -------------------------------------------------------------------------
+    # Identity
+    # -------------------------------------------------------------------------
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+        comment="Globally unique membership row identifier",
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=False,
+        comment=(
+            "Denormalized tenant scope for query performance; "
+            "must equal the parent team's tenant_id — validated at write time"
+        ),
+    )
+
+    # -------------------------------------------------------------------------
+    # Foreign keys
+    # -------------------------------------------------------------------------
+
+    team_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "enterprise_teams.id",
+            ondelete="CASCADE",
+            name="fk_enterprise_team_members_team_id",
+        ),
+        nullable=False,
+        comment="Parent team; cascade-deletes this membership when team is removed",
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "enterprise_users.id",
+            ondelete="CASCADE",
+            name="fk_enterprise_team_members_user_id",
+        ),
+        nullable=False,
+        comment="Member user; cascade-deletes this membership when user is removed",
+    )
+
+    # -------------------------------------------------------------------------
+    # Team-level role
+    # -------------------------------------------------------------------------
+
+    role: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="team_member",
+        server_default=text("'team_member'"),
+        comment="Role within the team; one of team_admin, team_member",
+    )
+
+    # -------------------------------------------------------------------------
+    # Audit
+    # -------------------------------------------------------------------------
+
+    # joined_at is intentionally NOT an onupdate column — join date is immutable
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        comment="Timezone-aware timestamp when the user joined the team; immutable",
+    )
+    created_by: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="User ID or 'system'; NULL until PRD-2 AuthContext is fully wired",
+    )
+
+    # -------------------------------------------------------------------------
+    # Relationships
+    # -------------------------------------------------------------------------
+
+    team: Mapped["EnterpriseTeam"] = relationship(
+        "EnterpriseTeam",
+        back_populates="members",
+        lazy="joined",
+    )
+    user: Mapped["EnterpriseUser"] = relationship(
+        "EnterpriseUser",
+        back_populates="team_memberships",
+        lazy="joined",
+    )
+
+    # -------------------------------------------------------------------------
+    # Table-level constraints and indexes
+    # -------------------------------------------------------------------------
+
+    __table_args__ = (
+        # Unique: one membership row per (tenant, team, user) triple
+        UniqueConstraint(
+            "tenant_id",
+            "team_id",
+            "user_id",
+            name="uq_enterprise_team_members_tenant_team_user",
+        ),
+        # B-tree: mandatory per-tenant filter on cross-team membership queries
+        Index(
+            "idx_enterprise_team_members_tenant_id",
+            "tenant_id",
+        ),
+        # B-tree: list all members of a given team
+        Index(
+            "idx_enterprise_team_members_team_id",
+            "team_id",
+        ),
+        # B-tree: reverse lookup — which teams is a user in?
+        Index(
+            "idx_enterprise_team_members_user_id",
+            "user_id",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        """Return unambiguous string representation of EnterpriseTeamMember."""
+        return (
+            f"<EnterpriseTeamMember("
+            f"id={self.id!r}, "
+            f"tenant_id={self.tenant_id!r}, "
+            f"team_id={self.team_id!r}, "
+            f"user_id={self.user_id!r}, "
+            f"role={self.role!r}"
             f")>"
         )

@@ -25,7 +25,9 @@ import logging
 from typing import List, Optional
 from urllib.parse import unquote
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from skillmeat.api.dependencies import get_auth_context, require_auth
 from skillmeat.api.schemas.context_module import (
     AddMemoryToModuleRequest,
     ContextModuleCreateRequest,
@@ -34,6 +36,7 @@ from skillmeat.api.schemas.context_module import (
     ContextModuleUpdateRequest,
 )
 from skillmeat.core.services.context_module_service import ContextModuleService
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +87,7 @@ async def list_context_modules(
         default=None,
         description="Cursor from previous page for pagination",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ContextModuleListResponse:
     """List context modules for a project with cursor-based pagination.
 
@@ -143,6 +147,7 @@ async def list_context_modules(
 async def create_context_module(
     request: ContextModuleCreateRequest,
     project_id: str = Query(..., description="Project ID to create module in"),
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ContextModuleResponse:
     """Create a new context module.
 
@@ -200,6 +205,7 @@ async def get_context_module(
         default=False,
         description="Include associated memory items in response",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ContextModuleResponse:
     """Get a single context module by ID.
 
@@ -246,6 +252,7 @@ async def get_context_module(
 async def update_context_module(
     module_id: str,
     request: ContextModuleUpdateRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ContextModuleResponse:
     """Update a context module's fields.
 
@@ -307,7 +314,10 @@ async def update_context_module(
         500: {"description": "Internal server error"},
     },
 )
-async def delete_context_module(module_id: str) -> None:
+async def delete_context_module(
+    module_id: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> None:
     """Delete a context module.
 
     Args:
@@ -354,6 +364,7 @@ async def delete_context_module(module_id: str) -> None:
 async def add_memory_to_module(
     module_id: str,
     request: AddMemoryToModuleRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ContextModuleResponse:
     """Add a memory item to a context module.
 
@@ -403,6 +414,7 @@ async def add_memory_to_module(
 async def remove_memory_from_module(
     module_id: str,
     memory_id: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Remove a memory item from a context module.
 
@@ -451,6 +463,7 @@ async def list_module_memories(
         le=1000,
         description="Maximum number of items to return",
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> List[dict]:
     """Get all memory items in a context module.
 

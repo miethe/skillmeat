@@ -14,6 +14,8 @@ from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from skillmeat.api.dependencies import get_auth_context, require_auth
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -25,6 +27,7 @@ from skillmeat.core.workflow.exceptions import (
     WorkflowValidationError,
 )
 from skillmeat.core.workflow.execution_service import WorkflowExecutionService
+from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +169,7 @@ def _get_service() -> WorkflowExecutionService:
 )
 async def start_execution(
     request: WorkflowExecutionStartRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> Dict[str, Any]:
     """Start a new workflow execution.
 
@@ -240,6 +244,7 @@ async def list_executions(
     ),
     skip: int = Query(0, ge=0, description="Number of records to skip."),
     limit: int = Query(50, ge=1, le=200, description="Maximum records to return."),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> List[Dict[str, Any]]:
     """List workflow executions with optional filters and offset pagination.
 
@@ -280,6 +285,7 @@ async def list_executions_by_workflow(
     workflow_id: str,
     skip: int = Query(0, ge=0, description="Number of records to skip."),
     limit: int = Query(50, ge=1, le=200, description="Maximum records to return."),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> List[Dict[str, Any]]:
     """List all workflow executions for a specific workflow.
 
@@ -330,6 +336,7 @@ async def list_executions_by_workflow(
 )
 async def batch_pause_executions(
     request: BatchExecutionRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> BatchExecutionResponse:
     """Pause multiple running workflow executions.
 
@@ -404,6 +411,7 @@ async def batch_pause_executions(
 )
 async def batch_resume_executions(
     request: BatchExecutionRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> BatchExecutionResponse:
     """Resume multiple paused workflow executions.
 
@@ -478,6 +486,7 @@ async def batch_resume_executions(
 )
 async def batch_cancel_executions(
     request: BatchExecutionRequest,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> BatchExecutionResponse:
     """Cancel multiple workflow executions.
 
@@ -550,7 +559,10 @@ async def batch_cancel_executions(
     description="Retrieve a single workflow execution by ID, including all step records.",
     status_code=status.HTTP_200_OK,
 )
-async def get_execution(execution_id: str) -> Dict[str, Any]:
+async def get_execution(
+    execution_id: str,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> Dict[str, Any]:
     """Retrieve a workflow execution by its primary key.
 
     Args:
@@ -594,7 +606,10 @@ async def get_execution(execution_id: str) -> Dict[str, Any]:
         "Returns 404 immediately if the execution does not exist."
     ),
 )
-async def stream_execution_events(execution_id: str) -> StreamingResponse:
+async def stream_execution_events(
+    execution_id: str,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> StreamingResponse:
     """Stream SSE events for a workflow execution.
 
     Polls ``WorkflowExecutionService.get_events()`` on a 0.5-second interval,
@@ -769,7 +784,10 @@ async def stream_execution_events(execution_id: str) -> StreamingResponse:
     description="Pause a running workflow execution.  The execution must be in the 'running' state.",
     status_code=status.HTTP_200_OK,
 )
-async def pause_execution(execution_id: str) -> Dict[str, Any]:
+async def pause_execution(
+    execution_id: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> Dict[str, Any]:
     """Pause a running workflow execution.
 
     Args:
@@ -812,7 +830,10 @@ async def pause_execution(execution_id: str) -> Dict[str, Any]:
     description="Resume a paused workflow execution.  The execution must be in the 'paused' state.",
     status_code=status.HTTP_200_OK,
 )
-async def resume_execution(execution_id: str) -> Dict[str, Any]:
+async def resume_execution(
+    execution_id: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> Dict[str, Any]:
     """Resume a paused workflow execution.
 
     Args:
@@ -855,7 +876,10 @@ async def resume_execution(execution_id: str) -> Dict[str, Any]:
     description="Cancel a running or paused workflow execution.",
     status_code=status.HTTP_200_OK,
 )
-async def cancel_execution(execution_id: str) -> Dict[str, Any]:
+async def cancel_execution(
+    execution_id: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> Dict[str, Any]:
     """Cancel a workflow execution.
 
     Args:
@@ -901,7 +925,10 @@ async def cancel_execution(execution_id: str) -> Dict[str, Any]:
     ),
     status_code=status.HTTP_200_OK,
 )
-async def approve_gate(execution_id: str, stage_id: str) -> Dict[str, Any]:
+async def approve_gate(
+    execution_id: str, stage_id: str,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+) -> Dict[str, Any]:
     """Approve a pending gate in a workflow execution.
 
     Args:
@@ -962,6 +989,7 @@ async def reject_gate(
     execution_id: str,
     stage_id: str,
     request: Optional[GateRejectRequest] = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> Dict[str, Any]:
     """Reject a pending gate in a workflow execution.
 

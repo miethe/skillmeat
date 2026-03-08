@@ -20,10 +20,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 
-from skillmeat.api.dependencies import DbSessionDep
+from skillmeat.api.dependencies import (
+    DbSessionDep,
+    get_auth_context,
+    require_auth,
+)
 from skillmeat.api.middleware.enterprise_auth import verify_enterprise_pat
 from skillmeat.api.schemas.enterprise import ArtifactDownloadResponse
 from skillmeat.cache.enterprise_repositories import EnterpriseArtifactRepository
+from skillmeat.api.schemas.auth import AuthContext
 from skillmeat.core.services.enterprise_content import (
     ArtifactFilesystemError,
     ArtifactNotFoundError,
@@ -54,8 +59,12 @@ def _get_content_service(session: DbSessionDep) -> EnterpriseContentService:
     Tenant isolation is controlled via ``TenantContext`` (a ContextVar in
     ``skillmeat.cache.enterprise_repositories``).  When ``TenantContext`` is
     not set, the repository falls back to ``DEFAULT_TENANT_ID`` automatically.
-    ENT-3.4 will set ``TenantContext`` via an authentication middleware before
-    this dependency runs, replacing the implicit default.
+
+    The router-level ``verify_enterprise_pat`` dependency (which now returns an
+    :class:`~skillmeat.api.schemas.auth.AuthContext`) runs before this function.
+    To wire ``TenantContext`` to the authenticated identity in a later phase,
+    inject ``auth: EnterprisePATDep`` here and call
+    ``TenantContext.set(auth.tenant_id)`` before constructing the repository.
 
     Parameters
     ----------
@@ -118,6 +127,7 @@ def download_artifact(
             "(Content-Type: application/gzip) instead of a JSON response."
         ),
     ),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> ArtifactDownloadResponse | Response:
     """Download an enterprise artifact bundle.
 

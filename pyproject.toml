@@ -95,10 +95,13 @@ skillmeat = "skillmeat.cli:main"
 packages = [
     "skillmeat",
     "skillmeat.api",
+    "skillmeat.api.auth",
     "skillmeat.api.routers",
     "skillmeat.api.middleware",
     "skillmeat.api.schemas",
     "skillmeat.cache",
+    "skillmeat.cli",
+    "skillmeat.cli.commands",
     "skillmeat.core",
     "skillmeat.core.auth",
     "skillmeat.core.sharing",

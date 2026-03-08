@@ -71,15 +71,18 @@ import hashlib
 import logging
 import uuid
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from datetime import datetime
-from typing import Dict, Generator, Generic, List, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Dict, Generator, Generic, List, Optional, Type, TypeVar
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import Select
 
 from skillmeat.cache.constants import DEFAULT_TENANT_ID
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +139,80 @@ def tenant_scope(tenant_id: uuid.UUID) -> Generator[None, None, None]:
         yield
     finally:
         TenantContext.reset(token)
+
+
+# ---------------------------------------------------------------------------
+# Imperative tenant context helpers (SVR-003)
+# ---------------------------------------------------------------------------
+
+def set_tenant_context(tenant_id: uuid.UUID) -> Token:
+    """Set the current tenant in ``TenantContext`` and return a reset token.
+
+    The returned token must be passed to :func:`clear_tenant_context` to
+    restore the previous value.  Prefer the :func:`tenant_scope` context
+    manager when possible — it handles cleanup automatically.
+
+    Parameters
+    ----------
+    tenant_id:
+        The UUID of the tenant to activate for the current execution context.
+
+    Returns
+    -------
+    contextvars.Token
+        Opaque token that can be passed to :func:`clear_tenant_context` to
+        undo this set operation.
+
+    Examples
+    --------
+    ::
+
+        token = set_tenant_context(my_tenant_id)
+        try:
+            ...
+        finally:
+            clear_tenant_context(token)
+    """
+    return TenantContext.set(tenant_id)
+
+
+def get_tenant_context() -> Optional[uuid.UUID]:
+    """Return the tenant UUID currently stored in ``TenantContext``.
+
+    Returns ``None`` when no tenant has been set for this execution context,
+    allowing callers to decide their own fallback behaviour (e.g. default to
+    ``DEFAULT_TENANT_ID`` for single-tenant mode, or raise for strict
+    multi-tenant enforcement).
+
+    Returns
+    -------
+    uuid.UUID or None
+        The active tenant UUID, or ``None`` if not set.
+    """
+    return TenantContext.get(None)
+
+
+def clear_tenant_context(token: Token) -> None:
+    """Reset ``TenantContext`` to the value it held before a :func:`set_tenant_context` call.
+
+    Parameters
+    ----------
+    token:
+        The token returned by the corresponding :func:`set_tenant_context`
+        call.  Passing any other token is undefined behaviour (mirrors the
+        underlying ``ContextVar.reset`` contract).
+
+    Examples
+    --------
+    ::
+
+        token = set_tenant_context(my_tenant_id)
+        try:
+            ...
+        finally:
+            clear_tenant_context(token)
+    """
+    TenantContext.reset(token)
 
 
 # ---------------------------------------------------------------------------
@@ -467,6 +544,38 @@ class EnterpriseRepositoryBase(Generic[T]):
             entry["metadata"] = metadata
         logger.info("audit %s", entry)
 
+    # ------------------------------------------------------------------
+    # Auth context helpers (SVR-006)
+    # ------------------------------------------------------------------
+
+    def _apply_auth_context(
+        self, auth_context: Optional["AuthContext"]
+    ) -> Optional[uuid.UUID]:
+        """Apply auth_context tenant to TenantContext and return the owner_id.
+
+        When *auth_context* is provided and carries a ``tenant_id``, this
+        method sets ``TenantContext`` so that all subsequent ``_apply_tenant_filter``
+        / ``_get_tenant_id`` calls in the same operation use the authenticated
+        tenant rather than any previously set value.
+
+        Parameters
+        ----------
+        auth_context:
+            The authenticated request context, or ``None`` for local/zero-auth
+            mode.  When ``None`` the method is a no-op.
+
+        Returns
+        -------
+        uuid.UUID or None
+            The ``user_id`` from *auth_context* (to use as ``owner_id`` on new
+            records), or ``None`` when *auth_context* is absent.
+        """
+        if auth_context is None:
+            return None
+        if auth_context.tenant_id is not None:
+            set_tenant_context(auth_context.tenant_id)
+        return auth_context.user_id
+
 
 # ---------------------------------------------------------------------------
 # EnterpriseArtifactRepository — write operations (ENT-2.4, ENT-2.5)
@@ -537,7 +646,11 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
     # ENT-2.2: Lookup methods with tenant scoping
     # ------------------------------------------------------------------
 
-    def get(self, artifact_id: uuid.UUID) -> "Optional[EnterpriseArtifact]":
+    def get(
+        self,
+        artifact_id: uuid.UUID,
+        auth_context: Optional["AuthContext"] = None,
+    ) -> "Optional[EnterpriseArtifact]":
         """Fetch an artifact by primary key, asserting tenant ownership.
 
         Uses ``session.get()`` for a PK lookup (identity-map hit when cached),
@@ -550,6 +663,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         ----------
         artifact_id:
             UUID primary key of the artifact to fetch.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before filtering.
 
         Returns
         -------
@@ -558,6 +674,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
 
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
+
+        self._apply_auth_context(auth_context)
         obj = self.session.get(EnterpriseArtifact, artifact_id)
         if obj is None:
             return None
@@ -570,9 +689,24 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
                 artifact_id,
             )
             return None
+        # ENT-002: Enforce visibility after tenant check.  Private artifacts
+        # are only visible to their owner; admins bypass the filter.
+        # Returns None for both not-found and not-visible (prevents existence
+        # disclosure — callers cannot distinguish the two cases).
+        if auth_context is not None:
+            stmt = apply_visibility_filter_stmt(
+                select(EnterpriseArtifact).where(EnterpriseArtifact.id == artifact_id),
+                EnterpriseArtifact,
+                auth_context,
+            )
+            obj = self.session.execute(stmt).scalar_one_or_none()
         return obj
 
-    def get_by_uuid(self, artifact_uuid: str) -> "Optional[EnterpriseArtifact]":
+    def get_by_uuid(
+        self,
+        artifact_uuid: str,
+        auth_context: Optional["AuthContext"] = None,
+    ) -> "Optional[EnterpriseArtifact]":
         """Fetch an artifact by its UUID string with tenant filter at query time.
 
         Unlike ``get()``, accepts a *string* UUID (the form typically received
@@ -583,6 +717,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         ----------
         artifact_uuid:
             UUID of the artifact as a string; will be parsed to ``uuid.UUID``.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before filtering.
 
         Returns
         -------
@@ -596,11 +733,23 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
 
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
+
+        self._apply_auth_context(auth_context)
         parsed: uuid.UUID = uuid.UUID(artifact_uuid)
         stmt = self._tenant_select().where(EnterpriseArtifact.id == parsed)
+        # ENT-002: Enforce visibility access control when auth context is present.
+        # Returns None for both not-found and not-visible (prevents existence
+        # disclosure — callers cannot distinguish the two cases).
+        if auth_context is not None:
+            stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def get_by_name(self, name: str) -> "Optional[EnterpriseArtifact]":
+    def get_by_name(
+        self,
+        name: str,
+        auth_context: Optional["AuthContext"] = None,
+    ) -> "Optional[EnterpriseArtifact]":
         """Fetch an artifact by name within the current tenant's scope.
 
         Name uniqueness is enforced by ``uq_enterprise_artifacts_tenant_name_type``,
@@ -612,6 +761,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         name:
             Human-readable artifact name (e.g. ``"canvas-design"``).
             Exact, case-sensitive match.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before filtering.
 
         Returns
         -------
@@ -620,12 +772,20 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
 
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
+
+        self._apply_auth_context(auth_context)
         stmt = (
             self._tenant_select()
             .where(EnterpriseArtifact.name == name)
             .order_by(EnterpriseArtifact.created_at)
             .limit(1)
         )
+        # ENT-002: Enforce visibility access control when auth context is present.
+        # Returns None for both not-found and not-visible (prevents existence
+        # disclosure — callers cannot distinguish the two cases).
+        if auth_context is not None:
+            stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
         return self.session.execute(stmt).scalar_one_or_none()
 
     # ------------------------------------------------------------------
@@ -638,6 +798,7 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         limit: int = 50,
         artifact_type: Optional[str] = None,
         name_contains: Optional[str] = None,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "List[EnterpriseArtifact]":
         """Return a paginated list of artifacts for the current tenant.
 
@@ -658,6 +819,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         name_contains:
             When provided, perform a case-insensitive substring match on
             ``name`` using SQL ``ILIKE``.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before filtering.
 
         Returns
         -------
@@ -665,7 +829,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             Ordered list of matching artifacts (may be empty).
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
 
+        self._apply_auth_context(auth_context)
         stmt = self._tenant_select().order_by(
             EnterpriseArtifact.created_at.desc()
         )
@@ -675,16 +841,29 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             stmt = stmt.where(
                 EnterpriseArtifact.name.ilike(f"%{name_contains}%")
             )
+        # ENT-002: Apply visibility-based access control when auth context is
+        # present.  Public and team items are visible to all tenant members;
+        # private items are restricted to their owner.
+        # Visibility-excluded items are silently omitted from results.
+        if auth_context is not None:
+            stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
         stmt = stmt.offset(offset).limit(limit)
         return list(self.session.execute(stmt).scalars().all())
 
-    def count(self, artifact_type: Optional[str] = None) -> int:
+    def count(
+        self,
+        artifact_type: Optional[str] = None,
+        auth_context: Optional["AuthContext"] = None,
+    ) -> int:
         """Return the number of artifacts for the current tenant.
 
         Parameters
         ----------
         artifact_type:
             When provided, count only artifacts of this type.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before filtering.
 
         Returns
         -------
@@ -694,12 +873,25 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         from sqlalchemy import func
 
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
 
-        stmt = self._apply_tenant_filter(
-            select(func.count()).select_from(EnterpriseArtifact)
-        )
-        if artifact_type is not None:
-            stmt = stmt.where(EnterpriseArtifact.artifact_type == artifact_type)
+        self._apply_auth_context(auth_context)
+        # ENT-002: For count with visibility, use a subquery approach so that
+        # apply_visibility_filter_stmt (which works on a Select of the model)
+        # can add its WHERE predicates before wrapping in count().
+        # Counts only visibility-filtered results — excluded artifacts are not counted.
+        if auth_context is not None:
+            inner = self._tenant_select()
+            if artifact_type is not None:
+                inner = inner.where(EnterpriseArtifact.artifact_type == artifact_type)
+            inner = apply_visibility_filter_stmt(inner, EnterpriseArtifact, auth_context)
+            stmt = select(func.count()).select_from(inner.subquery())
+        else:
+            stmt = self._apply_tenant_filter(
+                select(func.count()).select_from(EnterpriseArtifact)
+            )
+            if artifact_type is not None:
+                stmt = stmt.where(EnterpriseArtifact.artifact_type == artifact_type)
         result = self.session.execute(stmt).scalar_one()
         return int(result)
 
@@ -707,6 +899,7 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         self,
         tags: List[str],
         match_all: bool = False,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "List[EnterpriseArtifact]":
         """Return artifacts whose ``tags`` JSONB array contains the given tags.
 
@@ -729,6 +922,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             List of tag strings to search for.  Empty list returns no rows.
         match_all:
             When ``True``, require all listed tags to be present.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before filtering.
 
         Returns
         -------
@@ -742,6 +938,7 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
 
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
 
+        self._apply_auth_context(auth_context)
         if not tags:
             return []
 
@@ -772,6 +969,13 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
                 .order_by(EnterpriseArtifact.created_at.desc())
             )
 
+        # ENT-002: Enforce visibility access control when auth context is present.
+        # Visibility-excluded items are silently omitted from results.
+        if auth_context is not None:
+            from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
+
+            stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
+
         return list(self.session.execute(stmt).scalars().all())
 
     # ------------------------------------------------------------------
@@ -782,6 +986,7 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         self,
         artifact_id: uuid.UUID,
         version: Optional[str] = None,
+        auth_context: Optional["AuthContext"] = None,
     ) -> Optional[str]:
         """Return the Markdown content for a specific or the latest artifact version.
 
@@ -796,6 +1001,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         version:
             Optional ``version_tag`` string (e.g. ``"v1.2.0"``, ``"latest"``).
             When ``None``, the newest version by ``created_at`` is returned.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before filtering.
 
         Returns
         -------
@@ -805,7 +1013,10 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifactVersion
 
-        artifact = self.get(artifact_id)
+        self._apply_auth_context(auth_context)
+        # get() returns None for both not-found and not-visible (prevents existence
+        # disclosure).  Propagate None immediately — no separate access-denied path.
+        artifact = self.get(artifact_id, auth_context=auth_context)
         if artifact is None:
             return None
 
@@ -824,7 +1035,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         return version_row.markdown_payload
 
     def list_versions(
-        self, artifact_id: uuid.UUID
+        self,
+        artifact_id: uuid.UUID,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "List[EnterpriseArtifactVersion]":
         """Return all version records for an artifact, newest first.
 
@@ -835,6 +1048,9 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         ----------
         artifact_id:
             UUID primary key of the parent artifact.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before filtering.
 
         Returns
         -------
@@ -845,7 +1061,10 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifactVersion
 
-        artifact = self.get(artifact_id)
+        self._apply_auth_context(auth_context)
+        # get() returns None for both not-found and not-visible (prevents existence
+        # disclosure).  Propagate empty list immediately — no separate access-denied path.
+        artifact = self.get(artifact_id, auth_context=auth_context)
         if artifact is None:
             return []
 
@@ -868,6 +1087,7 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         content: Optional[str] = None,
         metadata: Optional[Dict] = None,
         tags: Optional[List[str]] = None,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "EnterpriseArtifact":
         """Create a new artifact row and optionally an initial version.
 
@@ -887,6 +1107,10 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             Arbitrary JSONB key-value pairs stored in ``custom_fields``.
         tags:
             List of tag strings stored in the ``tags`` JSONB column.
+        auth_context:
+            Optional authentication context.  When provided, the active tenant
+            is set via ``TenantContext`` and ``owner_id`` is populated from
+            ``auth_context.user_id``.
 
         Returns
         -------
@@ -898,9 +1122,11 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             EnterpriseArtifactVersion,
         )
 
+        owner_id = self._apply_auth_context(auth_context)
         tenant_id = self._get_tenant_id()
         artifact = EnterpriseArtifact(
             tenant_id=tenant_id,
+            owner_id=owner_id,
             name=name,
             artifact_type=artifact_type,
             source_url=source,
@@ -942,6 +1168,7 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         content: Optional[str] = None,
         metadata: Optional[Dict] = None,
         tags: Optional[List[str]] = None,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "EnterpriseArtifact":
         """Update mutable fields on an existing artifact.
 
@@ -963,6 +1190,10 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             unchanged.
         tags:
             Replacement tag list, or ``None`` to leave unchanged.
+        auth_context:
+            Optional authentication context.  When provided, the active tenant
+            is set via ``TenantContext`` and the update is further restricted to
+            artifacts owned by ``auth_context.user_id``.
 
         Returns
         -------
@@ -972,7 +1203,8 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         Raises
         ------
         ValueError
-            If no artifact with *artifact_id* exists in the current tenant.
+            If no artifact with *artifact_id* exists in the current tenant (or
+            owned by the authenticated user when *auth_context* is provided).
         TenantIsolationError
             If the artifact belongs to a different tenant.
         """
@@ -981,12 +1213,19 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             EnterpriseArtifactVersion,
         )
 
+        owner_id = self._apply_auth_context(auth_context)
         artifact: Optional[EnterpriseArtifact] = self.session.get(
             EnterpriseArtifact, artifact_id
         )
         if artifact is None:
             raise ValueError(f"EnterpriseArtifact {artifact_id!r} not found.")
         self._assert_tenant_owns(artifact)
+        # When an authenticated user is present, enforce owner-level access.
+        if owner_id is not None and artifact.owner_id != owner_id:
+            raise ValueError(
+                f"EnterpriseArtifact {artifact_id!r} is not owned by the "
+                f"authenticated user."
+            )
 
         changed_fields: Dict[str, object] = {}
         if name is not None:
@@ -1035,7 +1274,11 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
     # ENT-2.5: Soft delete
     # ------------------------------------------------------------------
 
-    def soft_delete(self, artifact_id: uuid.UUID) -> bool:
+    def soft_delete(
+        self,
+        artifact_id: uuid.UUID,
+        auth_context: Optional["AuthContext"] = None,
+    ) -> bool:
         """Logically delete an artifact by clearing ``is_active``.
 
         The row is retained in the database for audit purposes.  Subsequent
@@ -1045,6 +1288,10 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         ----------
         artifact_id:
             UUID primary key of the artifact to soft-delete.
+        auth_context:
+            Optional authentication context.  When provided, the active tenant
+            is set via ``TenantContext`` and the operation is restricted to
+            artifacts owned by ``auth_context.user_id``.
 
         Returns
         -------
@@ -1054,18 +1301,25 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         Raises
         ------
         ValueError
-            If no artifact with *artifact_id* exists in the current tenant.
+            If no artifact with *artifact_id* exists in the current tenant (or
+            owned by the authenticated user when *auth_context* is provided).
         TenantIsolationError
             If the artifact belongs to a different tenant.
         """
         from skillmeat.cache.models_enterprise import EnterpriseArtifact
 
+        owner_id = self._apply_auth_context(auth_context)
         artifact: Optional[EnterpriseArtifact] = self.session.get(
             EnterpriseArtifact, artifact_id
         )
         if artifact is None:
             raise ValueError(f"EnterpriseArtifact {artifact_id!r} not found.")
         self._assert_tenant_owns(artifact)
+        if owner_id is not None and artifact.owner_id != owner_id:
+            raise ValueError(
+                f"EnterpriseArtifact {artifact_id!r} is not owned by the "
+                f"authenticated user."
+            )
 
         artifact.is_active = False
         artifact.updated_at = datetime.utcnow()
@@ -1082,7 +1336,11 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
     # ENT-2.5: Hard delete
     # ------------------------------------------------------------------
 
-    def hard_delete(self, artifact_id: uuid.UUID) -> bool:
+    def hard_delete(
+        self,
+        artifact_id: uuid.UUID,
+        auth_context: Optional["AuthContext"] = None,
+    ) -> bool:
         """Permanently remove an artifact and all related rows.
 
         Removal order:
@@ -1101,6 +1359,10 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         ----------
         artifact_id:
             UUID primary key of the artifact to permanently remove.
+        auth_context:
+            Optional authentication context.  When provided, the active tenant
+            is set via ``TenantContext`` and the operation is restricted to
+            artifacts owned by ``auth_context.user_id``.
 
         Returns
         -------
@@ -1110,7 +1372,8 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
         Raises
         ------
         ValueError
-            If no artifact with *artifact_id* exists in the current tenant.
+            If no artifact with *artifact_id* exists in the current tenant (or
+            owned by the authenticated user when *auth_context* is provided).
         TenantIsolationError
             If the artifact belongs to a different tenant.
         """
@@ -1119,12 +1382,18 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             EnterpriseCollectionArtifact,
         )
 
+        owner_id = self._apply_auth_context(auth_context)
         artifact: Optional[EnterpriseArtifact] = self.session.get(
             EnterpriseArtifact, artifact_id
         )
         if artifact is None:
             raise ValueError(f"EnterpriseArtifact {artifact_id!r} not found.")
         self._assert_tenant_owns(artifact)
+        if owner_id is not None and artifact.owner_id != owner_id:
+            raise ValueError(
+                f"EnterpriseArtifact {artifact_id!r} is not owned by the "
+                f"authenticated user."
+            )
 
         # Explicitly remove collection membership rows before the artifact
         # itself so that intent is clear regardless of cascade settings.
@@ -1192,6 +1461,7 @@ class EnterpriseCollectionRepository(
         name: str,
         description: Optional[str] = None,
         metadata: Optional[Dict] = None,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "EnterpriseCollection":
         """Create a new collection scoped to the current tenant.
 
@@ -1203,6 +1473,10 @@ class EnterpriseCollectionRepository(
             Optional free-text description.
         metadata:
             Reserved for future extensibility; unused by the model today.
+        auth_context:
+            Optional authentication context.  When provided, the active tenant
+            is set via ``TenantContext`` and ``owner_id`` is populated from
+            ``auth_context.user_id``.
 
         Returns
         -------
@@ -1211,9 +1485,11 @@ class EnterpriseCollectionRepository(
         """
         from skillmeat.cache.models_enterprise import EnterpriseCollection
 
+        owner_id = self._apply_auth_context(auth_context)
         tenant_id = self._get_tenant_id()
         collection = EnterpriseCollection(
             tenant_id=tenant_id,
+            owner_id=owner_id,
             name=name,
             description=description,
         )
@@ -1228,14 +1504,26 @@ class EnterpriseCollectionRepository(
         return collection
 
     def get(
-        self, collection_id: uuid.UUID
+        self,
+        collection_id: uuid.UUID,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "Optional[EnterpriseCollection]":
         """Retrieve a collection by primary key, asserting tenant ownership.
+
+        .. note::
+            Collections are intentionally **not** visibility-filtered.
+            ``EnterpriseCollection`` has no ``visibility`` column — all tenant
+            members share access to every collection (shared-library model).
+            Visibility filtering applies only to the *artifacts* returned
+            through a collection (see :meth:`list_artifacts`).
 
         Parameters
         ----------
         collection_id:
             UUID primary key of the collection to fetch.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before the ownership assertion.
 
         Returns
         -------
@@ -1249,19 +1537,34 @@ class EnterpriseCollectionRepository(
         """
         from skillmeat.cache.models_enterprise import EnterpriseCollection
 
+        self._apply_auth_context(auth_context)
         collection = self.session.get(EnterpriseCollection, collection_id)
         if collection is None:
             return None
         self._assert_tenant_owns(collection)
         return collection
 
-    def get_by_name(self, name: str) -> "Optional[EnterpriseCollection]":
+    def get_by_name(
+        self,
+        name: str,
+        auth_context: Optional["AuthContext"] = None,
+    ) -> "Optional[EnterpriseCollection]":
         """Retrieve a collection by name within the current tenant.
+
+        .. note::
+            Collections are intentionally **not** visibility-filtered.
+            ``EnterpriseCollection`` has no ``visibility`` column — all tenant
+            members share access to every collection (shared-library model).
+            Visibility filtering applies only to the *artifacts* returned
+            through a collection (see :meth:`list_artifacts`).
 
         Parameters
         ----------
         name:
             The exact collection name to look up.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before filtering.
 
         Returns
         -------
@@ -1269,6 +1572,7 @@ class EnterpriseCollectionRepository(
         """
         from skillmeat.cache.models_enterprise import EnterpriseCollection
 
+        self._apply_auth_context(auth_context)
         stmt = self._tenant_select().where(EnterpriseCollection.name == name)
         return self.session.execute(stmt).scalar_one_or_none()
 
@@ -1276,8 +1580,16 @@ class EnterpriseCollectionRepository(
         self,
         offset: int = 0,
         limit: int = 50,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "List[EnterpriseCollection]":
         """Return a paginated list of collections for the current tenant.
+
+        .. note::
+            Collections are intentionally **not** visibility-filtered.
+            ``EnterpriseCollection`` has no ``visibility`` column — all tenant
+            members share access to every collection (shared-library model).
+            Visibility filtering applies only to the *artifacts* returned
+            through a collection (see :meth:`list_artifacts`).
 
         Parameters
         ----------
@@ -1285,6 +1597,9 @@ class EnterpriseCollectionRepository(
             Number of rows to skip (0-based).
         limit:
             Maximum number of rows to return.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before filtering.
 
         Returns
         -------
@@ -1293,6 +1608,7 @@ class EnterpriseCollectionRepository(
         """
         from skillmeat.cache.models_enterprise import EnterpriseCollection
 
+        self._apply_auth_context(auth_context)
         stmt = (
             self._tenant_select()
             .order_by(EnterpriseCollection.name)
@@ -1306,6 +1622,7 @@ class EnterpriseCollectionRepository(
         collection_id: uuid.UUID,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "EnterpriseCollection":
         """Update mutable fields on an existing collection.
 
@@ -1320,6 +1637,10 @@ class EnterpriseCollectionRepository(
             New name, or ``None`` to leave unchanged.
         description:
             New description, or ``None`` to leave unchanged.
+        auth_context:
+            Optional authentication context.  When provided, the active tenant
+            is set via ``TenantContext`` and the update is restricted to
+            collections owned by ``auth_context.user_id``.
 
         Returns
         -------
@@ -1329,14 +1650,21 @@ class EnterpriseCollectionRepository(
         Raises
         ------
         ValueError
-            If the collection does not exist.
+            If the collection does not exist (or is not owned by the
+            authenticated user when *auth_context* is provided).
         TenantIsolationError
             If the collection belongs to a different tenant.
         """
+        owner_id = self._apply_auth_context(auth_context)
         collection = self.get(collection_id)
         if collection is None:
             raise ValueError(
                 f"EnterpriseCollection {collection_id!r} not found."
+            )
+        if owner_id is not None and collection.owner_id != owner_id:
+            raise ValueError(
+                f"EnterpriseCollection {collection_id!r} is not owned by the "
+                f"authenticated user."
             )
         changed: Dict[str, object] = {}
         if name is not None:
@@ -1355,7 +1683,11 @@ class EnterpriseCollectionRepository(
         )
         return collection
 
-    def delete(self, collection_id: uuid.UUID) -> bool:
+    def delete(
+        self,
+        collection_id: uuid.UUID,
+        auth_context: Optional["AuthContext"] = None,
+    ) -> bool:
         """Delete a collection and all of its membership rows.
 
         Membership rows are removed first (in case the DB engine does not
@@ -1366,6 +1698,10 @@ class EnterpriseCollectionRepository(
         ----------
         collection_id:
             UUID of the collection to delete.
+        auth_context:
+            Optional authentication context.  When provided, the active tenant
+            is set via ``TenantContext`` and the operation is restricted to
+            collections owned by ``auth_context.user_id``.
 
         Returns
         -------
@@ -1375,14 +1711,23 @@ class EnterpriseCollectionRepository(
 
         Raises
         ------
+        ValueError
+            If the collection is not owned by the authenticated user when
+            *auth_context* is provided.
         TenantIsolationError
             If the collection belongs to a different tenant.
         """
         from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
 
+        owner_id = self._apply_auth_context(auth_context)
         collection = self.get(collection_id)
         if collection is None:
             return False
+        if owner_id is not None and collection.owner_id != owner_id:
+            raise ValueError(
+                f"EnterpriseCollection {collection_id!r} is not owned by the "
+                f"authenticated user."
+            )
         # Remove membership rows explicitly alongside the ORM cascade.
         self.session.execute(
             delete(EnterpriseCollectionArtifact).where(
@@ -1403,9 +1748,24 @@ class EnterpriseCollectionRepository(
     # ------------------------------------------------------------------
 
     def _get_artifact_for_tenant(
-        self, artifact_id: uuid.UUID
+        self,
+        artifact_id: uuid.UUID,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "Optional[EnterpriseArtifact]":
         """Return an EnterpriseArtifact if it exists and belongs to the current tenant.
+
+        This is a write-path helper (called from :meth:`add_artifact`).
+        Visibility filtering is intentionally not applied here: write
+        operations check tenant isolation only, not per-user visibility.
+
+        Parameters
+        ----------
+        artifact_id:
+            UUID of the artifact to look up.
+        auth_context:
+            Optional authentication context.  Reserved for future use;
+            currently unused in write-path existence checks (``None`` is the
+            expected default).
 
         Raises
         ------
@@ -1433,6 +1793,7 @@ class EnterpriseCollectionRepository(
         collection_id: uuid.UUID,
         artifact_id: uuid.UUID,
         position: Optional[int] = None,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "EnterpriseCollectionArtifact":
         """Add an artifact to a collection.
 
@@ -1448,6 +1809,9 @@ class EnterpriseCollectionRepository(
             UUID of the artifact to add.
         position:
             Explicit 0-based position index; ``None`` = append.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before all ownership checks.
 
         Returns
         -------
@@ -1464,6 +1828,7 @@ class EnterpriseCollectionRepository(
         from sqlalchemy import func as _func
         from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
 
+        self._apply_auth_context(auth_context)
         collection = self.get(collection_id)
         if collection is None:
             raise ValueError(
@@ -1506,6 +1871,7 @@ class EnterpriseCollectionRepository(
         self,
         collection_id: uuid.UUID,
         artifact_id: uuid.UUID,
+        auth_context: Optional["AuthContext"] = None,
     ) -> bool:
         """Remove an artifact from a collection.
 
@@ -1515,6 +1881,9 @@ class EnterpriseCollectionRepository(
             UUID of the collection.
         artifact_id:
             UUID of the artifact to remove.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before the ownership check.
 
         Returns
         -------
@@ -1529,6 +1898,7 @@ class EnterpriseCollectionRepository(
         """
         from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
 
+        self._apply_auth_context(auth_context)
         collection = self.get(collection_id)
         if collection is None:
             return False
@@ -1554,19 +1924,35 @@ class EnterpriseCollectionRepository(
         return deleted
 
     def list_artifacts(
-        self, collection_id: uuid.UUID
+        self,
+        collection_id: uuid.UUID,
+        auth_context: Optional["AuthContext"] = None,
     ) -> "List[EnterpriseArtifact]":
-        """Return the artifacts in a collection, ordered by position.
+        """Return the visibility-filtered artifacts in a collection, ordered by position.
+
+        Collections themselves are public-within-tenant (no ``visibility``
+        column on ``EnterpriseCollection``).  However, the *artifacts* inside
+        a collection DO carry per-row visibility, so a tenant member must not
+        see private artifacts owned by someone else just because they share a
+        collection.  When *auth_context* is provided,
+        :func:`~skillmeat.core.repositories.filters.apply_visibility_filter_stmt`
+        is applied to the ``EnterpriseArtifact`` half of the join so that only
+        rows the caller is permitted to see are returned.
 
         Parameters
         ----------
         collection_id:
             UUID of the collection.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before the ownership check and applies
+            per-user visibility filtering to the returned artifacts.
 
         Returns
         -------
         List[EnterpriseArtifact]
-            Artifacts ordered by ``order_index`` ascending.
+            Artifacts ordered by ``order_index`` ascending, filtered by the
+            caller's visibility permissions when *auth_context* is not ``None``.
 
         Raises
         ------
@@ -1577,7 +1963,9 @@ class EnterpriseCollectionRepository(
             EnterpriseArtifact,
             EnterpriseCollectionArtifact,
         )
+        from skillmeat.core.repositories.filters import apply_visibility_filter_stmt
 
+        self._apply_auth_context(auth_context)
         collection = self.get(collection_id)
         if collection is None:
             return []
@@ -1594,12 +1982,18 @@ class EnterpriseCollectionRepository(
             )
             .order_by(EnterpriseCollectionArtifact.order_index)
         )
+        # ENT-002: Visibility-excluded artifacts are silently omitted from
+        # results.  Members cannot see private artifacts owned by others even
+        # when they share the same collection.
+        if auth_context is not None:
+            stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
         return list(self.session.execute(stmt).scalars())
 
     def reorder_artifacts(
         self,
         collection_id: uuid.UUID,
         artifact_ids: List[uuid.UUID],
+        auth_context: Optional["AuthContext"] = None,
     ) -> bool:
         """Reorder artifacts within a collection.
 
@@ -1614,6 +2008,9 @@ class EnterpriseCollectionRepository(
             UUID of the collection to reorder.
         artifact_ids:
             Ordered list of artifact UUIDs.  Position 0 → ``order_index = 0``.
+        auth_context:
+            Optional authentication context.  When provided, sets the active
+            tenant via ``TenantContext`` before the ownership check.
 
         Returns
         -------
@@ -1628,6 +2025,7 @@ class EnterpriseCollectionRepository(
         """
         from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
 
+        self._apply_auth_context(auth_context)
         collection = self.get(collection_id)
         if collection is None:
             return False

@@ -1,11 +1,15 @@
 """Collection API schemas for request and response models."""
 
+from __future__ import annotations
+
+from uuid import UUID as _UUID
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from .auth import OwnerType, Visibility
 from .common import PageInfo, PaginatedResponse
 
 
@@ -22,6 +26,34 @@ class CollectionCreateRequest(BaseModel):
         max_length=100,
         examples=["my-collection"],
     )
+    owner_type: Optional[str] = Field(
+        default=None,
+        description="Owner type: 'user' or 'team'. Defaults to 'user' when not provided.",
+    )
+    visibility: Optional[str] = Field(
+        default=None,
+        description="Visibility: 'private', 'team', or 'public'. Defaults to 'private' when not provided.",
+    )
+
+    @field_validator("owner_type")
+    @classmethod
+    def validate_owner_type(cls, v: Optional[str]) -> Optional[str]:
+        """Validate owner_type matches OwnerType enum values when provided."""
+        if v is not None:
+            valid = {m.value for m in OwnerType}
+            if v not in valid:
+                raise ValueError(f"owner_type must be one of {sorted(valid)}, got '{v}'")
+        return v
+
+    @field_validator("visibility")
+    @classmethod
+    def validate_visibility(cls, v: Optional[str]) -> Optional[str]:
+        """Validate visibility matches Visibility enum values when provided."""
+        if v is not None:
+            valid = {m.value for m in Visibility}
+            if v not in valid:
+                raise ValueError(f"visibility must be one of {sorted(valid)}, got '{v}'")
+        return v
 
 
 class CollectionUpdateRequest(BaseModel):
@@ -38,6 +70,34 @@ class CollectionUpdateRequest(BaseModel):
         max_length=100,
         examples=["renamed-collection"],
     )
+    owner_type: Optional[str] = Field(
+        default=None,
+        description="Owner type: 'user' or 'team'.",
+    )
+    visibility: Optional[str] = Field(
+        default=None,
+        description="Visibility: 'private', 'team', or 'public'.",
+    )
+
+    @field_validator("owner_type")
+    @classmethod
+    def validate_owner_type(cls, v: Optional[str]) -> Optional[str]:
+        """Validate owner_type matches OwnerType enum values when provided."""
+        if v is not None:
+            valid = {m.value for m in OwnerType}
+            if v not in valid:
+                raise ValueError(f"owner_type must be one of {sorted(valid)}, got '{v}'")
+        return v
+
+    @field_validator("visibility")
+    @classmethod
+    def validate_visibility(cls, v: Optional[str]) -> Optional[str]:
+        """Validate visibility matches Visibility enum values when provided."""
+        if v is not None:
+            valid = {m.value for m in Visibility}
+            if v not in valid:
+                raise ValueError(f"visibility must be one of {sorted(valid)}, got '{v}'")
+        return v
 
 
 class ArtifactSummary(BaseModel):
@@ -102,6 +162,18 @@ class CollectionResponse(BaseModel):
     updated: datetime = Field(
         description="Last update timestamp",
     )
+    owner_id: Optional[_UUID] = Field(
+        default=None,
+        description="UUID of the owning user or team",
+    )
+    owner_type: Optional[str] = Field(
+        default=None,
+        description="Owner type: 'user' or 'team'",
+    )
+    visibility: Optional[str] = Field(
+        default=None,
+        description="Visibility level: 'private', 'team', or 'public'",
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -114,6 +186,9 @@ class CollectionResponse(BaseModel):
                 "artifact_count": 5,
                 "created": "2024-11-16T12:00:00Z",
                 "updated": "2024-11-16T15:30:00Z",
+                "owner_id": None,
+                "owner_type": "user",
+                "visibility": "private",
             }
         }
 
