@@ -157,7 +157,7 @@ Replace Clerk's `SignIn`/`SignUp` components in `app/auth/login/page.tsx` and `a
 
 ### 5. Update environment variables
 
-Add the new provider's env vars to `.env.local` and `.env.example`. Add `NEXT_PUBLIC_AUTH_PROVIDER=new-provider` to select it.
+Add the new provider's env vars to `.env.local` and `.env.local.example`. Add `NEXT_PUBLIC_AUTH_PROVIDER=new-provider` to select it.
 
 ### 6. Remove old provider (optional)
 
