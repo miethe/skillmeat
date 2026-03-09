@@ -19,10 +19,14 @@ set -euo pipefail
 # ===================================================================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-COMPOSE_FILE="$SCRIPT_DIR/docker-compose.production.yml"
+COMPOSE_FILE="$PROJECT_ROOT/docker-compose.yml"
+COMPOSE_PROFILE="enterprise"
 ENV_FILE="$SCRIPT_DIR/env.production"
 SMOKE_TESTS="$SCRIPT_DIR/smoke-tests.sh"
 STAGING_SMOKE_TESTS="$PROJECT_ROOT/deploy/staging/smoke-tests.sh"
+
+# GHCR image references
+GHCR_REGISTRY="ghcr.io/miethe"
 
 # Deployment configuration
 DEPLOYMENT_TIMEOUT=300  # 5 minutes
@@ -47,6 +51,8 @@ DEPLOYMENT_STARTED=false
 ROLLBACK_NEEDED=false
 DEPLOYMENT_ID=""
 DEPLOY_VERSION="${SKILLMEAT_VERSION:-latest}"
+API_IMAGE="${GHCR_REGISTRY}/skillmeat-api:${DEPLOY_VERSION}"
+WEB_IMAGE="${GHCR_REGISTRY}/skillmeat-web:${DEPLOY_VERSION}"
 
 # Flags
 CONFIRM=false
@@ -100,9 +106,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Recompute image references after argument parsing (--version may have changed DEPLOY_VERSION)
+API_IMAGE="${GHCR_REGISTRY}/skillmeat-api:${DEPLOY_VERSION}"
+WEB_IMAGE="${GHCR_REGISTRY}/skillmeat-web:${DEPLOY_VERSION}"
+
 # ===================================================================
 # HELPER FUNCTIONS
 # ===================================================================
+
+# Wrapper: runs docker compose with unified config, profile, and env file
+dc() {
+    docker compose -f "$COMPOSE_FILE" --profile "$COMPOSE_PROFILE" --env-file "$ENV_FILE" "$@"
+}
 
 log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
@@ -152,9 +167,9 @@ check_prerequisites() {
         return 1
     fi
 
-    # Check Docker Compose
-    if ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose is not installed"
+    # Check Docker Compose v2 plugin
+    if ! docker compose version &> /dev/null; then
+        log_error "Docker Compose v2 plugin is not installed"
         return 1
     fi
 
@@ -205,10 +220,11 @@ verify_staging() {
         return 1
     fi
 
-    # Check if staging is running
-    local staging_compose="$PROJECT_ROOT/deploy/staging/docker-compose.staging.yml"
-    if [ -f "$staging_compose" ]; then
-        if docker-compose -f "$staging_compose" ps skillmeat-api 2>/dev/null | grep -q "Up"; then
+    # Check if staging is running using the unified compose with local profile
+    local staging_env="$PROJECT_ROOT/deploy/staging/env.staging"
+    if [ -f "$staging_env" ]; then
+        if docker compose -f "$COMPOSE_FILE" --profile local --env-file "$staging_env" \
+                ps skillmeat-api 2>/dev/null | grep -q "Up\|running"; then
             log_info "Staging is running, executing smoke tests..."
             export SKILLMEAT_API_URL="http://localhost:8080"
             chmod +x "$STAGING_SMOKE_TESTS"
@@ -226,7 +242,7 @@ verify_staging() {
             return 0
         fi
     else
-        log_warn "Staging compose file not found"
+        log_warn "Staging env file not found"
         log_warn "Ensure staging environment has been validated before production deployment"
         return 0
     fi
@@ -249,12 +265,15 @@ deployment_id=$DEPLOYMENT_ID
 timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 version=$DEPLOY_VERSION
 previous_api_image=$current_api_image
+api_image=$API_IMAGE
+web_image=$WEB_IMAGE
 compose_file=$COMPOSE_FILE
+compose_profile=$COMPOSE_PROFILE
 EOF
 
-    # Save current compose config
+    # Save current compose config snapshot
     if [ -f "$COMPOSE_FILE" ]; then
-        cp "$COMPOSE_FILE" "$backup_path/docker-compose.production.yml.bak"
+        cp "$COMPOSE_FILE" "$backup_path/docker-compose.yml.bak"
     fi
 
     # Save current env
@@ -275,43 +294,24 @@ EOF
     return 0
 }
 
-build_images() {
-    log_step "Building Docker images (version: $DEPLOY_VERSION)"
+pull_images() {
+    log_step "Pulling GHCR images (version: $DEPLOY_VERSION)"
 
-    # Check if Dockerfiles exist
-    local api_dockerfile="$PROJECT_ROOT/Dockerfile"
-    local web_dockerfile="$PROJECT_ROOT/web/Dockerfile"
+    log_info "Pulling API image: $API_IMAGE"
+    docker pull "$API_IMAGE" || {
+        log_error "Failed to pull API image: $API_IMAGE"
+        log_error "Ensure the image is published and you are authenticated to GHCR"
+        return 1
+    }
+    log_info "API image pulled successfully"
 
-    if [ ! -f "$api_dockerfile" ]; then
-        log_warn "API Dockerfile not found at $api_dockerfile"
-        log_warn "Skipping API image build (using existing image)"
-    else
-        log_info "Building API image..."
-        docker build -t "skillmeat/api:$DEPLOY_VERSION" -f "$api_dockerfile" "$PROJECT_ROOT" || {
-            log_error "Failed to build API image"
-            return 1
-        }
-        # Tag as latest if deploying a specific version
-        if [ "$DEPLOY_VERSION" != "latest" ]; then
-            docker tag "skillmeat/api:$DEPLOY_VERSION" "skillmeat/api:latest"
-        fi
-        log_info "API image built successfully"
-    fi
-
-    if [ ! -f "$web_dockerfile" ]; then
-        log_warn "Web Dockerfile not found at $web_dockerfile"
-        log_warn "Skipping web image build (using existing image or service disabled)"
-    else
-        log_info "Building web image..."
-        docker build -t "skillmeat/web:$DEPLOY_VERSION" -f "$web_dockerfile" "$PROJECT_ROOT/web" || {
-            log_error "Failed to build web image"
-            return 1
-        }
-        if [ "$DEPLOY_VERSION" != "latest" ]; then
-            docker tag "skillmeat/web:$DEPLOY_VERSION" "skillmeat/web:latest"
-        fi
-        log_info "Web image built successfully"
-    fi
+    log_info "Pulling Web image: $WEB_IMAGE"
+    docker pull "$WEB_IMAGE" || {
+        log_error "Failed to pull Web image: $WEB_IMAGE"
+        log_error "Ensure the image is published and you are authenticated to GHCR"
+        return 1
+    }
+    log_info "Web image pulled successfully"
 
     return 0
 }
@@ -332,8 +332,8 @@ run_migrations() {
     log_info "Running Alembic migrations..."
 
     # Option 1: If container is already running
-    if docker-compose -f "$COMPOSE_FILE" ps skillmeat-api 2>/dev/null | grep -q "Up"; then
-        docker-compose -f "$COMPOSE_FILE" exec -T skillmeat-api \
+    if dc ps skillmeat-api 2>/dev/null | grep -q "Up\|running"; then
+        dc exec -T skillmeat-api \
             alembic -c /app/skillmeat/cache/migrations/alembic.ini upgrade head || {
             log_error "Failed to run migrations"
             return 1
@@ -341,9 +341,8 @@ run_migrations() {
     # Option 2: Run in a temporary container
     else
         docker run --rm \
-            -v "$PROJECT_ROOT:/app" \
-            -w /app \
-            "skillmeat/api:$DEPLOY_VERSION" \
+            --env-file "$ENV_FILE" \
+            "$API_IMAGE" \
             alembic -c /app/skillmeat/cache/migrations/alembic.ini upgrade head || {
             log_warn "Failed to run migrations in temporary container"
             log_info "Migrations will be attempted after service start"
@@ -356,19 +355,14 @@ run_migrations() {
 }
 
 start_services() {
-    log_step "Starting services (blue-green deployment)"
+    log_step "Starting services (blue-green deployment, profile: $COMPOSE_PROFILE)"
 
     DEPLOYMENT_STARTED=true
 
-    # Pull latest images for monitoring services
-    log_info "Pulling monitoring service images..."
-    docker-compose -f "$COMPOSE_FILE" pull prometheus grafana alertmanager || {
-        log_warn "Failed to pull some monitoring images (may use cached versions)"
-    }
-
-    # Start services with the new version
+    # Start services with the new version using unified compose and enterprise profile
     log_info "Starting all services with version: $DEPLOY_VERSION..."
-    SKILLMEAT_VERSION="$DEPLOY_VERSION" docker-compose -f "$COMPOSE_FILE" up -d || {
+    SKILLMEAT_API_IMAGE="$API_IMAGE" SKILLMEAT_WEB_IMAGE="$WEB_IMAGE" \
+        dc up -d || {
         log_error "Failed to start services"
         ROLLBACK_NEEDED=true
         return 1
@@ -406,9 +400,9 @@ run_post_deployment_migrations() {
     log_step "Running post-deployment migrations (if needed)"
 
     # If migrations failed earlier, try again now that the service is running
-    if docker-compose -f "$COMPOSE_FILE" ps skillmeat-api 2>/dev/null | grep -q "Up"; then
+    if dc ps skillmeat-api 2>/dev/null | grep -q "Up\|running"; then
         log_info "Attempting migrations inside running container..."
-        docker-compose -f "$COMPOSE_FILE" exec -T skillmeat-api \
+        dc exec -T skillmeat-api \
             alembic -c /app/skillmeat/cache/migrations/alembic.ini upgrade head 2>/dev/null || {
             log_warn "Migrations command not available or already up to date"
         }
@@ -441,7 +435,14 @@ show_status() {
 
     echo ""
     log_info "Service status:"
-    docker-compose -f "$COMPOSE_FILE" ps
+    dc ps
+
+    echo ""
+    log_info "Version: $DEPLOY_VERSION"
+    log_info "Profile: $COMPOSE_PROFILE"
+    log_info "Images:"
+    echo "  API: $API_IMAGE"
+    echo "  Web: $WEB_IMAGE"
 
     echo ""
     log_info "Endpoints:"
@@ -449,11 +450,8 @@ show_status() {
     echo "  API Health:   http://localhost:8080/health"
     echo "  API Docs:     http://localhost:8080/docs"
     echo "  Metrics:      http://localhost:8080/metrics"
-    echo "  Prometheus:   http://localhost:9090"
-    echo "  Grafana:      http://localhost:3000"
-    echo "  Alertmanager: http://localhost:9093"
-    if docker-compose -f "$COMPOSE_FILE" ps skillmeat-web 2>/dev/null | grep -q "Up"; then
-        echo "  Web UI:       http://localhost:3001"
+    if dc ps skillmeat-web 2>/dev/null | grep -q "Up\|running"; then
+        echo "  Web UI:       http://localhost:3000"
     fi
 
     echo ""
@@ -463,9 +461,9 @@ show_status() {
 
     echo ""
     log_info "Useful commands:"
-    echo "  View logs:       docker-compose -f $COMPOSE_FILE logs -f skillmeat-api"
-    echo "  Restart service: docker-compose -f $COMPOSE_FILE restart skillmeat-api"
-    echo "  Stop all:        docker-compose -f $COMPOSE_FILE down"
+    echo "  View logs:       docker compose -f $COMPOSE_FILE --profile $COMPOSE_PROFILE logs -f skillmeat-api"
+    echo "  Restart service: docker compose -f $COMPOSE_FILE --profile $COMPOSE_PROFILE restart skillmeat-api"
+    echo "  Stop all:        docker compose -f $COMPOSE_FILE --profile $COMPOSE_PROFILE down"
     echo "  Run smoke tests: $SMOKE_TESTS"
     echo "  Rollback:        $0 --rollback"
 
@@ -498,32 +496,34 @@ rollback() {
         local previous_path
         previous_path=$(readlink "$PREVIOUS_LINK")
 
-        if [ ! -f "$previous_path/docker-compose.production.yml.bak" ]; then
+        if [ ! -f "$previous_path/docker-compose.yml.bak" ]; then
             log_error "Previous deployment backup is incomplete"
             exit 1
         fi
 
         log_info "Rolling back to: $(basename "$previous_path")"
 
-        # Get the previous version from metadata
+        # Get the previous version and image refs from metadata
         local prev_version
         prev_version=$(grep "^version=" "$previous_path/metadata.txt" 2>/dev/null | cut -d= -f2 || echo "latest")
+        local prev_api_image="${GHCR_REGISTRY}/skillmeat-api:${prev_version}"
+        local prev_web_image="${GHCR_REGISTRY}/skillmeat-web:${prev_version}"
 
         # Stop current services
         log_info "Stopping current services..."
-        docker-compose -f "$COMPOSE_FILE" down || {
+        dc down || {
             log_error "Failed to stop current services"
             log_error "Manual intervention required"
             exit 1
         }
 
-        # Restore previous configuration
-        cp "$previous_path/docker-compose.production.yml.bak" "$COMPOSE_FILE"
+        # Restore previous env file
         cp "$previous_path/env.production.bak" "$ENV_FILE"
 
         # Start with previous version
         log_info "Starting previous version ($prev_version)..."
-        SKILLMEAT_VERSION="$prev_version" docker-compose -f "$COMPOSE_FILE" up -d || {
+        SKILLMEAT_API_IMAGE="$prev_api_image" SKILLMEAT_WEB_IMAGE="$prev_web_image" \
+            dc up -d || {
             log_error "Failed to start previous version"
             log_error "Manual intervention required"
             exit 1
@@ -548,7 +548,7 @@ rollback() {
     # Automatic rollback during failed deployment
     if [ "$DEPLOYMENT_STARTED" = true ]; then
         log_info "Stopping failed deployment..."
-        docker-compose -f "$COMPOSE_FILE" down || {
+        dc down || {
             log_error "Failed to stop services during rollback"
             log_error "Manual intervention required"
             notify "DEPLOYMENT FAILED - manual intervention required" "critical"
@@ -561,9 +561,12 @@ rollback() {
             previous_path=$(readlink "$PREVIOUS_LINK")
             local prev_version
             prev_version=$(grep "^version=" "$previous_path/metadata.txt" 2>/dev/null | cut -d= -f2 || echo "latest")
+            local prev_api_image="${GHCR_REGISTRY}/skillmeat-api:${prev_version}"
+            local prev_web_image="${GHCR_REGISTRY}/skillmeat-web:${prev_version}"
 
             log_info "Attempting automatic rollback to: $(basename "$previous_path")"
-            SKILLMEAT_VERSION="$prev_version" docker-compose -f "$COMPOSE_FILE" up -d || {
+            SKILLMEAT_API_IMAGE="$prev_api_image" SKILLMEAT_WEB_IMAGE="$prev_web_image" \
+                dc up -d || {
                 log_error "Automatic rollback failed"
             }
 
@@ -589,10 +592,10 @@ rollback() {
     echo ""
     echo "To investigate the issue:"
     echo "  1. Check service logs:"
-    echo "     docker-compose -f $COMPOSE_FILE logs skillmeat-api"
+    echo "     docker compose -f $COMPOSE_FILE --profile $COMPOSE_PROFILE logs skillmeat-api"
     echo ""
     echo "  2. Check container status:"
-    echo "     docker-compose -f $COMPOSE_FILE ps"
+    echo "     docker compose -f $COMPOSE_FILE --profile $COMPOSE_PROFILE ps"
     echo ""
     echo "  3. Check recent container logs:"
     echo "     docker logs skillmeat-api-production --tail 100"
@@ -614,9 +617,9 @@ cleanup_on_interrupt() {
     notify "Deployment interrupted by user" "warning"
     if [ "$DEPLOYMENT_STARTED" = true ]; then
         log_info "Services may be in partial state. Check status with:"
-        echo "  docker-compose -f $COMPOSE_FILE ps"
+        echo "  docker compose -f $COMPOSE_FILE --profile $COMPOSE_PROFILE ps"
         echo "To clean up:"
-        echo "  docker-compose -f $COMPOSE_FILE down"
+        echo "  docker compose -f $COMPOSE_FILE --profile $COMPOSE_PROFILE down"
         echo "To rollback:"
         echo "  $0 --rollback"
     fi
@@ -671,6 +674,9 @@ main() {
     log_info "Environment: production"
     log_info "Version:     $DEPLOY_VERSION"
     log_info "Compose:     $COMPOSE_FILE"
+    log_info "Profile:     $COMPOSE_PROFILE"
+    log_info "API Image:   $API_IMAGE"
+    log_info "Web Image:   $WEB_IMAGE"
     log_info "Started at:  $(date)"
     echo ""
 
@@ -687,8 +693,8 @@ main() {
     # Save state for rollback
     save_deployment_state || log_warn "Could not save deployment state"
 
-    # Build
-    build_images || exit 1
+    # Pull images from GHCR
+    pull_images || exit 1
 
     # Attempt pre-deployment migrations (may fail if DB not ready)
     run_migrations || log_warn "Pre-deployment migrations skipped or failed"
