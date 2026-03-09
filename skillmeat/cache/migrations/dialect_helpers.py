@@ -85,6 +85,7 @@ def is_postgresql() -> bool:
 def create_updated_at_trigger(
     table_name: str,
     column: str = "updated_at",
+    pk_column: str = "id",
 ) -> None:
     """Create a dialect-appropriate trigger to maintain an auto-updated timestamp.
 
@@ -161,7 +162,7 @@ def create_updated_at_trigger(
             AFTER UPDATE ON {table_name}
             FOR EACH ROW
             BEGIN
-                UPDATE {table_name} SET {column} = CURRENT_TIMESTAMP WHERE id = NEW.id;
+                UPDATE {table_name} SET {column} = CURRENT_TIMESTAMP WHERE {pk_column} = NEW.{pk_column};
             END;
             """
         )

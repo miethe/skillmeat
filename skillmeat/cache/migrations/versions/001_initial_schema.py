@@ -7,9 +7,10 @@ Create Date: 2025-12-01 15:00:00.000000
 This migration creates the complete database schema for the SkillMeat
 persistent project cache, including:
 
-- 5 tables: projects, artifacts, artifact_metadata, marketplace, cache_metadata
-- 11 indexes for query optimization
-- 3 triggers for automatic timestamp updates
+- 6 tables: projects, artifacts, artifact_metadata, marketplace, cache_metadata,
+  marketplace_sources
+- 14 indexes for query optimization
+- 4 triggers for automatic timestamp updates
 - SQLite PRAGMA configuration for performance
 
 The schema is designed for:
@@ -52,12 +53,13 @@ def upgrade() -> None:
         - artifact_metadata: Extended artifact metadata (YAML frontmatter)
         - marketplace: Cached marketplace artifact listings
         - cache_metadata: Cache system metadata (version, TTL, etc.)
+        - marketplace_sources: GitHub repository sources for marketplace scanning
 
     Indexes Created:
-        - 11 indexes for optimized query performance
+        - 14 indexes for optimized query performance
 
     Triggers Created:
-        - 3 auto-update triggers for timestamp maintenance
+        - 4 auto-update triggers for timestamp maintenance
     """
     # ==========================================================================
     # Projects Table
@@ -217,12 +219,103 @@ def upgrade() -> None:
     )
 
     # ==========================================================================
+    # Marketplace Sources Table
+    # ==========================================================================
+    # GitHub repository sources for marketplace artifact scanning
+    op.create_table(
+        "marketplace_sources",
+        sa.Column("id", sa.String(), nullable=False),
+        # Core repository fields
+        sa.Column("repo_url", sa.String(), nullable=False),
+        sa.Column("owner", sa.String(), nullable=False),
+        sa.Column("repo_name", sa.String(), nullable=False),
+        sa.Column(
+            "ref",
+            sa.String(),
+            nullable=False,
+            server_default="main",
+        ),
+        sa.Column("root_hint", sa.String(), nullable=True),
+        # Extended configuration
+        sa.Column("manual_map", sa.Text(), nullable=True),
+        sa.Column("access_token_id", sa.String(), nullable=True),
+        # Security and visibility
+        sa.Column(
+            "trust_level",
+            sa.String(),
+            nullable=False,
+            server_default="basic",
+        ),
+        sa.Column(
+            "visibility",
+            sa.String(),
+            nullable=False,
+            server_default="public",
+        ),
+        # Sync status
+        sa.Column("last_sync_at", sa.DateTime(), nullable=True),
+        sa.Column("last_error", sa.Text(), nullable=True),
+        sa.Column(
+            "scan_status",
+            sa.String(),
+            nullable=False,
+            server_default="pending",
+        ),
+        sa.Column(
+            "artifact_count",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+        ),
+        # Timestamps
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("repo_url", name="idx_marketplace_sources_repo_url"),
+        sa.CheckConstraint(
+            "trust_level IN ('untrusted', 'basic', 'verified', 'official')",
+            name="check_trust_level",
+        ),
+        sa.CheckConstraint(
+            "visibility IN ('private', 'internal', 'public')",
+            name="check_visibility",
+        ),
+        sa.CheckConstraint(
+            "scan_status IN ('pending', 'scanning', 'success', 'error')",
+            name="check_scan_status",
+        ),
+    )
+
+    # Marketplace sources indexes
+    op.create_index(
+        "idx_marketplace_sources_last_sync",
+        "marketplace_sources",
+        ["last_sync_at"],
+    )
+    op.create_index(
+        "idx_marketplace_sources_scan_status",
+        "marketplace_sources",
+        ["scan_status"],
+    )
+
+    # ==========================================================================
     # Triggers for automatic updated_at maintenance
     # ==========================================================================
 
     create_updated_at_trigger("projects")
     create_updated_at_trigger("artifacts")
-    create_updated_at_trigger("cache_metadata")
+    create_updated_at_trigger("cache_metadata", pk_column="key")
+    create_updated_at_trigger("marketplace_sources")
 
     # ==========================================================================
     # Initialize cache metadata with schema version
@@ -247,8 +340,10 @@ def downgrade() -> None:
     drop_updated_at_trigger("projects")
     drop_updated_at_trigger("artifacts")
     drop_updated_at_trigger("cache_metadata")
+    drop_updated_at_trigger("marketplace_sources")
 
     # Drop tables in reverse order (respecting foreign keys)
+    op.drop_table("marketplace_sources")
     op.drop_table("cache_metadata")
     op.drop_table("marketplace")
     op.drop_table("artifact_metadata")

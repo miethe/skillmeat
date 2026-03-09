@@ -75,13 +75,11 @@ def upgrade() -> None:
     # but Alembic handles this with a table recreation strategy)
     with op.batch_alter_table("match_history") as batch_op:
         batch_op.drop_column("user_confirmed")
-
-    # Add check constraint for valid outcome values
-    op.create_check_constraint(
-        "check_valid_outcome",
-        "match_history",
-        "outcome IS NULL OR outcome IN ('confirmed', 'rejected', 'ignored')",
-    )
+        # Add check constraint for valid outcome values
+        batch_op.create_check_constraint(
+            "check_valid_outcome",
+            condition="outcome IS NULL OR outcome IN ('confirmed', 'rejected', 'ignored')",
+        )
 
     # Update schema version
     op.execute(
