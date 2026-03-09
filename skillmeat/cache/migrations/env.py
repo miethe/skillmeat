@@ -121,18 +121,25 @@ from skillmeat.cache.models import Base, create_db_engine  # noqa: E402
 
 target_metadata = Base.metadata
 
-# Resolve DB URL from skillmeat config if not set in alembic.ini
-if config.get_main_option("sqlalchemy.url") is None:
-    try:
-        from skillmeat.core.config import ConfigManager  # noqa: E402
+# Resolve DB URL: DATABASE_URL env var > alembic.ini > ConfigManager > default SQLite
+import os  # noqa: E402
 
-        cfg_mgr = ConfigManager()
-        db_path = cfg_mgr.get("cache.db-path") or (
-            Path.home() / ".skillmeat" / "cache" / "cache.db"
-        )
-    except Exception:
-        db_path = Path.home() / ".skillmeat" / "cache" / "cache.db"
-    config.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
+if config.get_main_option("sqlalchemy.url") is None:
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if database_url:
+        # Use DATABASE_URL from environment (e.g. postgresql://... for enterprise)
+        config.set_main_option("sqlalchemy.url", database_url)
+    else:
+        try:
+            from skillmeat.core.config import ConfigManager  # noqa: E402
+
+            cfg_mgr = ConfigManager()
+            db_path = cfg_mgr.get("cache.db-path") or (
+                Path.home() / ".skillmeat" / "cache" / "cache.db"
+            )
+        except Exception:
+            db_path = Path.home() / ".skillmeat" / "cache" / "cache.db"
+        config.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
 
 
 def run_migrations_offline() -> None:
@@ -167,44 +174,45 @@ def run_migrations_online() -> None:
     with the context.
 
     This is the standard mode for applying migrations directly to a database.
+    Supports both SQLite and PostgreSQL backends.
     """
-    # Get configuration and add SQLite-specific settings
     configuration = config.get_section(config.config_ini_section) or {}
     db_url = config.get_main_option("sqlalchemy.url")
     if db_url:
         configuration["sqlalchemy.url"] = db_url
 
-    # Create engine with SQLite-optimized settings
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
-        # SQLite doesn't use connection pooling
-        poolclass=pool.NullPool,
-        # SQLite-specific connection arguments
-        connect_args={
-            "check_same_thread": False,  # Allow multi-threaded access
-            "timeout": 30.0,  # 30 second lock timeout
-        },
-    )
+    is_sqlite = db_url and db_url.startswith("sqlite")
+
+    # Engine kwargs differ by backend
+    engine_kwargs: dict = {
+        "prefix": "sqlalchemy.",
+        "poolclass": pool.NullPool,
+    }
+    if is_sqlite:
+        engine_kwargs["connect_args"] = {
+            "check_same_thread": False,
+            "timeout": 30.0,
+        }
+
+    connectable = engine_from_config(configuration, **engine_kwargs)
 
     with connectable.connect() as connection:
-        # Execute PRAGMA statements before migrations
-        connection.execute(text("PRAGMA journal_mode = WAL"))
-        connection.execute(text("PRAGMA synchronous = NORMAL"))
-        connection.execute(text("PRAGMA foreign_keys = ON"))
-        connection.execute(text("PRAGMA temp_store = MEMORY"))
-        connection.execute(text("PRAGMA cache_size = -64000"))
-        connection.execute(text("PRAGMA mmap_size = 268435456"))
-        connection.commit()
+        # SQLite-specific PRAGMA tuning
+        if is_sqlite:
+            connection.execute(text("PRAGMA journal_mode = WAL"))
+            connection.execute(text("PRAGMA synchronous = NORMAL"))
+            connection.execute(text("PRAGMA foreign_keys = ON"))
+            connection.execute(text("PRAGMA temp_store = MEMORY"))
+            connection.execute(text("PRAGMA cache_size = -64000"))
+            connection.execute(text("PRAGMA mmap_size = 268435456"))
+            connection.commit()
 
-        # Configure migration context
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            # SQLite-specific settings
-            render_as_batch=True,  # Required for SQLite ALTER TABLE support
-            compare_type=True,  # Detect column type changes
-            compare_server_default=True,  # Detect default value changes
+            render_as_batch=is_sqlite,  # Required for SQLite ALTER TABLE
+            compare_type=True,
+            compare_server_default=True,
         )
 
         with context.begin_transaction():
