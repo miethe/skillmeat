@@ -1,102 +1,102 @@
 ---
 schema_version: 2
 doc_type: prd
-title: "PRD: Deployment Infrastructure Consolidation"
-status: draft
+title: 'PRD: Deployment Infrastructure Consolidation'
+status: inferred_complete
 created: 2026-03-08
 updated: 2026-03-08
-feature_slug: "deployment-infrastructure-consolidation"
-feature_version: "v1"
+feature_slug: deployment-infrastructure-consolidation
+feature_version: v1
 prd_ref: null
 plan_ref: null
 related_documents:
-  - docs/ops/operations-guide.md
-  - docs/ops/enterprise-readiness-checklist.md
-  - docs/project_plans/PRDs/refactors/enterprise-db-storage-v1.md
-  - docs/project_plans/PRDs/refactors/repo-pattern-refactor-v1.md
+- docs/ops/operations-guide.md
+- docs/ops/enterprise-readiness-checklist.md
+- docs/project_plans/PRDs/refactors/enterprise-db-storage-v1.md
+- docs/project_plans/PRDs/refactors/repo-pattern-refactor-v1.md
 owner: null
 contributors: []
 priority: high
 risk_level: medium
-category: "product-planning"
+category: product-planning
 tags:
-  - prd
-  - deployment
-  - docker
-  - infrastructure
-  - devops
-  - consolidation
+- prd
+- deployment
+- docker
+- infrastructure
+- devops
+- consolidation
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - Dockerfile.api
-  - Dockerfile.web
-  - .dockerignore
-  - docker-compose.yml
-  - docker-compose.override.yml
-  - docker-compose.monitoring.yml
-  - docker/docker-entrypoint.sh
-  - Makefile
-  - .env.local.example
-  - .env.local-auth.example
-  - .env.enterprise.example
-  - deploy/staging/docker-compose.staging.yml
-  - deploy/production/docker-compose.production.yml
-  - .github/workflows/publish-images.yml
-  - docs/ops/deployment.md
-problem_statement: >
-  SkillMeat's deployment infrastructure is fragmented across 5 compose files,
-  4 env template locations, and no production Dockerfiles, requiring 30+ minutes
-  of context-gathering before any deployment can succeed.
-personas:
-  - solo-developer
-  - self-hosting-user
-  - devops-engineer
-  - enterprise-admin
-goals:
-  - "Single unified Docker Compose file with edition profiles"
-  - "Production-grade Dockerfiles for API and Web"
-  - "Makefile as the canonical developer entry point"
-  - "Container images published to GHCR on every release"
-  - "Consolidated deployment documentation as a single entry point"
-non_goals:
-  - Kubernetes manifests
-  - Terraform/IaC for cloud deployment
-  - CI/CD pipeline redesign
-  - Application code changes
-  - Backstage demo/ directory (archive separately)
-  - Custom domain/TLS configuration
-requirements:
-  - "Multi-stage production Dockerfile for API (non-root, auto-migrations)"
-  - "Multi-stage production Dockerfile for Web (Next.js standalone, non-root)"
-  - ".dockerignore excluding dev/secret artifacts from build context"
-  - "Unified docker-compose.yml with local/local-auth/enterprise profiles"
-  - "docker-compose.override.yml for containerized dev with hot reload"
-  - "docker-compose.monitoring.yml as opt-in addon"
-  - "docker/docker-entrypoint.sh to run Alembic migrations before uvicorn"
-  - "Volume mount strategy for local edition ~/.skillmeat/ access"
-  - "Consolidated env templates at repo root"
-  - "Makefile with dev/build/test/deploy targets"
-  - "GitHub Actions workflow for GHCR image publishing"
-  - "Single deployment documentation entry point"
-success_metrics:
-  - "Time to first successful deploy (new user) < 5 minutes"
-  - "Docker Compose files to understand: 1 (+ 2 optional addons)"
-  - "Env template locations: 1 (repo root)"
-  - "Container images available at GHCR on every release"
-  - "API image < 500 MB; Web image < 300 MB"
-dependencies:
-  - "Docker and Docker Compose v2 on target systems"
-  - "Existing Alembic migration infrastructure (working)"
-  - "Next.js standalone output mode (already configured in next.config.js)"
-  - "GHCR access via GitHub Actions"
-risks:
-  - "Breaking existing deploy scripts during compose consolidation"
-  - "Filesystem volume permission issues on macOS vs Linux host systems"
-  - "Hot reload performance degradation in containerized dev"
----
+- Dockerfile.api
+- Dockerfile.web
+- .dockerignore
+- docker-compose.yml
+- docker-compose.override.yml
+- docker-compose.monitoring.yml
+- docker/docker-entrypoint.sh
+- Makefile
+- .env.local.example
+- .env.local-auth.example
+- .env.enterprise.example
+- deploy/staging/docker-compose.staging.yml
+- deploy/production/docker-compose.production.yml
+- .github/workflows/publish-images.yml
+- docs/ops/deployment.md
+problem_statement: 'SkillMeat''s deployment infrastructure is fragmented across 5
+  compose files, 4 env template locations, and no production Dockerfiles, requiring
+  30+ minutes of context-gathering before any deployment can succeed.
 
+  '
+personas:
+- solo-developer
+- self-hosting-user
+- devops-engineer
+- enterprise-admin
+goals:
+- Single unified Docker Compose file with edition profiles
+- Production-grade Dockerfiles for API and Web
+- Makefile as the canonical developer entry point
+- Container images published to GHCR on every release
+- Consolidated deployment documentation as a single entry point
+non_goals:
+- Kubernetes manifests
+- Terraform/IaC for cloud deployment
+- CI/CD pipeline redesign
+- Application code changes
+- Backstage demo/ directory (archive separately)
+- Custom domain/TLS configuration
+requirements:
+- Multi-stage production Dockerfile for API (non-root, auto-migrations)
+- Multi-stage production Dockerfile for Web (Next.js standalone, non-root)
+- .dockerignore excluding dev/secret artifacts from build context
+- Unified docker-compose.yml with local/local-auth/enterprise profiles
+- docker-compose.override.yml for containerized dev with hot reload
+- docker-compose.monitoring.yml as opt-in addon
+- docker/docker-entrypoint.sh to run Alembic migrations before uvicorn
+- Volume mount strategy for local edition ~/.skillmeat/ access
+- Consolidated env templates at repo root
+- Makefile with dev/build/test/deploy targets
+- GitHub Actions workflow for GHCR image publishing
+- Single deployment documentation entry point
+success_metrics:
+- Time to first successful deploy (new user) < 5 minutes
+- 'Docker Compose files to understand: 1 (+ 2 optional addons)'
+- 'Env template locations: 1 (repo root)'
+- Container images available at GHCR on every release
+- API image < 500 MB; Web image < 300 MB
+dependencies:
+- Docker and Docker Compose v2 on target systems
+- Existing Alembic migration infrastructure (working)
+- Next.js standalone output mode (already configured in next.config.js)
+- GHCR access via GitHub Actions
+risks:
+- Breaking existing deploy scripts during compose consolidation
+- Filesystem volume permission issues on macOS vs Linux host systems
+- Hot reload performance degradation in containerized dev
+---
 # Feature Brief & Metadata
 
 **Feature Name:**
