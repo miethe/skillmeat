@@ -1,5 +1,5 @@
 <!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
-<!-- GENERATED: 2026-03-01T17:59:42.251Z -->
+<!-- GENERATED: 2026-03-09T16:49:00.984Z -->
 <!-- VERSION: 0.9.0 -->
 
 <!-- BEGIN:hero -->
@@ -7,7 +7,8 @@
 
 Personal collection manager for Claude Code artifacts
 
-[![Version](https://img.shields.io/badge/version-0.3.0--beta-blue.svg)](https://github.com/yourusername/skillmeat/releases)
+[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](https://github.com/yourusername/skillmeat/releases)
+[![PyPI](https://img.shields.io/pypi/v/skillmeat.svg)](https://pypi.org/project/skillmeat/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/yourusername/skillmeat/actions)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -44,8 +45,6 @@ As you build more complex agentic workflows with Claude Code, managing your **Sk
 * **🛡️ Safety-First Versioning:** Automatic snapshots before any destructive operation. If a new skill version breaks your workflow, roll back with a single command.
 * **🌐 Dual Interface:** Use the high-performance **CLI** for your terminal workflows or the **Next.js Web UI** for visual discovery and analytics.
 * **🧩 MCP Orchestration:** Centralized management for Model Context Protocol servers—deploy, health-check, and configure environment variables from one place.
-* **🔐 Authentication & RBAC:** Pluggable auth with zero-auth local mode, Clerk integration for teams, and role/scope-based access control. [Learn more →](docs/guides/security/rbac-model.md)
-* **🏢 Enterprise Storage:** Optional PostgreSQL backend with multi-tenant isolation, team workspaces, and data ownership controls. [Learn more →](docs/guides/deployment/auth-rollout.md)
 
 ---
 
@@ -159,33 +158,7 @@ skillmeat web dev
 # Open http://localhost:3000 to access the dashboard
 ```
 
-## Deployment
-
-SkillMeat supports three deployment patterns. Choose one below:
-
-| Pattern | Use Case | Quick Start |
-|---------|----------|-------------|
-| **Local** | Personal testing, development | `cp .env.local.example .env && docker compose --profile local up -d` |
-| **Local + Auth** | Personal with login | `cp .env.local-auth.example .env && docker compose --profile local-auth up -d` |
-| **Enterprise** | Teams, production | `cp .env.enterprise.example .env && docker compose --profile enterprise up -d` |
-
-All deployment patterns use Docker Compose for consistency. See the [Deployment Guide](docs/deployment/README.md) for:
-- Complete quick-start commands and decision tree
-- Pattern-specific setup (local, enterprise)
-- Configuration reference
-- Troubleshooting guide
-
-For development with hot reload and full debugging, see [Development Environment](docs/deployment/development.md).
-
-### Authentication & Database (Optional)
-
-- **Local mode (default)**: No authentication, SQLite database, single-user
-- **Local + Auth**: Clerk JWT authentication, SQLite database, personal use with login
-- **Enterprise**: Clerk JWT or PAT authentication, PostgreSQL database, multi-tenant with team isolation
-
-See [Deployment Guide](docs/deployment/README.md) for detailed auth setup and the [Security Guide](docs/guides/security/rbac-model.md) for RBAC and tenant isolation details.
-
-For complete CLI documentation, see the [Quickstart Guide](docs/user/quickstart.md) and [CLI Commands](docs/user/cli/commands.md).
+For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md) and [Multi-Platform Deployment Upgrade Guide](docs/migration/multi-platform-deployment-upgrade.md).
 <!-- END:quickstart -->
 
 <!-- BEGIN:features -->
@@ -594,9 +567,7 @@ Comprehensive guides and references to help you get the most out of SkillMeat.
 ### User Guides
 
 - [Quickstart Guide](docs/user/quickstart.md) - Installation, setup, and first steps
-- [CLI Authentication](docs/guides/user/cli-authentication.md) - Login, PAT setup, and credential management
 - [Multi-Platform Upgrade Guide](docs/migration/multi-platform-deployment-upgrade.md) - Upgrade legacy projects and adopt deployment profiles
-- [Zero-Auth → Authenticated Migration](docs/migration/zero-auth-to-authenticated.md) - Upgrade from local to authenticated mode
 - [Memory & Context Guide](docs/user/guides/memory-context-system.md) - Memory Inbox, modules, and context pack workflows
 - [Memory Inbox Guide](docs/user/guides/memory-inbox.md) - Triage, lifecycle, and keyboard-first memory review
 - [Context Modules Guide](docs/user/guides/context-modules.md) - Selector-driven modules and pack generation
@@ -609,15 +580,19 @@ Comprehensive guides and references to help you get the most out of SkillMeat.
 
 - [API Development](skillmeat/api/CLAUDE.md) - Backend development guide
 - [Web Development](skillmeat/web/CLAUDE.md) - Frontend development guide
-- [API Authentication](docs/guides/api/authentication.md) - API auth methods, scopes, and examples
-- [Developer Auth Patterns](docs/guides/developer/auth-patterns.md) - Writing auth-aware endpoints and tests
 - [Memory Context Developer Guide](docs/developer/guides/memory-context-system.md) - Architecture, APIs, and extension points
 - [Contributing Guide](CONTRIBUTING.md) - Development setup, coding standards, and guidelines
 
-### Security & Operations
+### Advanced Topics
 
-- [Security & RBAC Model](docs/guides/security/rbac-model.md) - Roles, scopes, tenant isolation, threat model
-- [Deployment & Rollout](docs/guides/deployment/auth-rollout.md) - Feature flags, canary deployment, monitoring
+<!-- Planned documentation - Coming soon:
+- API Reference - REST API endpoints and schemas
+- Testing Guide - Testing strategies and patterns
+- Sync & Conflict Resolution - Bidirectional sync workflows
+- Marketplace Publishing - Share your artifacts
+- MCP Integration - Model Context Protocol servers
+- Security & Vault - Credential management
+-->
 <!-- END:documentation -->
 
 <!-- BEGIN:contributing -->
