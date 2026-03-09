@@ -159,33 +159,33 @@ skillmeat web dev
 # Open http://localhost:3000 to access the dashboard
 ```
 
-### Authentication (Optional)
+## Deployment
 
-SkillMeat works out of the box with **zero-auth local mode** — no login required for personal use. To enable authentication for team or production use:
+SkillMeat supports three deployment patterns. Choose one below:
 
-```bash
-# Enable local auth (built-in user management)
-export SKILLMEAT_AUTH_ENABLED=true
-export SKILLMEAT_AUTH_PROVIDER=local
+| Pattern | Use Case | Quick Start |
+|---------|----------|-------------|
+| **Local** | Personal testing, development | `cp .env.local.example .env && docker compose --profile local up -d` |
+| **Local + Auth** | Personal with login | `cp .env.local-auth.example .env && docker compose --profile local-auth up -d` |
+| **Enterprise** | Teams, production | `cp .env.enterprise.example .env && docker compose --profile enterprise up -d` |
 
-# CLI login (device code flow)
-skillmeat auth login
-```
+All deployment patterns use Docker Compose for consistency. See the [Deployment Guide](docs/deployment/README.md) for:
+- Complete quick-start commands and decision tree
+- Pattern-specific setup (local, enterprise)
+- Configuration reference
+- Troubleshooting guide
 
-For Clerk integration, enterprise SSO, or API key setup, see the [Authentication Guide](docs/guides/api/authentication.md). For team RBAC and tenant isolation, see the [Security Guide](docs/guides/security/rbac-model.md).
+For development with hot reload and full debugging, see [Development Environment](docs/deployment/development.md).
 
-### Enterprise Database (Optional)
+### Authentication & Database (Optional)
 
-By default, SkillMeat uses SQLite — no setup needed. For multi-user or production deployments, switch to PostgreSQL:
+- **Local mode (default)**: No authentication, SQLite database, single-user
+- **Local + Auth**: Clerk JWT authentication, SQLite database, personal use with login
+- **Enterprise**: Clerk JWT or PAT authentication, PostgreSQL database, multi-tenant with team isolation
 
-```bash
-export SKILLMEAT_DATABASE_URL=postgresql://user:pass@localhost:5432/skillmeat
-export SKILLMEAT_EDITION=enterprise
-```
+See [Deployment Guide](docs/deployment/README.md) for detailed auth setup and the [Security Guide](docs/guides/security/rbac-model.md) for RBAC and tenant isolation details.
 
-See the [Migration Guide](docs/migration/zero-auth-to-authenticated.md) for detailed upgrade steps and the [Deployment Guide](docs/guides/deployment/auth-rollout.md) for rollout strategy.
-
-For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md) and [Multi-Platform Deployment Upgrade Guide](docs/migration/multi-platform-deployment-upgrade.md).
+For complete CLI documentation, see the [Quickstart Guide](docs/user/quickstart.md) and [CLI Commands](docs/user/cli/commands.md).
 <!-- END:quickstart -->
 
 <!-- BEGIN:features -->

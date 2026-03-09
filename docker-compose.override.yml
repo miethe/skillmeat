@@ -1,0 +1,53 @@
+# Development overrides -- auto-applied by `docker compose up`
+#
+# Enables hot reload for both API (uvicorn --reload) and Web (next dev)
+# with bind-mounted source directories for live code changes.
+#
+# Usage:
+#   docker compose --profile local up
+#
+# To skip these overrides, use explicit -f:
+#   docker compose -f docker-compose.yml --profile local up
+
+services:
+  # -----------------------------------------------------------------
+  # API -- hot reload + debugpy port
+  # -----------------------------------------------------------------
+  skillmeat-api:
+    volumes:
+      - skillmeat-data:/home/app/.skillmeat
+      - ./skillmeat:/app/skillmeat:cached
+    ports:
+      - "${SKILLMEAT_API_PORT:-8080}:8080"
+      - "5678:5678"
+    environment:
+      - SKILLMEAT_HOST=0.0.0.0
+      - SKILLMEAT_PORT=8080
+      - SKILLMEAT_ENV=development
+      - SKILLMEAT_RELOAD=true
+    command:
+      [
+        "uvicorn",
+        "skillmeat.api.server:app",
+        "--host", "0.0.0.0",
+        "--port", "8080",
+        "--reload",
+        "--reload-dir", "skillmeat",
+      ]
+
+  # -----------------------------------------------------------------
+  # WEB -- next dev with filesystem polling
+  # -----------------------------------------------------------------
+  skillmeat-web:
+    volumes:
+      - ./skillmeat/web/app:/app/app:cached
+      - ./skillmeat/web/components:/app/components:cached
+      - ./skillmeat/web/hooks:/app/hooks:cached
+      - ./skillmeat/web/lib:/app/lib:cached
+      - ./skillmeat/web/types:/app/types:cached
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://skillmeat-api:8080}
+      - NEXT_TELEMETRY_DISABLED=1
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+    command: ["npx", "next", "dev", "--port", "3000", "--hostname", "0.0.0.0"]

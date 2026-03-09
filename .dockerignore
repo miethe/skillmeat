@@ -1,0 +1,51 @@
+# Version control
+.git
+.github/
+
+# Dependencies
+node_modules
+.venv
+venv
+.tox
+
+# Python bytecode and caches
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.mypy_cache
+.pytest_cache
+.ruff_cache
+
+# Build artifacts
+dist/
+build/
+.next
+
+# Environment and secrets
+.env*
+
+# Agent and AI config
+.claude/
+ai/
+
+# Tests and docs
+tests/
+docs/
+demo/
+*.md
+!README.md
+
+# Deployment configs (not needed inside images)
+deploy/
+docker-compose*.yml
+Makefile
+
+# Logs and OS files
+*.log
+.DS_Store
+
+# Misc
+coverage
+.storybook
+MANAGE_PAGE_EXPLORATION.md

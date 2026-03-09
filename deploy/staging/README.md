@@ -21,7 +21,7 @@ cp env.staging env.staging.local
 | File | Purpose |
 |------|---------|
 | `deploy.sh` | Main deployment script with migrations and rollback |
-| `docker-compose.staging.yml` | Service definitions (API, Prometheus, Grafana, Alertmanager) |
+| ~~`docker-compose.staging.yml`~~ | **Removed** -- superseded by unified `docker-compose.yml` at repo root with profiles |
 | `env.staging` | Environment configuration template (placeholders only) |
 | `smoke-tests.sh` | Post-deployment validation tests |
 | `VALIDATION.md` | Comprehensive validation checklist |
@@ -198,38 +198,38 @@ GRAFANA_ADMIN_PASSWORD=secure_password_here
 
 ```bash
 # All services
-docker-compose -f docker-compose.staging.yml logs -f
+docker compose --profile local logs -f
 
 # Specific service
-docker-compose -f docker-compose.staging.yml logs -f skillmeat-api
+docker compose --profile local logs -f skillmeat-api
 
 # Last 100 lines
-docker-compose -f docker-compose.staging.yml logs --tail 100 skillmeat-api
+docker compose --profile local logs --tail 100 skillmeat-api
 ```
 
 ### Restart Services
 
 ```bash
 # Restart all
-docker-compose -f docker-compose.staging.yml restart
+docker compose --profile local restart
 
 # Restart specific service
-docker-compose -f docker-compose.staging.yml restart skillmeat-api
+docker compose --profile local restart skillmeat-api
 ```
 
 ### Update Configuration
 
 ```bash
-# 1. Edit env.staging.local or docker-compose.staging.yml
+# 1. Edit env.staging.local or docker-compose.yml
 # 2. Recreate services with new config
-docker-compose -f docker-compose.staging.yml up -d --force-recreate
+docker compose --profile local up -d --force-recreate
 ```
 
 ### Run Migrations Manually
 
 ```bash
 # Inside running container
-docker-compose -f docker-compose.staging.yml exec skillmeat-api \
+docker compose --profile local exec skillmeat-api \
   alembic -c /app/skillmeat/cache/migrations/alembic.ini upgrade head
 
 # Or in temporary container
@@ -242,10 +242,10 @@ docker run --rm -v "$(pwd)/../..:/app" -w /app \
 
 ```bash
 # Stop services (keep data)
-docker-compose -f docker-compose.staging.yml down
+docker compose --profile local down
 
 # Stop services and remove volumes (DESTROYS DATA!)
-docker-compose -f docker-compose.staging.yml down -v
+docker compose --profile local down -v
 
 # Remove unused images
 docker image prune -a
@@ -257,7 +257,7 @@ docker image prune -a
 
 **Check logs:**
 ```bash
-docker-compose -f docker-compose.staging.yml logs
+docker compose --profile local logs
 ```
 
 **Common causes:**
@@ -275,8 +275,8 @@ curl -v http://localhost:8080/health
 
 **Check container:**
 ```bash
-docker-compose -f docker-compose.staging.yml ps
-docker-compose -f docker-compose.staging.yml logs skillmeat-api --tail 50
+docker compose --profile local ps
+docker compose --profile local logs skillmeat-api --tail 50
 ```
 
 ### Smoke Tests Failing
@@ -302,13 +302,13 @@ curl http://localhost:8080/metrics
 
 **Check migrations:**
 ```bash
-docker-compose -f docker-compose.staging.yml exec skillmeat-api \
+docker compose --profile local exec skillmeat-api \
   alembic -c /app/skillmeat/cache/migrations/alembic.ini current
 ```
 
 **Reset database (DESTROYS DATA):**
 ```bash
-docker-compose -f docker-compose.staging.yml down -v
+docker compose --profile local down -v
 rm -rf data/skillmeat/*
 ./deploy.sh
 ```
@@ -319,7 +319,7 @@ If deployment fails, follow these steps:
 
 1. **Stop current deployment:**
    ```bash
-   docker-compose -f docker-compose.staging.yml down
+   docker compose --profile local down
    ```
 
 2. **Restore database backup:**

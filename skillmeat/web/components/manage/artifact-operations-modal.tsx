@@ -705,6 +705,7 @@ export function ArtifactOperationsModal({
   const handleLinkChange = () => {
     void refetchLinkedArtifacts();
     queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+    queryClient.invalidateQueries({ queryKey: ['entities'] });
   };
 
   // Fetch marketplace sources for Sources tab
@@ -823,6 +824,7 @@ export function ArtifactOperationsModal({
       await queryClient.invalidateQueries({
         queryKey: deploymentKeys.list(deployment.project_path),
       });
+      queryClient.invalidateQueries({ queryKey: ['entities'] });
       toast({
         title: 'Deployment Removed',
         description: `Successfully removed "${deployment.artifact_name}" from project`,
@@ -1030,6 +1032,7 @@ export function ArtifactOperationsModal({
                     projects?.forEach((p) => {
                       queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
                     });
+                    queryClient.invalidateQueries({ queryKey: ['entities'] });
                   }}
                   variant="outline"
                   size="sm"
@@ -1067,6 +1070,7 @@ export function ArtifactOperationsModal({
                   projects?.forEach((p) => {
                     queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
                   });
+                  queryClient.invalidateQueries({ queryKey: ['entities'] });
                 }}
                 variant="outline"
                 size="sm"
@@ -1356,6 +1360,7 @@ export function ArtifactOperationsModal({
                 projects?.forEach((p) => {
                   queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
                 });
+                queryClient.invalidateQueries({ queryKey: ['entities'] });
               }}
               variant="outline"
               size="sm"
@@ -1381,6 +1386,7 @@ export function ArtifactOperationsModal({
                     projects?.forEach((p) => {
                       queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
                     });
+                    queryClient.invalidateQueries({ queryKey: ['entities'] });
                   }}
                   variant="outline"
                   size="sm"

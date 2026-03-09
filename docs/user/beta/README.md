@@ -67,7 +67,7 @@ All of these must be met for GA release:
 **Setup Infrastructure**
 ```bash
 # Start observability stack for telemetry
-docker-compose -f docker-compose.observability.yml up -d
+docker-compose -f docker-compose.monitoring.yml up -d
 
 # Verify Grafana dashboard is accessible
 open http://localhost:3001

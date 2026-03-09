@@ -58,10 +58,10 @@ pnpm start
 
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` and configure:
+Copy `.env.local.example` to `.env.local` and configure:
 
 ```bash
-cp .env.example .env.local
+cp .env.local.example .env.local
 ```
 
 ### Available Variables

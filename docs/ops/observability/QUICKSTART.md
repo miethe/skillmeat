@@ -4,7 +4,7 @@
 
 ```bash
 # 1. Start observability stack
-docker-compose -f docker-compose.observability.yml up -d
+docker-compose -f docker-compose.monitoring.yml up -d
 
 # 2. Access dashboards
 # Grafana: http://localhost:3001 (admin/admin)
@@ -29,7 +29,7 @@ docker logs skillmeat-api 2>&1 | jq
 ### Step 1: Start Observability Stack (1 min)
 
 ```bash
-docker-compose -f docker-compose.observability.yml up -d
+docker-compose -f docker-compose.monitoring.yml up -d
 ```
 
 This starts:
@@ -42,7 +42,7 @@ This starts:
 
 ```bash
 # Check services are running
-docker-compose -f docker-compose.observability.yml ps
+docker-compose -f docker-compose.monitoring.yml ps
 
 # Expected output:
 # skillmeat-prometheus  Up  9090/tcp
@@ -252,10 +252,10 @@ docker logs skillmeat-api 2>&1 | head -1 | jq
 
 ```bash
 # Stop observability stack
-docker-compose -f docker-compose.observability.yml down
+docker-compose -f docker-compose.monitoring.yml down
 
 # Remove volumes (careful: deletes all data)
-docker-compose -f docker-compose.observability.yml down -v
+docker-compose -f docker-compose.monitoring.yml down -v
 ```
 
 ## Need Help?

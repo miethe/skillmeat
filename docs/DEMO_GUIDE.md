@@ -110,7 +110,7 @@ You can verify with:
 Start all services (SkillMeat API, Web UI, Backstage stub, and PostgreSQL):
 
 ```bash
-docker compose -f docker-compose.demo.yml --profile full up
+docker compose -f docker-compose.yml --profile full up
 ```
 
 This will pull Docker images and start services. Wait for all to be healthy (~30-45 seconds):
@@ -127,7 +127,7 @@ This will pull Docker images and start services. Wait for all to be healthy (~30
 In a separate terminal, check service health:
 
 ```bash
-docker compose -f docker-compose.demo.yml --profile full ps
+docker compose -f docker-compose.yml --profile full ps
 ```
 
 Expected output:
@@ -151,7 +151,7 @@ Open your browser and verify each service:
 
 > **Key Point:** If any service is not healthy, check the logs with:
 > ```bash
-> docker compose -f docker-compose.demo.yml logs -f [service-name]
+> docker compose -f docker-compose.yml logs -f [service-name]
 > ```
 
 ---
@@ -590,14 +590,14 @@ Use these talking points during the demo to emphasize value:
 
 ### Issue: Docker services fail to start
 
-**Symptom**: `docker compose -f docker-compose.demo.yml up` exits with errors.
+**Symptom**: `docker compose -f docker-compose.yml up` exits with errors.
 
 **Solution**:
 
 1. Verify Docker is running: `docker ps`
 2. Check disk space: `df -h` (need ~500 MB)
-3. View detailed logs: `docker compose -f docker-compose.demo.yml logs -f`
-4. Try pulling fresh images: `docker compose -f docker-compose.demo.yml --profile full pull`
+3. View detailed logs: `docker compose -f docker-compose.yml logs -f`
+4. Try pulling fresh images: `docker compose -f docker-compose.yml --profile full pull`
 
 ### Issue: SkillMeat API not healthy after 60 seconds
 
@@ -608,7 +608,7 @@ Use these talking points during the demo to emphasize value:
 Check the API logs:
 
 ```bash
-docker compose -f docker-compose.demo.yml logs skillmeat-api | tail -100
+docker compose -f docker-compose.yml logs skillmeat-api | tail -100
 ```
 
 Common causes:
@@ -646,7 +646,7 @@ Common causes:
 
 1. Create a GitHub personal access token: https://github.com/settings/tokens (needs `repo` scope)
 2. Set `GITHUB_TOKEN` environment variable: `export GITHUB_TOKEN=ghp_xxx`
-3. Restart Backstage: `docker compose -f docker-compose.demo.yml restart backstage`
+3. Restart Backstage: `docker compose -f docker-compose.yml restart backstage`
 4. Alternatively, skip the publish step in the template (edit `demo/backstage-templates/fin-serv-project/template.yaml`)
 
 ---
@@ -658,7 +658,7 @@ Common causes:
 Stop all services but keep the database volume intact:
 
 ```bash
-docker compose -f docker-compose.demo.yml down
+docker compose -f docker-compose.yml down
 ```
 
 Services will stop, but the PostgreSQL data volume (`demo-db-data`) persists. Restart later with `up` and you'll have the same data.
@@ -668,7 +668,7 @@ Services will stop, but the PostgreSQL data volume (`demo-db-data`) persists. Re
 Stop all services and delete all volumes (data is lost):
 
 ```bash
-docker compose -f docker-compose.demo.yml down -v
+docker compose -f docker-compose.yml down -v
 ```
 
 This removes:
@@ -711,22 +711,22 @@ If you created test repositories in GitHub during the demo, delete them from you
 
 ```bash
 # Start full stack
-docker compose -f docker-compose.demo.yml --profile full up
+docker compose -f docker-compose.yml --profile full up
 
 # Start API + DB only (faster for backend demos)
-docker compose -f docker-compose.demo.yml --profile api-only up
+docker compose -f docker-compose.yml --profile api-only up
 
 # View logs for a service
-docker compose -f docker-compose.demo.yml logs -f skillmeat-api
+docker compose -f docker-compose.yml logs -f skillmeat-api
 
 # Check service health
-docker compose -f docker-compose.demo.yml ps
+docker compose -f docker-compose.yml ps
 
 # Stop (data preserved)
-docker compose -f docker-compose.demo.yml down
+docker compose -f docker-compose.yml down
 
 # Stop and wipe data
-docker compose -f docker-compose.demo.yml down -v
+docker compose -f docker-compose.yml down -v
 
 # Seed the context pack
 python scripts/seed_demo_composite.py
