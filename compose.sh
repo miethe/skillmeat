@@ -99,8 +99,52 @@ echo "[compose.sh] Using: $COMPOSE_CMD (engine: $ENGINE)"
 # ── Podman build workarounds ─────────────────────────────────────────────
 
 if [ "$ENGINE" = "podman" ]; then
-    # Raise default open-file limit for builds (Next.js needs many FDs)
+    # podman-compose doesn't pass --ulimit to podman build, so we
+    # pre-build any services that have a build context, then let
+    # compose do the rest (start/pull only).
     export BUILDAH_ULIMIT="nofile=65536:65536"
+
+    # Check if this is an "up --build" or "build" invocation
+    NEEDS_PREBUILD=false
+    for arg in "$@"; do
+        case "$arg" in
+            --build|build) NEEDS_PREBUILD=true ;;
+        esac
+    done
+
+    if [ "$NEEDS_PREBUILD" = true ]; then
+        echo "[compose.sh] Pre-building images with Podman (--ulimit nofile=65536:65536)..."
+
+        # Resolve project name (directory basename, lowercased)
+        PROJECT_NAME=$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]_-')
+
+        # Build skillmeat-api (root context)
+        if [ -f Dockerfile ]; then
+            echo "[compose.sh]   Building ${PROJECT_NAME}_skillmeat-api..."
+            podman build --ulimit nofile=65536:65536 \
+                --format docker \
+                -t "${PROJECT_NAME}_skillmeat-api" \
+                -f Dockerfile .
+        fi
+
+        # Build skillmeat-web (web context)
+        if [ -f skillmeat/web/Dockerfile ]; then
+            echo "[compose.sh]   Building ${PROJECT_NAME}_skillmeat-web..."
+            podman build --ulimit nofile=65536:65536 \
+                --format docker \
+                -t "${PROJECT_NAME}_skillmeat-web" \
+                -f skillmeat/web/Dockerfile skillmeat/web
+        fi
+
+        echo "[compose.sh] Pre-build complete. Starting services..."
+
+        # Strip --build from args so compose doesn't re-build
+        FILTERED_ARGS=()
+        for arg in "$@"; do
+            [ "$arg" != "--build" ] && FILTERED_ARGS+=("$arg")
+        done
+        set -- "${FILTERED_ARGS[@]}"
+    fi
 fi
 
 # ── Execute ────────────────────────────────────────────────────────────────
