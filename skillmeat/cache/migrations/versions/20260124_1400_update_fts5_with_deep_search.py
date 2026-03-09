@@ -27,6 +27,7 @@ import logging
 from typing import Sequence, Union
 
 from alembic import op
+from skillmeat.cache.migrations.dialect_helpers import is_sqlite
 
 # revision identifiers, used by Alembic.
 revision: str = "20260124_1400_update_fts5_with_deep_search"
@@ -47,6 +48,13 @@ def upgrade() -> None:
     4. Recreate triggers to sync all columns including deep_search_text
     5. Rebuild index from existing marketplace_catalog_entries data
     """
+    if not is_sqlite():
+        logger.info(
+            "Non-SQLite dialect detected — skipping FTS5 catalog_fts update "
+            "(FTS5 is SQLite-only)"
+        )
+        return
+
     try:
         # Step 1: Drop existing triggers
         op.execute("DROP TRIGGER IF EXISTS catalog_fts_au")
@@ -206,6 +214,13 @@ def downgrade() -> None:
     Recreates the original FTS5 schema from migration 20260124_1200 with only
     the original 6 columns (name, artifact_type, title, description, search_text, search_tags).
     """
+    if not is_sqlite():
+        logger.info(
+            "Non-SQLite dialect detected — skipping FTS5 catalog_fts downgrade "
+            "(FTS5 is SQLite-only)"
+        )
+        return
+
     # Step 1: Drop triggers
     op.execute("DROP TRIGGER IF EXISTS catalog_fts_au")
     op.execute("DROP TRIGGER IF EXISTS catalog_fts_ad")

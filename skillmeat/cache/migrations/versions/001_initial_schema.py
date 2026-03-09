@@ -27,6 +27,10 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from skillmeat.cache.migrations.dialect_helpers import (
+    create_updated_at_trigger,
+    drop_updated_at_trigger,
+)
 
 # revision identifiers, used by Alembic.
 revision: str = "001_initial_schema"
@@ -216,41 +220,9 @@ def upgrade() -> None:
     # Triggers for automatic updated_at maintenance
     # ==========================================================================
 
-    # Projects updated_at trigger
-    op.execute(
-        """
-        CREATE TRIGGER projects_updated_at
-        AFTER UPDATE ON projects
-        FOR EACH ROW
-        BEGIN
-            UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-        END;
-        """
-    )
-
-    # Artifacts updated_at trigger
-    op.execute(
-        """
-        CREATE TRIGGER artifacts_updated_at
-        AFTER UPDATE ON artifacts
-        FOR EACH ROW
-        BEGIN
-            UPDATE artifacts SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-        END;
-        """
-    )
-
-    # Cache metadata updated_at trigger
-    op.execute(
-        """
-        CREATE TRIGGER cache_metadata_updated_at
-        AFTER UPDATE ON cache_metadata
-        FOR EACH ROW
-        BEGIN
-            UPDATE cache_metadata SET updated_at = CURRENT_TIMESTAMP WHERE key = NEW.key;
-        END;
-        """
-    )
+    create_updated_at_trigger("projects")
+    create_updated_at_trigger("artifacts")
+    create_updated_at_trigger("cache_metadata")
 
     # ==========================================================================
     # Initialize cache metadata with schema version
@@ -271,10 +243,10 @@ def downgrade() -> None:
 
     WARNING: This will destroy all cached data. Use with caution.
     """
-    # Drop triggers first (SQLite requires explicit trigger drops)
-    op.execute("DROP TRIGGER IF EXISTS projects_updated_at")
-    op.execute("DROP TRIGGER IF EXISTS artifacts_updated_at")
-    op.execute("DROP TRIGGER IF EXISTS cache_metadata_updated_at")
+    # Drop triggers first
+    drop_updated_at_trigger("projects")
+    drop_updated_at_trigger("artifacts")
+    drop_updated_at_trigger("cache_metadata")
 
     # Drop tables in reverse order (respecting foreign keys)
     op.drop_table("cache_metadata")
