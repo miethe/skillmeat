@@ -117,27 +117,30 @@ volumes:
 # ===================================================================
 # USAGE REFERENCE
 # ===================================================================
+# Use ./compose.sh for automatic Docker/Podman detection, or
+# substitute `docker compose` / `podman compose` directly.
+#
 # Local development (SQLite, no auth):
-#   docker compose --profile local up
+#   ./compose.sh --profile local up
 #
 # Local with Clerk auth:
-#   docker compose --profile local-auth up
+#   ./compose.sh --profile local-auth up
 #
 # Enterprise (Postgres + auth):
-#   docker compose --profile enterprise up
+#   ./compose.sh --profile enterprise up
 #
 # Build and start fresh:
-#   docker compose --profile local up --build
+#   ./compose.sh --profile local up --build
 #
 # View logs for a single service:
-#   docker compose logs -f skillmeat-api
+#   ./compose.sh logs -f skillmeat-api
 #
 # Override ports:
 #   SKILLMEAT_API_PORT=9080 SKILLMEAT_WEB_PORT=4000 \
-#     docker compose --profile local up
+#     ./compose.sh --profile local up
 #
 # Stop all services (data preserved):
-#   docker compose down
+#   ./compose.sh down
 #
 # Stop and wipe all data:
-#   docker compose down -v
+#   ./compose.sh down -v

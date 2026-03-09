@@ -33,7 +33,7 @@ Choose your deployment pattern below and copy the command into your terminal.
 Perfect for personal testing and development without login requirements.
 
 ```bash
-cp .env.local.example .env && docker compose --profile local up -d
+cp .env.local.example .env && ./compose.sh --profile local up -d
 ```
 
 Then open [http://localhost:3000](http://localhost:3000).
@@ -43,7 +43,7 @@ Then open [http://localhost:3000](http://localhost:3000).
 Personal use with login and authentication via Clerk.
 
 ```bash
-cp .env.local-auth.example .env && docker compose --profile local-auth up -d
+cp .env.local-auth.example .env && ./compose.sh --profile local-auth up -d
 ```
 
 You'll need a Clerk application configured in your `.env` file. See [Local Authentication Setup](local.md#authentication).
@@ -53,7 +53,7 @@ You'll need a Clerk application configured in your `.env` file. See [Local Authe
 Team deployment with PostgreSQL, enterprise authentication, and optional monitoring stack (Prometheus, Grafana, Loki).
 
 ```bash
-cp .env.enterprise.example .env && docker compose --profile enterprise -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+cp .env.enterprise.example .env && ./compose.sh --profile enterprise -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 ```
 
 Then open [http://localhost:3000](http://localhost:3000). Full setup guide: [Enterprise Deployment](enterprise.md).
@@ -71,17 +71,52 @@ Use this decision tree to find your deployment pattern:
 
 ## Prerequisites
 
-- **Docker Engine** v24 or later
-- **Docker Compose** v2.0 or later (included in Docker Desktop)
+- **Container Runtime**: Docker Engine v24+ **or** Podman v4.7+
+- **Compose Tool**: Docker Compose v2+ (included in Docker Desktop) **or** `podman compose`
 - **4 GB RAM** minimum (8 GB recommended for enterprise)
 - **5 GB disk space** for all three editions (including monitoring)
 
 Check your versions:
 
 ```bash
+# Docker
 docker --version
 docker compose version
+
+# Podman
+podman --version
+podman compose version
 ```
+
+### Using the Compose Wrapper (Recommended)
+
+The `compose.sh` wrapper auto-detects Docker vs Podman and runs the correct compose command:
+
+```bash
+./compose.sh --profile local up -d
+```
+
+Override detection with `COMPOSE_ENGINE=podman ./compose.sh ...` if needed.
+
+### Podman Setup
+
+If using Podman instead of Docker:
+
+1. **Enable the Podman socket** (required for compose compatibility):
+   ```bash
+   systemctl --user enable --now podman.socket
+   ```
+
+2. **Install compose support** (one of):
+   - `podman compose` — built-in since Podman 4.7 (recommended)
+   - `pip install podman-compose` — standalone fallback
+
+3. **Set `DOCKER_HOST`** if compose tools can't find the socket:
+   ```bash
+   export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
+   ```
+
+> **Note**: The Python-based `docker-compose` v1 is **not compatible** with Podman due to URL scheme issues in the Python `docker` library. Use `podman compose` or `docker compose` v2 instead.
 
 ## Deployment Overview
 
@@ -134,30 +169,30 @@ Copy the appropriate template to `.env` before deploying.
 
 ```bash
 # Local edition
-docker compose --profile local up -d
+./compose.sh --profile local up -d
 
 # Local with authentication
-docker compose --profile local-auth up -d
+./compose.sh --profile local-auth up -d
 
 # Enterprise with monitoring
-docker compose --profile enterprise -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+./compose.sh --profile enterprise -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 ```
 
 ### Stop Services
 
 ```bash
-docker compose down
+./compose.sh down
 ```
 
 ### View Logs
 
 ```bash
 # All services
-docker compose logs -f
+./compose.sh logs -f
 
 # Specific service
-docker compose logs -f api
-docker compose logs -f web
+./compose.sh logs -f skillmeat-api
+./compose.sh logs -f skillmeat-web
 ```
 
 ### Run Database Migrations
@@ -165,25 +200,25 @@ docker compose logs -f web
 Migrations run automatically on API startup via the entrypoint script. To manually trigger:
 
 ```bash
-docker compose exec api alembic upgrade head
+./compose.sh exec skillmeat-api alembic upgrade head
 ```
 
 ### Access Database
 
 **Local (SQLite)**:
 ```bash
-docker compose exec api sqlite3 ~/.skillmeat/skillmeat.db
+./compose.sh exec skillmeat-api sqlite3 ~/.skillmeat/skillmeat.db
 ```
 
 **Enterprise (PostgreSQL)**:
 ```bash
-docker compose exec postgres psql -U skillmeat -d skillmeat
+./compose.sh exec postgres psql -U skillmeat -d skillmeat
 ```
 
 ### Rebuild Images
 
 ```bash
-docker compose build
+./compose.sh build
 ```
 
 ## Detailed Guides
@@ -238,6 +273,23 @@ docker compose logs postgres
 ```
 
 Then verify connection string in `.env` matches the container setup.
+
+### Podman: "Not supported URL scheme http+docker"
+
+This error occurs when using the Python-based `docker-compose` v1 with Podman. Solutions:
+
+1. **Use `./compose.sh`** — it auto-detects Podman and uses the right command
+2. **Use `podman compose`** directly (built-in since Podman 4.7)
+3. **Ensure socket is running**: `systemctl --user enable --now podman.socket`
+4. **Set DOCKER_HOST**: `export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock`
+
+### Podman: Permission Denied on Volumes
+
+Podman runs rootless by default. If volume mounts fail:
+
+```bash
+podman unshare chown 1000:1000 ~/.skillmeat
+```
 
 ### Migrations Timeout
 
