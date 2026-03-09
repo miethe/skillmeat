@@ -96,6 +96,13 @@ COMPOSE_CMD=$(resolve_compose "$ENGINE")
 
 echo "[compose.sh] Using: $COMPOSE_CMD (engine: $ENGINE)"
 
+# ── Podman build workarounds ─────────────────────────────────────────────
+
+if [ "$ENGINE" = "podman" ]; then
+    # Raise default open-file limit for builds (Next.js needs many FDs)
+    export BUILDAH_ULIMIT="nofile=65536:65536"
+fi
+
 # ── Execute ────────────────────────────────────────────────────────────────
 
 # shellcheck disable=SC2086
