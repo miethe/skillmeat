@@ -42,8 +42,6 @@ services:
     environment:
       - SKILLMEAT_HOST=0.0.0.0
       - SKILLMEAT_PORT=8080
-      # DATABASE_URL controls backend: omit/empty for SQLite, set for Postgres.
-      - DATABASE_URL=${DATABASE_URL:-}
     volumes:
       - skillmeat-data:/home/app/.skillmeat
     healthcheck:
