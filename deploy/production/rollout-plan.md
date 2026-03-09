@@ -72,14 +72,14 @@ Monitor for **4 hours** minimum before proceeding to Phase 2.
 1. Enable the feature flag for the environment:
    ```bash
    # Option A: Update docker-compose environment variable
-   # In docker-compose.production.yml, change:
+   # In docker-compose.yml, change:
    #   SKILLMEAT_MEMORY_CONTEXT_ENABLED=false
    # to:
    #   SKILLMEAT_MEMORY_CONTEXT_ENABLED=true
 
    # Option B: Override at runtime (no file change)
    SKILLMEAT_MEMORY_CONTEXT_ENABLED=true \
-     docker-compose -f docker-compose.production.yml up -d skillmeat-api
+     docker compose --profile local up -d skillmeat-api
 
    # Option C: Per-request header (if API supports it)
    curl -H "X-Feature-Memory-Context: enabled" \
@@ -129,7 +129,7 @@ Monitor for **4 hours** minimum before proceeding to Phase 2.
 ```bash
 # Disable the feature flag immediately
 SKILLMEAT_MEMORY_CONTEXT_ENABLED=false \
-  docker-compose -f docker-compose.production.yml up -d skillmeat-api
+  docker compose --profile local up -d skillmeat-api
 
 # Verify disabled
 curl -s http://localhost:8080/api/v1/config | grep memory_context_enabled
@@ -223,7 +223,7 @@ Monitor for **48 hours** minimum before proceeding to Phase 4.
    # To:     SKILLMEAT_MEMORY_CONTEXT_ENABLED=true
    ```
 
-2. Update docker-compose.production.yml:
+2. Update docker-compose.yml:
    ```bash
    # Change: SKILLMEAT_MEMORY_CONTEXT_ENABLED=false
    # To:     SKILLMEAT_MEMORY_CONTEXT_ENABLED=true
@@ -231,7 +231,7 @@ Monitor for **48 hours** minimum before proceeding to Phase 4.
 
 3. Restart the API service:
    ```bash
-   docker-compose -f docker-compose.production.yml up -d skillmeat-api
+   docker compose --profile local up -d skillmeat-api
    ```
 
 4. Remove canary instance (if Phase 3 was used):
@@ -246,7 +246,7 @@ Monitor for **48 hours** minimum before proceeding to Phase 4.
 
 6. Commit the configuration change:
    ```bash
-   git add deploy/production/env.production deploy/production/docker-compose.production.yml
+   git add deploy/production/env.production deploy/production/docker-compose.yml
    git commit -m "feat(deploy): enable Memory & Context system in production"
    ```
 
@@ -255,7 +255,7 @@ Monitor for **48 hours** minimum before proceeding to Phase 4.
 ```bash
 # Emergency: Disable immediately via runtime override
 SKILLMEAT_MEMORY_CONTEXT_ENABLED=false \
-  docker-compose -f docker-compose.production.yml up -d skillmeat-api
+  docker compose --profile local up -d skillmeat-api
 
 # Then: Revert configuration files and commit
 ```
@@ -282,7 +282,7 @@ Continue monitoring indefinitely. Declare full rollout success after **48 hours*
 ```bash
 # Override feature flag without restarting
 SKILLMEAT_MEMORY_CONTEXT_ENABLED=false \
-  docker-compose -f docker-compose.production.yml up -d skillmeat-api
+  docker compose --profile local up -d skillmeat-api
 ```
 
 ### Full Rollback (< 5 minutes)
@@ -297,10 +297,10 @@ cd deploy/production
 Memory items are stored in the SQLite database at the persistent volume.
 If data corruption occurs:
 
-1. Stop the API: `docker-compose -f docker-compose.production.yml stop skillmeat-api`
+1. Stop the API: `docker compose --profile local stop skillmeat-api`
 2. Backup the database: `cp data/skillmeat/cache/skillmeat.db data/skillmeat/cache/skillmeat.db.bak`
 3. If needed, restore from the last known good backup
-4. Restart: `docker-compose -f docker-compose.production.yml up -d skillmeat-api`
+4. Restart: `docker compose --profile local up -d skillmeat-api`
 
 ---
 

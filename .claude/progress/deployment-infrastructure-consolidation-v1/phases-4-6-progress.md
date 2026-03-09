@@ -59,7 +59,7 @@ tasks:
   dependencies: []
 - id: DEPLOY-6.1
   title: Remove deprecated compose files
-  status: pending
+  status: completed
   assigned_to:
   - devops-architect
   dependencies: []
@@ -72,13 +72,13 @@ tasks:
   - DEPLOY-6.1
 - id: DEPLOY-6.3
   title: Remove old env templates
-  status: pending
+  status: completed
   assigned_to:
   - devops-architect
   dependencies: []
 - id: DEPLOY-6.4
   title: Update operations guide
-  status: pending
+  status: completed
   assigned_to:
   - documentation-writer
   dependencies:
@@ -111,10 +111,10 @@ parallelization:
   batch_5:
   - DEPLOY-6.5
 total_tasks: 11
-completed_tasks: 6
+completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 54
+progress: 81
 ---
 
 # Phases 4-6 Progress: Deployment Infrastructure Consolidation

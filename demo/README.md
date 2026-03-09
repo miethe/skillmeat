@@ -15,19 +15,19 @@ Docker Compose stack for the SkillMeat / Backstage IDP integration demo.
 
 ```bash
 # With podman-compose (recommended on RHEL/Fedora):
-podman-compose -f docker-compose.demo.yml --profile full up
+podman-compose -f docker-compose.yml --profile full up
 
 # API + DB only (faster, good for backend/API demos)
-podman-compose -f docker-compose.demo.yml --profile api-only up
+podman-compose -f docker-compose.yml --profile api-only up
 
 # Backstage only (uses already-running skillmeat web dev on host)
-podman-compose -f docker-compose.demo.yml --profile backstage-only up
+podman-compose -f docker-compose.yml --profile backstage-only up
 
 # Stop (data volume preserved)
-podman-compose -f docker-compose.demo.yml down
+podman-compose -f docker-compose.yml down
 
 # Stop + wipe database
-podman-compose -f docker-compose.demo.yml down -v
+podman-compose -f docker-compose.yml down -v
 ```
 
 ## Prerequisites
@@ -51,7 +51,7 @@ Example:
 ```bash
 SKILLMEAT_GITHUB_TOKEN=ghp_xxx \
 SKILLMEAT_COLLECTION_PATH=/path/to/collection \
-podman-compose -f docker-compose.demo.yml --profile full up
+podman-compose -f docker-compose.yml --profile full up
 ```
 
 ## Database
@@ -106,29 +106,29 @@ From the repo root:
 
 ```bash
 # docker (recommended):
-docker compose -f docker-compose.demo.yml build backstage
+docker compose -f docker-compose.yml build backstage
 
 # podman needs BUILDAH_FORMAT=docker for --mount=type=cache in the Dockerfile
 # and requires a profile to see the backstage service:
-BUILDAH_FORMAT=docker podman-compose -f docker-compose.demo.yml --profile backstage-only build backstage
+BUILDAH_FORMAT=docker podman-compose -f docker-compose.yml --profile backstage-only build backstage
 ```
 
 ### 6. Start Backstage
 
 ```bash
 # Against the in-compose API (full profile):
-podman-compose -f docker-compose.demo.yml --profile full up
+podman-compose -f docker-compose.yml --profile full up
 
 # Against an already-running skillmeat web dev on the host:
-podman-compose -f docker-compose.demo.yml --profile backstage-only up
+podman-compose -f docker-compose.yml --profile backstage-only up
 ```
 
 ### Rebuilding after plugin changes
 
 ```bash
 cd demo/backstage-app && yarn build:backend && cd ../..
-docker compose -f docker-compose.demo.yml build backstage
-docker compose -f docker-compose.demo.yml --profile backstage-only up --force-recreate backstage
+docker compose -f docker-compose.yml build backstage
+docker compose -f docker-compose.yml --profile backstage-only up --force-recreate backstage
 ```
 
 See `plugins/backstage-plugin-scaffolder-backend/README.md` for full plugin documentation.

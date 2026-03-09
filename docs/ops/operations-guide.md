@@ -2,12 +2,17 @@
 title: "Operations Guide"
 description: "Maintenance scripts, cache management, and operational procedures for SkillMeat"
 audience: [developers, operators]
-tags: [operations, maintenance, cache, database]
+tags: [operations, maintenance, cache, database, deployment]
 created: 2026-02-02
-updated: 2026-02-03
+updated: 2026-03-08
 category: operations
 status: active
-related_documents: []
+related_documents:
+- docs/deployment/README.md
+- docs/deployment/local.md
+- docs/deployment/enterprise.md
+- docs/deployment/development.md
+- docs/deployment/configuration.md
 ---
 
 # Operations Guide
@@ -27,104 +32,28 @@ SkillMeat provides a suite of operational tools for:
 
 **Target Audience**: Developers and operators running SkillMeat locally or in production.
 
-### Deployment Modes
+## Deployment
 
-SkillMeat supports two distinct deployment editions controlled via `SKILLMEAT_EDITION`:
+See the [Deployment Guide](../deployment/README.md) for comprehensive deployment documentation:
 
-| Edition | Backend | Deployment | Auth |
-|---|---|---|---|
-| **local** (default) | Filesystem + SQLite cache | Single-user, local development, self-hosted | LocalAuthProvider (no enforcement) or Clerk JWT |
-| **enterprise** | SQLAlchemy DB-backed | Multi-tenant, production SaaS | Clerk JWT or Enterprise PAT |
+- **[Local Deployment](../deployment/local.md)** — SQLite setup, volume mounts, native development
+- **[Local + Authentication](../deployment/local.md#authentication)** — Clerk JWT integration for single-user auth
+- **[Enterprise Deployment](../deployment/enterprise.md)** — PostgreSQL, monitoring, multi-tenant production setup
+- **[Development Environment](../deployment/development.md)** — Makefile targets, hot reload, debugging
+- **[Configuration Reference](../deployment/configuration.md)** — All environment variables documented
 
-Each edition has separate configuration, visibility enforcement, and repository implementations. See "Edition Configuration" below for details.
+For quick start commands and deployment decision tree, see [Deployment Quick Start](../deployment/README.md#quick-start).
 
----
+### Edition Architecture
 
-## Edition Configuration
+SkillMeat supports two deployment editions with different storage and auth backends:
 
-SkillMeat's deployment edition is controlled by the `SKILLMEAT_EDITION` environment variable and determines which repository implementations are used throughout the application.
+| Edition | Storage | Architecture | Auth | Use Case |
+|---------|---------|-------------|------|----------|
+| **local** | SQLite + Filesystem | Single-tenant | Local or Clerk | Personal, development, self-hosted |
+| **enterprise** | PostgreSQL | Multi-tenant with visibility enforcement | Clerk + PAT | Teams, production, SaaS |
 
-### Local Edition (Default)
-
-**Configuration**:
-```bash
-export SKILLMEAT_EDITION=local
-export SKILLMEAT_AUTH_ENABLED=false  # or true for Clerk JWT
-```
-
-**Behavior**:
-- Artifacts/collections stored on filesystem
-- Single-tenant architecture
-- `get_artifact_repository()` and `get_collection_repository()` return local implementations
-- No visibility enforcement (all authenticated users see all resources)
-- Suitable for personal use, development, self-hosted deployments
-
-**Repository Implementations**:
-- `LocalArtifactRepository` (filesystem + in-memory)
-- `LocalCollectionRepository` (filesystem + in-memory)
-- All other repos (`project`, `deployment`, `tag`, etc.) use local implementations
-
-### Enterprise Edition
-
-**Configuration**:
-```bash
-export SKILLMEAT_EDITION=enterprise
-export SKILLMEAT_AUTH_ENABLED=true
-export SKILLMEAT_AUTH_PROVIDER=clerk  # or enterprise PAT
-export SKILLMEAT_ENTERPRISE_PAT_SECRET="your-shared-secret"  # for service accounts
-```
-
-**Behavior**:
-- Artifacts/collections stored in SQLAlchemy-backed database
-- Multi-tenant architecture with tenant isolation
-- `get_artifact_repository()` and `get_collection_repository()` return enterprise implementations
-- Row-level visibility enforcement: private (owner only), team (team members), public (all authenticated)
-- Non-owners receive 404 (not 403) when accessing private resources they don't own — no existence disclosure
-- Supported: artifact, collection
-- Unsupported (return 503): project, deployment, tag, settings, group, context_entity, marketplace_source, project_template
-
-**Repository Implementations**:
-- `EnterpriseArtifactRepository` (SQLAlchemy + visibility filtering)
-- `EnterpriseCollectionRepository` (SQLAlchemy + visibility filtering)
-- Unsupported repos return HTTP 503 with message listing supported providers
-
-### Switching Editions
-
-To switch from local to enterprise (or vice versa):
-
-1. **Set environment variable**:
-```bash
-export SKILLMEAT_EDITION=enterprise
-```
-
-2. **Ensure database is initialized** (for enterprise):
-```bash
-# Alembic migrations must be run for enterprise DB schema
-alembic upgrade head
-```
-
-3. **Restart API server**:
-```bash
-# Docker
-docker restart skillmeat-api
-
-# Systemd
-sudo systemctl restart skillmeat-api
-
-# Kubernetes
-kubectl rollout restart deployment/skillmeat-api
-```
-
-4. **Verify edition is active**:
-```bash
-# Check startup logs for edition confirmation
-grep "SKILLMEAT_EDITION" /var/log/skillmeat/api.log
-
-# Or test via API: unsupported repos should return 503
-curl -H "Authorization: Bearer $token" \
-  http://localhost:8080/api/v1/projects | jq '.detail'
-# Expected (enterprise): "Enterprise edition does not yet support project..."
-```
+For detailed architecture documentation including repository implementations, configuration, and switching editions, see [Enterprise Deployment](../deployment/enterprise.md#architecture).
 
 ### Auth Provider Configuration
 

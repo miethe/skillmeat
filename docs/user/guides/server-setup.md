@@ -490,7 +490,7 @@ Environment profiles in the repository root provide ready-to-use templates:
 
 | Profile | Command | Use Case |
 |---------|---------|----------|
-| [`.env.example`](../../../.env.example) | `cp .env.example .env` | Local dev, zero-auth |
+| [`.env.local.example`](../../../.env.local.example) | `cp .env.local.example .env` | Local dev, zero-auth |
 | [`.env.local-auth.example`](../../../.env.local-auth.example) | `cp .env.local-auth.example .env` | Small teams, API key auth |
 | [`.env.enterprise.example`](../../../.env.enterprise.example) | `cp .env.enterprise.example .env` | Production, PostgreSQL + Clerk |
 

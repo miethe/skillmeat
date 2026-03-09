@@ -71,7 +71,7 @@ This document provides comprehensive validation procedures for the SkillMeat sta
 
 ### Service Status
 
-- [ ] **All services running**: `docker-compose -f docker-compose.staging.yml ps`
+- [ ] **All services running**: `docker compose --profile local ps`
   - [ ] `skillmeat-api` - Status: Up
   - [ ] `prometheus` - Status: Up
   - [ ] `grafana` - Status: Up
