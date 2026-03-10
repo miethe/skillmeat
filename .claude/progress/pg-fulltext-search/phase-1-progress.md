@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 5
+completed_tasks: 7
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -179,7 +179,7 @@ tasks:
     '
 - id: PG-FTS-1.6
   description: Unit tests for tsvector search (mocked)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -208,7 +208,7 @@ tasks:
     '
 - id: PG-FTS-1.7
   description: Integration tests for tsvector search (PostgreSQL)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -266,7 +266,7 @@ tasks:
     Run as part of standard pytest suite (no @pytest.mark.integration needed).
 
     '
-progress: 62
+progress: 87
 updated: '2026-03-10'
 ---
 
