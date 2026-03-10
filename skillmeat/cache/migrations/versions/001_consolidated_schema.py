@@ -423,7 +423,7 @@ def upgrade() -> None:
     sa.Column('member_set_id', sa.String(), nullable=True, comment='Nested deployment set id for hierarchical sets'),
     sa.Column('position', sa.Integer(), server_default='0', nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.CheckConstraint('(artifact_uuid IS NOT NULL) + (group_id IS NOT NULL) + (member_set_id IS NOT NULL) = 1', name='check_deployment_set_member_one_ref'),
+    sa.CheckConstraint('CAST((artifact_uuid IS NOT NULL) AS INTEGER) + CAST((group_id IS NOT NULL) AS INTEGER) + CAST((member_set_id IS NOT NULL) AS INTEGER) = 1', name='check_deployment_set_member_one_ref'),
     sa.CheckConstraint('position >= 0', name='check_deployment_set_member_position'),
     sa.ForeignKeyConstraint(['member_set_id'], ['deployment_sets.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['set_id'], ['deployment_sets.id'], ondelete='CASCADE'),
