@@ -3591,8 +3591,9 @@ class DeploymentSetMember(Base):
     # Constraints and indexes
     __table_args__ = (
         CheckConstraint(
-            "CAST((artifact_uuid IS NOT NULL) AS INTEGER) + CAST((group_id IS NOT NULL) AS INTEGER)"
-            " + CAST((member_set_id IS NOT NULL) AS INTEGER) = 1",
+            "(CASE WHEN artifact_uuid IS NOT NULL THEN 1 ELSE 0 END)"
+            " + (CASE WHEN group_id IS NOT NULL THEN 1 ELSE 0 END)"
+            " + (CASE WHEN member_set_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
             name="check_deployment_set_member_one_ref",
         ),
         CheckConstraint("position >= 0", name="check_deployment_set_member_position"),
