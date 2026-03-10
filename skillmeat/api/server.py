@@ -204,7 +204,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             ensure_default_collection,
             migrate_artifacts_to_default_collection,
         )
-        from skillmeat.api.utils.fts5 import check_fts5_available
+        from skillmeat.api.utils.fts5 import detect_and_cache_backend
         from skillmeat.cache.models import get_session
         from skillmeat.cache.repositories import DbUserCollectionRepository
 
@@ -213,8 +213,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             ensure_default_collection(DbUserCollectionRepository())
             logger.info("Default collection verified/created")
 
-            # Check FTS5 availability at startup
-            check_fts5_available(session)
+            # Detect search backend (FTS5 / tsvector / LIKE) at startup
+            detected = detect_and_cache_backend(session)
+            logger.info("Search backend: %s", detected.value)
 
             # Migrate existing artifacts to default collection
             if app_state.artifact_manager and app_state.collection_manager:
