@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 2
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -87,7 +87,7 @@ tasks:
     \ as current FTS5 check.\n"
 - id: PG-FTS-1.3
   description: Add SQLAlchemy TSVector column to MarketplaceCatalogEntry model
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -266,7 +266,7 @@ tasks:
     Run as part of standard pytest suite (no @pytest.mark.integration needed).
 
     '
-progress: 25
+progress: 37
 updated: '2026-03-10'
 ---
 
