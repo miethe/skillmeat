@@ -2,199 +2,279 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "workflow-artifact-wiring"
-feature_slug: "workflow-artifact-wiring"
+prd: workflow-artifact-wiring
+feature_slug: workflow-artifact-wiring
 phase: 0
-phase_title: "All Phases"
+phase_title: All Phases
 status: pending
 created: 2026-03-10
-updated: 2026-03-10
-prd_ref: "docs/project_plans/PRDs/features/workflow-artifact-wiring-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/workflow-artifact-wiring-v1.md"
+updated: '2026-03-10'
+prd_ref: docs/project_plans/PRDs/features/workflow-artifact-wiring-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/workflow-artifact-wiring-v1.md
 commit_refs: []
 pr_refs: []
-
-owners: ["opus-orchestrator"]
-contributors: ["data-layer-expert", "python-backend-engineer", "backend-architect", "ui-engineer-enhanced", "frontend-developer", "senior-code-reviewer", "openapi-expert"]
-
+owners:
+- opus-orchestrator
+contributors:
+- data-layer-expert
+- python-backend-engineer
+- backend-architect
+- ui-engineer-enhanced
+- frontend-developer
+- senior-code-reviewer
+- openapi-expert
 tasks:
-  # Phase 1: Data Layer (6 pts)
-  - id: "WAW-P1.1"
-    name: "Alembic migration"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    effort: 2
-  - id: "WAW-P1.2"
-    name: "Artifact model validation"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["WAW-P1.1"]
-    effort: 1
-  - id: "WAW-P1.3"
-    name: "Sync repository methods"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P1.1"]
-    effort: 2
-  - id: "WAW-P1.4"
-    name: "Mutual exclusivity validation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P1.3"]
-    effort: 1
-
-  # Phase 2: Service Layer (9 pts)
-  - id: "WAW-P2.1"
-    name: "Sync service implementation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "backend-architect"]
-    dependencies: ["WAW-P1.3"]
-    effort: 3
-  - id: "WAW-P2.2"
-    name: "Service hooks in WorkflowService"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P2.1"]
-    effort: 2
-  - id: "WAW-P2.3"
-    name: "Role validation service"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P1.3"]
-    effort: 2
-  - id: "WAW-P2.4"
-    name: "Feature flag integration"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P2.1"]
-    effort: 1
-  - id: "WAW-P2.5"
-    name: "Full re-sync path"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P2.1"]
-    effort: 1
-
-  # Phase 3: API Layer (7 pts)
-  - id: "WAW-P3.1"
-    name: "Deployment set schema"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P1.3"]
-    effort: 2
-  - id: "WAW-P3.2"
-    name: "Deployment set API handler"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P3.1"]
-    effort: 2
-  - id: "WAW-P3.3"
-    name: "Collection listing endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P2.1"]
-    effort: 1
-  - id: "WAW-P3.4"
-    name: "Workflow detail resolve_roles"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P2.3"]
-    effort: 1
-  - id: "WAW-P3.5"
-    name: "OpenAPI documentation"
-    status: "pending"
-    assigned_to: ["openapi-expert"]
-    dependencies: ["WAW-P3.4"]
-    effort: 1
-
-  # Phase 4: Frontend (8 pts)
-  - id: "WAW-P4.1"
-    name: "Collection tab wiring"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["WAW-P3.3"]
-    effort: 2
-  - id: "WAW-P4.2"
-    name: "Artifact card rendering"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["WAW-P4.1"]
-    effort: 2
-  - id: "WAW-P4.3"
-    name: "Card link-through"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["WAW-P4.2"]
-    effort: 1
-  - id: "WAW-P4.4"
-    name: "Manage page rows"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["WAW-P4.3"]
-    effort: 2
-  - id: "WAW-P4.5"
-    name: "TypeScript types"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["WAW-P4.1"]
-    effort: 1
-
-  # Phase 5: Testing (16 pts)
-  - id: "WAW-P5.1"
-    name: "Unit tests: sync service"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P2.1"]
-    effort: 3
-  - id: "WAW-P5.2"
-    name: "Unit tests: role validator"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P2.3"]
-    effort: 2
-  - id: "WAW-P5.3"
-    name: "Integration tests: round-trip"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P3.2", "WAW-P4.1"]
-    effort: 3
-  - id: "WAW-P5.4"
-    name: "Integration tests: collection API"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P3.3"]
-    effort: 2
-  - id: "WAW-P5.5"
-    name: "Integration tests: deployment set members"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P3.2"]
-    effort: 2
-  - id: "WAW-P5.6"
-    name: "E2E tests: UI flow"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["WAW-P4.4"]
-    effort: 3
-  - id: "WAW-P5.7"
-    name: "E2E tests: CLI integration"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["WAW-P3.3"]
-    effort: 1
-
+- id: WAW-P1.1
+  name: Alembic migration
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  effort: 2
+- id: WAW-P1.2
+  name: Artifact model validation
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - WAW-P1.1
+  effort: 1
+- id: WAW-P1.3
+  name: Sync repository methods
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P1.1
+  effort: 2
+- id: WAW-P1.4
+  name: Mutual exclusivity validation
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P1.3
+  effort: 1
+- id: WAW-P2.1
+  name: Sync service implementation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  - backend-architect
+  dependencies:
+  - WAW-P1.3
+  effort: 3
+- id: WAW-P2.2
+  name: Service hooks in WorkflowService
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P2.1
+  effort: 2
+- id: WAW-P2.3
+  name: Role validation service
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P1.3
+  effort: 2
+- id: WAW-P2.4
+  name: Feature flag integration
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P2.1
+  effort: 1
+- id: WAW-P2.5
+  name: Full re-sync path
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P2.1
+  effort: 1
+- id: WAW-P3.1
+  name: Deployment set schema
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P1.3
+  effort: 2
+- id: WAW-P3.2
+  name: Deployment set API handler
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P3.1
+  effort: 2
+- id: WAW-P3.3
+  name: Collection listing endpoint
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P2.1
+  effort: 1
+- id: WAW-P3.4
+  name: Workflow detail resolve_roles
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P2.3
+  effort: 1
+- id: WAW-P3.5
+  name: OpenAPI documentation
+  status: pending
+  assigned_to:
+  - openapi-expert
+  dependencies:
+  - WAW-P3.4
+  effort: 1
+- id: WAW-P4.1
+  name: Collection tab wiring
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - WAW-P3.3
+  effort: 2
+- id: WAW-P4.2
+  name: Artifact card rendering
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - WAW-P4.1
+  effort: 2
+- id: WAW-P4.3
+  name: Card link-through
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - WAW-P4.2
+  effort: 1
+- id: WAW-P4.4
+  name: Manage page rows
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - WAW-P4.3
+  effort: 2
+- id: WAW-P4.5
+  name: TypeScript types
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - WAW-P4.1
+  effort: 1
+- id: WAW-P5.1
+  name: 'Unit tests: sync service'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P2.1
+  effort: 3
+- id: WAW-P5.2
+  name: 'Unit tests: role validator'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P2.3
+  effort: 2
+- id: WAW-P5.3
+  name: 'Integration tests: round-trip'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P3.2
+  - WAW-P4.1
+  effort: 3
+- id: WAW-P5.4
+  name: 'Integration tests: collection API'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P3.3
+  effort: 2
+- id: WAW-P5.5
+  name: 'Integration tests: deployment set members'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P3.2
+  effort: 2
+- id: WAW-P5.6
+  name: 'E2E tests: UI flow'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - WAW-P4.4
+  effort: 3
+- id: WAW-P5.7
+  name: 'E2E tests: CLI integration'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - WAW-P3.3
+  effort: 1
 parallelization:
-  batch_1: ["WAW-P1.1"]
-  batch_2: ["WAW-P1.2", "WAW-P1.3"]
-  batch_3: ["WAW-P1.4", "WAW-P2.1", "WAW-P2.3"]
-  batch_4: ["WAW-P2.2", "WAW-P2.4", "WAW-P2.5", "WAW-P3.1"]
-  batch_5: ["WAW-P3.2", "WAW-P3.3", "WAW-P3.4"]
-  batch_6: ["WAW-P3.5", "WAW-P4.1", "WAW-P4.5", "WAW-P5.1", "WAW-P5.2"]
-  batch_7: ["WAW-P4.2", "WAW-P5.4", "WAW-P5.5", "WAW-P5.7"]
-  batch_8: ["WAW-P4.3"]
-  batch_9: ["WAW-P4.4", "WAW-P5.3"]
-  batch_10: ["WAW-P5.6"]
+  batch_1:
+  - WAW-P1.1
+  batch_2:
+  - WAW-P1.2
+  - WAW-P1.3
+  batch_3:
+  - WAW-P1.4
+  - WAW-P2.1
+  - WAW-P2.3
+  batch_4:
+  - WAW-P2.2
+  - WAW-P2.4
+  - WAW-P2.5
+  - WAW-P3.1
+  batch_5:
+  - WAW-P3.2
+  - WAW-P3.3
+  - WAW-P3.4
+  batch_6:
+  - WAW-P3.5
+  - WAW-P4.1
+  - WAW-P4.5
+  - WAW-P5.1
+  - WAW-P5.2
+  batch_7:
+  - WAW-P4.2
+  - WAW-P5.4
+  - WAW-P5.5
+  - WAW-P5.7
+  batch_8:
+  - WAW-P4.3
+  batch_9:
+  - WAW-P4.4
+  - WAW-P5.3
+  batch_10:
+  - WAW-P5.6
+total_tasks: 26
+completed_tasks: 4
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 15
 ---
 
 # Workflow-Artifact Wiring — All Phases Progress
