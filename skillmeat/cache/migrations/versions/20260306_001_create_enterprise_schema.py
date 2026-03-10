@@ -587,17 +587,17 @@ def upgrade() -> None:
 
     # B-tree indexes on enterprise_collection_artifacts
     op.create_index(
-        "idx_collection_artifacts_collection_id",
+        "idx_ent_ca_collection_id",
         "enterprise_collection_artifacts",
         ["collection_id"],
     )
     op.create_index(
-        "idx_collection_artifacts_artifact_id",
+        "idx_ent_ca_artifact_id",
         "enterprise_collection_artifacts",
         ["artifact_id"],
     )
     op.create_index(
-        "idx_collection_artifacts_collection_order",
+        "idx_ent_ca_collection_order",
         "enterprise_collection_artifacts",
         ["collection_id", "order_index"],
     )
@@ -617,15 +617,15 @@ def downgrade() -> None:
 
     # 4. enterprise_collection_artifacts (references both collections + artifacts)
     op.drop_index(
-        "idx_collection_artifacts_collection_order",
+        "idx_ent_ca_collection_order",
         table_name="enterprise_collection_artifacts",
     )
     op.drop_index(
-        "idx_collection_artifacts_artifact_id",
+        "idx_ent_ca_artifact_id",
         table_name="enterprise_collection_artifacts",
     )
     op.drop_index(
-        "idx_collection_artifacts_collection_id",
+        "idx_ent_ca_collection_id",
         table_name="enterprise_collection_artifacts",
     )
     op.drop_table("enterprise_collection_artifacts")

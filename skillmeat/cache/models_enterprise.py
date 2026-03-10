@@ -928,9 +928,9 @@ class EnterpriseCollectionArtifact(EnterpriseBase):
             UNIQUE (collection_id, artifact_id)
 
     Indexes:
-        idx_collection_artifacts_collection_id:   (collection_id)
-        idx_collection_artifacts_artifact_id:     (artifact_id)
-        idx_collection_artifacts_collection_order: (collection_id, order_index)
+        idx_ent_ca_collection_id:   (collection_id)
+        idx_ent_ca_artifact_id:     (artifact_id)
+        idx_ent_ca_collection_order: (collection_id, order_index)
 
     Schema reference:
         docs/project_plans/architecture/enterprise-db-schema-v1.md §2.4
@@ -1018,18 +1018,18 @@ class EnterpriseCollectionArtifact(EnterpriseBase):
         ),
         # B-tree: primary filter when loading a collection's members
         Index(
-            "idx_collection_artifacts_collection_id",
+            "idx_ent_ca_collection_id",
             "collection_id",
         ),
         # B-tree: reverse lookup — which collections contain a given artifact?
         Index(
-            "idx_collection_artifacts_artifact_id",
+            "idx_ent_ca_artifact_id",
             "artifact_id",
         ),
         # B-tree composite: ordered membership scan within a single collection
         # (used by EnterpriseCollection.memberships order_by clause)
         Index(
-            "idx_collection_artifacts_collection_order",
+            "idx_ent_ca_collection_order",
             "collection_id",
             "order_index",
         ),
