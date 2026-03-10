@@ -60,11 +60,11 @@ tasks:
     \   - search_tags: weight 'B'\n   - description: weight 'C'\n   - search_text\
     \ + deep_search_text: weight 'D'\n4. Create trigger to auto-update search_vector\
     \ on INSERT/UPDATE\n5. Backfill existing rows: UPDATE ... SET search_vector =\
-    \ to_tsvector(...)\n\nWeight mapping (SQLite FTS5 → PostgreSQL):\n- SEARCH_WEIGHT_TITLE\
-    \ (10.0) → 'A'\n- SEARCH_WEIGHT_TAGS (3.0) → 'B'\n- SEARCH_WEIGHT_DESCRIPTION\
-    \ (5.0) → 'C' (PG has only A/B/C/D)\n- SEARCH_WEIGHT_SEARCH_TEXT (2.0) → 'D'\n\
-    - SEARCH_WEIGHT_DEEP (1.0) → 'D'\n\nDowngrade: drop trigger, function, index,\
-    \ column.\n"
+    \ to_tsvector(...)\n\nWeight mapping (SQLite FTS5 \u2192 PostgreSQL):\n- SEARCH_WEIGHT_TITLE\
+    \ (10.0) \u2192 'A'\n- SEARCH_WEIGHT_TAGS (3.0) \u2192 'B'\n- SEARCH_WEIGHT_DESCRIPTION\
+    \ (5.0) \u2192 'C' (PG has only A/B/C/D)\n- SEARCH_WEIGHT_SEARCH_TEXT (2.0) \u2192\
+    \ 'D'\n- SEARCH_WEIGHT_DEEP (1.0) \u2192 'D'\n\nDowngrade: drop trigger, function,\
+    \ index, column.\n"
 - id: PG-FTS-1.2
   description: Refactor search backend detection from FTS5-only to dialect-aware
   status: completed
@@ -79,8 +79,8 @@ tasks:
     \nCurrent: `check_fts5_available()` checks sqlite_master for catalog_fts table.\n\
     \nNew behavior:\n1. Add `SearchBackendType` enum: FTS5, TSVECTOR, LIKE\n2. Add\
     \ `detect_search_backend(session) -> SearchBackendType`:\n   - If dialect is PostgreSQL:\
-    \ check for search_vector column → TSVECTOR\n   - If dialect is SQLite: existing\
-    \ FTS5 check → FTS5 or LIKE\n3. Add `get_search_backend() -> SearchBackendType`\
+    \ check for search_vector column \u2192 TSVECTOR\n   - If dialect is SQLite: existing\
+    \ FTS5 check \u2192 FTS5 or LIKE\n3. Add `get_search_backend() -> SearchBackendType`\
     \ (cached, like current is_fts5_available)\n4. Keep `is_fts5_available()` working\
     \ for backward compatibility (returns True if FTS5)\n5. Add `is_tsvector_available()`\
     \ for PostgreSQL path\n\nThe detection runs once at API startup (lifespan), same\
@@ -96,27 +96,15 @@ tasks:
   priority: critical
   files:
   - skillmeat/cache/models.py
-  notes: 'Add `search_vector` column to MarketplaceCatalogEntry model.
-
-
-    Must be dialect-conditional — only present on PostgreSQL:
-
-    - Use `Column(TSVector(), nullable=True)` from sqlalchemy.dialects.postgresql
-
-    - The column must not break SQLite (column just won''t exist in SQLite schema)
-
-    - Consider using a deferred column or conditional model mixin
-
-
-    Alternative: Since SQLAlchemy models define the "desired" schema and migrations
-
-    handle the actual DB, the column can exist in the model — SQLite simply won''t
-
-    have it. The model should use `server_default=None` and the column should be
-
-    excluded from SQLite queries via the repository layer.
-
-    '
+  notes: "Add `search_vector` column to MarketplaceCatalogEntry model.\n\nMust be\
+    \ dialect-conditional \u2014 only present on PostgreSQL:\n- Use `Column(TSVector(),\
+    \ nullable=True)` from sqlalchemy.dialects.postgresql\n- The column must not break\
+    \ SQLite (column just won't exist in SQLite schema)\n- Consider using a deferred\
+    \ column or conditional model mixin\n\nAlternative: Since SQLAlchemy models define\
+    \ the \"desired\" schema and migrations\nhandle the actual DB, the column can\
+    \ exist in the model \u2014 SQLite simply won't\nhave it. The model should use\
+    \ `server_default=None` and the column should be\nexcluded from SQLite queries\
+    \ via the repository layer.\n"
 - id: PG-FTS-1.4
   description: Implement _search_tsvector() in MarketplaceCatalogRepository
   status: completed
@@ -130,10 +118,10 @@ tasks:
   files:
   - skillmeat/cache/repositories.py
   notes: "Add `_search_tsvector()` method parallel to existing `_search_fts5()`.\n\
-    \nImplementation:\n1. Query building:\n   - Parse user query → `plainto_tsquery('english',\
+    \nImplementation:\n1. Query building:\n   - Parse user query \u2192 `plainto_tsquery('english',\
     \ query)` or `websearch_to_tsquery`\n   - Same special char stripping as `_build_fts5_query()`\n\
     \   - Prefix matching: use `to_tsquery` with `:*` suffix for partial matches\n\
-    \n2. Relevance ranking:\n   - `ts_rank_cd(search_vector, query)` — uses cover\
+    \n2. Relevance ranking:\n   - `ts_rank_cd(search_vector, query)` \u2014 uses cover\
     \ density ranking\n   - Weights already baked into tsvector via trigger (A/B/C/D)\n\
     \   - Negate rank for cursor compatibility (FTS5 uses negative BM25)\n\n3. Snippet\
     \ generation:\n   - `ts_headline('english', title, query, 'StartSel=<mark>, StopSel=</mark>')`\
@@ -159,24 +147,12 @@ tasks:
   priority: high
   files:
   - skillmeat/api/routers/marketplace_catalog.py
-  notes: 'Update `search_catalog()` endpoint:
-
-    1. Import `get_search_backend` from utils
-
-    2. Pass backend type to repository `search()` method
-
-    3. No changes to API contract — request/response schemas unchanged
-
-    4. Optionally: add `x-search-backend` response header for debugging
-
-
-    The endpoint remains identical from the consumer''s perspective.
-
-    SQLite deployments get FTS5, PostgreSQL deployments get tsvector,
-
-    and both fall back to LIKE if their respective FTS is unavailable.
-
-    '
+  notes: "Update `search_catalog()` endpoint:\n1. Import `get_search_backend` from\
+    \ utils\n2. Pass backend type to repository `search()` method\n3. No changes to\
+    \ API contract \u2014 request/response schemas unchanged\n4. Optionally: add `x-search-backend`\
+    \ response header for debugging\n\nThe endpoint remains identical from the consumer's\
+    \ perspective.\nSQLite deployments get FTS5, PostgreSQL deployments get tsvector,\n\
+    and both fall back to LIKE if their respective FTS is unavailable.\n"
 - id: PG-FTS-1.6
   description: Unit tests for tsvector search (mocked)
   status: completed
@@ -217,29 +193,17 @@ tasks:
   priority: high
   files:
   - skillmeat/cache/tests/test_pg_search_integration.py
-  notes: '@pytest.mark.integration tests against real PostgreSQL:
-
-    1. Run migration → verify search_vector column + GIN index created
-
-    2. Insert catalog entries → verify trigger populates search_vector
-
-    3. Search by title → verify relevance ranking (title matches rank highest)
-
-    4. Search by tags → verify tag matches rank appropriately
-
-    5. Search deep content → verify deep_match flag set correctly
-
-    6. Pagination → verify cursor-based pagination works
-
-    7. Snippet markup → verify <mark> tags in snippets
-
-    8. Empty/special queries → verify graceful handling
-
-    9. Compare results with LIKE fallback for same query → verify superset
-
-    '
+  notes: "@pytest.mark.integration tests against real PostgreSQL:\n1. Run migration\
+    \ \u2192 verify search_vector column + GIN index created\n2. Insert catalog entries\
+    \ \u2192 verify trigger populates search_vector\n3. Search by title \u2192 verify\
+    \ relevance ranking (title matches rank highest)\n4. Search by tags \u2192 verify\
+    \ tag matches rank appropriately\n5. Search deep content \u2192 verify deep_match\
+    \ flag set correctly\n6. Pagination \u2192 verify cursor-based pagination works\n\
+    7. Snippet markup \u2192 verify <mark> tags in snippets\n8. Empty/special queries\
+    \ \u2192 verify graceful handling\n9. Compare results with LIKE fallback for same\
+    \ query \u2192 verify superset\n"
 - id: PG-FTS-1.8
-  description: SQLite regression test — verify FTS5 path unchanged
+  description: "SQLite regression test \u2014 verify FTS5 path unchanged"
   status: completed
   assigned_to:
   - python-backend-engineer
@@ -250,22 +214,12 @@ tasks:
   priority: critical
   files:
   - skillmeat/cache/tests/test_fts5_regression.py
-  notes: 'Verify the existing SQLite FTS5 search path is completely unaffected:
-
-    1. FTS5 detection still works
-
-    2. Search results identical to before refactor
-
-    3. Snippets, pagination, deep search all unchanged
-
-    4. LIKE fallback still works when FTS5 unavailable
-
-
-    This is the safety net — dual-backend must not regress the primary path.
-
-    Run as part of standard pytest suite (no @pytest.mark.integration needed).
-
-    '
+  notes: "Verify the existing SQLite FTS5 search path is completely unaffected:\n\
+    1. FTS5 detection still works\n2. Search results identical to before refactor\n\
+    3. Snippets, pagination, deep search all unchanged\n4. LIKE fallback still works\
+    \ when FTS5 unavailable\n\nThis is the safety net \u2014 dual-backend must not\
+    \ regress the primary path.\nRun as part of standard pytest suite (no @pytest.mark.integration\
+    \ needed).\n"
 progress: 100
 updated: '2026-03-10'
 ---

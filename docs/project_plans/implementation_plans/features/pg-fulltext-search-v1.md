@@ -2,7 +2,7 @@
 title: 'Implementation Plan: PostgreSQL Full-Text Search'
 schema_version: 2
 doc_type: implementation_plan
-status: in-progress
+status: completed
 created: 2026-03-09
 updated: '2026-03-10'
 feature_slug: pg-fulltext-search
