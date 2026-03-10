@@ -23,8 +23,6 @@ category: product-planning
 status: draft
 priority: HIGH
 risk_level: high
-schema_version: 2
-doc_type: implementation_plan
 feature_slug: skillbom-attestation
 prd_ref: /docs/project_plans/PRDs/features/skillbom-attestation-v1.md
 plan_ref: null
@@ -166,7 +164,7 @@ Implementation details for each phase are in the following linked documents:
 - Unit tests for model relationships pass (foreign keys, cascades, indexes)
 
 ### Phase 2 Exit Criteria
-- `BomGenerator` class instantiates and generates valid JSON per BOM v1.0 schema
+- `BomGenerator` class instantiates and generates valid JSON per BOM v2.0 schema
 - All 13+ artifact type adapters implemented and tested
 - `context.lock` file produced with correct format and content hashes
 - Performance: BOM generation for 50 artifacts completes in < 2s

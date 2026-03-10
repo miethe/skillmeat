@@ -26,7 +26,7 @@ schema_version: 2
 doc_type: prd
 feature_slug: skillbom-attestation
 prd_ref: null
-plan_ref: null
+plan_ref: docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md
 related_documents:
   - /docs/project_plans/PRDs/features/versioning-merge-system-v1.5-state-tracking.md
   - /docs/dev/architecture/decisions/004-artifact-version-tracking.md
@@ -238,7 +238,7 @@ sequenceDiagram
 | FR-07 | `skillmeat bom verify` validates Ed25519 signatures on `context.lock` files | Must | Uses existing `SIGNING_POLICY.md` infrastructure |
 | FR-08 | `skillmeat bom restore --commit <git-hash>` rehydrates `.claude/` to the exact artifact state at that commit | Must | Reads BOM from target commit; fetches historical hashes |
 | FR-09 | Git pre-commit hook appends `SkillBOM-Hash: sha256:<hash>` footer to commit messages | Must | `skillmeat bom install-hook` installs `.git/hooks/pre-commit` |
-| FR-10 | `generate_attestation` Claude Code tool allows agents to snapshot their environment before issuing git commits | Must | Tool definition in `skillmeat/core/bom/` |
+| FR-10 | `generate_attestation` Claude Code tool allows agents to snapshot their environment before issuing git commits | Must | Tool definition in skillmeat/core/bom/tool.py; registered as a Claude Code MCP tool via SkillMeat's MCP server |
 | FR-11 | Enterprise attestations support required policy fields (required_artifacts, required_scopes, compliance_metadata) configurable per tenant | Should | Enterprise edition only; stored in DB |
 | FR-12 | `GET /integrations/idp/bom-card/{project_id}` returns a Backstage-renderable BOM card payload (current snapshot + recent history delta) | Must | Extends existing `idp_integration` router |
 | FR-13 | Web app artifact detail pages include a "Provenance" tab showing BOM snapshot and history timeline | Should | New tab in artifact detail view |
@@ -493,6 +493,8 @@ Every BOM snapshot record carries owner attribution sourced from the `AuthContex
 | `team` | `team` | Team members + `system_admin` |
 | `enterprise` | `public` within tenant | All tenant users + `system_admin` |
 
+> **Migration note:** The existing `OwnerType` enum in `skillmeat/cache/auth_types.py` currently has only `user` and `team`. Adding `enterprise` requires an Alembic migration to extend the enum (Phase 1, TASK-1.5).
+
 **Enterprise attestation policy fields** (enterprise edition only):
 ```json
 {
@@ -688,7 +690,7 @@ class ArtifactHistoryEvent(Base):
     owner_id = Column(String, nullable=False)
     tenant_id = Column(String, nullable=True)
     project_id = Column(String, nullable=False)
-    metadata = Column(JSON, nullable=True)
+    metadata = Column(Text, nullable=True)  # JSON serialized; sa.Text() for SQLite/PostgreSQL portability
     occurred_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 ```
 
@@ -909,5 +911,9 @@ class ArtifactHistoryEvent(Base):
 ---
 
 **Progress Tracking:**
-
-See progress tracking: `.claude/progress/skillbom-attestation/all-phases-progress.md`
+- Phase 1-2: `.claude/progress/skillbom-attestation/phase-1-2-progress.md`
+- Phase 3-4: `.claude/progress/skillbom-attestation/phase-3-4-progress.md`
+- Phase 5-6: `.claude/progress/skillbom-attestation/phase-5-6-progress.md`
+- Phase 7-8: `.claude/progress/skillbom-attestation/phase-7-8-progress.md`
+- Phase 9-10: `.claude/progress/skillbom-attestation/phase-9-10-progress.md`
+- Phase 11: `.claude/progress/skillbom-attestation/phase-11-progress.md`
