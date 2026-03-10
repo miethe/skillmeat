@@ -8,7 +8,7 @@ prd_ref: null
 plan_ref: null
 phase: 1
 title: PostgreSQL Full-Text Search (Dual-Backend)
-status: pending
+status: completed
 started: null
 completed: null
 commit_refs: []
@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 7
+completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -240,7 +240,7 @@ tasks:
     '
 - id: PG-FTS-1.8
   description: SQLite regression test — verify FTS5 path unchanged
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -266,7 +266,7 @@ tasks:
     Run as part of standard pytest suite (no @pytest.mark.integration needed).
 
     '
-progress: 87
+progress: 100
 updated: '2026-03-10'
 ---
 
