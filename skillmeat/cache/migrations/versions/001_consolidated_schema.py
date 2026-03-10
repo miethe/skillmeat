@@ -299,7 +299,7 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False, comment='Unique human-readable team name'),
     sa.Column('description', sa.Text(), nullable=True, comment="Optional description of the team's purpose"),
     sa.Column('is_active', sa.Boolean(), server_default='1', nullable=False, comment='When False the team is dissolved but rows are retained for audit'),
-    sa.Column('created_at', sa.DateTime(), server_default='CURRENT_TIMESTAMP', nullable=False, comment='UTC creation timestamp'),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False, comment='UTC creation timestamp'),
     sa.Column('updated_at', sa.DateTime(), nullable=False, comment='UTC last-modified timestamp'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
@@ -326,7 +326,7 @@ def upgrade() -> None:
     sa.Column('display_name', sa.String(length=255), nullable=True, comment='Human-readable display name shown in the UI'),
     sa.Column('role', sa.String(length=50), server_default='viewer', nullable=False, comment='System-wide role; one of UserRole enum values (viewer, team_member, team_admin, system_admin)'),
     sa.Column('is_active', sa.Boolean(), server_default='1', nullable=False, comment='When False the account is disabled; row is retained for audit'),
-    sa.Column('created_at', sa.DateTime(), server_default='CURRENT_TIMESTAMP', nullable=False, comment='UTC creation timestamp'),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False, comment='UTC creation timestamp'),
     sa.Column('updated_at', sa.DateTime(), nullable=False, comment='UTC last-modified timestamp; updated by app on every write'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('external_id')
@@ -544,7 +544,7 @@ def upgrade() -> None:
     sa.Column('team_id', sa.Integer(), nullable=False, comment='Parent team; cascade-deletes this membership when team is removed'),
     sa.Column('user_id', sa.Integer(), nullable=False, comment='Member user; cascade-deletes this membership when user is removed'),
     sa.Column('role', sa.String(length=50), server_default='team_member', nullable=False, comment='Role within the team; one of team_admin, team_member'),
-    sa.Column('joined_at', sa.DateTime(), server_default='CURRENT_TIMESTAMP', nullable=False, comment='UTC timestamp when the user joined the team'),
+    sa.Column('joined_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False, comment='UTC timestamp when the user joined the team'),
     sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
@@ -598,7 +598,7 @@ def upgrade() -> None:
     sa.Column('embedding', sa.LargeBinary(), nullable=False, comment='Raw float32 bytes of the embedding vector (numpy ndarray.tobytes() / frombuffer(dtype=float32))'),
     sa.Column('model_name', sa.String(), nullable=False, comment="Model that produced this embedding (e.g. 'all-MiniLM-L6-v2')"),
     sa.Column('embedding_dim', sa.Integer(), nullable=False, comment='Number of dimensions in the embedding vector (e.g. 384)'),
-    sa.Column('computed_at', sa.DateTime(), server_default='CURRENT_TIMESTAMP', nullable=False, comment='Timestamp when the embedding was computed; used for TTL invalidation'),
+    sa.Column('computed_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False, comment='Timestamp when the embedding was computed; used for TTL invalidation'),
     sa.ForeignKeyConstraint(['artifact_uuid'], ['artifacts.uuid'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('artifact_uuid')
     )
@@ -761,7 +761,7 @@ def upgrade() -> None:
     sa.Column('target_artifact_uuid', sa.String(), nullable=False, comment="UUID of the target artifact (the 'candidate' side of the comparison)"),
     sa.Column('composite_score', sa.Float(), nullable=False, comment='Final weighted composite similarity score in [0.0, 1.0]'),
     sa.Column('breakdown_json', sa.Text(), nullable=True, comment='JSON-encoded dict of per-dimension scores (e.g. name, tags, text)'),
-    sa.Column('computed_at', sa.DateTime(), server_default='CURRENT_TIMESTAMP', nullable=False, comment='Timestamp when this score was computed; used for cache invalidation'),
+    sa.Column('computed_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False, comment='Timestamp when this score was computed; used for cache invalidation'),
     sa.ForeignKeyConstraint(['source_artifact_uuid'], ['artifacts.uuid'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['target_artifact_uuid'], ['artifacts.uuid'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('source_artifact_uuid', 'target_artifact_uuid')
