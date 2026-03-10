@@ -11,7 +11,7 @@ import { Platform, Tool } from './enums';
 /**
  * Supported artifact types in SkillMeat.
  */
-export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'hook' | 'composite';
+export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'hook' | 'composite' | 'workflow';
 
 /**
  * Artifact scope determines where the artifact is stored.
@@ -654,6 +654,39 @@ export const ARTIFACT_TYPES: Record<ArtifactType, ArtifactTypeConfig> = {
           type: 'tags',
           required: false,
           placeholder: 'artifact_id[:position]',
+        },
+      ],
+    },
+  },
+  workflow: {
+    type: 'workflow',
+    label: 'Workflow',
+    pluralLabel: 'Workflows',
+    icon: 'GitBranch',
+    color: 'text-cyan-500',
+    requiredFile: 'WORKFLOW.yaml',
+    formSchema: {
+      fields: [
+        {
+          name: 'name',
+          label: 'Name',
+          type: 'text',
+          required: true,
+          placeholder: 'my-workflow',
+        },
+        {
+          name: 'description',
+          label: 'Description',
+          type: 'textarea',
+          required: false,
+          placeholder: 'What does this workflow do?',
+        },
+        {
+          name: 'tags',
+          label: 'Tags',
+          type: 'tags',
+          required: false,
+          placeholder: 'Add tags...',
         },
       ],
     },

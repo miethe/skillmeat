@@ -17,7 +17,7 @@ export type NotificationStatus = 'read' | 'unread';
 /**
  * Type of artifact being imported or synced
  */
-export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'hook' | 'composite';
+export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'hook' | 'composite' | 'workflow';
 
 /**
  * Result of a single artifact import operation
