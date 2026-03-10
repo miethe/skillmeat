@@ -16,6 +16,7 @@ related_documents:
   - docs/project_plans/PRDs/features/workflow-artifact-wiring-v1.md
   - docs/project_plans/implementation_plans/features/workflow-orchestration-v1.md
   - docs/project_plans/PRDs/features/deployment-sets-v1.md
+  - docs/project_plans/architecture/ADRs/adr-008-artifact-tiering-composition-hierarchy.md
 owner: null
 contributors: []
 priority: high
@@ -48,6 +49,7 @@ files_affected:
 - **PRD**: `docs/project_plans/PRDs/features/workflow-artifact-wiring-v1.md`
 - **Workflow Orchestration**: `docs/project_plans/implementation_plans/features/workflow-orchestration-v1.md`
 - **Deployment Sets**: `docs/project_plans/PRDs/features/deployment-sets-v1.md`
+- **ADR-008**: `docs/project_plans/architecture/ADRs/adr-008-artifact-tiering-composition-hierarchy.md`
 
 **Complexity**: Large
 **Total Estimated Effort**: 26 story points

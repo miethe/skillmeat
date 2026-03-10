@@ -19,12 +19,7 @@ Wire the Workflow Orchestration Engine into the Artifact Collection system via a
 
 ## Artifact Tiering Model
 
-| Tier | Name | Examples |
-|------|------|---------|
-| 0 | Atomic | Skills, agents, commands, MCP, hooks, context modules, memories |
-| 1 | Grouped | Composites (plugins/stacks/suites), groups |
-| 2 | Deployable | Deployment sets, context packs |
-| 3 | Orchestrated | Workflow definitions |
+See [ADR-008](docs/project_plans/architecture/ADRs/adr-008-artifact-tiering-composition-hierarchy.md) for the formal hierarchy. Key point: Workflows are Tier 3 (Process/Distribution) — highest tier, references T0-T2 only.
 
 ## Key Design Decisions
 

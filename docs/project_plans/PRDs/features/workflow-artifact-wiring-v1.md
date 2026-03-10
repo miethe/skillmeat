@@ -15,6 +15,7 @@ related_documents:
 - docs/project_plans/PRDs/features/deployment-sets-v1.md
 - docs/project_plans/PRDs/features/composite-artifact-infrastructure-v1.md
 - docs/project_plans/PRDs/features/memory-context-system-v1.md
+- docs/project_plans/architecture/ADRs/adr-008-artifact-tiering-composition-hierarchy.md
 owner: null
 contributors: []
 priority: high
@@ -70,6 +71,7 @@ files_affected:
 > - `docs/project_plans/PRDs/features/memory-context-system-v1.md`
 > - `docs/project_plans/PRDs/integrations/backstage-integration-demo.md`
 > - `docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md`
+> - `docs/project_plans/architecture/ADRs/adr-008-artifact-tiering-composition-hierarchy.md`
 > - `docs/project_plans/implementation_plans/features/workflow-orchestration-v1.md`
 
 ---
@@ -130,16 +132,7 @@ SkillMeat uses a layered architecture:
 - **DB Cache** — Web's source of truth; filesystem is CLI's source of truth
 - **Write-through pattern** — Mutations write primary record first, then sync derived records
 
-**Artifact Tiering Model:**
-
-| Tier | Name | Contains | Examples |
-|------|------|----------|---------|
-| 0 | Atomic | Individual deployable units | Skills, agents, commands, MCP servers, hooks, context modules, memories |
-| 1 | Grouped | Static bundles of T0 | Composites (plugins/stacks/suites), groups |
-| 2 | Deployable | Target-aware packages of T0-T2 | Deployment sets, context packs |
-| 3 | Orchestrated | DAG-executed processes referencing T0-T2 | Workflow definitions |
-
-Tier 3 is the highest tier. A workflow can reference any T0-T2 artifact in its stages. Wiring workflows into the collection system is the prerequisite for any future Tier 3 deployment capability.
+**Artifact Tiering Model:** See [ADR-008: Artifact Tiering and Composition Hierarchy](../../architecture/ADRs/adr-008-artifact-tiering-composition-hierarchy.md) for the formal 4-tier hierarchy (T0 Atomic → T1 Composite → T2 Aggregator → T3 Process/Distribution). Workflows are Tier 3 — the highest tier, able to reference any T0-T2 artifact. Wiring workflows into the collection system is the prerequisite for any future Tier 3 deployment capability.
 
 ---
 
