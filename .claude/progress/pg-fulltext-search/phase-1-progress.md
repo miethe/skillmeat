@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 3
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -119,7 +119,7 @@ tasks:
     '
 - id: PG-FTS-1.4
   description: Implement _search_tsvector() in MarketplaceCatalogRepository
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -150,7 +150,7 @@ tasks:
     \   ```\n"
 - id: PG-FTS-1.5
   description: Update search endpoint to pass backend type to repository
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -266,7 +266,7 @@ tasks:
     Run as part of standard pytest suite (no @pytest.mark.integration needed).
 
     '
-progress: 37
+progress: 62
 updated: '2026-03-10'
 ---
 

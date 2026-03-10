@@ -12,7 +12,7 @@ import json
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from skillmeat.api.dependencies import (
     MarketplaceCatalogRepoDep,
@@ -23,6 +23,7 @@ from skillmeat.api.schemas.marketplace import (
     CatalogSearchResponse,
     CatalogSearchResult,
 )
+from skillmeat.api.utils.fts5 import get_search_backend
 from skillmeat.cache.models import MarketplaceCatalogEntry
 from skillmeat.api.schemas.auth import AuthContext
 
@@ -165,6 +166,7 @@ async def search_catalog(
         examples=["95:cat_abc123"],
     ),
     auth_context: AuthContext = Depends(get_auth_context),
+    response: Response = None,
 ) -> CatalogSearchResponse:
     """Search artifacts across all marketplace sources.
 
@@ -236,6 +238,9 @@ async def search_catalog(
             f"min_confidence={min_confidence}, tags={tags}, "
             f"has_more={result.has_more})"
         )
+
+        if response is not None:
+            response.headers["x-search-backend"] = get_search_backend().value
 
         return CatalogSearchResponse(
             items=items,

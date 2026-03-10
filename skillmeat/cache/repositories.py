@@ -2768,9 +2768,12 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
     ) -> PaginatedResult[MarketplaceCatalogEntry]:
         """Cross-source artifact search.
 
-        Uses FTS5 full-text search when available for better performance and
-        relevance ranking. Falls back to LIKE-based queries when FTS5 is not
-        available or when no query is provided.
+        Uses the best available full-text search backend for performance and
+        relevance ranking.  Backend selection priority:
+
+        1. **tsvector** – PostgreSQL with a pre-built ``search_vector`` column.
+        2. **fts5** – SQLite FTS5 virtual table (``catalog_fts``).
+        3. **like** – Plain ``LIKE`` fallback (every database, no FTS index).
 
         Searches across marketplace catalog entries on name, title, description,
         and search_tags fields. Supports filtering by artifact type, source IDs,
@@ -2821,12 +2824,24 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
             ...         cursor=result.next_cursor
             ...     )
         """
-        # Lazy import to avoid circular import
-        from skillmeat.api.utils.fts5 import is_fts5_available
+        # Lazy import to avoid circular dependency
+        from skillmeat.api.utils.fts5 import SearchBackendType, get_search_backend
 
-        # Use FTS5 when: query is provided AND FTS5 is available
-        # Fall back to LIKE: no query, or FTS5 unavailable
-        if query and is_fts5_available():
+        backend = get_search_backend()
+
+        if query and backend == SearchBackendType.TSVECTOR:
+            logger.debug(f"Using tsvector search for query: {query}")
+            return self._search_tsvector(
+                query=query,
+                artifact_type=artifact_type,
+                source_ids=source_ids,
+                min_confidence=min_confidence,
+                tags=tags,
+                limit=limit,
+                cursor=cursor,
+            )
+
+        if query and backend == SearchBackendType.FTS5:
             logger.debug(f"Using FTS5 search for query: {query}")
             return self._search_fts5(
                 query=query,
@@ -2838,9 +2853,7 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                 cursor=cursor,
             )
 
-        logger.debug(
-            f"Using LIKE search (query={query}, fts5_available={is_fts5_available()})"
-        )
+        logger.debug(f"Using LIKE search (query={query}, backend={backend})")
         return self._search_like(
             query=query,
             artifact_type=artifact_type,
@@ -2893,6 +2906,273 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
         # Use prefix matching for partial word search
         # e.g., "skill doc" -> "skill* doc*"
         return " ".join(f"{term}*" for term in terms if term)
+
+    def _search_tsvector(
+        self,
+        query: str,
+        artifact_type: Optional[str] = None,
+        source_ids: Optional[List[str]] = None,
+        min_confidence: int = 0,
+        tags: Optional[List[str]] = None,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> PaginatedResult[MarketplaceCatalogEntry]:
+        """PostgreSQL tsvector full-text search with relevance ranking.
+
+        Uses the pre-built ``search_vector`` column on
+        ``marketplace_catalog_entries`` together with ``websearch_to_tsquery``
+        for user-friendly query parsing and ``ts_rank_cd`` for relevance
+        scoring.  Snippet highlighting is generated via ``ts_headline``.
+
+        Cursor format mirrors :meth:`_search_fts5`:
+        ``"{rank}:{confidence_score}:{entry_id}"`` where *rank* is the
+        **negated** ``ts_rank_cd`` value (so that higher relevance sorts first
+        with an ascending ORDER BY).
+
+        Args:
+            query: Search query (required for the tsvector path).
+            artifact_type: Optional filter by artifact type.
+            source_ids: Optional list of source IDs to filter by.
+            min_confidence: Minimum confidence score (0-100).
+            tags: Optional list of tags to filter by (OR logic).
+            limit: Maximum number of items per page.
+            cursor: Cursor from the previous page.
+
+        Returns:
+            PaginatedResult with items, next_cursor, and has_more flag.
+        """
+        session = self._get_session()
+        try:
+            # ------------------------------------------------------------------
+            # 1. Clean query (reuse same stripping logic as _build_fts5_query)
+            # ------------------------------------------------------------------
+            special_chars = ['"', "'", "*", "(", ")", "-", ":", "^", "+"]
+            special_operators = {"OR", "AND", "NOT", "NEAR"}
+            clean_query = query
+            for char in special_chars:
+                clean_query = clean_query.replace(char, " ")
+            terms = [t for t in clean_query.split() if t.upper() not in special_operators]
+            clean_query = " ".join(terms)
+
+            if not clean_query:
+                # All terms stripped — fall through to LIKE
+                logger.debug(
+                    "tsvector: empty query after cleaning, falling back to LIKE"
+                )
+                return self._search_like(
+                    query=query,
+                    artifact_type=artifact_type,
+                    source_ids=source_ids,
+                    min_confidence=min_confidence,
+                    tags=tags,
+                    limit=limit,
+                    cursor=cursor,
+                )
+
+            # ------------------------------------------------------------------
+            # 2. Build SQLAlchemy ORM query with tsvector filter
+            # ------------------------------------------------------------------
+            tsquery = func.websearch_to_tsquery("english", clean_query)
+
+            # ts_rank_cd: higher = more relevant; negate so ORDER BY rank ASC =
+            # most-relevant first (mirrors the FTS5 convention of negative bm25).
+            rank_expr = (-func.ts_rank_cd(MarketplaceCatalogEntry.search_vector, tsquery)).label(
+                "rank"
+            )
+
+            title_snippet_expr = func.ts_headline(
+                "english",
+                MarketplaceCatalogEntry.title,
+                tsquery,
+                "StartSel=<mark>, StopSel=</mark>, MaxWords=10, MinWords=5",
+            ).label("title_snippet")
+
+            description_snippet_expr = func.ts_headline(
+                "english",
+                MarketplaceCatalogEntry.description,
+                tsquery,
+                "StartSel=<mark>, StopSel=</mark>, MaxWords=30, MinWords=10, MaxFragments=2",
+            ).label("description_snippet")
+
+            base_q = (
+                select(
+                    MarketplaceCatalogEntry,
+                    rank_expr,
+                    title_snippet_expr,
+                    description_snippet_expr,
+                )
+                .where(
+                    MarketplaceCatalogEntry.search_vector.isnot(None),
+                    MarketplaceCatalogEntry.search_vector.op("@@")(tsquery),
+                    MarketplaceCatalogEntry.status.notin_(["excluded", "removed"]),
+                )
+            )
+
+            # ------------------------------------------------------------------
+            # 3. Apply optional filters
+            # ------------------------------------------------------------------
+            if artifact_type:
+                base_q = base_q.where(
+                    MarketplaceCatalogEntry.artifact_type == artifact_type
+                )
+
+            if source_ids:
+                base_q = base_q.where(
+                    MarketplaceCatalogEntry.source_id.in_(source_ids)
+                )
+
+            if min_confidence > 0:
+                base_q = base_q.where(
+                    MarketplaceCatalogEntry.confidence_score >= min_confidence
+                )
+
+            if tags:
+                tag_conditions = [
+                    MarketplaceCatalogEntry.search_tags.ilike(f'%"{tag}"%')
+                    for tag in tags
+                ]
+                base_q = base_q.where(or_(*tag_conditions))
+
+            # ------------------------------------------------------------------
+            # 4. Cursor-based pagination
+            # Cursor format: "{rank}:{confidence_score}:{entry_id}"
+            # ORDER BY rank ASC (higher relevance = lower negated value),
+            #          confidence_score DESC, id ASC
+            # "After cursor" means:
+            #   rank > cursor_rank  (worse relevance), OR
+            #   rank = cursor_rank AND confidence_score < cursor_confidence, OR
+            #   rank = cursor_rank AND confidence_score = cursor_confidence AND id > cursor_id
+            # ------------------------------------------------------------------
+            cursor_rank: Optional[float] = None
+            cursor_confidence: Optional[int] = None
+            cursor_id: Optional[str] = None
+            if cursor:
+                try:
+                    parts = cursor.split(":", 2)
+                    if len(parts) == 3:
+                        cursor_rank = float(parts[0])
+                        cursor_confidence = int(parts[1])
+                        cursor_id = parts[2]
+                    elif len(parts) == 2:
+                        # Legacy "confidence:id" format from LIKE path
+                        cursor_confidence = int(parts[0])
+                        cursor_id = parts[1]
+                        logger.debug(f"tsvector: using legacy cursor format: {cursor}")
+                except (ValueError, AttributeError, IndexError):
+                    logger.warning(f"tsvector: invalid cursor format ignored: {cursor}")
+
+            if cursor_rank is not None and cursor_confidence is not None and cursor_id:
+                base_q = base_q.where(
+                    or_(
+                        rank_expr > cursor_rank,
+                        and_(
+                            rank_expr == cursor_rank,
+                            MarketplaceCatalogEntry.confidence_score < cursor_confidence,
+                        ),
+                        and_(
+                            rank_expr == cursor_rank,
+                            MarketplaceCatalogEntry.confidence_score == cursor_confidence,
+                            MarketplaceCatalogEntry.id > cursor_id,
+                        ),
+                    )
+                )
+            elif cursor_confidence is not None and cursor_id:
+                # Legacy cursor from LIKE fallback — filter by confidence/id only
+                base_q = base_q.where(
+                    or_(
+                        MarketplaceCatalogEntry.confidence_score < cursor_confidence,
+                        and_(
+                            MarketplaceCatalogEntry.confidence_score == cursor_confidence,
+                            MarketplaceCatalogEntry.id > cursor_id,
+                        ),
+                    )
+                )
+
+            base_q = base_q.order_by(
+                rank_expr.asc(),
+                MarketplaceCatalogEntry.confidence_score.desc(),
+                MarketplaceCatalogEntry.id.asc(),
+            ).limit(limit + 1)
+
+            # ------------------------------------------------------------------
+            # 5. Execute and process results
+            # ------------------------------------------------------------------
+            rows = session.execute(base_q).all()
+
+            has_more = len(rows) > limit
+            if has_more:
+                rows = rows[:limit]
+
+            # Collect snippets and rank scores keyed by entry ID
+            snippets: Dict[str, Dict[str, Any]] = {}
+            rank_scores: Dict[str, float] = {}
+            entry_objects: List[MarketplaceCatalogEntry] = []
+
+            for row in rows:
+                entry: MarketplaceCatalogEntry = row[0]
+                row_rank: float = row[1]
+                title_snippet: Optional[str] = row[2]
+                description_snippet: Optional[str] = row[3]
+
+                rank_scores[entry.id] = row_rank
+
+                title_has_match = bool(title_snippet and "<mark>" in title_snippet)
+                desc_has_match = bool(description_snippet and "<mark>" in description_snippet)
+                # Deep match: search_vector matched but neither title nor description
+                # had a highlighted term (match came from search_text/deep_search_text).
+                deep_match = not title_has_match and not desc_has_match
+
+                snippets[entry.id] = {
+                    "title_snippet": title_snippet,
+                    "description_snippet": description_snippet,
+                    "deep_match": deep_match,
+                    "matched_file": None,  # tsvector has no per-file index
+                }
+                entry_objects.append(entry)
+
+            # ------------------------------------------------------------------
+            # 6. Generate next cursor
+            # ------------------------------------------------------------------
+            next_cursor = None
+            if entry_objects and has_more:
+                last = entry_objects[-1]
+                last_rank = rank_scores.get(last.id, 0.0)
+                next_cursor = f"{last_rank}:{last.confidence_score}:{last.id}"
+
+            logger.debug(
+                "tsvector search returned %d entries "
+                "(query=%r, type=%s, sources=%s, min_conf=%d, tags=%s, "
+                "cursor=%s, has_more=%s)",
+                len(entry_objects),
+                query,
+                artifact_type,
+                source_ids,
+                min_confidence,
+                tags,
+                cursor,
+                has_more,
+            )
+
+            return PaginatedResult(
+                items=entry_objects,
+                next_cursor=next_cursor,
+                has_more=has_more,
+                snippets=snippets,
+            )
+        except Exception as exc:
+            # If tsvector query fails for any reason, fall back to LIKE
+            logger.warning("tsvector search failed, falling back to LIKE: %s", exc)
+            return self._search_like(
+                query=query,
+                artifact_type=artifact_type,
+                source_ids=source_ids,
+                min_confidence=min_confidence,
+                tags=tags,
+                limit=limit,
+                cursor=cursor,
+            )
+        finally:
+            session.close()
 
     def _search_fts5(
         self,
