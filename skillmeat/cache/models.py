@@ -3500,37 +3500,38 @@ class DeploymentSet(Base):
 class DeploymentSetMember(Base):
     """Polymorphic member entry within a DeploymentSet.
 
-    Each row references exactly one of three target types via a mutually
-    exclusive nullable column — artifact, group, or a nested deployment
-    set.  A DB CHECK constraint enforces that exactly one reference is
-    non-null.
+    Each row references exactly one of four target types via a mutually
+    exclusive nullable column — artifact, group, a nested deployment set,
+    or a workflow.  A DB CHECK constraint enforces that exactly one reference
+    is non-null.
 
     Member type semantics
     ---------------------
     - ``artifact_uuid`` set  → member is a collection artifact (ADR-007 UUID)
     - ``group_id`` set       → member is an artifact group
     - ``member_set_id`` set  → member is a nested DeploymentSet (nesting)
+    - ``workflow_id`` set    → member is a Workflow definition
 
     Attributes:
         id: Unique identifier (UUID hex, primary key)
         set_id: FK to ``deployment_sets.id``, CASCADE delete (required)
-        artifact_uuid: Collection artifact UUID (nullable; one-of-three)
-        group_id: Artifact group id (nullable; one-of-three)
-        member_set_id: Nested deployment set id (nullable; one-of-three)
+        artifact_uuid: Collection artifact UUID (nullable; one-of-four)
+        group_id: Artifact group id (nullable; one-of-four)
+        member_set_id: Nested deployment set id (nullable; one-of-four)
+        workflow_id: Workflow id (nullable; one-of-four)
         position: Display/deployment order within the set (0-based, default 0)
         created_at: UTC timestamp when membership was created
 
     CHECK constraint:
-        Exactly one of ``artifact_uuid``, ``group_id``, ``member_set_id``
-        must be non-null.  Expressed in SQL as:
-        ``(artifact_uuid IS NOT NULL) + (group_id IS NOT NULL) +
-        (member_set_id IS NOT NULL) = 1``
-        (SQLite supports integer coercion of boolean expressions.)
+        Exactly one of ``artifact_uuid``, ``group_id``, ``member_set_id``,
+        ``workflow_id`` must be non-null.  Uses ``CASE WHEN … THEN 1 ELSE 0
+        END`` summation for dual-dialect compatibility (SQLite + PostgreSQL).
 
     Indexes:
         - idx_deployment_set_members_set_id: Fast child lookup by parent set
         - idx_deployment_set_members_member_set_id: Reverse lookup for nesting
         - idx_deployment_set_members_set_position: Ordered retrieval within set
+        - idx_deployment_set_members_workflow_id: Fast lookup by workflow
     """
 
     __tablename__ = "deployment_set_members"
@@ -3564,6 +3565,12 @@ class DeploymentSetMember(Base):
         nullable=True,
         comment="Nested deployment set id for hierarchical sets",
     )
+    workflow_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        ForeignKey("workflows.id", ondelete="CASCADE"),
+        nullable=True,
+        comment="Workflow id (WAW-P1.1)",
+    )
 
     # Ordering
     position: Mapped[int] = mapped_column(
@@ -3587,32 +3594,39 @@ class DeploymentSetMember(Base):
         foreign_keys=[member_set_id],
         lazy="joined",
     )
+    workflow: Mapped[Optional["Workflow"]] = relationship(
+        "Workflow",
+        back_populates="deployment_set_members",
+        foreign_keys="[DeploymentSetMember.workflow_id]",
+        lazy="select",
+    )
 
     # Constraints and indexes
     __table_args__ = (
         CheckConstraint(
             "(CASE WHEN artifact_uuid IS NOT NULL THEN 1 ELSE 0 END)"
             " + (CASE WHEN group_id IS NOT NULL THEN 1 ELSE 0 END)"
-            " + (CASE WHEN member_set_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
+            " + (CASE WHEN member_set_id IS NOT NULL THEN 1 ELSE 0 END)"
+            " + (CASE WHEN workflow_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
             name="check_deployment_set_member_one_ref",
         ),
         CheckConstraint("position >= 0", name="check_deployment_set_member_position"),
         Index("idx_deployment_set_members_set_id", "set_id"),
         Index("idx_deployment_set_members_member_set_id", "member_set_id"),
         Index("idx_deployment_set_members_set_position", "set_id", "position"),
+        Index("idx_deployment_set_members_workflow_id", "workflow_id"),
     )
 
     def __repr__(self) -> str:
         """Return string representation of DeploymentSetMember."""
-        ref = (
-            f"artifact_uuid={self.artifact_uuid!r}"
-            if self.artifact_uuid
-            else (
-                f"group_id={self.group_id!r}"
-                if self.group_id
-                else f"member_set_id={self.member_set_id!r}"
-            )
-        )
+        if self.artifact_uuid:
+            ref = f"artifact_uuid={self.artifact_uuid!r}"
+        elif self.group_id:
+            ref = f"group_id={self.group_id!r}"
+        elif self.workflow_id:
+            ref = f"workflow_id={self.workflow_id!r}"
+        else:
+            ref = f"member_set_id={self.member_set_id!r}"
         return (
             f"<DeploymentSetMember(id={self.id!r}, set_id={self.set_id!r}, "
             f"{ref}, position={self.position})>"
@@ -3626,17 +3640,20 @@ class DeploymentSetMember(Base):
             "artifact_uuid": self.artifact_uuid,
             "group_id": self.group_id,
             "member_set_id": self.member_set_id,
+            "workflow_id": self.workflow_id,
             "position": self.position,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
     @property
     def member_type(self) -> str:
-        """Return the member type as a string: 'artifact', 'group', or 'set'."""
+        """Return the member type as a string: 'artifact', 'group', 'set', or 'workflow'."""
         if self.artifact_uuid is not None:
             return "artifact"
         if self.group_id is not None:
             return "group"
+        if self.workflow_id is not None:
+            return "workflow"
         return "set"
 
 
@@ -4107,6 +4124,12 @@ class Workflow(Base):
         back_populates="workflow",
         cascade="save-update, merge",
         lazy="selectin",
+    )
+    deployment_set_members: Mapped[List["DeploymentSetMember"]] = relationship(
+        "DeploymentSetMember",
+        back_populates="workflow",
+        cascade="all, delete-orphan",
+        lazy="select",
     )
 
     def __repr__(self) -> str:

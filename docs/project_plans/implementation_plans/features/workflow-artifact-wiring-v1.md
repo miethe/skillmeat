@@ -1,43 +1,52 @@
 ---
-title: "Implementation Plan: Workflow-Artifact Collection Wiring"
+title: 'Implementation Plan: Workflow-Artifact Collection Wiring'
 schema_version: 2
 doc_type: implementation_plan
-status: draft
-created: "2026-03-10"
-updated: "2026-03-10"
-feature_slug: "workflow-artifact-wiring"
-feature_version: "v1"
-prd_ref: "docs/project_plans/PRDs/features/workflow-artifact-wiring-v1.md"
+status: in-progress
+created: '2026-03-10'
+updated: '2026-03-10'
+feature_slug: workflow-artifact-wiring
+feature_version: v1
+prd_ref: docs/project_plans/PRDs/features/workflow-artifact-wiring-v1.md
 plan_ref: null
-scope: "Backend sync service + deployment set integration + frontend UI wiring to make workflows discoverable and deployable alongside artifacts"
-effort_estimate: "26 story points"
-architecture_summary: "Write-through sync from workflows table to artifacts table; extend DeploymentSetMember with workflow_id; wire collection UI to artifact endpoints"
+scope: Backend sync service + deployment set integration + frontend UI wiring to make
+  workflows discoverable and deployable alongside artifacts
+effort_estimate: 26 story points
+architecture_summary: Write-through sync from workflows table to artifacts table;
+  extend DeploymentSetMember with workflow_id; wire collection UI to artifact endpoints
 related_documents:
-  - docs/project_plans/PRDs/features/workflow-artifact-wiring-v1.md
-  - docs/project_plans/implementation_plans/features/workflow-orchestration-v1.md
-  - docs/project_plans/PRDs/features/deployment-sets-v1.md
-  - docs/project_plans/architecture/ADRs/adr-008-artifact-tiering-composition-hierarchy.md
+- docs/project_plans/PRDs/features/workflow-artifact-wiring-v1.md
+- docs/project_plans/implementation_plans/features/workflow-orchestration-v1.md
+- docs/project_plans/PRDs/features/deployment-sets-v1.md
+- docs/project_plans/architecture/ADRs/adr-008-artifact-tiering-composition-hierarchy.md
 owner: null
 contributors: []
 priority: high
 risk_level: medium
-category: "product-planning"
-tags: [implementation, workflow, artifact, collection, wiring, tiering, deployment]
+category: product-planning
+tags:
+- implementation
+- workflow
+- artifact
+- collection
+- wiring
+- tiering
+- deployment
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/cache/models.py
-  - skillmeat/cache/workflow_repository.py
-  - skillmeat/cache/migrations/versions/*.py
-  - skillmeat/core/workflow/service.py
-  - skillmeat/core/services/workflow_artifact_sync_service.py
-  - skillmeat/api/routers/workflows.py
-  - skillmeat/api/routers/deployment_sets.py
-  - skillmeat/api/routers/artifacts.py
-  - skillmeat/web/types/artifact.ts
-  - skillmeat/web/app/collection/page.tsx
-  - skillmeat/web/app/manage/page.tsx
+- skillmeat/cache/models.py
+- skillmeat/cache/workflow_repository.py
+- skillmeat/cache/migrations/versions/*.py
+- skillmeat/core/workflow/service.py
+- skillmeat/core/services/workflow_artifact_sync_service.py
+- skillmeat/api/routers/workflows.py
+- skillmeat/api/routers/deployment_sets.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/web/types/artifact.ts
+- skillmeat/web/app/collection/page.tsx
+- skillmeat/web/app/manage/page.tsx
 ---
 
 # Implementation Plan: Workflow-Artifact Collection Wiring
