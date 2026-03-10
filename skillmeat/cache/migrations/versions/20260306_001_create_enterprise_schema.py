@@ -357,6 +357,9 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # 3. artifact_versions
     # ------------------------------------------------------------------
+    # Drop the local-mode artifact_versions table created by 001_consolidated_schema.
+    # On PostgreSQL the enterprise version (UUID PKs, tenant_id, JSONB) replaces it.
+    op.execute("DROP TABLE IF EXISTS artifact_versions CASCADE")
     op.create_table(
         "artifact_versions",
         # Identity
