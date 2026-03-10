@@ -28,6 +28,7 @@ import logging
 from typing import Sequence, Union
 
 from alembic import op
+from skillmeat.cache.migrations.dialect_helpers import is_sqlite
 
 # revision identifiers, used by Alembic.
 revision: str = "20260124_1200_add_fts5_catalog_search"
@@ -51,6 +52,13 @@ def upgrade() -> None:
     not available, the migration logs a warning and continues. The search
     functionality will fall back to LIKE-based queries.
     """
+    if not is_sqlite():
+        logger.info(
+            "Non-SQLite dialect detected — skipping FTS5 catalog_fts creation "
+            "(FTS5 is SQLite-only)"
+        )
+        return
+
     try:
         # Create FTS5 virtual table with external content mode
         # Using external content table to avoid data duplication
@@ -185,6 +193,13 @@ def downgrade() -> None:
     Drops triggers first to avoid any issues with the virtual table removal.
     The FTS index data is automatically removed when the virtual table is dropped.
     """
+    if not is_sqlite():
+        logger.info(
+            "Non-SQLite dialect detected — skipping FTS5 catalog_fts teardown "
+            "(FTS5 is SQLite-only)"
+        )
+        return
+
     # Drop triggers first (order matters - triggers reference the table)
     op.execute("DROP TRIGGER IF EXISTS catalog_fts_au")
     op.execute("DROP TRIGGER IF EXISTS catalog_fts_ad")

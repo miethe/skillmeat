@@ -14,8 +14,13 @@ from .error_handlers import (
     validate_artifact_request,
 )
 from .fts5 import (
+    SearchBackendType,
     check_fts5_available,
+    detect_and_cache_backend,
+    detect_search_backend,
+    get_search_backend,
     is_fts5_available,
+    is_tsvector_available,
     reset_fts5_check,
 )
 from .github_cache import (
@@ -48,7 +53,13 @@ __all__ = [
     "create_rate_limit_error",
     "create_validation_error",
     "validate_artifact_request",
-    # FTS5 detection
+    # Search backend detection (dialect-aware)
+    "SearchBackendType",
+    "detect_search_backend",
+    "detect_and_cache_backend",
+    "get_search_backend",
+    "is_tsvector_available",
+    # FTS5 detection (backward-compatible helpers)
     "check_fts5_available",
     "is_fts5_available",
     "reset_fts5_check",

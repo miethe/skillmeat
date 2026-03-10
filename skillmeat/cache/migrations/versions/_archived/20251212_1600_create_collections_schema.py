@@ -29,6 +29,10 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from skillmeat.cache.migrations.dialect_helpers import (
+    create_updated_at_trigger,
+    drop_updated_at_trigger,
+)
 
 # revision identifiers, used by Alembic.
 revision: str = "20251212_1600_create_collections_schema"
@@ -243,29 +247,8 @@ def upgrade() -> None:
     # Triggers for automatic updated_at maintenance
     # ==========================================================================
 
-    # Collections updated_at trigger
-    op.execute(
-        """
-        CREATE TRIGGER collections_updated_at
-        AFTER UPDATE ON collections
-        FOR EACH ROW
-        BEGIN
-            UPDATE collections SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-        END;
-        """
-    )
-
-    # Groups updated_at trigger
-    op.execute(
-        """
-        CREATE TRIGGER groups_updated_at
-        AFTER UPDATE ON groups
-        FOR EACH ROW
-        BEGIN
-            UPDATE groups SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-        END;
-        """
-    )
+    create_updated_at_trigger("collections")
+    create_updated_at_trigger("groups")
 
     # ==========================================================================
     # Update schema version
@@ -292,9 +275,9 @@ def downgrade() -> None:
     WARNING: This is a destructive operation. All collection and group
     data will be permanently lost.
     """
-    # Drop triggers first (SQLite requires explicit trigger drops)
-    op.execute("DROP TRIGGER IF EXISTS collections_updated_at")
-    op.execute("DROP TRIGGER IF EXISTS groups_updated_at")
+    # Drop triggers first
+    drop_updated_at_trigger("collections")
+    drop_updated_at_trigger("groups")
 
     # Drop tables in reverse dependency order
     # Note: Indexes are automatically dropped when tables are dropped

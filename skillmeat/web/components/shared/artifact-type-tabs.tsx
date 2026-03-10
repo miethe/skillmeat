@@ -42,7 +42,7 @@ export function ArtifactTypeTabs({
         value={value}
         onValueChange={(next) => onChange(next as ArtifactTypeTabValue)}
       >
-        <TabsList className="grid w-full grid-cols-7 h-8">
+        <TabsList className="grid w-full grid-cols-8 h-8">
           <TabsTrigger value="all" className="flex items-center gap-1 px-2 py-1 text-xs">
             <LucideIcons.LayoutGrid className="h-3.5 w-3.5 shrink-0" />
             <span className="hidden sm:inline truncate">{`All${renderCount('all')}`}</span>

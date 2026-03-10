@@ -28,6 +28,10 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from skillmeat.cache.migrations.dialect_helpers import (
+    create_updated_at_trigger,
+    drop_updated_at_trigger,
+)
 
 # revision identifiers, used by Alembic.
 revision: str = "20251215_1200_add_project_templates"
@@ -163,17 +167,7 @@ def upgrade() -> None:
     # Triggers for automatic updated_at maintenance
     # ==========================================================================
 
-    # Project templates updated_at trigger
-    op.execute(
-        """
-        CREATE TRIGGER project_templates_updated_at
-        AFTER UPDATE ON project_templates
-        FOR EACH ROW
-        BEGIN
-            UPDATE project_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-        END;
-        """
-    )
+    create_updated_at_trigger("project_templates")
 
     # ==========================================================================
     # Update schema version
@@ -198,8 +192,8 @@ def downgrade() -> None:
     WARNING: This is a destructive operation. All project template
     data will be permanently lost.
     """
-    # Drop trigger first (SQLite requires explicit trigger drops)
-    op.execute("DROP TRIGGER IF EXISTS project_templates_updated_at")
+    # Drop trigger first
+    drop_updated_at_trigger("project_templates")
 
     # Drop tables in reverse dependency order
     # Note: Indexes are automatically dropped when tables are dropped

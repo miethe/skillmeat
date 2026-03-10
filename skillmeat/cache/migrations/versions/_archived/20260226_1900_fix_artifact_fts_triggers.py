@@ -38,6 +38,7 @@ import logging
 from typing import Sequence, Union
 
 from alembic import op
+from skillmeat.cache.migrations.dialect_helpers import is_sqlite
 
 # revision identifiers, used by Alembic.
 revision: str = "20260226_1900_fix_artifact_fts_triggers"
@@ -120,6 +121,12 @@ def _create_triggers() -> None:
 
 
 def upgrade() -> None:
+    if not is_sqlite():
+        logger.info(
+            "Non-SQLite dialect detected — skipping artifact_fts trigger fix "
+            "(FTS5 triggers are SQLite-only)"
+        )
+        return
     logger.info(
         "SSO fix: dropping and recreating artifact_fts triggers "
         "(replace a.title with NULL)"
@@ -130,6 +137,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if not is_sqlite():
+        logger.info(
+            "Non-SQLite dialect detected — skipping artifact_fts trigger downgrade "
+            "(FTS5 triggers are SQLite-only)"
+        )
+        return
     # Intentionally recreate the correct (NULL) triggers on downgrade.
     # Restoring the buggy a.title variant would cause immediate runtime errors.
     logger.info(

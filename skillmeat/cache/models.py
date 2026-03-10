@@ -84,6 +84,15 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
+# TSVECTOR is a pure type definition in SQLAlchemy — always importable regardless
+# of which DB driver (psycopg2/asyncpg) is installed.
+try:
+    from sqlalchemy.dialects.postgresql import TSVECTOR as _TSVECTOR
+
+    _pg_tsvector_type = _TSVECTOR()
+except ImportError:  # pragma: no cover — only on very old SQLAlchemy builds
+    _pg_tsvector_type = None  # type: ignore[assignment]
+
 
 # =============================================================================
 # Constants
@@ -2113,6 +2122,19 @@ class MarketplaceCatalogEntry(Base):
         Text,
         nullable=True,
         comment="JSON array of files included in deep index",
+    )
+
+    # PostgreSQL full-text search vector (PostgreSQL only, managed by DB trigger)
+    # This column is intentionally omitted from __init__, to_dict(), and all insert/update
+    # logic — it is populated exclusively by a PostgreSQL trigger on INSERT/UPDATE.
+    # On SQLite the column type is accepted at model-definition time but the column
+    # will never be created (SQLite migrations skip it); reads return None harmlessly.
+    search_vector: Mapped[Optional[Any]] = mapped_column(
+        _pg_tsvector_type,
+        nullable=True,
+        index=False,
+        deferred=True,
+        comment="Managed by PostgreSQL trigger — do not set manually",
     )
 
     # Additional metadata

@@ -386,7 +386,7 @@ export function mapArtifactToEntity(
   }
 
   // Validate type is a known artifact type
-  const validTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite'];
+  const validTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite', 'workflow'];
   if (!validTypes.includes(artifact.type as ArtifactType)) {
     throw new Error(`Entity mapping error: unknown type "${artifact.type}"`);
   }

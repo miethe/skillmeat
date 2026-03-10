@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### PostgreSQL Full-Text Search Backend (2026-03-10)
+
+- `TSVector` column added to `MarketplaceCatalogEntry` model for native PG full-text search
+- New Alembic migration `20260310_0001_add_pg_fulltext_search.py` with tsvector column, GIN index, and trigger-based auto-update
+- Dialect-aware backend detection: automatically selects tsvector (PostgreSQL) or FTS5 (SQLite) at startup
+- `repositories.py` updated with `search_catalog_pg()` using `to_tsquery` / `plainto_tsquery` for ranked results
+- `/api/v1/marketplace/catalog/search` endpoint wired to PG backend when available
+- 4 new test modules: unit (`test_tsvector_search.py`), integration (`test_pg_search_integration.py`), migrations (`test_pg_migrations.py`), and FTS5 regression (`test_fts5_regression.py`) — 2000+ lines of coverage
+
+#### Migration Consolidation & Dialect Compatibility (2026-03-10)
+
+- 65 incremental Alembic migrations squashed into a single `001_consolidated_schema.py` for clean-slate installs
+- Original migrations archived to `versions/_archived/` (preserved for upgrade path reference)
+- New `dialect_helpers.py` utility module providing `is_sqlite()`, `is_postgresql()`, and conditional DDL helpers
+- All existing migrations retrofitted with SQLite/PostgreSQL dialect guards to prevent cross-engine errors
+- `marketplace_sources` table added to initial schema (was previously missing from base migration)
+- `20260226_1900_fix_artifact_fts_triggers.py` and `20260124_1200/1400_add_fts5_catalog_search.py` updated with dialect-safe trigger/virtual-table creation
+
+#### SkillBOM & Attestation System (Planning) (2026-03-10)
+
+- PRD and 11-phase implementation plan for the SkillBOM & Attestation System feature
+- Covers artifact bill-of-materials generation, cryptographic signing, SBOM export (CycloneDX/SPDX), Git provenance, RBAC-gated attestation APIs, CLI commands, and web UI
+- Progress tracking scaffolds for all 11 phases
+
+### Fixed
+
+#### Frontend Fixes (2026-03-10)
+
+- Added `workflow` to the frontend artifact type union (`skillmeat/web/types/artifact.ts`) to match backend enum
+- Resolved CSS parse error caused by malformed `font-family` values in `tailwind.config.js`
+- Updated `entity-mapper.ts` to handle new `workflow` artifact type in type mapping
+
 #### Authentication, Authorization & Accounting (AAA) with RBAC Foundation (2026-03-07)
 
 **Phase 1: Database Layer**
