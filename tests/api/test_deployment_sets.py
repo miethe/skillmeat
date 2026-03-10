@@ -88,6 +88,7 @@ def _make_member_orm(
     artifact_uuid="artifact-uuid-abc",
     group_id=None,
     member_set_id=None,
+    workflow_id=None,
     position=0,
     created_at=None,
 ):
@@ -98,6 +99,7 @@ def _make_member_orm(
     m.artifact_uuid = artifact_uuid
     m.group_id = group_id
     m.member_set_id = member_set_id
+    m.workflow_id = workflow_id
     m.position = position
     m.created_at = created_at or datetime(2026, 1, 1, 0, 0, 0)
     return m
@@ -853,3 +855,206 @@ class TestBatchDeploy:
             app.dependency_overrides.pop(get_deployment_set_repository, None)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+# ---------------------------------------------------------------------------
+# MemberCreate schema — mutual exclusivity validation (WAW-P1.4)
+# ---------------------------------------------------------------------------
+
+
+class TestMemberCreateMutualExclusivity:
+    """Tests for MemberCreate Pydantic schema mutual exclusivity validation.
+
+    Verifies that the model_validator enforces exactly-one-of-four for
+    artifact_uuid, group_id, nested_set_id, and workflow_id.
+    """
+
+    def test_only_artifact_uuid_is_valid(self, client):
+        """Providing only artifact_uuid passes schema validation (404 from missing parent)."""
+        response = client.post(
+            "/api/v1/deployment-sets/nonexistent/members",
+            json={"artifact_uuid": "550e8400-e29b-41d4-a716-446655440000"},
+        )
+        # 404 (parent not found) is acceptable — schema validation passed
+        assert response.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_only_group_id_is_valid(self, client):
+        """Providing only group_id passes schema validation."""
+        response = client.post(
+            "/api/v1/deployment-sets/nonexistent/members",
+            json={"group_id": "42"},
+        )
+        assert response.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_only_nested_set_id_is_valid(self, client):
+        """Providing only nested_set_id passes schema validation."""
+        response = client.post(
+            "/api/v1/deployment-sets/nonexistent/members",
+            json={"nested_set_id": "9124ec6b03dd4578a0881a4cde186501"},
+        )
+        assert response.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_only_workflow_id_is_valid(self, client):
+        """Providing only workflow_id passes schema validation."""
+        response = client.post(
+            "/api/v1/deployment-sets/nonexistent/members",
+            json={"workflow_id": "data-pipeline-v1"},
+        )
+        assert response.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_no_ref_fields_returns_422(self, client):
+        """Providing none of the four reference fields fails with 422."""
+        response = client.post(
+            "/api/v1/deployment-sets/any-set/members",
+            json={"position": 1},
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_workflow_id_plus_artifact_uuid_returns_422(self, client):
+        """Providing workflow_id and artifact_uuid together fails with 422."""
+        response = client.post(
+            "/api/v1/deployment-sets/any-set/members",
+            json={
+                "workflow_id": "data-pipeline-v1",
+                "artifact_uuid": "550e8400-e29b-41d4-a716-446655440000",
+            },
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_workflow_id_plus_group_id_returns_422(self, client):
+        """Providing workflow_id and group_id together fails with 422."""
+        response = client.post(
+            "/api/v1/deployment-sets/any-set/members",
+            json={
+                "workflow_id": "data-pipeline-v1",
+                "group_id": "42",
+            },
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_workflow_id_plus_nested_set_id_returns_422(self, client):
+        """Providing workflow_id and nested_set_id together fails with 422."""
+        response = client.post(
+            "/api/v1/deployment-sets/any-set/members",
+            json={
+                "workflow_id": "data-pipeline-v1",
+                "nested_set_id": "9124ec6b03dd4578a0881a4cde186501",
+            },
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_all_four_refs_returns_422(self, client):
+        """Providing all four reference fields fails with 422."""
+        response = client.post(
+            "/api/v1/deployment-sets/any-set/members",
+            json={
+                "artifact_uuid": "550e8400-e29b-41d4-a716-446655440000",
+                "group_id": "42",
+                "nested_set_id": "9124ec6b03dd4578a0881a4cde186501",
+                "workflow_id": "data-pipeline-v1",
+            },
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_error_message_lists_conflicting_fields(self, client):
+        """Error detail names the conflicting fields when multiple refs are provided."""
+        response = client.post(
+            "/api/v1/deployment-sets/any-set/members",
+            json={
+                "workflow_id": "data-pipeline-v1",
+                "artifact_uuid": "550e8400-e29b-41d4-a716-446655440000",
+            },
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        # Pydantic wraps the ValueError into a detail list; the message should
+        # mention both conflicting fields.
+        detail_text = str(response.json())
+        assert "workflow_id" in detail_text
+        assert "artifact_uuid" in detail_text
+
+    def test_error_message_when_none_provided(self, client):
+        """Error detail mentions workflow_id among accepted fields when none is provided."""
+        response = client.post(
+            "/api/v1/deployment-sets/any-set/members",
+            json={"position": 0},
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        detail_text = str(response.json())
+        assert "workflow_id" in detail_text
+
+
+# ---------------------------------------------------------------------------
+# workflow_id member — API handler passthrough (WAW-P1.4)
+# ---------------------------------------------------------------------------
+
+
+class TestAddWorkflowMember:
+    """Tests for adding workflow_id members via POST /api/v1/deployment-sets/{set_id}/members."""
+
+    def test_add_workflow_member_success(self, app, client):
+        """Adding a workflow member returns 201 with member_type 'workflow'."""
+        from skillmeat.cache.session import get_db_session
+
+        ds = _make_ds_orm()
+        member = _make_member_orm(
+            artifact_uuid=None,
+            workflow_id="data-pipeline-v1",
+        )
+
+        mock_repo = MagicMock()
+        mock_repo.get.return_value = ds
+        mock_repo.add_member.return_value = member
+
+        mock_session = MagicMock()
+
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
+            response = client.post(
+                "/api/v1/deployment-sets/set-uuid-001/members",
+                json={"workflow_id": "data-pipeline-v1", "position": 0},
+            )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["member_type"] == "workflow"
+        assert data["workflow_id"] == "data-pipeline-v1"
+        # repo.add_member was called with workflow_id passed through
+        mock_repo.add_member.assert_called_once()
+        call_kwargs = mock_repo.add_member.call_args[1]
+        assert call_kwargs.get("workflow_id") == "data-pipeline-v1"
+        assert call_kwargs.get("artifact_uuid") is None
+
+    def test_workflow_member_response_includes_workflow_id_field(self, app, client):
+        """MemberResponse always includes workflow_id field (None when not a workflow)."""
+        from skillmeat.cache.session import get_db_session
+
+        ds = _make_ds_orm()
+        artifact_member = _make_member_orm(artifact_uuid="some-uuid")
+
+        mock_repo = MagicMock()
+        mock_repo.get.return_value = ds
+        mock_repo.add_member.return_value = artifact_member
+
+        mock_session = MagicMock()
+
+        app.dependency_overrides[get_deployment_set_repository] = lambda: mock_repo
+        app.dependency_overrides[get_db_session] = lambda: mock_session
+        try:
+            response = client.post(
+                "/api/v1/deployment-sets/set-uuid-001/members",
+                json={"artifact_uuid": "some-uuid"},
+            )
+        finally:
+            app.dependency_overrides.pop(get_deployment_set_repository, None)
+            app.dependency_overrides.pop(get_db_session, None)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        # workflow_id key must always be present in the response
+        assert "workflow_id" in data
+        assert data["workflow_id"] is None
+        assert data["member_type"] == "artifact"

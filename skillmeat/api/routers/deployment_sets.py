@@ -94,6 +94,8 @@ def _member_type(member: DeploymentSetMember) -> str:
         return "artifact"
     if member.group_id is not None:
         return "group"
+    if member.workflow_id is not None:
+        return "workflow"
     return "set"
 
 
@@ -105,6 +107,7 @@ def _member_to_response(member: DeploymentSetMember) -> MemberResponse:
         artifact_uuid=member.artifact_uuid,
         group_id=member.group_id,
         nested_set_id=member.member_set_id,
+        workflow_id=member.workflow_id,
         member_type=_member_type(member),
         position=member.position,
         added_at=member.created_at,
@@ -402,6 +405,7 @@ def clone_deployment_set(
                 artifact_uuid=member.artifact_uuid,
                 group_id=member.group_id,
                 member_set_id=member.member_set_id,
+                workflow_id=member.workflow_id,
                 position=member.position,
             )
     except RepositoryError as exc:
@@ -531,12 +535,13 @@ def add_member(
                     detail="This would create a circular reference",
                 ) from exc
         else:
-            # Artifact or group members — no cycle risk
+            # Artifact, group, or workflow members — no cycle risk
             member = repo.add_member(
                 set_id,
                 owner_id,
                 artifact_uuid=request.artifact_uuid,
                 group_id=request.group_id,
+                workflow_id=request.workflow_id,
                 position=request.position,
             )
     except (RepositoryError, ValueError) as exc:
