@@ -241,20 +241,18 @@ def upgrade() -> None:
         ["tenant_id", "created_at"],
     )
 
-    # GIN index on tags — created with CONCURRENTLY via raw SQL to avoid
-    # a full table lock during deployment.  CONCURRENTLY requires that the
-    # statement runs outside an explicit transaction block; Alembic's
-    # op.execute() satisfies this when autocommit is in effect for the
-    # connection.  See ENT-1.7 migration guidance in the schema doc.
+    # GIN index on tags and partial B-tree on source_url — no CONCURRENTLY
+    # because the table is empty at migration time and CONCURRENTLY cannot
+    # run inside a transaction block.
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS "
+        "CREATE INDEX IF NOT EXISTS "
         "idx_enterprise_artifacts_tags_gin "
         "ON enterprise_artifacts USING GIN (tags jsonb_path_ops)"
     )
 
     # Partial B-tree: source_url lookup for upstream sync (NOT NULL rows only)
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS "
+        "CREATE INDEX IF NOT EXISTS "
         "idx_enterprise_artifacts_source_url "
         "ON enterprise_artifacts (source_url) "
         "WHERE source_url IS NOT NULL"
@@ -498,9 +496,10 @@ def upgrade() -> None:
     )
 
     # Partial B-tree: upstream sync check "have we already ingested this commit?"
-    # CONCURRENTLY keeps the table available during index build.
+    # No CONCURRENTLY — table is empty during initial migration and CONCURRENTLY
+    # cannot run inside a transaction block.
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS "
+        "CREATE INDEX IF NOT EXISTS "
         "idx_artifact_versions_commit_sha "
         "ON artifact_versions (commit_sha) "
         "WHERE commit_sha IS NOT NULL"
