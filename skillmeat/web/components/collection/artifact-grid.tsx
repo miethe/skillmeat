@@ -37,6 +37,8 @@ interface ArtifactGridProps {
   onGroupClick?: (groupId: string) => void;
   /** Handler for navigating to the Manage page for this artifact */
   onManage?: (artifact: Artifact) => void;
+  /** Handler for navigating to the Workflow detail page (workflow artifacts only) */
+  onViewWorkflow?: (workflowId: string) => void;
   /** Set of selected artifact IDs for bulk operations */
   selectedArtifactIds?: Set<string>;
   /** Called when user toggles artifact selection */
@@ -69,6 +71,7 @@ export function ArtifactGrid({
   onTagClick,
   onGroupClick,
   onManage,
+  onViewWorkflow,
   selectedArtifactIds,
   onToggleArtifactSelect,
 }: ArtifactGridProps) {
@@ -126,6 +129,7 @@ export function ArtifactGrid({
             onTagClick={onTagClick}
             onGroupClick={onGroupClick}
             onManage={onManage}
+            onViewWorkflow={onViewWorkflow}
             onDelete={onDelete ? () => onDelete(artifact) : undefined}
             isSelected={selectedArtifactIds?.has(artifact.id) ?? false}
             onToggleSelect={onToggleArtifactSelect}

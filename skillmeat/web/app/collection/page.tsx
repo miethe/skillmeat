@@ -978,6 +978,11 @@ function CollectionPageContent() {
   // ==========================================================================
 
   const handleArtifactClick = (artifact: Artifact) => {
+    // Workflow artifacts with a workflow_id navigate directly to the workflow detail page
+    if (artifact.type === 'workflow' && artifact.workflow_id) {
+      router.push(`/workflows/${artifact.workflow_id}`);
+      return;
+    }
     setSelectedArtifact(artifact);
     setIsDetailOpen(true);
     // Update URL with artifact ID (and clear tab to start at default)
@@ -1263,6 +1268,9 @@ function CollectionPageContent() {
                 onManage={(artifact) => {
                   router.push(`/manage?artifact=${encodeURIComponent(artifact.id)}`);
                 }}
+                onViewWorkflow={(workflowId) => {
+                  router.push(`/workflows/${workflowId}`);
+                }}
                 selectedArtifactIds={selectedArtifactIds}
                 onToggleArtifactSelect={handleToggleArtifactSelect}
               />
@@ -1303,6 +1311,9 @@ function CollectionPageContent() {
                 onGroupClick={handleGroupClick}
                 onManage={(artifact) => {
                   router.push(`/manage?artifact=${encodeURIComponent(artifact.id)}`);
+                }}
+                onViewWorkflow={(workflowId) => {
+                  router.push(`/workflows/${workflowId}`);
                 }}
                 selectedArtifactIds={selectedArtifactIds}
                 onToggleArtifactSelect={handleToggleArtifactSelect}
