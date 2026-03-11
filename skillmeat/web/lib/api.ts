@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
