@@ -71,6 +71,7 @@ from sqlalchemy import (
     LargeBinary,
     String,
     Text,
+    TypeDecorator,
     UniqueConstraint,
     create_engine,
     event,
@@ -84,14 +85,27 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
-# TSVECTOR is a pure type definition in SQLAlchemy — always importable regardless
-# of which DB driver (psycopg2/asyncpg) is installed.
-try:
-    from sqlalchemy.dialects.postgresql import TSVECTOR as _TSVECTOR
+class TSVectorType(TypeDecorator):
+    """Dialect-adaptive TSVECTOR type.
 
-    _pg_tsvector_type = _TSVECTOR()
-except ImportError:  # pragma: no cover — only on very old SQLAlchemy builds
-    _pg_tsvector_type = None  # type: ignore[assignment]
+    On PostgreSQL: uses native TSVECTOR for full-text search.
+    On SQLite: uses Text (column never populated, but prevents compilation errors).
+
+    This allows the same model definition to work with both dialects without
+    conditional column definitions or model modifications.
+    """
+
+    impl = Text  # Default/fallback implementation
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import TSVECTOR
+
+            return dialect.type_descriptor(TSVECTOR())
+        else:
+            # SQLite and other dialects: use Text as a no-op placeholder
+            return dialect.type_descriptor(Text())
 
 
 # =============================================================================
@@ -2124,13 +2138,13 @@ class MarketplaceCatalogEntry(Base):
         comment="JSON array of files included in deep index",
     )
 
-    # PostgreSQL full-text search vector (PostgreSQL only, managed by DB trigger)
+    # PostgreSQL full-text search vector (managed by DB trigger on PostgreSQL)
+    # Uses dialect-adaptive TSVectorType: native TSVECTOR on PostgreSQL, Text on SQLite.
+    # On SQLite the column exists in the model but is never populated or queried.
     # This column is intentionally omitted from __init__, to_dict(), and all insert/update
     # logic — it is populated exclusively by a PostgreSQL trigger on INSERT/UPDATE.
-    # On SQLite the column type is accepted at model-definition time but the column
-    # will never be created (SQLite migrations skip it); reads return None harmlessly.
     search_vector: Mapped[Optional[Any]] = mapped_column(
-        _pg_tsvector_type,
+        TSVectorType(),
         nullable=True,
         index=False,
         deferred=True,
