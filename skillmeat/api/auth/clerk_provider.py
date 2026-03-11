@@ -219,7 +219,7 @@ class ClerkAuthProvider(AuthProvider):
         # at startup rather than at the first authenticated request.
         self._jwks_client = jwt.PyJWKClient(
             self._jwks_url,
-            lifespan_in_seconds=self._lifespan_in_seconds,
+            lifespan=self._lifespan_in_seconds,
         )
 
         logger.info(
