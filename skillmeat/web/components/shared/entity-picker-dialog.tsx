@@ -52,8 +52,15 @@ export interface EntityPickerTab<T> {
   /** Lucide-compatible icon component shown beside the label */
   icon: React.ComponentType<{ className?: string }>;
   /**
-   * Hook factory called with the current search + type filter.
-   * Must return an `InfiniteDataResult<T>`.
+   * React hook that returns paginated data for this tab.
+   *
+   * **Important**: This is called as a hook by TabContent — it MUST follow
+   * the Rules of Hooks (called unconditionally at the top of a render function).
+   * Do not call this inside conditionals, loops, or callbacks.
+   *
+   * ESLint cannot detect this as a hook via static analysis because it is stored
+   * as an interface field. Callers and implementors are responsible for ensuring
+   * compliance with the Rules of Hooks.
    */
   useData: (params: { search: string; typeFilter?: string[] }) => InfiniteDataResult<T>;
   /**
