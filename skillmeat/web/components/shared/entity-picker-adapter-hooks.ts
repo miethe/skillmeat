@@ -15,22 +15,7 @@ import { useContextModules } from '@/hooks';
 import { mapApiResponseToArtifact } from '@/lib/api/mappers';
 import type { Artifact } from '@/types/artifact';
 import type { ContextModuleResponse } from '@/sdk/models/ContextModuleResponse';
-
-// ============================================================================
-// SHARED RESULT SHAPE
-// ============================================================================
-
-/**
- * Uniform result interface returned by all entity picker adapter hooks.
- * Matches the data contract expected by EntityPickerDialog.
- */
-export interface InfiniteDataResult<T> {
-  items: T[];
-  isLoading: boolean;
-  hasNextPage: boolean;
-  fetchNextPage: () => void;
-  isFetchingNextPage: boolean;
-}
+import type { InfiniteDataResult } from './entity-picker-dialog';
 
 // ============================================================================
 // UEPD-1.3: Artifact Adapter
