@@ -73,7 +73,7 @@ import uuid
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict, Generator, Generic, List, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Dict, Generator, Generic, List, Optional, Tuple, Type, TypeVar
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -977,6 +977,59 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
 
         return list(self.session.execute(stmt).scalars().all())
+
+    def batch_resolve_uuids(
+        self,
+        artifacts: List[Tuple[str, str]],
+        ctx: Optional["RequestContext"] = None,
+        auth_context: Optional["AuthContext"] = None,
+    ) -> Dict[Tuple[str, str], str]:
+        """Batch-resolve UUIDs for multiple (artifact_type, name) pairs.
+
+        Executes a single query with OR conditions for all pairs, applying
+        tenant scoping per EnterpriseRepositoryBase conventions.
+
+        Parameters
+        ----------
+        artifacts:
+            List of (artifact_type, name) tuples to resolve.
+        ctx:
+            Optional per-request metadata (unused in enterprise repo).
+        auth_context:
+            Optional authentication context for tenant scoping.
+
+        Returns
+        -------
+        dict
+            Mapping from (artifact_type, name) tuple to 32-char hex UUID string.
+            Pairs that cannot be resolved are omitted.
+        """
+        from sqlalchemy import and_, or_
+
+        from skillmeat.cache.models_enterprise import EnterpriseArtifact
+
+        if not artifacts:
+            return {}
+
+        self._apply_auth_context(auth_context)
+
+        # Build OR conditions for each (type, name) pair
+        conditions = [
+            and_(
+                EnterpriseArtifact.artifact_type == atype,
+                EnterpriseArtifact.name == name,
+            )
+            for atype, name in artifacts
+        ]
+
+        stmt = self._tenant_select().where(or_(*conditions))
+        rows = self.session.execute(stmt).scalars().all()
+
+        # Map results back to (type, name) tuple keys
+        return {
+            (row.artifact_type, row.name): row.id.hex
+            for row in rows
+        }
 
     # ------------------------------------------------------------------
     # ENT-2.6: Version history retrieval
