@@ -206,38 +206,68 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         from skillmeat.api.utils.fts5 import detect_and_cache_backend
         from skillmeat.cache.models import get_session
-        from skillmeat.cache.repositories import DbUserCollectionRepository
 
-        session = get_session()
-        try:
-            ensure_default_collection(DbUserCollectionRepository())
-            logger.info("Default collection verified/created")
+        edition = settings.edition if settings else "local"
 
-            # Detect search backend (FTS5 / tsvector / LIKE) at startup
-            detected = detect_and_cache_backend(session)
-            logger.info("Search backend: %s", detected.value)
+        if edition == "enterprise":
+            # Enterprise: bootstrap default collection in PostgreSQL via the
+            # same engine/session factory used by request-time DI.
+            from skillmeat.cache.models import get_engine
+            from skillmeat.cache.enterprise_repositories import (
+                EnterpriseCollectionRepository,
+            )
+            from sqlalchemy.orm import Session as SASession
 
-            # Migrate existing artifacts to default collection
-            if app_state.artifact_manager and app_state.collection_manager:
-                result = migrate_artifacts_to_default_collection(
-                    session=session,
-                    artifact_mgr=app_state.artifact_manager,
-                    collection_mgr=app_state.collection_manager,
-                )
-                logger.info(
-                    f"Artifact migration: {result['migrated_count']} migrated, "
-                    f"{result['already_present_count']} already present, "
-                    f"{result['total_artifacts']} total"
-                )
-                # Log metadata cache stats if available
-                if "metadata_cache" in result:
-                    cache_stats = result["metadata_cache"]
-                    if cache_stats.get("errors"):
-                        logger.warning(
-                            f"Metadata cache errors: {len(cache_stats['errors'])} artifacts failed"
-                        )
-        finally:
-            session.close()
+            ent_engine = get_engine()
+            with SASession(ent_engine) as ent_session:
+                ent_repo = EnterpriseCollectionRepository(session=ent_session)
+                existing = ent_repo.get_by_name("default")
+                if existing is None:
+                    ent_repo.create(
+                        name="default",
+                        description="Default collection",
+                    )
+                    ent_session.commit()
+                    logger.info(
+                        "Default collection created (enterprise)"
+                    )
+                else:
+                    logger.info(
+                        "Default collection verified (enterprise)"
+                    )
+        else:
+            from skillmeat.cache.repositories import DbUserCollectionRepository
+
+            session = get_session()
+            try:
+                ensure_default_collection(DbUserCollectionRepository())
+                logger.info("Default collection verified/created")
+
+                # Detect search backend (FTS5 / tsvector / LIKE) at startup
+                detected = detect_and_cache_backend(session)
+                logger.info("Search backend: %s", detected.value)
+
+                # Migrate existing artifacts to default collection
+                if app_state.artifact_manager and app_state.collection_manager:
+                    result = migrate_artifacts_to_default_collection(
+                        session=session,
+                        artifact_mgr=app_state.artifact_manager,
+                        collection_mgr=app_state.collection_manager,
+                    )
+                    logger.info(
+                        f"Artifact migration: {result['migrated_count']} migrated, "
+                        f"{result['already_present_count']} already present, "
+                        f"{result['total_artifacts']} total"
+                    )
+                    # Log metadata cache stats if available
+                    if "metadata_cache" in result:
+                        cache_stats = result["metadata_cache"]
+                        if cache_stats.get("errors"):
+                            logger.warning(
+                                f"Metadata cache errors: {len(cache_stats['errors'])} artifacts failed"
+                            )
+            finally:
+                session.close()
     except Exception as e:
         logger.warning(f"Could not ensure default collection or migrate artifacts: {e}")
 
