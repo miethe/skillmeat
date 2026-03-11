@@ -93,7 +93,7 @@ class AppState:
         self.config_manager = ConfigManager()
         self.collection_manager = CollectionManager(config=self.config_manager)
         self.artifact_manager = ArtifactManager(collection_mgr=self.collection_manager)
-        self.token_manager = TokenManager()
+        self.token_manager = TokenManager() if settings.auth_enabled else None
         self.sync_manager = SyncManager(
             collection_manager=self.collection_manager,
             artifact_manager=self.artifact_manager,
