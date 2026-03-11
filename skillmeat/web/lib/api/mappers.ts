@@ -114,6 +114,9 @@ export interface ArtifactResponse {
   // Composite sub-type (only present when type === 'composite')
   composite_type?: 'plugin' | 'stack' | 'suite';
 
+  // Workflow-specific fields (only present when type === 'workflow')
+  workflow_id?: string;
+
   // Metadata (nested or flattened)
   metadata?: ApiMetadata;
   description?: string;
@@ -286,7 +289,7 @@ export function mapApiResponseToArtifact(
   }
 
   // Validate type is a known artifact type
-  const validTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite'];
+  const validTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite', 'workflow'];
   if (!validTypes.includes(response.type as ArtifactType)) {
     throw new Error(`Artifact mapping error: unknown type "${response.type}"`);
   }
@@ -431,6 +434,9 @@ export function mapApiResponseToArtifact(
     ...((response.modifiedAt || response.modified_at) && {
       modifiedAt: response.modifiedAt || response.modified_at,
     }),
+
+    // Workflow-specific fields
+    ...(response.workflow_id && { workflow_id: response.workflow_id }),
   };
 
   return artifact;

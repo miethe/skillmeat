@@ -331,6 +331,17 @@ export interface Artifact {
 
   /** ISO 8601 timestamp of last local modification (former Entity field) */
   modifiedAt?: string;
+
+  // ============================================================================
+  // Workflow-Specific Fields
+  // ============================================================================
+
+  /**
+   * UUID of the originating workflow definition.
+   * Only present when type === 'workflow'. References the workflow in the
+   * workflows table that this artifact was synced from.
+   */
+  workflow_id?: string;
 }
 
 // ============================================================================
