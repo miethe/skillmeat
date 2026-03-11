@@ -2,7 +2,7 @@
 title: 'PRD: Workflow-Artifact Collection Wiring'
 schema_version: 2
 doc_type: prd
-status: draft
+status: completed
 created: '2026-03-10'
 updated: '2026-03-10'
 feature_slug: workflow-artifact-wiring

@@ -4,7 +4,7 @@ doc_type: implementation_plan
 title: "SkillBOM & Attestation System - Implementation Plan"
 description: >
   Comprehensive phased implementation plan for cryptographic tracking and provenance of AI artifacts,
-  with full lifecycle history, RBAC-scoped attestation metadata, and multi-surface viewing.
+  with separate artifact activity history, RBAC-scoped attestation metadata, and multi-surface viewing.
 audience:
   - ai-agents
   - developers
@@ -46,16 +46,16 @@ related_documents:
 
 ## Executive Summary
 
-This implementation plan breaks down the SkillBOM & Attestation System (from PRD: `skillbom-attestation-v1.md`) into 11 phased workstreams with explicit subagent assignments. The system introduces cryptographic bill-of-materials tracking for all 13+ AI artifact types, with full lifecycle history, owner-scoped attestation metadata, and multi-surface viewing (CLI, API, web app, Backstage plugin).
+This implementation plan breaks down the SkillBOM & Attestation System (from PRD: `skillbom-attestation-v1.md`) into 11 phased workstreams with explicit subagent assignments. The system introduces cryptographic bill-of-materials tracking for all 13+ AI artifact types, with separate artifact activity history, owner-scoped attestation metadata, and multi-surface viewing (CLI, API, web app, Backstage backend integration).
 
 The plan follows MeatyPrompts' layered hexagonal architecture, with clear separation between database models, repositories, services, and API routers. Both local (SQLite + SQLAlchemy 1.x) and enterprise (PostgreSQL + SQLAlchemy 2.x) editions are designed in parallel through the `RepositoryFactory` pattern.
 
 **Key Milestones:**
 - **Phase 1-2** (Weeks 1-3): Universal schema and BOM generation foundation
-- **Phase 3-4** (Weeks 4-6): History capture and RBAC metadata integration
+- **Phase 3-4** (Weeks 4-6): Artifact activity capture and RBAC metadata integration
 - **Phase 5-6** (Weeks 7-9): Git integration and cryptographic signing
 - **Phase 7-8** (Weeks 10-12): API layer and CLI commands
-- **Phase 9-10** (Weeks 13-15): Web app and Backstage plugin
+- **Phase 9-10** (Weeks 13-15): Web app and Backstage backend integration
 - **Phase 11** (Week 16): Testing, docs, and deployment
 
 **Critical Dependencies:**
@@ -71,14 +71,14 @@ The plan follows MeatyPrompts' layered hexagonal architecture, with clear separa
 |-------|-------|----------|--------|------------------|-----------------|
 | 1 | Universal Schema & Data Models | 2 wks | 13-15 pts | SQLAlchemy models (6), Pydantic schemas, Alembic migrations | data-layer-expert |
 | 2 | BOM Generation Service | 2 wks | 14-16 pts | BomGenerator service, 13+ type adapters, serializer | python-backend-engineer |
-| 3 | History Capture Layer | 2 wks | 12-14 pts | ArtifactHistoryRepository, event hooks, query service | python-backend-engineer, data-layer-expert |
+| 3 | Artifact Activity History | 2 wks | 12-14 pts | Activity repository, explicit event capture, provenance query service | python-backend-engineer, data-layer-expert |
 | 4 | AAA/RBAC Scoped Metadata | 1 wk | 8-10 pts | AttestationScopeResolver, owner enrichment, policy enforcement | python-backend-engineer |
-| 5 | Git Commit Integration | 1 wk | 8-10 pts | Pre-commit hook installer, commit-linked BOM retrieval, agent tool | python-backend-engineer |
+| 5 | Git Commit Integration | 1 wk | 8-10 pts | Git hook installer, commit-linked BOM retrieval, agent tool | python-backend-engineer |
 | 6 | Cryptographic Signing | 1 wk | 6-8 pts | Ed25519 signing/verification, signature chain validation | python-backend-engineer |
 | 7 | API Layer | 2 wks | 16-18 pts | 8 endpoints, auth middleware, response pagination | python-backend-engineer |
 | 8 | CLI Commands | 2 wks | 12-14 pts | bom/history/attest commands, scaffolder integration | python-backend-engineer |
 | 9 | Web App Integration | 2 wks | 14-16 pts | ProvenanceTab, BomViewer, AttestationBadge, HistoryTimeline, hooks | ui-engineer-enhanced |
-| 10 | Backstage Plugin Integration | 1 wk | 8-10 pts | Extend idp_integration router, entity card data shape, scaffolder actions | python-backend-engineer, ui-engineer-enhanced |
+| 10 | Backstage Backend Integration | 1 wk | 5-7 pts | Extend idp_integration router, payload contract, scaffolder actions | python-backend-engineer |
 | 11 | Testing, Docs, Deployment | 2 wks | 14-16 pts | Unit, integration, migration tests; API docs; CI/CD guides | python-backend-engineer, documentation-writer |
 
 **Total Estimated Effort: 78-90 story points**
@@ -91,10 +91,10 @@ The plan follows MeatyPrompts' layered hexagonal architecture, with clear separa
 ### Architecture Patterns
 
 1. **Hexagonal Repositories**: All BOM data access through `IBomRepository` ABC with local/enterprise implementations via `RepositoryFactory`.
-2. **Fire-and-Forget History Writes**: History event recording must not block API responses; background task captures failures.
-3. **Owner-Scoped Queries**: All attestation/history queries filtered by caller's `AuthContext` — no cross-tenant/cross-owner data leakage.
-4. **Write-Through Pattern**: Mutations sync filesystem first, then call `refresh_single_artifact_cache()` to hydrate DB.
-5. **Idempotent Operations**: BOM generation, verification, and restoration produce identical output given identical input state.
+2. **Dual History Model**: Existing version-lineage history remains intact; new artifact activity history captures audit/provenance events and feeds SkillBOM views.
+3. **Explicit Domain Event Capture**: Activity events are emitted from repository/service boundaries in write-through flows, not inferred from ORM listeners.
+4. **Owner-Scoped Queries**: All attestation/activity queries filtered by resolved `user|team|enterprise` ownership — no cross-tenant/cross-owner data leakage.
+5. **Deterministic BOM Payloads**: BOM content ordering and hashing are deterministic; ephemeral generation metadata is stored separately from signed/hashed payloads.
 
 ### Parallel Work Opportunities
 
@@ -112,11 +112,11 @@ The plan follows MeatyPrompts' layered hexagonal architecture, with clear separa
 
 | Risk | Mitigation |
 |------|-----------|
-| History write blocks mutations | Async background task; fire-and-forget; log failures without blocking |
+| Activity capture misses filesystem-first mutations | Emit events explicitly from repository/service boundaries in deploy/sync/BOM flows; do not rely on ORM listeners |
 | `context.lock` grows too large | Track only active deployed artifacts; configurable artifact limit (50 default) |
 | Enterprise/local schema divergence | Strict type checking; unit tests for both SQLite and PostgreSQL paths |
 | Version skew in restored state | Restore uses content_hash + parent_hash chain; validation before write |
-| Backstage plugin dependency on unstable API | API endpoints locked in Phase 7 with acceptance tests before Phase 10 |
+| Backstage frontend scope leaks into backend module | Restrict Phase 10 to backend/scaffolder work; track frontend EntityPage card as follow-on |
 
 ---
 
@@ -129,9 +129,9 @@ Implementation details for each phase are in the following linked documents:
 - Phase 1: Universal Schema & Data Models
 - Phase 2: BOM Generation Service
 
-### Phases 3-4: History & RBAC
+### Phases 3-4: Activity & RBAC
 **File**: [`phase-3-4-history-rbac.md`](./skillbom-attestation-v1/phase-3-4-history-rbac.md)
-- Phase 3: History Capture Layer
+- Phase 3: Artifact Activity History
 - Phase 4: AAA/RBAC Scoped Metadata
 
 ### Phases 5-6: Git & Crypto
@@ -144,10 +144,10 @@ Implementation details for each phase are in the following linked documents:
 - Phase 7: API Layer
 - Phase 8: CLI Commands
 
-### Phases 9-10: Web & Backstage
+### Phases 9-10: Web & Backstage Backend
 **File**: [`phase-9-10-web-backstage.md`](./skillbom-attestation-v1/phase-9-10-web-backstage.md)
 - Phase 9: Web App Integration
-- Phase 10: Backstage Plugin Integration
+- Phase 10: Backstage Backend Integration
 
 ### Phase 11: Validation & Deployment
 **File**: [`phase-11-validation.md`](./skillbom-attestation-v1/phase-11-validation.md)
@@ -170,20 +170,20 @@ Implementation details for each phase are in the following linked documents:
 - Performance: BOM generation for 50 artifacts completes in < 2s
 
 ### Phase 3 Exit Criteria
-- History events recorded on artifact create/update/delete mutations
+- Activity events recorded on artifact, deployment, sync, BOM, and attestation actions
 - Fire-and-forget write does not block mutation responses (verified with load test)
-- History query service returns paginated results with filters (artifact_id, event_type, time_range, actor_id)
-- Unit tests for history repository CRUD operations pass
+- Activity query service returns paginated results with filters (artifact_id, event_type, time_range, actor_id)
+- Unit tests for activity repository CRUD operations pass
 
 ### Phase 4 Exit Criteria
-- AttestationRecord populated with owner_type/owner_id from AuthContext
-- Owner-scope filtering enforced (user only sees own records; team_admin sees team records)
+- AttestationRecord populated with owner_type/owner_id from resolved ownership context
+- Owner-scope filtering enforced (user/team/enterprise)
 - Enterprise policy fields (required_artifacts, required_scopes) configurable per tenant
 - RBAC tests verify correct access control per owner type
 
 ### Phase 5 Exit Criteria
-- `skillmeat bom install-hook` creates valid pre-commit hook in `.git/hooks/`
-- Hook calls BomGenerator and appends `SkillBOM-Hash` footer to commit message
+- `skillmeat bom install-hook` creates valid Git hook set in `.git/hooks/`
+- Commit-message footer appended via `prepare-commit-msg` or `commit-msg`, with final commit linkage handled post-commit
 - `skillmeat restore --commit <hash>` fetches BOM from target commit and rehydrates `.claude/`
 - `generate_attestation` tool callable from Claude Code agents
 
@@ -212,13 +212,13 @@ Implementation details for each phase are in the following linked documents:
 - BomViewer displays structured context.lock contents
 - HistoryTimeline shows time-ordered events with keyboard navigation
 - WCAG 2.1 AA compliance verified with accessibility audit
-- API hooks (useArtifactHistory, useBomSnapshot, useAttestations) tested
+- API hooks (`useArtifactActivityHistory`, `useBomSnapshot`, `useAttestations`) tested
 
 ### Phase 10 Exit Criteria
 - `/integrations/idp/bom-card/{project_id}` endpoint returns Backstage-renderable payload
-- Backstage EntityPage card displays live BOM data without data duplication
-- Scaffolder plugin actions (skillmeat:attest, skillmeat:bom-generate) integrated
-- E2E test verifies Backstage card load time < 500ms
+- Payload contract documented for future Backstage frontend consumers
+- Scaffolder plugin actions (`skillmeat:attest`, `skillmeat:bom-generate`) integrated
+- Backend tests verify payload shape and scaffolder action behavior
 
 ### Phase 11 Exit Criteria
 - Unit test coverage for all repositories, services, routers >= 80%
@@ -240,26 +240,30 @@ Implementation details for each phase are in the following linked documents:
 - `skillmeat/core/interfaces/repositories.py` — Add `IBomRepository` ABC
 - `skillmeat/core/repositories/local_bom.py` — Local BOM repository (SQLAlchemy 1.x)
 - `skillmeat/cache/enterprise_repositories.py` — Enterprise BOM repository (SQLAlchemy 2.x)
+- `skillmeat/core/interfaces/repositories.py` — Add artifact activity repository interface adjacent to existing history interfaces
 
 ### Core Services (Phases 2-6)
 - `skillmeat/core/bom/generator.py` — BomGenerator class + artifact adapters
-- `skillmeat/core/bom/history.py` — ArtifactHistoryService
+- `skillmeat/core/bom/history.py` — Artifact activity capture and provenance selection service
 - `skillmeat/core/bom/signing.py` — Ed25519 signing/verification
 - `skillmeat/core/bom/scope.py` — AttestationScopeResolver
 
 ### API Layer (Phases 7-10)
 - `skillmeat/api/schemas/bom.py` — Pydantic schemas (BomSchema, AttestationSchema, etc.)
 - `skillmeat/api/routers/bom.py` — BOM API endpoints (8 routes)
+- `skillmeat/api/routers/artifact_activity.py` or equivalent — Activity-history API surface
 - `skillmeat/api/routers/idp_integration.py` — Extended with `/integrations/idp/bom-card` endpoint
 
 ### CLI (Phase 8)
-- `skillmeat/cli.py` — New command groups: `bom`, `history`, `attest`
+- `skillmeat/cli/__init__.py` — Register new command groups: `bom`, `history`, `attest`
+- `skillmeat/cli/commands/` — New BOM/attestation command modules if the CLI split continues
 
 ### Web (Phase 9)
 - `skillmeat/web/components/provenance/provenance-tab.tsx` — Artifact detail provenance tab
 - `skillmeat/web/components/bom/bom-viewer.tsx` — context.lock viewer
 - `skillmeat/web/components/bom/history-timeline.tsx` — Event timeline
-- `skillmeat/web/hooks/useBom.ts` — API hooks (useArtifactHistory, useBomSnapshot, useAttestations)
+- `skillmeat/web/hooks/useArtifactActivityHistory.ts` — Provenance/activity history hook
+- `skillmeat/web/hooks/useBomSnapshot.ts` / `useAttestations.ts` — BOM and attestation data hooks
 
 ### Tests (Phase 11)
 - `skillmeat/cache/tests/test_bom_models.py` — Model tests
@@ -286,7 +290,7 @@ Implementation details for each phase are in the following linked documents:
 - Security engineer can audit AI-authored commits with cryptographic provenance (FR-01–FR-07)
 - Team admin views team-scoped attestation records (FR-05–FR-06)
 - Developer uses time-travel restore for debugging (FR-08)
-- Backstage user sees live BOM card without leaving IDP (FR-12)
+- Backstage user receives BOM payload and scaffolder actions through the existing IDP backend integration (FR-12)
 
 ---
 
@@ -317,18 +321,18 @@ All BOM data access goes through `IBomRepository` ABC with local/enterprise impl
 
 **Reference**: `.claude/context/key-context/repository-architecture.md`
 
-### 2. Fire-and-Forget History Writes
-History event recording is asynchronous (background task) to prevent blocking mutations. Failures are logged but do not propagate to the caller.
+### 2. Artifact Activity History
+Artifact activity history is a separate audit/provenance stream from the existing version-lineage history. Events are recorded asynchronously where possible, but emitted explicitly from service/repository boundaries so filesystem-first flows are not missed.
 
-**Rationale**: History is audit trail (important but non-blocking); mutations must remain fast.
+**Rationale**: Version lineage and provenance/audit history solve different problems and should not be conflated in either storage or UI.
 
 ### 3. Owner-Scoped Queries
-All attestation/history queries are filtered by caller's `AuthContext` — team members cannot see other teams' records.
+All attestation/activity queries are filtered by resolved `user|team|enterprise` ownership — team members cannot see other teams' records, and enterprise-owned records follow tenant admin policy.
 
 **Reference**: `.claude/context/key-context/auth-architecture.md`
 
 ### 4. Edition-Based Schema
-`AttestationPolicy` model is enterprise-only (PostgreSQL + SQLAlchemy 2.x). Local edition uses simplified `AttestationRecord` without policy fields.
+`AttestationPolicy` model is enterprise-only (PostgreSQL + SQLAlchemy 2.x). `OwnerType.enterprise` is part of this feature track and must be represented consistently in local and enterprise code paths.
 
 **Rationale**: Keeps local edition lightweight; enterprise can layer compliance on top.
 
