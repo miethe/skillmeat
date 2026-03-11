@@ -885,16 +885,33 @@ def get_marketplace_transaction_handler() -> MarketplaceTransactionHandler:
     return MarketplaceTransactionHandler()
 
 
-def get_db_user_collection_repository() -> IDbUserCollectionRepository:
-    """Get DbUserCollectionRepository dependency.
+def get_db_user_collection_repository(
+    state: Annotated["AppState", Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> IDbUserCollectionRepository:
+    """Get an edition-aware IDbUserCollectionRepository dependency.
 
-    Returns a new ``DbUserCollectionRepository`` instance.  The repository
-    manages its own session lifecycle internally, so no state injection is
-    required.
+    In local mode returns a ``DbUserCollectionRepository`` backed by the
+    SQLite cache (manages its own session).  In enterprise mode returns an
+    ``EnterpriseUserCollectionAdapter`` that wraps the PostgreSQL-backed
+    ``EnterpriseCollectionRepository`` and receives the per-request
+    ``Session`` from the FastAPI DI layer.
+
+    Args:
+        state: Application state (used to read the configured edition).
+        session: Per-request SQLAlchemy session (used by the enterprise path).
 
     Returns:
-        IDbUserCollectionRepository implementation backed by the SQLite cache.
+        IDbUserCollectionRepository implementation appropriate for the
+        configured edition.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseUserCollectionAdapter,
+        )
+
+        return EnterpriseUserCollectionAdapter(session=session)
     return DbUserCollectionRepository()
 
 

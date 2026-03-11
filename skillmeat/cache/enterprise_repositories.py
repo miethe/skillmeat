@@ -2100,4 +2100,149 @@ class EnterpriseCollectionRepository(
             entity_id=collection_id,
             metadata={"count": len(artifact_ids)},
         )
+
+
+# =============================================================================
+# EnterpriseUserCollectionAdapter
+# =============================================================================
+
+
+class EnterpriseUserCollectionAdapter:
+    """Adapts :class:`EnterpriseCollectionRepository` to
+    :class:`~skillmeat.core.interfaces.repositories.IDbUserCollectionRepository`.
+
+    In enterprise mode the ``user_collections`` router must query PostgreSQL
+    instead of SQLite.  This adapter wraps the existing
+    :class:`EnterpriseCollectionRepository` and translates its ORM results to
+    :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO` frozen
+    dataclasses, satisfying the interface contract without modifying the
+    underlying repository or the router.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the PostgreSQL enterprise
+        database.  Lifecycle is managed by the FastAPI DI layer via
+        ``get_db_session``.
+    """
+
+    def __init__(self, session: Session) -> None:
+        self._repo = EnterpriseCollectionRepository(session=session)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _to_dto(collection: "EnterpriseCollection") -> "UserCollectionDTO":  # type: ignore[name-defined]
+        """Convert an :class:`EnterpriseCollection` ORM instance to a DTO."""
+        from skillmeat.core.interfaces.dtos import UserCollectionDTO
+
+        created_at_iso: Optional[str] = None
+        updated_at_iso: Optional[str] = None
+        if collection.created_at is not None:
+            created_at_iso = collection.created_at.isoformat()
+        if collection.updated_at is not None:
+            updated_at_iso = collection.updated_at.isoformat()
+
+        # created_by on EnterpriseCollection is a string (user ID or "system")
+        created_by = collection.created_by
+
+        # Membership count — available only when the relationship is loaded;
+        # fall back to 0 rather than triggering a lazy load.
+        try:
+            artifact_count = len(collection.memberships)
+        except Exception:
+            artifact_count = 0
+
+        return UserCollectionDTO(
+            id=str(collection.id),
+            name=collection.name,
+            description=collection.description,
+            created_by=created_by,
+            collection_type=None,
+            context_category=None,
+            created_at=created_at_iso,
+            updated_at=updated_at_iso,
+            artifact_count=artifact_count,
+        )
+
+    # ------------------------------------------------------------------
+    # IDbUserCollectionRepository implementation
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        *,
+        created_by: Optional[str] = None,
+        collection_type: Optional[str] = None,
+        context_category: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: Optional[object] = None,
+    ) -> "list[UserCollectionDTO]":  # type: ignore[override]
+        """Return a paginated list of enterprise collections as DTOs.
+
+        The *created_by*, *collection_type*, and *context_category* filters
+        map as follows against the enterprise schema:
+
+        * ``created_by`` — filters by ``EnterpriseCollection.created_by``
+          (string user-ID column).
+        * ``collection_type`` and ``context_category`` — the enterprise schema
+          has no direct equivalents; these filters are silently ignored so the
+          adapter remains forward-compatible.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseCollection
+
+        collections = self._repo.list(offset=offset, limit=limit)
+
+        if created_by is not None:
+            collections = [c for c in collections if c.created_by == created_by]
+
+        return [self._to_dto(c) for c in collections]
+
+    def get_by_id(
+        self,
+        collection_id: str,
+        ctx: Optional[object] = None,
+    ) -> "UserCollectionDTO | None":
+        """Return a collection by its UUID string primary key."""
+        try:
+            uid = uuid.UUID(collection_id)
+        except (ValueError, AttributeError):
+            return None
+
+        collection = self._repo.get(uid)
+        if collection is None:
+            return None
+        return self._to_dto(collection)
+
+    def get_by_name(
+        self,
+        name: str,
+        ctx: Optional[object] = None,
+    ) -> "UserCollectionDTO | None":
+        """Return a collection by its human-readable name."""
+        collection = self._repo.get_by_name(name)
+        if collection is None:
+            return None
+        return self._to_dto(collection)
+
+    def create(
+        self,
+        *,
+        name: str,
+        description: Optional[str] = None,
+        created_by: Optional[str] = None,
+        collection_type: Optional[str] = None,
+        context_category: Optional[str] = None,
+        ctx: Optional[object] = None,
+    ) -> "UserCollectionDTO":
+        """Persist a new enterprise collection and return its DTO."""
+        collection = self._repo.create(name=name, description=description)
+        # Populate created_by when provided and the ORM model supports it.
+        if created_by is not None and hasattr(collection, "created_by"):
+            collection.created_by = created_by
+            self._repo.session.flush()
+        return self._to_dto(collection)
         return True
