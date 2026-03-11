@@ -5,7 +5,7 @@
  *
  * Wraps SlideOverPanel (width='lg') with a structured form covering:
  *   - Basic Info: name, description, stage type, execution mode
- *   - Roles: primary agent (ArtifactPicker single), supporting tools (ArtifactPicker multi)
+ *   - Roles: primary agent (EntityPickerDialog single), supporting tools (EntityPickerDialog multi)
  *   - Context Policy: context modules (ContextModulePicker), inherit global switch
  *   - Advanced (collapsed): timeout seconds, max retries, failure action
  *
@@ -24,10 +24,17 @@
  */
 
 import * as React from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Package } from 'lucide-react';
 import { SlideOverPanel } from '@/components/shared/slide-over-panel';
-import { ArtifactPicker } from '@/components/shared/artifact-picker';
+import {
+  EntityPickerDialog,
+  EntityPickerTrigger,
+} from '@/components/shared/entity-picker-dialog';
+import type { EntityPickerTab } from '@/components/shared/entity-picker-dialog';
+import { useEntityPickerArtifacts } from '@/components/shared/entity-picker-adapter-hooks';
+import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
 import { ContextModulePicker } from '@/components/shared/context-module-picker';
+import type { Artifact } from '@/types/artifact';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -296,6 +303,18 @@ export function StageEditor({ stage, open, onClose, onSave }: StageEditorProps) 
   const [form, setForm] = React.useState<StageFormState>(defaultFormState);
   const [initialForm, setInitialForm] = React.useState<StageFormState>(defaultFormState);
 
+  // Dialog open states for the two pickers
+  const [primaryAgentDialogOpen, setPrimaryAgentDialogOpen] = React.useState(false);
+  const [toolsDialogOpen, setToolsDialogOpen] = React.useState(false);
+
+  // Accumulated name map: uuid → name, built up as the user browses/selects artifacts.
+  // Used to display resolved names in the triggers without additional API calls.
+  const resolvedNamesRef = React.useRef<Map<string, string>>(new Map());
+
+  // Incrementing this state triggers a re-render so the trigger can pick up
+  // names accumulated in resolvedNamesRef after a dialog closes.
+  const [, setResolvedNamesVersion] = React.useState(0);
+
   // Re-initialise form whenever stage or open state changes
   React.useEffect(() => {
     const next = stage ? stageToFormState(stage) : defaultFormState();
@@ -312,6 +331,61 @@ export function StageEditor({ stage, open, onClose, onSave }: StageEditorProps) 
   function patch<K extends keyof StageFormState>(key: K, value: StageFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  // --------------------------------------------------------------------------
+  // Artifact tab configs for EntityPickerDialog
+  // --------------------------------------------------------------------------
+
+  // Stable renderCard that captures artifact names into the ref for trigger display.
+  // Using useCallback with an empty dep array so the tab config object is stable
+  // across renders and does not cause infinite re-renders inside EntityPickerDialog.
+  const renderAgentCard = React.useCallback((item: Artifact, _isSelected: boolean) => {
+    resolvedNamesRef.current.set(item.uuid, item.name);
+    return <MiniArtifactCard artifact={item} onClick={() => {}} />;
+  }, []);
+
+  const renderToolCard = React.useCallback((item: Artifact, _isSelected: boolean) => {
+    resolvedNamesRef.current.set(item.uuid, item.name);
+    return <MiniArtifactCard artifact={item} onClick={() => {}} />;
+  }, []);
+
+  const primaryAgentTabs: EntityPickerTab<Artifact>[] = React.useMemo(() => [{
+    id: 'artifacts',
+    label: 'Agents',
+    icon: Package,
+    useData: (params) => useEntityPickerArtifacts({ ...params, typeFilter: ['agent'] }),
+    renderCard: renderAgentCard,
+    getId: (item) => item.uuid,
+  }], [renderAgentCard]);
+
+  const supportingToolsTabs: EntityPickerTab<Artifact>[] = React.useMemo(() => [{
+    id: 'artifacts',
+    label: 'Tools',
+    icon: Package,
+    useData: (params) => useEntityPickerArtifacts({ ...params, typeFilter: ['skill', 'command', 'mcp'] }),
+    renderCard: renderToolCard,
+    getId: (item) => item.uuid,
+    typeFilters: [
+      { value: 'skill', label: 'Skills' },
+      { value: 'command', label: 'Commands' },
+      { value: 'mcp', label: 'MCP Servers' },
+    ],
+  }], [renderToolCard]);
+
+  // --------------------------------------------------------------------------
+  // Resolved display items for EntityPickerTrigger
+  // --------------------------------------------------------------------------
+
+  const resolvedNames = resolvedNamesRef.current;
+
+  const primaryAgentItems: { id: string; name: string }[] = form.primaryAgentUuid
+    ? [{ id: form.primaryAgentUuid, name: resolvedNames.get(form.primaryAgentUuid) ?? form.primaryAgentUuid.slice(0, 8) }]
+    : [];
+
+  const toolItems: { id: string; name: string }[] = form.toolUuids.map((uuid) => ({
+    id: uuid,
+    name: resolvedNames.get(uuid) ?? uuid.slice(0, 8),
+  }));
 
   // --------------------------------------------------------------------------
   // Save handler
@@ -409,25 +483,58 @@ export function StageEditor({ stage, open, onClose, onSave }: StageEditorProps) 
         {/* Section 2: Roles                                                  */}
         {/* ---------------------------------------------------------------- */}
         <Section id="roles" title="Roles">
+          {/* UEPD-3.1: Primary Agent picker */}
           <div className="space-y-1.5">
-            <ArtifactPicker
+            <EntityPickerTrigger
               label="Primary Agent"
               value={form.primaryAgentUuid}
-              onChange={(v) => patch('primaryAgentUuid', v as string)}
+              items={primaryAgentItems}
               mode="single"
-              typeFilter={['agent']}
+              onClick={() => setPrimaryAgentDialogOpen(true)}
               placeholder="Select an agent..."
+            />
+            <EntityPickerDialog
+              open={primaryAgentDialogOpen}
+              onOpenChange={(open) => {
+                setPrimaryAgentDialogOpen(open);
+                if (!open) setResolvedNamesVersion((v) => v + 1);
+              }}
+              tabs={primaryAgentTabs}
+              mode="single"
+              value={form.primaryAgentUuid}
+              onChange={(value) => {
+                patch('primaryAgentUuid', value as string);
+              }}
+              title="Select Primary Agent"
+              description="Choose the main agent for this stage."
             />
           </div>
 
+          {/* UEPD-3.2: Supporting Tools picker */}
           <div className="space-y-1.5">
-            <ArtifactPicker
+            <EntityPickerTrigger
               label="Supporting Tools"
               value={form.toolUuids}
-              onChange={(v) => patch('toolUuids', v as string[])}
+              items={toolItems}
               mode="multi"
-              typeFilter={['skill', 'command', 'mcp']}
+              onClick={() => setToolsDialogOpen(true)}
+              onRemove={(id) => patch('toolUuids', form.toolUuids.filter((uuid) => uuid !== id))}
               placeholder="Add supporting tools..."
+            />
+            <EntityPickerDialog
+              open={toolsDialogOpen}
+              onOpenChange={(open) => {
+                setToolsDialogOpen(open);
+                if (!open) setResolvedNamesVersion((v) => v + 1);
+              }}
+              tabs={supportingToolsTabs}
+              mode="multi"
+              value={form.toolUuids}
+              onChange={(value) => {
+                patch('toolUuids', value as string[]);
+              }}
+              title="Select Supporting Tools"
+              description="Choose skills, commands, and MCP servers available to this stage."
             />
           </div>
         </Section>
