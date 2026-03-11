@@ -24,6 +24,11 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# Internal API URL for Next.js rewrites (baked into standalone build at compile time).
+# Override at build time: docker build --build-arg INTERNAL_API_URL=http://my-api:8080
+ARG INTERNAL_API_URL=http://skillmeat-api:8080
+ENV INTERNAL_API_URL=$INTERNAL_API_URL
+
 # Raise open-file limit for Next.js build (Podman defaults are often too low)
 RUN ulimit -n 65536 2>/dev/null || true; pnpm build
 
