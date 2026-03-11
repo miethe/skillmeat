@@ -57,7 +57,7 @@ tasks:
   effort: 1
 - id: WAW-P2.1
   name: Sync service implementation
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   - backend-architect
@@ -74,7 +74,7 @@ tasks:
   effort: 2
 - id: WAW-P2.3
   name: Role validation service
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -271,10 +271,10 @@ parallelization:
   batch_10:
   - WAW-P5.6
 total_tasks: 26
-completed_tasks: 4
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 15
+progress: 23
 ---
 
 # Workflow-Artifact Wiring — All Phases Progress

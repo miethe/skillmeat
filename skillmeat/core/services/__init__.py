@@ -40,6 +40,9 @@ from skillmeat.core.services.enterprise_content import (
     ArtifactVersionNotFoundError,
     ArtifactFilesystemError,
 )
+from skillmeat.core.services.workflow_artifact_sync_service import (
+    WorkflowArtifactSyncService,
+)
 
 __all__ = [
     # Template service
@@ -79,4 +82,6 @@ __all__ = [
     "EnterpriseArtifactNotFoundError",
     "ArtifactVersionNotFoundError",
     "ArtifactFilesystemError",
+    # Workflow artifact sync service
+    "WorkflowArtifactSyncService",
 ]
