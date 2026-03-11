@@ -27,6 +27,12 @@ Models:
     - CustomColor: User-defined hex colors for the site-wide color palette registry
     - DuplicatePair: Persisted record of a similar/duplicate artifact pair with optional ignored flag
     - SimilarityCache: Cached pairwise composite similarity scores with breakdown JSON (SSO-2.2)
+    - AttestationRecord: Owner-scoped attestation metadata for an artifact (skillbom-attestation)
+    - ArtifactHistoryEvent: Immutable audit log entries for artifact lifecycle events (skillbom-attestation)
+    - BomSnapshot: Point-in-time Bill-of-Materials snapshots (skillbom-attestation)
+    - AttestationPolicy: Enterprise policy for enforcing attestation requirements (skillbom-attestation)
+    - BomMetadata: BOM version and format metadata (skillbom-attestation)
+    - ScopeValidator: Utility model for RBAC scope pattern validation (skillbom-attestation)
 
 Usage:
     >>> from skillmeat.cache.models import get_session, Project, Artifact
@@ -5210,3 +5216,439 @@ def drop_tables(db_path: Optional[str | Path] = None) -> None:
     """
     engine = create_db_engine(db_path)
     Base.metadata.drop_all(engine)
+
+
+# =============================================================================
+# SkillBOM & Attestation Models
+# =============================================================================
+
+
+class AttestationRecord(Base):
+    """Owner-scoped attestation metadata for an artifact.
+
+    Records which owner (user or team) has attested to an artifact, including
+    the RBAC roles and scopes they assert, and the visibility level of the
+    attestation.  One artifact can have multiple attestation records from
+    different owners.
+
+    Attributes:
+        id: Auto-incrementing primary key.
+        artifact_id: Foreign key to artifacts.id (CASCADE delete).
+        owner_type: Discriminator for the owning principal ('user' or 'team').
+        owner_id: Opaque identifier for the owning user or team.
+        roles: JSON list of role strings asserted by this attestation.
+        scopes: JSON list of scope strings granted by this attestation.
+        visibility: Access-visibility level ('private', 'team', or 'public').
+        created_at: Timestamp when the attestation was created.
+        updated_at: Timestamp when the attestation was last modified.
+        artifact: Relationship back to the attested Artifact.
+
+    Indexes:
+        - idx_attestation_records_owner: Fast owner look-ups.
+        - idx_attestation_records_artifact_id: Join performance.
+    """
+
+    __tablename__ = "attestation_records"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Foreign key
+    artifact_id: Mapped[str] = mapped_column(
+        String, ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Owner fields
+    owner_type: Mapped[str] = mapped_column(
+        String, nullable=False, default=OwnerType.user.value
+    )
+    owner_id: Mapped[str] = mapped_column(String, nullable=False)
+
+    # RBAC payloads
+    roles: Mapped[Optional[List[Any]]] = mapped_column(JSON, nullable=True)
+    scopes: Mapped[Optional[List[Any]]] = mapped_column(JSON, nullable=True)
+
+    # Visibility
+    visibility: Mapped[str] = mapped_column(
+        String, nullable=False, default=Visibility.private.value
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    artifact: Mapped["Artifact"] = relationship("Artifact", lazy="select")
+
+    # Constraints / indexes
+    __table_args__ = (
+        Index("idx_attestation_records_owner", "owner_type", "owner_id"),
+        Index("idx_attestation_records_artifact_id", "artifact_id"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of AttestationRecord."""
+        return (
+            f"<AttestationRecord(id={self.id!r}, artifact_id={self.artifact_id!r}, "
+            f"owner_type={self.owner_type!r}, owner_id={self.owner_id!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert AttestationRecord to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "artifact_id": self.artifact_id,
+            "owner_type": self.owner_type,
+            "owner_id": self.owner_id,
+            "roles": self.roles,
+            "scopes": self.scopes,
+            "visibility": self.visibility,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ArtifactHistoryEvent(Base):
+    """Immutable audit log entry for an artifact lifecycle event.
+
+    Records every significant state change for an artifact: creation, updates,
+    deployments, un-deployments, and sync operations.  Rows are append-only by
+    application convention — never update or delete individual events.
+
+    Attributes:
+        id: Auto-incrementing primary key.
+        artifact_id: Foreign key to artifacts.id (CASCADE delete).
+        event_type: One of 'create', 'update', 'delete', 'deploy',
+                    'undeploy', or 'sync'.
+        actor_id: Opaque identifier for the user or system that triggered
+                  the event; nullable for automated/system events.
+        owner_type: Owner context at the time of the event.
+        timestamp: Wall-clock time of the event (UTC).
+        diff_json: JSON-serialised diff payload describing what changed.
+        content_hash: SHA-256 hash of artifact content at event time.
+
+    Indexes:
+        - idx_artifact_history_artifact_ts: Artifact timeline queries.
+        - idx_artifact_history_type_ts: Event-type filtered queries.
+        - idx_artifact_history_actor_id: Actor audit queries.
+    """
+
+    __tablename__ = "artifact_history_events"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Foreign key
+    artifact_id: Mapped[str] = mapped_column(
+        String, ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Event metadata
+    event_type: Mapped[str] = mapped_column(String, nullable=False)
+    actor_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    owner_type: Mapped[str] = mapped_column(
+        String, nullable=False, default=OwnerType.user.value
+    )
+
+    # Timestamp (immutable after insert)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Change payload
+    diff_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Constraints / indexes
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('create', 'update', 'delete', 'deploy', 'undeploy', 'sync')",
+            name="check_artifact_history_event_type",
+        ),
+        Index("idx_artifact_history_artifact_ts", "artifact_id", "timestamp"),
+        Index("idx_artifact_history_type_ts", "event_type", "timestamp"),
+        Index("idx_artifact_history_actor_id", "actor_id"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ArtifactHistoryEvent."""
+        return (
+            f"<ArtifactHistoryEvent(id={self.id!r}, artifact_id={self.artifact_id!r}, "
+            f"event_type={self.event_type!r}, timestamp={self.timestamp!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ArtifactHistoryEvent to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "artifact_id": self.artifact_id,
+            "event_type": self.event_type,
+            "actor_id": self.actor_id,
+            "owner_type": self.owner_type,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "diff_json": self.diff_json,
+            "content_hash": self.content_hash,
+        }
+
+
+class BomSnapshot(Base):
+    """Point-in-time Bill-of-Materials snapshot.
+
+    Captures the full BOM for a project at a given moment (or at a specific
+    git commit).  The serialised BOM is stored as text in ``bom_json`` and may
+    be optionally signed for integrity verification.
+
+    Attributes:
+        id: Auto-incrementing primary key.
+        project_id: Opaque project identifier; nullable for collection-level BOMs.
+        commit_sha: Git commit SHA associated with this snapshot; nullable.
+        bom_json: Serialised BOM payload (JSON text).
+        signature: Optional cryptographic signature over ``bom_json``.
+        signature_algorithm: Algorithm used to produce the signature (e.g. 'ed25519').
+        owner_type: Owner context at snapshot time.
+        created_at: Timestamp when the snapshot was captured.
+
+    Indexes:
+        - idx_bom_snapshots_project_created: Project timeline queries.
+        - idx_bom_snapshots_commit_sha: Commit-based look-ups.
+    """
+
+    __tablename__ = "bom_snapshots"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Scope identifiers
+    project_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    commit_sha: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # BOM payload
+    bom_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Optional signing
+    signature: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    signature_algorithm: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Owner context
+    owner_type: Mapped[str] = mapped_column(
+        String, nullable=False, default=OwnerType.user.value
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Constraints / indexes
+    __table_args__ = (
+        Index("idx_bom_snapshots_project_created", "project_id", "created_at"),
+        Index("idx_bom_snapshots_commit_sha", "commit_sha"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of BomSnapshot."""
+        return (
+            f"<BomSnapshot(id={self.id!r}, project_id={self.project_id!r}, "
+            f"commit_sha={self.commit_sha!r}, created_at={self.created_at!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert BomSnapshot to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "project_id": self.project_id,
+            "commit_sha": self.commit_sha,
+            "bom_json": self.bom_json,
+            "signature": self.signature,
+            "signature_algorithm": self.signature_algorithm,
+            "owner_type": self.owner_type,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class AttestationPolicy(Base):
+    """Enterprise policy for enforcing attestation requirements.
+
+    Defines which artifacts and scopes must be attested before a project can
+    be considered compliant.  In local (SQLite) mode this table exists but is
+    not enforced; policy evaluation is an enterprise-only runtime behaviour.
+
+    Attributes:
+        id: Auto-incrementing primary key.
+        tenant_id: Enterprise tenant identifier; nullable in local mode.
+        name: Human-readable policy name (unique per installation).
+        required_artifacts: JSON list of artifact identifiers that must be attested.
+        required_scopes: JSON list of scope strings that must be present.
+        compliance_metadata: Arbitrary JSON metadata for compliance tooling.
+        created_at: Timestamp when the policy was created.
+        updated_at: Timestamp when the policy was last modified.
+
+    Indexes:
+        - idx_attestation_policies_tenant_id: Tenant-scoped look-ups.
+        - idx_attestation_policies_name: Name look-ups.
+    """
+
+    __tablename__ = "attestation_policies"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Tenant scope (enterprise only; nullable in local mode)
+    tenant_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Policy definition
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    required_artifacts: Mapped[Optional[List[Any]]] = mapped_column(JSON, nullable=True)
+    required_scopes: Mapped[Optional[List[Any]]] = mapped_column(JSON, nullable=True)
+    compliance_metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON, nullable=True
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Constraints / indexes
+    __table_args__ = (
+        Index("idx_attestation_policies_tenant_id", "tenant_id"),
+        Index("idx_attestation_policies_name", "name"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of AttestationPolicy."""
+        return (
+            f"<AttestationPolicy(id={self.id!r}, name={self.name!r}, "
+            f"tenant_id={self.tenant_id!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert AttestationPolicy to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "name": self.name,
+            "required_artifacts": self.required_artifacts,
+            "required_scopes": self.required_scopes,
+            "compliance_metadata": self.compliance_metadata,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class BomMetadata(Base):
+    """BOM version and format metadata.
+
+    Stores versioning information for the BOM schema and generator toolchain.
+    One row is typically inserted per BOM generation run and referenced by the
+    associated BomSnapshot.
+
+    Attributes:
+        id: Auto-incrementing primary key.
+        schema_version: Version of the BOM schema (default '1.0.0').
+        format_version: Version of the serialisation format.
+        generator_version: Version of the SkillMeat release that produced the BOM.
+        created_at: Timestamp when this metadata record was created.
+    """
+
+    __tablename__ = "bom_metadata"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Version fields
+    schema_version: Mapped[str] = mapped_column(
+        String, nullable=False, default="1.0.0", server_default="1.0.0"
+    )
+    format_version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    generator_version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of BomMetadata."""
+        return (
+            f"<BomMetadata(id={self.id!r}, schema_version={self.schema_version!r}, "
+            f"format_version={self.format_version!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert BomMetadata to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "schema_version": self.schema_version,
+            "format_version": self.format_version,
+            "generator_version": self.generator_version,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class ScopeValidator(Base):
+    """Utility model for RBAC scope pattern validation.
+
+    Stores the authoritative list of recognised scope patterns and their
+    associated owner context.  At runtime, scope strings on attestation
+    records are checked against these patterns to detect invalid or
+    out-of-date scopes.
+
+    Attributes:
+        id: Auto-incrementing primary key.
+        scope_pattern: Unique scope pattern string (e.g. 'artifact:read').
+        owner_type: Owner context for which this scope is valid.
+        description: Human-readable description of what the scope grants.
+        created_at: Timestamp when the scope was registered.
+
+    Indexes:
+        - idx_scope_validators_scope_pattern: Unique look-up by pattern.
+        - idx_scope_validators_owner_type: Filter by owner context.
+    """
+
+    __tablename__ = "scope_validators"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Scope definition
+    scope_pattern: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    owner_type: Mapped[str] = mapped_column(
+        String, nullable=False, default=OwnerType.user.value
+    )
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Constraints / indexes
+    __table_args__ = (
+        Index("idx_scope_validators_scope_pattern", "scope_pattern", unique=True),
+        Index("idx_scope_validators_owner_type", "owner_type"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ScopeValidator."""
+        return (
+            f"<ScopeValidator(id={self.id!r}, scope_pattern={self.scope_pattern!r}, "
+            f"owner_type={self.owner_type!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ScopeValidator to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "scope_pattern": self.scope_pattern,
+            "owner_type": self.owner_type,
+            "description": self.description,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }

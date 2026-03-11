@@ -6,31 +6,32 @@ description: >
   Comprehensive phased implementation plan for cryptographic tracking and provenance of AI artifacts,
   with separate artifact activity history, RBAC-scoped attestation metadata, and multi-surface viewing.
 audience:
-  - ai-agents
-  - developers
-  - security-engineers
-  - platform-engineers
+- ai-agents
+- developers
+- security-engineers
+- platform-engineers
 tags:
-  - implementation-plan
-  - planning
-  - features
-  - skillbom
-  - security
-  - attestation
+- implementation-plan
+- planning
+- features
+- skillbom
+- security
+- attestation
 created: 2026-03-10
 updated: 2026-03-11
 category: product-planning
-status: draft
+status: in-progress
 priority: HIGH
 risk_level: high
 feature_slug: skillbom-attestation
 prd_ref: /docs/project_plans/PRDs/features/skillbom-attestation-v1.md
 plan_ref: null
 scope: full-stack
-effort_estimate: "78-90 story points"
-timeline: "12-16 weeks"
-critical_path: "Phase 1 → Phase 2 → Phase 3 → Phase 7 → Phase 9"
-parallelization_strategy: "Parallel tracks after Phase 2 (DB models established)"
+effort_estimate: 78-90 story points
+timeline: 12-16 weeks
+critical_path: "Phase 1 \u2192 Phase 2 \u2192 Phase 3 \u2192 Phase 7 \u2192 Phase\
+  \ 9"
+parallelization_strategy: Parallel tracks after Phase 2 (DB models established)
 related_documents:
   - /docs/project_plans/PRDs/features/skillbom-attestation-v1.md
   - /docs/project_plans/design-specs/skillbom-point-in-time-environment-recovery.md
