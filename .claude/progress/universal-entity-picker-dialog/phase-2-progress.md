@@ -8,7 +8,7 @@ prd_ref: docs/project_plans/PRDs/enhancements/universal-entity-picker-dialog-v1.
 plan_ref: docs/project_plans/implementation_plans/enhancements/universal-entity-picker-dialog-v1.md
 phase: 2
 title: Context Entity Mini Card
-status: in_progress
+status: completed
 started: null
 completed: null
 commit_refs: []
@@ -16,8 +16,8 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 2
-completed_tasks: 0
-in_progress_tasks: 2
+completed_tasks: 2
+in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
@@ -27,7 +27,7 @@ tasks:
 - id: UEPD-2.1
   description: Create MiniContextEntityCard component following mini-artifact-card
     pattern
-  status: in_progress
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies: []
@@ -35,7 +35,7 @@ tasks:
   priority: medium
 - id: UEPD-2.2
   description: Create useEntityPickerContextModules adapter hook wrapping useContextModules
-  status: in_progress
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies: []
@@ -59,7 +59,7 @@ success_criteria:
 files_modified:
 - skillmeat/web/components/context/mini-context-entity-card.tsx
 - skillmeat/web/components/shared/entity-picker-adapter-hooks.ts
-progress: 0
+progress: 100
 updated: '2026-03-11'
 ---
 

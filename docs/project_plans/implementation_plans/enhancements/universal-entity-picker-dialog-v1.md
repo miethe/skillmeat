@@ -2,7 +2,7 @@
 title: 'Implementation Plan: Universal Entity Picker Dialog'
 schema_version: '1.0'
 doc_type: implementation_plan
-status: in-progress
+status: completed
 created: '2026-03-06'
 updated: '2026-03-11'
 feature_slug: universal-entity-picker-dialog
