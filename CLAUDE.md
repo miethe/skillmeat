@@ -384,7 +384,7 @@ SkillMeat's memory system stores project-level development knowledge (patterns, 
 
 ## Architecture Overview
 
-**Full-Stack Web Application** (v0.9.0)
+**Full-Stack Web Application** (v0.9.1)
 
 ```
 skillmeat/
