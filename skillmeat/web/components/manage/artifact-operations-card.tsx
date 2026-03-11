@@ -136,6 +136,7 @@ const artifactTypeBorderAccents: Record<ArtifactType, string> = {
   mcp: 'border-l-orange-500',
   hook: 'border-l-pink-500',
   composite: 'border-l-indigo-500',
+  workflow: 'border-l-cyan-500',
 };
 
 const artifactTypeCardTints: Record<ArtifactType, string> = {
@@ -145,6 +146,7 @@ const artifactTypeCardTints: Record<ArtifactType, string> = {
   mcp: 'bg-orange-500/[0.02] dark:bg-orange-500/[0.03]',
   hook: 'bg-pink-500/[0.02] dark:bg-pink-500/[0.03]',
   composite: 'bg-indigo-500/[0.02] dark:bg-indigo-500/[0.03]',
+  workflow: 'bg-cyan-500/[0.02] dark:bg-cyan-500/[0.03]',
 };
 
 // Health-based border accent overrides (when attention needed)

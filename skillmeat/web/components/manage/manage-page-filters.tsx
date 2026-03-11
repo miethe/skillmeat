@@ -54,6 +54,8 @@ const TYPE_OPTIONS: TypeOption[] = [
   { value: 'agent', label: 'Agents' },
   { value: 'mcp', label: 'MCP Servers' },
   { value: 'hook', label: 'Hooks' },
+  { value: 'composite', label: 'Composites' },
+  { value: 'workflow', label: 'Workflows' },
 ];
 
 /**
