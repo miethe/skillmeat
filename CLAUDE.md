@@ -653,7 +653,6 @@ Never use PyGithub directly; always go through the wrapper.
 - `.claude/context/key-context/agent-teams-patterns.md` - Agent Teams vs subagents decision framework
 - `.claude/context/key-context/repository-architecture.md` - Repository pattern invariants, DI recipes, backend implementation guide
 - `.claude/context/key-context/auth-architecture.md` - Auth provider selection, AuthContext flow, RBAC scopes/roles, endpoint auth patterns
-- `.claude/context/key-context/entity-picker-patterns.md` - EntityPickerDialog usage, adapter hooks, integration patterns
 
 **Reference Context** (load as needed):
 - `.claude/context/api-endpoint-mapping.md` - Full API reference
