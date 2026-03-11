@@ -197,10 +197,9 @@ See `repository-patterns.md` for full detail. Short version:
 - `_artifact_to_dto()` now accepts `db_uuid=` kwarg — DB UUID wins over any FS attribute
 - `get()` → single lookup; `list()`/`search()` → batch lookup; `get_by_uuid()` → DB-first
 
-### SQLAlchemy ORM Comparator Type Cache (test isolation gotcha)
-- Mutating `column.type` on a SQLAlchemy Table column object does NOT update `InstrumentedAttribute.comparator.__dict__['type']`
-- The comparator's `type` is frozen when `configure_mappers()` runs (triggered by first ORM class instantiation)
-- If test module A triggers `configure_mappers()` with `UUID(as_uuid=True)`, then test module B patches `column.type = _UUIDString()`, the comparator still uses `UUID.bind_processor` for WHERE clauses
-- `UUID(as_uuid=True).bind_processor` for SQLite strips hyphens → stored `'uuid-with-hyphens'` vs bound `'uuidnohyphens'` → zero rows returned
-- Fix: after patching table columns, also update `comparator.__dict__['type'] = mapped_col.type` for all ORM model classes
-- File: `skillmeat/cache/tests/test_enterprise_collection_repository.py` → `_patch_enterprise_metadata_for_sqlite()`
+### SQLite Testing Patterns (see testing-patterns.md)
+- `Base.metadata.create_all()` fails on SQLite due to TSVECTOR in `marketplace_catalog_entries.search_vector` — patch column type to `Text()` temporarily
+- Both `skillmeat.cache.models.create_tables` AND `skillmeat.cache.repositories.create_tables` must be patched
+- `get_artifact_by_workflow_id()` returns detached ORM instance — access `artifact_metadata` via separate session query
+- `stages[].roles.primary` must be a `RoleAssignment` dict with `artifact` key — NOT a plain string
+- SQLAlchemy ORM comparator type cache: mutating `column.type` doesn't update `comparator.__dict__['type']` — fix by patching comparator dict too (see enterprise test file)

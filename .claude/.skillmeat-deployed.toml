@@ -2063,8 +2063,25 @@ deployed_at = "2026-03-08T16:20:04.162393"
 artifact_path = "skills/generating-docker-compose-files"
 content_hash = "0771403df7570691f52435644874942d1e4914b9641a761a8d09820e6ff2c1be"
 local_modifications = false
+version_lineage = [
+    "0771403df7570691f52435644874942d1e4914b9641a761a8d09820e6ff2c1be",
+]
 merge_base_snapshot = "0771403df7570691f52435644874942d1e4914b9641a761a8d09820e6ff2c1be"
 deployment_profile_id = "claude_code"
 platform = "claude_code"
 profile_root_dir = ".claude"
 collection_sha = "0771403df7570691f52435644874942d1e4914b9641a761a8d09820e6ff2c1be"
+
+[[deployed]]
+artifact_name = "clerk-install-auth"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-03-10T21:40:01.219288"
+artifact_path = "skills/clerk-install-auth"
+content_hash = "a8d9918602c9bbd67d8acb348ad2e95627f699b1537cd1f3f6f1277760476402"
+local_modifications = false
+merge_base_snapshot = "a8d9918602c9bbd67d8acb348ad2e95627f699b1537cd1f3f6f1277760476402"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "a8d9918602c9bbd67d8acb348ad2e95627f699b1537cd1f3f6f1277760476402"
