@@ -1,6 +1,6 @@
 """Add workflow_id to deployment_set_members and update one-ref CHECK constraint
 
-Revision ID: 20260310_0002_add_workflow_id_to_deployment_set_members
+Revision ID: waw_001_add_workflow_id
 Revises: pg_001_fulltext_search
 Create Date: 2026-03-10 00:02:00.000000+00:00
 
@@ -70,7 +70,7 @@ from skillmeat.cache.migrations.dialect_helpers import is_sqlite, is_postgresql
 # Revision identifiers
 # ---------------------------------------------------------------------------
 
-revision: str = "20260310_0002_add_workflow_id_to_deployment_set_members"
+revision: str = "waw_001_add_workflow_id"
 down_revision: Union[str, None] = "pg_001_fulltext_search"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
