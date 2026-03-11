@@ -40,7 +40,7 @@ from skillmeat.api.schemas.deployment_sets import (
     ResolvedArtifactItem,
     ResolveResponse,
 )
-from skillmeat.cache.models import DeploymentSet, DeploymentSetMember
+from skillmeat.cache.models import DeploymentSet, DeploymentSetMember, Workflow
 from skillmeat.cache.repositories import RepositoryError
 from skillmeat.core.deployment_sets import DeploymentSetService
 from skillmeat.core.exceptions import DeploymentSetCycleError, DeploymentSetResolutionError
@@ -497,7 +497,7 @@ def add_member(
         The newly created member row.
 
     Raises:
-        HTTPException 404: If the parent set does not exist.
+        HTTPException 404: If the parent set or referenced workflow does not exist.
         HTTPException 422: If adding the member would create a circular reference.
     """
     owner_id = _get_owner_id(settings)
@@ -510,6 +510,24 @@ def add_member(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Deployment set '{set_id}' not found.",
         )
+
+    # Validate referenced workflow exists (SQLite does not enforce FK constraints by
+    # default, so we perform an explicit pre-flight check to return 404 rather than
+    # silently creating a dangling reference).
+    if request.workflow_id is not None:
+        workflow_exists = (
+            db.query(Workflow).filter(Workflow.id == request.workflow_id).first()
+        )
+        if workflow_exists is None:
+            logger.warning(
+                "Workflow not found for add_member: workflow_id=%s set_id=%s",
+                request.workflow_id,
+                set_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Workflow '{request.workflow_id}' not found.",
+            )
 
     try:
         svc = DeploymentSetService(session=db)
