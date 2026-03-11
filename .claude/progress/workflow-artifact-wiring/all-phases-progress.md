@@ -66,7 +66,7 @@ tasks:
   effort: 3
 - id: WAW-P2.2
   name: Service hooks in WorkflowService
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -82,7 +82,7 @@ tasks:
   effort: 2
 - id: WAW-P2.4
   name: Feature flag integration
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -90,7 +90,7 @@ tasks:
   effort: 1
 - id: WAW-P2.5
   name: Full re-sync path
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -271,10 +271,10 @@ parallelization:
   batch_10:
   - WAW-P5.6
 total_tasks: 26
-completed_tasks: 6
+completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 23
+progress: 34
 ---
 
 # Workflow-Artifact Wiring — All Phases Progress

@@ -9,6 +9,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from skillmeat.api.config import APISettings, get_settings
 from skillmeat.api.dependencies import get_app_state, verify_api_key
 from skillmeat.api.schemas.cache import (
     CacheInvalidateRequest,
@@ -97,6 +98,7 @@ def get_refresh_job(
 # Type aliases for cleaner dependency injection
 CacheManagerDep = Annotated[CacheManager, Depends(get_cache_manager)]
 RefreshJobDep = Annotated[RefreshJob, Depends(get_refresh_job)]
+SettingsDep = Annotated[APISettings, Depends(get_settings)]
 
 
 # =============================================================================
@@ -118,6 +120,7 @@ RefreshJobDep = Annotated[RefreshJob, Depends(get_refresh_job)]
 async def refresh_cache(
     request: CacheRefreshRequest,
     refresh_job: RefreshJobDep,
+    settings: SettingsDep,
 ) -> CacheRefreshResponse:
     """Trigger manual cache refresh.
 
@@ -147,6 +150,25 @@ async def refresh_cache(
         else:
             # Refresh all projects
             result = refresh_job.refresh_all(force=request.force)
+
+        # Sync workflow artifacts into the artifacts table (best-effort).
+        # Runs after the main cache refresh so a workflow sync failure does not
+        # fail the overall refresh response.
+        if settings.workflow_artifact_sync_enabled:
+            try:
+                from skillmeat.core.services.workflow_artifact_sync_service import (
+                    WorkflowArtifactSyncService,
+                )
+
+                sync_service = WorkflowArtifactSyncService()
+                sync_service.sync_all_workflows()
+            except Exception as wf_exc:
+                logger.error(
+                    "Workflow artifact sync failed during cache refresh: %r",
+                    wf_exc,
+                    exc_info=True,
+                )
+                # Intentionally swallowed — workflow sync is non-critical.
 
         # Build response
         message = "Refresh completed successfully"

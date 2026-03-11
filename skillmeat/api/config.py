@@ -287,6 +287,12 @@ class APISettings(BaseSettings):
         "Configurable via SKILLMEAT_WORKFLOW_ENGINE_ENABLED env var.",
     )
 
+    workflow_artifact_sync_enabled: bool = Field(
+        default=True,
+        description="Enable workflow-artifact sync. "
+        "Configurable via SKILLMEAT_WORKFLOW_ARTIFACT_SYNC_ENABLED env var.",
+    )
+
     # Modular Content Architecture feature flag (CECO-4.1)
     modular_content_architecture: bool = Field(
         default=False,
