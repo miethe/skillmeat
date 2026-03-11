@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
@@ -433,6 +433,14 @@ class EncryptedFileStorage(TokenStorage):
 
             logger.debug(f"Token retrieved from file: {token_id[:8]}...")
             return decrypted_data.decode()
+        except InvalidToken:
+            logger.warning(
+                f"Encrypted token file is stale or corrupt (key mismatch), "
+                f"removing: {token_id[:8]}..."
+            )
+            token_path = self._get_token_path(token_id)
+            token_path.unlink(missing_ok=True)
+            return None
         except Exception as e:
             raise RuntimeError(f"Failed to retrieve token from file: {e}")
 
