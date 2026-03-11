@@ -6,7 +6,7 @@ prd: workflow-artifact-wiring
 feature_slug: workflow-artifact-wiring
 phase: 0
 phase_title: All Phases
-status: pending
+status: completed
 created: 2026-03-10
 updated: '2026-03-10'
 prd_ref: docs/project_plans/PRDs/features/workflow-artifact-wiring-v1.md
@@ -138,7 +138,7 @@ tasks:
   effort: 1
 - id: WAW-P4.1
   name: Collection tab wiring
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -146,7 +146,7 @@ tasks:
   effort: 2
 - id: WAW-P4.2
   name: Artifact card rendering
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -154,7 +154,7 @@ tasks:
   effort: 2
 - id: WAW-P4.3
   name: Card link-through
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -162,7 +162,7 @@ tasks:
   effort: 1
 - id: WAW-P4.4
   name: Manage page rows
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -170,7 +170,7 @@ tasks:
   effort: 2
 - id: WAW-P4.5
   name: TypeScript types
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -178,7 +178,7 @@ tasks:
   effort: 1
 - id: WAW-P5.1
   name: 'Unit tests: sync service'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -186,7 +186,7 @@ tasks:
   effort: 3
 - id: WAW-P5.2
   name: 'Unit tests: role validator'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -194,7 +194,7 @@ tasks:
   effort: 2
 - id: WAW-P5.3
   name: 'Integration tests: round-trip'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -203,7 +203,7 @@ tasks:
   effort: 3
 - id: WAW-P5.4
   name: 'Integration tests: collection API'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -211,7 +211,7 @@ tasks:
   effort: 2
 - id: WAW-P5.5
   name: 'Integration tests: deployment set members'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -219,7 +219,7 @@ tasks:
   effort: 2
 - id: WAW-P5.6
   name: 'E2E tests: UI flow'
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -227,7 +227,7 @@ tasks:
   effort: 3
 - id: WAW-P5.7
   name: 'E2E tests: CLI integration'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -271,10 +271,10 @@ parallelization:
   batch_10:
   - WAW-P5.6
 total_tasks: 26
-completed_tasks: 14
+completed_tasks: 26
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 53
+progress: 100
 ---
 
 # Workflow-Artifact Wiring — All Phases Progress
