@@ -50,6 +50,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     restart: unless-stopped
 
   # ===================================================================
