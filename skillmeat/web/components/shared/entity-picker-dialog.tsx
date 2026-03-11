@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Loader2, Package, Search, X } from 'lucide-react';
+import { ChevronDown, Package, Search, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -137,11 +137,15 @@ export interface EntityPickerTriggerProps {
 /** Grid of skeleton cards shown during initial data load */
 function GridSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Loading items" aria-busy="true">
+    <div
+      className="grid grid-cols-2 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+      aria-label="Loading items"
+      aria-busy="true"
+    >
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="flex min-w-[160px] flex-col gap-2 rounded-lg border border-l-[3px] border-l-muted p-3"
+          className="flex min-w-[140px] flex-col gap-2 rounded-lg border border-l-[3px] border-l-muted p-3"
         >
           <div className="flex items-center gap-1.5">
             <Skeleton className="h-4 w-4 rounded" />
@@ -261,11 +265,18 @@ interface TabContentProps<T> {
   tab: EntityPickerTab<T>;
   selectedIds: Set<string>;
   onSelect: (id: string) => void;
+  /** Announcement text for the aria-live region (updates on selection change) */
+  liveAnnouncement: string;
+  onAnnounce: (text: string) => void;
 }
 
-function TabContent<T>({ tab, selectedIds, onSelect }: TabContentProps<T>) {
+function TabContent<T>({ tab, selectedIds, onSelect, liveAnnouncement, onAnnounce }: TabContentProps<T>) {
   const [search, setSearch] = useState('');
   const [activeTypeFilters, setActiveTypeFilters] = useState<Set<string>>(new Set());
+  // Tracks which card ID was most recently selected, for selection animation
+  const [recentlySelected, setRecentlySelected] = useState<string | null>(null);
+  // Grid container ref for arrow-key navigation
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -300,6 +311,55 @@ function TabContent<T>({ tab, selectedIds, onSelect }: TabContentProps<T>) {
     }
   }, [isIntersecting, fetchNextPage]);
 
+  // Clear selection animation after 200ms
+  useEffect(() => {
+    if (recentlySelected) {
+      const timer = setTimeout(() => setRecentlySelected(null), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [recentlySelected]);
+
+  const handleSelect = useCallback(
+    (id: string, name: string) => {
+      setRecentlySelected(id);
+      onSelect(id);
+      const willBeSelected = !selectedIds.has(id);
+      onAnnounce(willBeSelected ? `${name} selected` : `${name} deselected`);
+    },
+    [onSelect, onAnnounce, selectedIds],
+  );
+
+  /** Arrow-key navigation: move focus between grid card elements */
+  const handleGridKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!gridRef.current) return;
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+
+      const cards = Array.from(
+        gridRef.current.querySelectorAll<HTMLElement>('[data-picker-card]'),
+      );
+      const focused = document.activeElement as HTMLElement;
+      const currentIndex = cards.indexOf(focused);
+      if (currentIndex === -1) return;
+
+      e.preventDefault();
+
+      // Determine columns count from computed style
+      const gridStyle = window.getComputedStyle(gridRef.current);
+      const colCount = gridStyle.gridTemplateColumns.split(' ').length || 2;
+
+      let nextIndex = currentIndex;
+      if (e.key === 'ArrowRight') nextIndex = currentIndex + 1;
+      else if (e.key === 'ArrowLeft') nextIndex = currentIndex - 1;
+      else if (e.key === 'ArrowDown') nextIndex = currentIndex + colCount;
+      else if (e.key === 'ArrowUp') nextIndex = currentIndex - colCount;
+
+      const target = nextIndex >= 0 && nextIndex < cards.length ? cards[nextIndex] : undefined;
+      target?.focus();
+    },
+    [],
+  );
+
   const isEmpty = !isLoading && items.length === 0;
   const hasTypeFilters = !!tab.typeFilters && tab.typeFilters.length > 0;
 
@@ -317,7 +377,7 @@ function TabContent<T>({ tab, selectedIds, onSelect }: TabContentProps<T>) {
 
       <ScrollArea className="h-[340px]">
         {isLoading ? (
-          <GridSkeleton count={6} />
+          <GridSkeleton count={8} />
         ) : isEmpty ? (
           <EmptyState
             message={
@@ -328,30 +388,69 @@ function TabContent<T>({ tab, selectedIds, onSelect }: TabContentProps<T>) {
           />
         ) : (
           <>
+            {/* aria-live region: announces selection changes to screen readers */}
             <div
-              className="grid grid-cols-2 gap-2 sm:grid-cols-3"
-              role="list"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className="sr-only"
+            >
+              {liveAnnouncement}
+            </div>
+
+            <div
+              ref={gridRef}
+              className="grid grid-cols-2 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+              role="listbox"
               aria-label={tab.label}
+              aria-multiselectable="true"
+              onKeyDown={handleGridKeyDown}
             >
               {items.map((item) => {
                 const id = tab.getId(item);
                 const isSelected = selectedIds.has(id);
+                const isAnimating = recentlySelected === id;
                 return (
                   <div
                     key={id}
-                    role="listitem"
-                    className="relative min-w-[160px] cursor-pointer"
-                    onClick={() => onSelect(id)}
+                    data-picker-card
+                    role="option"
+                    aria-selected={isSelected}
+                    className={cn(
+                      'relative min-w-[140px] cursor-pointer rounded-lg',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+                      // Selection flash animation on pick
+                      isAnimating && 'animate-picker-flash',
+                    )}
+                    onClick={() => {
+                      // Extract name from the rendered card's aria-label if available
+                      const el = gridRef.current?.querySelector<HTMLElement>(`[data-picker-card-id="${id}"]`);
+                      const name = el?.getAttribute('aria-label') ?? id;
+                      handleSelect(id, name);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        onSelect(id);
+                        handleSelect(id, id);
                       }
                     }}
                     tabIndex={0}
-                    aria-pressed={isSelected}
+                    data-picker-card-id={id}
                   >
                     {tab.renderCard(item, isSelected)}
+                    {/* Selection checkmark overlay — WCAG color-not-alone */}
+                    {isSelected && (
+                      <span
+                        className={cn(
+                          'pointer-events-none absolute right-2 top-2 z-10',
+                          'flex h-5 w-5 items-center justify-center rounded-full',
+                          'bg-primary text-primary-foreground shadow-sm',
+                        )}
+                        aria-hidden="true"
+                      >
+                        <Check className="h-3 w-3" strokeWidth={3} />
+                      </span>
+                    )}
                     {/* Selection ring overlay */}
                     {isSelected && (
                       <div
@@ -364,16 +463,16 @@ function TabContent<T>({ tab, selectedIds, onSelect }: TabContentProps<T>) {
               })}
             </div>
 
-            {/* Infinite scroll sentinel */}
-            {hasNextPage && (
-              <div ref={targetRef} className="flex justify-center py-4">
-                {isFetchingNextPage && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    Loading more...
-                  </div>
-                )}
+            {/* Inline skeleton row during pagination fetch */}
+            {isFetchingNextPage && (
+              <div className="mt-2">
+                <GridSkeleton count={4} />
               </div>
+            )}
+
+            {/* Infinite scroll sentinel */}
+            {hasNextPage && !isFetchingNextPage && (
+              <div ref={targetRef} className="h-4" aria-hidden="true" />
             )}
           </>
         )}
@@ -431,12 +530,16 @@ export function EntityPickerDialog<T = unknown>({
   // Internal multi-select accumulator; for single mode we bypass this
   const [pendingSelection, setPendingSelection] = useState<Set<string>>(new Set());
 
+  // Screen-reader live announcement (selection changes)
+  const [liveAnnouncement, setLiveAnnouncement] = useState('');
+
   // Sync pendingSelection from external value when dialog opens
   useEffect(() => {
     if (open) {
       const ids = Array.isArray(value) ? value : value ? [value] : [];
       setPendingSelection(new Set(ids));
       setActiveTabId(tabs[0]?.id ?? '');
+      setLiveAnnouncement('');
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -516,6 +619,8 @@ export function EntityPickerDialog<T = unknown>({
                 tab={tab}
                 selectedIds={pendingSelection}
                 onSelect={handleSelect}
+                liveAnnouncement={liveAnnouncement}
+                onAnnounce={setLiveAnnouncement}
               />
             </TabsContent>
           ))}
