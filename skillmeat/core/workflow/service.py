@@ -418,6 +418,9 @@ class WorkflowService:
 
     Attributes:
         repo: Underlying ``WorkflowRepository`` instance.
+        _sync_service: Optional ``WorkflowArtifactSyncService`` instance.  When
+            supplied, lifecycle events (create / update / delete) are mirrored to
+            the artifacts table via :meth:`_sync_artifact`.
 
     Example::
 
@@ -439,17 +442,97 @@ class WorkflowService:
         svc.delete(dto.id)
     """
 
-    def __init__(self, db_path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        db_path: Optional[str] = None,
+        sync_service: Optional[Any] = None,
+    ) -> None:
         """Initialise the service.
 
         Args:
             db_path: Optional path to the SQLite database file.  Uses the
                 default ``~/.skillmeat/cache/cache.db`` when ``None``.
+            sync_service: Optional :class:`~skillmeat.core.services.workflow_artifact_sync_service.WorkflowArtifactSyncService`
+                instance.  When supplied, post-write sync hooks call
+                :meth:`sync_from_workflow` on each successful create / update /
+                delete.  When ``None``, no artifact sync is performed.
         """
         from skillmeat.cache.workflow_repository import WorkflowRepository  # noqa: PLC0415 — lazy import avoids circular
 
         self.repo = WorkflowRepository(db_path=db_path)
+        self._sync_service = sync_service
         logger.info("WorkflowService initialised")
+
+    # =========================================================================
+    # Internal helpers — sync hooks
+    # =========================================================================
+
+    def _sync_artifact(
+        self,
+        workflow_id: str,
+        operation: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        version: Optional[str] = None,
+    ) -> None:
+        """Mirror a workflow lifecycle event to the artifacts table.
+
+        This method is a post-write hook that delegates to the injected
+        :attr:`_sync_service`.  It is a no-op when:
+
+        - No sync service was supplied at construction time.
+        - The ``workflow_artifact_sync_enabled`` feature flag in
+          :class:`~skillmeat.api.config.APISettings` is ``False``.
+
+        Failures are caught and logged so they can never affect the primary
+        write path (belt-and-suspenders on top of the isolation already
+        implemented inside ``WorkflowArtifactSyncService``).
+
+        Args:
+            workflow_id: DB primary key of the workflow that was written.
+            operation:   One of ``"create"``, ``"update"``, or ``"delete"``.
+            name:        Workflow display name (required for create/update).
+            description: Optional workflow description.
+            version:     Optional version string.
+        """
+        if self._sync_service is None:
+            return
+
+        # Feature-flag check — default to enabled when config is unavailable.
+        try:
+            from skillmeat.api.config import get_settings  # noqa: PLC0415 — lazy to avoid circular
+
+            sync_enabled: bool = getattr(
+                get_settings(), "workflow_artifact_sync_enabled", True
+            )
+        except ImportError:
+            sync_enabled = True
+
+        if not sync_enabled:
+            logger.debug(
+                "_sync_artifact: skipped (workflow_artifact_sync_enabled=False) "
+                "workflow_id=%s operation=%s",
+                workflow_id,
+                operation,
+            )
+            return
+
+        try:
+            self._sync_service.sync_from_workflow(
+                workflow_id=workflow_id,
+                operation=operation,
+                name=name,
+                description=description,
+                version=version,
+            )
+        except Exception as exc:  # noqa: BLE001 — deliberate broad catch
+            logger.error(
+                "WorkflowService._sync_artifact: unexpected error "
+                "workflow_id=%s operation=%s error=%r",
+                workflow_id,
+                operation,
+                exc,
+            )
 
     # =========================================================================
     # CRUD
@@ -523,6 +606,13 @@ class WorkflowService:
                 "version": created.version,
                 "project_id": project_id,
             },
+        )
+        self._sync_artifact(
+            workflow_id=created.id,
+            operation="create",
+            name=created.name,
+            description=created.description,
+            version=created.version,
         )
         return _workflow_orm_to_dto(created)
 
@@ -656,6 +746,13 @@ class WorkflowService:
                 "version": updated.version,
             },
         )
+        self._sync_artifact(
+            workflow_id=updated.id,
+            operation="update",
+            name=updated.name,
+            description=updated.description,
+            version=updated.version,
+        )
         return _workflow_orm_to_dto(updated)
 
     def delete(self, workflow_id: str) -> None:
@@ -688,6 +785,10 @@ class WorkflowService:
                 "workflow_id": workflow_id,
                 "workflow_name": _workflow_name_for_log,
             },
+        )
+        self._sync_artifact(
+            workflow_id=workflow_id,
+            operation="delete",
         )
 
     def duplicate(

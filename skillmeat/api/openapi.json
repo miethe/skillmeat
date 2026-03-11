@@ -11919,7 +11919,7 @@
           "deployment-sets"
         ],
         "summary": "Add a member to a deployment set",
-        "description": "Add an artifact, group, or nested deployment set as a member.\n\nFor nested set members (``nested_set_id`` provided), circular-reference\ndetection is performed before insertion.  If the proposed nesting would\ncreate a cycle, HTTP 422 is returned.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    request: Member creation payload (exactly one ref must be set).\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    The newly created member row.\n\nRaises:\n    HTTPException 404: If the parent set does not exist.\n    HTTPException 422: If adding the member would create a circular reference.",
+        "description": "Add an artifact, group, or nested deployment set as a member.\n\nFor nested set members (``nested_set_id`` provided), circular-reference\ndetection is performed before insertion.  If the proposed nesting would\ncreate a cycle, HTTP 422 is returned.\n\nArgs:\n    set_id: Primary key of the parent deployment set.\n    request: Member creation payload (exactly one ref must be set).\n    settings: API settings.\n    repo: DeploymentSetRepository dependency.\n    db: Per-request SQLAlchemy session (used for DeploymentSetService).\n\nReturns:\n    The newly created member row.\n\nRaises:\n    HTTPException 404: If the parent set or referenced workflow does not exist.\n    HTTPException 422: If adding the member would create a circular reference.",
         "operationId": "add_member_api_v1_deployment_sets__set_id__members_post",
         "parameters": [
           {
@@ -24095,7 +24095,7 @@
           "workflows"
         ],
         "summary": "Get workflow",
-        "description": "Retrieve a single workflow definition by ID.",
+        "description": "Retrieve a single workflow definition by ID.  Pass ``resolve_roles=true`` to include a ``resolved_roles`` field that maps each artifact role reference in the workflow's stages to its corresponding artifact in the collection (if one exists).",
         "operationId": "get_workflow_api_v1_workflows__workflow_id__get",
         "parameters": [
           {
@@ -24106,6 +24106,18 @@
               "type": "string",
               "title": "Workflow Id"
             }
+          },
+          {
+            "name": "resolve_roles",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, resolve each artifact role reference in the workflow stages against the artifact collection and include ``resolved_roles`` in the response.",
+              "default": false,
+              "title": "Resolve Roles"
+            },
+            "description": "When true, resolve each artifact role reference in the workflow stages against the artifact collection and include ``resolved_roles`` in the response."
           }
         ],
         "responses": {
@@ -27400,6 +27412,18 @@
             ],
             "title": "Visibility",
             "description": "Visibility level: 'private', 'team', or 'public'"
+          },
+          "workflow_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Id",
+            "description": "Workflow primary key (workflows.id) for type='workflow' artifacts; null for all other types."
           }
         },
         "type": "object",
@@ -42749,6 +42773,21 @@
               "9124ec6b03dd4578a0881a4cde186501"
             ]
           },
+          "workflow_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Id",
+            "description": "ID of the workflow definition to add as a member",
+            "examples": [
+              "data-pipeline-v1"
+            ]
+          },
           "position": {
             "anyOf": [
               {
@@ -42767,7 +42806,7 @@
         },
         "type": "object",
         "title": "MemberCreate",
-        "description": "Request to add a member to a deployment set.\n\nExactly one of artifact_uuid, group_id, or nested_set_id must be provided.",
+        "description": "Request to add a member to a deployment set.\n\nExactly one of artifact_uuid, group_id, nested_set_id, or workflow_id must\nbe provided.",
         "example": {
           "artifact_uuid": "550e8400-e29b-41d4-a716-446655440000",
           "position": 0
@@ -42851,14 +42890,27 @@
             "title": "Nested Set Id",
             "description": "ID of the nested deployment set (if member_type is 'set')"
           },
+          "workflow_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Id",
+            "description": "ID of the workflow definition (if member_type is 'workflow')"
+          },
           "member_type": {
             "type": "string",
             "title": "Member Type",
-            "description": "Type of member: 'artifact', 'group', or 'set'",
+            "description": "Type of member: 'artifact', 'group', 'set', or 'workflow'",
             "examples": [
               "artifact",
               "group",
-              "set"
+              "set",
+              "workflow"
             ]
           },
           "position": {

@@ -72,6 +72,9 @@ export interface ArtifactBrowseCardProps {
   /** Handler for navigating to the Manage page for this artifact */
   onManage?: (artifact: Artifact) => void;
 
+  /** Handler for navigating to the Workflow detail page (workflow artifacts only) */
+  onViewWorkflow?: (workflowId: string) => void;
+
   /** Whether to show collection badge (All Collections view) */
   showCollectionBadge?: boolean;
 
@@ -96,6 +99,7 @@ const artifactTypeBorderAccents: Record<ArtifactType, string> = {
   mcp: 'border-l-orange-500',
   hook: 'border-l-pink-500',
   composite: 'border-l-indigo-500',
+  workflow: 'border-l-cyan-500',
 };
 
 // Subtle background tints per artifact type
@@ -106,6 +110,7 @@ const artifactTypeCardTints: Record<ArtifactType, string> = {
   mcp: 'bg-orange-500/[0.02] dark:bg-orange-500/[0.03]',
   hook: 'bg-pink-500/[0.02] dark:bg-pink-500/[0.03]',
   composite: 'bg-indigo-500/[0.02] dark:bg-indigo-500/[0.03]',
+  workflow: 'bg-cyan-500/[0.02] dark:bg-cyan-500/[0.03]',
 };
 
 // Known tool names from the Tool enum for matching against tags
@@ -161,6 +166,7 @@ export function ArtifactBrowseCard({
   onTagClick,
   onGroupClick,
   onManage,
+  onViewWorkflow,
   showCollectionBadge = false,
   onCollectionClick,
   className,
@@ -695,7 +701,7 @@ export function ArtifactBrowseCard({
         </>
       )}
 
-      {/* Card action buttons: Collection (opens detail modal) + Manage (navigates to /manage) */}
+      {/* Card action buttons: Collection (opens detail modal) + Manage (navigates to /manage) + Workflow (navigates to /workflows/{id}) */}
       <div
         className="flex items-center gap-1 border-t px-4 py-2"
         onClick={(e) => e.stopPropagation()}
@@ -726,6 +732,21 @@ export function ArtifactBrowseCard({
           >
             <LucideIcons.Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
             Manage
+          </Button>
+        )}
+        {artifact.type === 'workflow' && artifact.workflow_id && onViewWorkflow && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-xs text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300"
+            aria-label={`View workflow detail for ${artifact.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewWorkflow(artifact.workflow_id!);
+            }}
+          >
+            <LucideIcons.GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
+            Workflow
           </Button>
         )}
       </div>

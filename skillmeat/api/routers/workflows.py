@@ -118,6 +118,25 @@ class WorkflowPlanRequest(BaseModel):
     parameters: Optional[Dict[str, Any]] = None
 
 
+class ResolvedRole(BaseModel):
+    """Resolved artifact role from a workflow stage.
+
+    Attributes:
+        role_name:     The original ``<type>:<name>`` role string from the
+                       workflow stage definition.
+        resolved:      ``True`` when the role matched an artifact in the DB.
+        artifact_id:   The matched ``Artifact.id`` (``<type>:<name>`` PK).
+                       ``None`` when ``resolved`` is ``False``.
+        artifact_name: The matched artifact's display name.  ``None`` when
+                       ``resolved`` is ``False``.
+    """
+
+    role_name: str
+    resolved: bool
+    artifact_id: Optional[str] = None
+    artifact_name: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -159,6 +178,63 @@ def _get_service() -> WorkflowService:
         Fresh ``WorkflowService`` instance.
     """
     return WorkflowService()
+
+
+def _resolve_workflow_roles(workflow_id: str) -> List[Dict[str, Any]]:
+    """Resolve all artifact role references in a workflow's stages.
+
+    Opens a short-lived DB session via the cache layer, delegates resolution
+    to ``ArtifactReferenceValidator``, and converts the result to a list of
+    :class:`ResolvedRole`-compatible dicts.  All errors are caught and logged
+    so that a resolution failure never surfaces as an HTTP error on the parent
+    endpoint.
+
+    Args:
+        workflow_id: DB primary key of the workflow to resolve.
+
+    Returns:
+        List of dicts with keys ``role_name``, ``resolved``, ``artifact_id``
+        (optional), and ``artifact_name`` (optional).  Returns an empty list
+        on any error.
+    """
+    try:
+        from skillmeat.cache.models import get_session  # noqa: PLC0415
+        from skillmeat.core.services.artifact_reference_validator import (  # noqa: PLC0415
+            ArtifactReferenceValidator,
+        )
+
+        session = get_session()
+        validator = ArtifactReferenceValidator(session)
+        resolution = validator.resolve_stage_roles(workflow_id)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Failed to resolve artifact roles for workflow %s", workflow_id
+        )
+        return []
+
+    roles: List[Dict[str, Any]] = []
+
+    for entry in resolution.resolved:
+        roles.append(
+            {
+                "role_name": entry["role_string"],
+                "resolved": True,
+                "artifact_id": entry["artifact_id"],
+                "artifact_name": entry["name"],
+            }
+        )
+
+    for role_string in resolution.unresolved:
+        roles.append(
+            {
+                "role_name": role_string,
+                "resolved": False,
+                "artifact_id": None,
+                "artifact_name": None,
+            }
+        )
+
+    return roles
 
 
 # ---------------------------------------------------------------------------
@@ -299,20 +375,39 @@ async def batch_delete_workflows(
 @router.get(
     "/{workflow_id}",
     summary="Get workflow",
-    description="Retrieve a single workflow definition by ID.",
+    description=(
+        "Retrieve a single workflow definition by ID.  "
+        "Pass ``resolve_roles=true`` to include a ``resolved_roles`` field that "
+        "maps each artifact role reference in the workflow's stages to its "
+        "corresponding artifact in the collection (if one exists)."
+    ),
     status_code=status.HTTP_200_OK,
 )
 async def get_workflow(
     workflow_id: str,
+    resolve_roles: bool = Query(
+        False,
+        description=(
+            "When true, resolve each artifact role reference in the workflow "
+            "stages against the artifact collection and include ``resolved_roles`` "
+            "in the response."
+        ),
+    ),
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> Dict[str, Any]:
     """Retrieve a workflow by its primary key.
 
     Args:
-        workflow_id: UUID hex string identifying the workflow.
+        workflow_id:   UUID hex string identifying the workflow.
+        resolve_roles: When ``True``, include ``resolved_roles`` in the
+                       response body — a list of :class:`ResolvedRole` dicts
+                       showing whether each artifact role reference in the
+                       workflow's stages matched a known artifact.  Defaults to
+                       ``False``; resolution is **not** computed unless
+                       explicitly requested (performance opt-in).
 
     Returns:
-        Workflow dict (HTTP 200).
+        Workflow dict (HTTP 200), optionally extended with ``resolved_roles``.
 
     Raises:
         HTTPException 404: If no workflow with ``workflow_id`` exists.
@@ -333,7 +428,12 @@ async def get_workflow(
             detail="Failed to retrieve workflow.",
         ) from exc
 
-    return _dto_to_dict(dto)
+    result = _dto_to_dict(dto)
+
+    if resolve_roles:
+        result["resolved_roles"] = _resolve_workflow_roles(workflow_id)
+
+    return result
 
 
 @router.put(

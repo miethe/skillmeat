@@ -5094,13 +5094,14 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
         artifact_uuid: Optional[str] = None,
         group_id: Optional[str] = None,
         member_set_id: Optional[str] = None,
+        workflow_id: Optional[str] = None,
         position: Optional[int] = None,
     ) -> DeploymentSetMember:
         """Add a member to a DeploymentSet.
 
-        Exactly one of ``artifact_uuid``, ``group_id``, or ``member_set_id``
-        must be provided — this mirrors the DB CHECK constraint and produces
-        a clear error before the row is even attempted.
+        Exactly one of ``artifact_uuid``, ``group_id``, ``member_set_id``, or
+        ``workflow_id`` must be provided — this mirrors the DB CHECK constraint
+        and produces a clear error before the row is even attempted.
 
         If ``position`` is omitted, the member is appended after the current
         maximum position (``max_position + 1``).  If the set has no existing
@@ -5112,6 +5113,7 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
             artifact_uuid: Collection artifact UUID (ADR-007 stable identity).
             group_id: Artifact group id.
             member_set_id: Nested deployment set id.
+            workflow_id: Workflow definition id.
             position: Explicit 0-based ordering position.  Auto-assigned
                 when omitted.
 
@@ -5129,12 +5131,13 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 artifact_uuid is not None,
                 group_id is not None,
                 member_set_id is not None,
+                workflow_id is not None,
             ]
         )
         if refs_provided != 1:
             raise ValueError(
-                "Exactly one of artifact_uuid, group_id, or member_set_id must be "
-                f"provided (got {refs_provided} non-null values)."
+                "Exactly one of artifact_uuid, group_id, member_set_id, or workflow_id "
+                f"must be provided (got {refs_provided} non-null values)."
             )
 
         session = self._get_session()
@@ -5167,6 +5170,7 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 artifact_uuid=artifact_uuid,
                 group_id=group_id,
                 member_set_id=member_set_id,
+                workflow_id=workflow_id,
                 position=position,
                 created_at=datetime.utcnow(),
             )

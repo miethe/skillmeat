@@ -40,7 +40,7 @@ from skillmeat.api.schemas.deployment_sets import (
     ResolvedArtifactItem,
     ResolveResponse,
 )
-from skillmeat.cache.models import DeploymentSet, DeploymentSetMember
+from skillmeat.cache.models import DeploymentSet, DeploymentSetMember, Workflow, get_session
 from skillmeat.cache.repositories import RepositoryError
 from skillmeat.core.deployment_sets import DeploymentSetService
 from skillmeat.core.exceptions import DeploymentSetCycleError, DeploymentSetResolutionError
@@ -94,6 +94,8 @@ def _member_type(member: DeploymentSetMember) -> str:
         return "artifact"
     if member.group_id is not None:
         return "group"
+    if member.workflow_id is not None:
+        return "workflow"
     return "set"
 
 
@@ -105,6 +107,7 @@ def _member_to_response(member: DeploymentSetMember) -> MemberResponse:
         artifact_uuid=member.artifact_uuid,
         group_id=member.group_id,
         nested_set_id=member.member_set_id,
+        workflow_id=member.workflow_id,
         member_type=_member_type(member),
         position=member.position,
         added_at=member.created_at,
@@ -402,6 +405,7 @@ def clone_deployment_set(
                 artifact_uuid=member.artifact_uuid,
                 group_id=member.group_id,
                 member_set_id=member.member_set_id,
+                workflow_id=member.workflow_id,
                 position=member.position,
             )
     except RepositoryError as exc:
@@ -493,7 +497,7 @@ def add_member(
         The newly created member row.
 
     Raises:
-        HTTPException 404: If the parent set does not exist.
+        HTTPException 404: If the parent set or referenced workflow does not exist.
         HTTPException 422: If adding the member would create a circular reference.
     """
     owner_id = _get_owner_id(settings)
@@ -506,6 +510,24 @@ def add_member(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Deployment set '{set_id}' not found.",
         )
+
+    # Validate referenced workflow exists (SQLite does not enforce FK constraints by
+    # default, so we perform an explicit pre-flight check to return 404 rather than
+    # silently creating a dangling reference).
+    if request.workflow_id is not None:
+        workflow_exists = (
+            db.query(Workflow).filter(Workflow.id == request.workflow_id).first()
+        )
+        if workflow_exists is None:
+            logger.warning(
+                "Workflow not found for add_member: workflow_id=%s set_id=%s",
+                request.workflow_id,
+                set_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Workflow '{request.workflow_id}' not found.",
+            )
 
     try:
         svc = DeploymentSetService(session=db)
@@ -531,12 +553,13 @@ def add_member(
                     detail="This would create a circular reference",
                 ) from exc
         else:
-            # Artifact or group members — no cycle risk
+            # Artifact, group, or workflow members — no cycle risk
             member = repo.add_member(
                 set_id,
                 owner_id,
                 artifact_uuid=request.artifact_uuid,
                 group_id=request.group_id,
+                workflow_id=request.workflow_id,
                 position=request.position,
             )
     except (RepositoryError, ValueError) as exc:

@@ -146,13 +146,14 @@ class DeploymentSetService:
         member_set_id: Optional[str] = None,
         artifact_uuid: Optional[str] = None,
         group_id: Optional[str] = None,
+        workflow_id: Optional[str] = None,
         position: Optional[int] = None,
     ):
         """Add a member to *set_id*, performing cycle detection for set-type members.
 
         For set-type members (``member_set_id`` is provided) this method calls
-        :meth:`_check_cycle` before delegating to the repository.  Artifact and
-        group members cannot form cycles so they bypass the check.
+        :meth:`_check_cycle` before delegating to the repository.  Artifact,
+        group, and workflow members cannot form cycles so they bypass the check.
 
         Args:
             set_id: Primary key of the parent deployment set.
@@ -160,6 +161,7 @@ class DeploymentSetService:
             member_set_id: Nested deployment set to add.  Triggers cycle check.
             artifact_uuid: Collection artifact UUID.  No cycle check.
             group_id: Artifact group id.  No cycle check.
+            workflow_id: Workflow definition id.  No cycle check.
             position: Explicit 0-based ordering position.  Auto-assigned when
                 omitted.
 
@@ -191,6 +193,7 @@ class DeploymentSetService:
             artifact_uuid=artifact_uuid,
             group_id=group_id,
             member_set_id=member_set_id,
+            workflow_id=workflow_id,
             position=position,
         )
 

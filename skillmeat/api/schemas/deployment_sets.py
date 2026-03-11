@@ -177,7 +177,8 @@ class DeploymentSetListResponse(BaseModel):
 class MemberCreate(BaseModel):
     """Request to add a member to a deployment set.
 
-    Exactly one of artifact_uuid, group_id, or nested_set_id must be provided.
+    Exactly one of artifact_uuid, group_id, nested_set_id, or workflow_id must
+    be provided.
     """
 
     artifact_uuid: Optional[str] = Field(
@@ -195,6 +196,11 @@ class MemberCreate(BaseModel):
         description="ID of the nested deployment set to add as a member (UUID hex)",
         examples=["9124ec6b03dd4578a0881a4cde186501"],
     )
+    workflow_id: Optional[str] = Field(
+        default=None,
+        description="ID of the workflow definition to add as a member",
+        examples=["data-pipeline-v1"],
+    )
     position: Optional[int] = Field(
         default=None,
         description="Optional ordering position within the set",
@@ -203,20 +209,27 @@ class MemberCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_exactly_one_ref(self) -> "MemberCreate":
-        """Ensure exactly one of artifact_uuid, group_id, nested_set_id is set."""
-        refs = [
-            self.artifact_uuid is not None,
-            self.group_id is not None,
-            self.nested_set_id is not None,
-        ]
-        count = sum(refs)
+        """Ensure exactly one of artifact_uuid, group_id, nested_set_id, or workflow_id is set."""
+        provided = {
+            name: value
+            for name, value in [
+                ("artifact_uuid", self.artifact_uuid),
+                ("group_id", self.group_id),
+                ("nested_set_id", self.nested_set_id),
+                ("workflow_id", self.workflow_id),
+            ]
+            if value is not None
+        }
+        count = len(provided)
         if count == 0:
             raise ValueError(
-                "Exactly one of 'artifact_uuid', 'group_id', or 'nested_set_id' must be provided"
+                "Exactly one of 'artifact_uuid', 'group_id', 'nested_set_id', or "
+                "'workflow_id' must be provided"
             )
         if count > 1:
+            field_names = ", ".join(f"'{f}'" for f in provided)
             raise ValueError(
-                "Only one of 'artifact_uuid', 'group_id', or 'nested_set_id' may be provided"
+                f"Only one member reference field may be provided; got {count}: {field_names}"
             )
         return self
 
@@ -266,9 +279,13 @@ class MemberResponse(BaseModel):
         default=None,
         description="ID of the nested deployment set (if member_type is 'set')",
     )
+    workflow_id: Optional[str] = Field(
+        default=None,
+        description="ID of the workflow definition (if member_type is 'workflow')",
+    )
     member_type: str = Field(
-        description="Type of member: 'artifact', 'group', or 'set'",
-        examples=["artifact", "group", "set"],
+        description="Type of member: 'artifact', 'group', 'set', or 'workflow'",
+        examples=["artifact", "group", "set", "workflow"],
     )
     position: Optional[int] = Field(
         default=None,
@@ -288,6 +305,7 @@ class MemberResponse(BaseModel):
                 "artifact_uuid": "550e8400-e29b-41d4-a716-446655440000",
                 "group_id": None,
                 "nested_set_id": None,
+                "workflow_id": None,
                 "member_type": "artifact",
                 "position": 0,
                 "added_at": "2026-02-24T10:00:00Z",
