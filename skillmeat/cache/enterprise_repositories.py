@@ -81,6 +81,8 @@ from sqlalchemy.sql import Select
 
 from skillmeat.cache.constants import DEFAULT_TENANT_ID
 
+from skillmeat.core.interfaces.repositories import IDbUserCollectionRepository
+
 if TYPE_CHECKING:
     from skillmeat.api.schemas.auth import AuthContext
 
@@ -2107,7 +2109,7 @@ class EnterpriseCollectionRepository(
 # =============================================================================
 
 
-class EnterpriseUserCollectionAdapter:
+class EnterpriseUserCollectionAdapter(IDbUserCollectionRepository):
     """Adapts :class:`EnterpriseCollectionRepository` to
     :class:`~skillmeat.core.interfaces.repositories.IDbUserCollectionRepository`.
 
