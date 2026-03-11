@@ -98,7 +98,7 @@ tasks:
   effort: 1
 - id: WAW-P3.1
   name: Deployment set schema
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -106,7 +106,7 @@ tasks:
   effort: 2
 - id: WAW-P3.2
   name: Deployment set API handler
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -114,7 +114,7 @@ tasks:
   effort: 2
 - id: WAW-P3.3
   name: Collection listing endpoint
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -122,7 +122,7 @@ tasks:
   effort: 1
 - id: WAW-P3.4
   name: Workflow detail resolve_roles
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -130,7 +130,7 @@ tasks:
   effort: 1
 - id: WAW-P3.5
   name: OpenAPI documentation
-  status: pending
+  status: completed
   assigned_to:
   - openapi-expert
   dependencies:
@@ -271,10 +271,10 @@ parallelization:
   batch_10:
   - WAW-P5.6
 total_tasks: 26
-completed_tasks: 9
+completed_tasks: 14
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 34
+progress: 53
 ---
 
 # Workflow-Artifact Wiring — All Phases Progress
