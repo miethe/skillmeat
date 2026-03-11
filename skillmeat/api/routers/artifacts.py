@@ -146,7 +146,10 @@ from skillmeat.api.services.artifact_cache_service import (
 )
 from skillmeat.api.schemas.deployments import DeploymentSummary
 from skillmeat.cache.composite_repository import CompositeMembershipRepository
-from skillmeat.cache.models import get_session
+from skillmeat.cache.models import (
+    Artifact as DbArtifact,
+    get_session,
+)
 from skillmeat.observability.timing import PerfTimer
 
 logger = logging.getLogger(__name__)
@@ -764,6 +767,141 @@ async def build_version_graph(
     )
 
 
+def _list_workflow_artifacts_from_db(
+    db_session,
+    limit: int,
+    after: Optional[str],
+    search: Optional[str],
+    start_time: float,
+) -> "ArtifactListResponse":
+    """Return a paginated ArtifactListResponse for workflow-type artifacts from the DB.
+
+    Workflow artifacts are synced into the ``artifacts`` table by
+    :class:`~skillmeat.core.services.workflow_artifact_sync_service.WorkflowArtifactSyncService`
+    and have no filesystem representation.  This helper bypasses the collection
+    manager and queries the DB directly, ensuring the response shape matches the
+    standard ArtifactListResponse including the ``workflow_id`` field populated
+    from ``ArtifactMetadata.metadata_json``.
+
+    No N+1 queries: the ``artifact_metadata`` relationship is ``lazy="selectin"``
+    on the ORM model, so a single joined query loads metadata for all rows.
+
+    Args:
+        db_session: Active SQLAlchemy session (from ``DbSessionDep``).
+        limit: Maximum number of items per page.
+        after: Opaque cursor string for keyset pagination.
+        search: Optional substring filter applied to ``name`` and ``description``.
+        start_time: ``time.perf_counter()`` timestamp taken at the start of the
+            parent request handler (used only for duration logging).
+
+    Returns:
+        Fully populated :class:`ArtifactListResponse`.
+    """
+    query = (
+        db_session.query(DbArtifact)
+        .filter(DbArtifact.type == "workflow")
+        .order_by(DbArtifact.name)
+    )
+
+    # Optional substring search on name / description
+    if search:
+        search_lower = search.lower()
+        # SQLite LIKE is case-insensitive for ASCII by default; use Python filter
+        # for a consistent cross-dialect experience and to match the FS path.
+        all_rows: List[DbArtifact] = query.all()
+        all_rows = [
+            r
+            for r in all_rows
+            if search_lower in r.name.lower()
+            or (r.description and search_lower in r.description.lower())
+        ]
+    else:
+        all_rows = query.all()
+
+    total_count = len(all_rows)
+
+    # Decode cursor (format: artifact_id = "workflow:<name>")
+    start_idx = 0
+    if after:
+        cursor_value = decode_cursor(after)
+        artifact_keys = [r.id for r in all_rows]
+        try:
+            start_idx = artifact_keys.index(cursor_value) + 1
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid cursor: workflow artifact not found",
+            )
+
+    end_idx = start_idx + limit
+    page_rows: List[DbArtifact] = all_rows[start_idx:end_idx]
+
+    items: List[ArtifactResponse] = []
+    for row in page_rows:
+        # Extract workflow_id from metadata_json (stored by WorkflowArtifactSyncRepository)
+        wf_id: Optional[str] = None
+        if row.artifact_metadata and row.artifact_metadata.metadata_json:
+            try:
+                payload = json.loads(row.artifact_metadata.metadata_json)
+                wf_id = payload.get("workflow_id")
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        now = datetime.utcnow()
+        items.append(
+            ArtifactResponse(
+                id=row.id,
+                uuid=row.uuid,
+                name=row.name,
+                type="workflow",
+                source="local",
+                origin="local",
+                origin_source=None,
+                version=row.deployed_version or "unknown",
+                aliases=[],
+                tags=[],
+                target_platforms=None,
+                metadata=(
+                    ArtifactMetadataResponse(
+                        description=row.artifact_metadata.description
+                        if row.artifact_metadata
+                        else None,
+                    )
+                    if row.artifact_metadata
+                    else None
+                ),
+                upstream=None,
+                collections=[],
+                deployments=None,
+                added=row.created_at or now,
+                updated=row.updated_at or now,
+                workflow_id=wf_id,
+            )
+        )
+
+    has_next = end_idx < total_count
+    has_previous = start_idx > 0
+
+    start_cursor = encode_cursor(page_rows[0].id) if page_rows else None
+    end_cursor = encode_cursor(page_rows[-1].id) if page_rows else None
+
+    page_info = PageInfo(
+        has_next_page=has_next,
+        has_previous_page=has_previous,
+        start_cursor=start_cursor,
+        end_cursor=end_cursor,
+        total_count=total_count,
+    )
+
+    elapsed = time.perf_counter() - start_time
+    logger.debug(
+        "Workflow artifact DB list completed",
+        extra={"elapsed_ms": round(elapsed * 1000, 2), "artifact_count": len(items)},
+    )
+    logger.info(f"Retrieved {len(items)} workflow artifacts from DB")
+    return ArtifactListResponse(items=items, page_info=page_info)
+
+
 def artifact_to_response(
     artifact,
     drift_status: Optional[str] = None,
@@ -772,6 +910,7 @@ def artifact_to_response(
     db_source: Optional[str] = None,
     deployments: Optional[List[DeploymentSummary]] = None,
     db_uuid: Optional[str] = None,
+    workflow_id: Optional[str] = None,
 ) -> ArtifactResponse:
     """Convert Artifact model to API response schema.
 
@@ -853,6 +992,7 @@ def artifact_to_response(
         deployments=deployments,
         added=artifact.added,
         updated=artifact.last_updated or artifact.added,
+        workflow_id=workflow_id,
     )
 
 
@@ -2116,6 +2256,24 @@ async def list_artifacts(
         tag_filter = None
         if tags:
             tag_filter = [t.strip() for t in tags.split(",") if t.strip()]
+
+        # Workflow artifacts live exclusively in the DB (synced by
+        # WorkflowArtifactSyncService) — they have no filesystem representation.
+        # When the caller filters by type=workflow we short-circuit directly to
+        # a DB query and return early with a properly shaped paginated response.
+        _only_workflow = type_filter == ArtifactType.WORKFLOW or (
+            isinstance(type_filter, list)
+            and len(type_filter) == 1
+            and type_filter[0] == ArtifactType.WORKFLOW
+        )
+        if _only_workflow:
+            return _list_workflow_artifacts_from_db(
+                db_session=db_session,
+                limit=limit,
+                after=after,
+                search=search,
+                start_time=start_time,
+            )
 
         # Get artifacts from specified collection or all collections
         if collection:

@@ -388,6 +388,10 @@ class ArtifactResponse(BaseModel):
         default=None,
         description="Visibility level: 'private', 'team', or 'public'",
     )
+    workflow_id: Optional[str] = Field(
+        default=None,
+        description="Workflow primary key (workflows.id) for type='workflow' artifacts; null for all other types.",
+    )
 
     class Config:
         """Pydantic model configuration."""
