@@ -40,7 +40,7 @@ from skillmeat.api.schemas.deployment_sets import (
     ResolvedArtifactItem,
     ResolveResponse,
 )
-from skillmeat.cache.models import DeploymentSet, DeploymentSetMember, Workflow
+from skillmeat.cache.models import DeploymentSet, DeploymentSetMember, Workflow, get_session
 from skillmeat.cache.repositories import RepositoryError
 from skillmeat.core.deployment_sets import DeploymentSetService
 from skillmeat.core.exceptions import DeploymentSetCycleError, DeploymentSetResolutionError
