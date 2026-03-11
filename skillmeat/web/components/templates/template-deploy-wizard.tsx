@@ -189,7 +189,7 @@ export function TemplateDeployWizard({
 
     try {
       // Build API URL
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
       const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
       const url = `${API_BASE}/api/${API_VERSION}/project-templates/${template.id}/deploy`;
 

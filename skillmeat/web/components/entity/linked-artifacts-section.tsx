@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 import { X, Link as LinkIcon, AlertCircle, Plus, RefreshCw, Loader2 } from 'lucide-react';
 import type { LinkType } from './artifact-linking-dialog';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
 
 function buildUrl(path: string): string {
