@@ -1,7 +1,7 @@
 """add supplementary auth indexes: owner_id on entity tables, enterprise_team_members composites
 
-Revision ID: 20260306_006_add_auth_indexes_constraints
-Revises: 20260306_005_populate_local_admin_defaults
+Revision ID: ent_006_auth_indexes
+Revises: ent_005_local_admin
 Create Date: 2026-03-06 00:06:00.000000+00:00
 
 Background
@@ -58,8 +58,8 @@ from alembic import op
 # Revision identifiers
 # ---------------------------------------------------------------------------
 
-revision: str = "20260306_006_add_auth_indexes_constraints"
-down_revision: Union[str, None] = "20260306_005_populate_local_admin_defaults"
+revision: str = "ent_006_auth_indexes"
+down_revision: Union[str, None] = "ent_005_local_admin"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

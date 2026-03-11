@@ -1,7 +1,7 @@
 """add auth schema: users, teams, team_members tables and ownership columns
 
-Revision ID: 20260306_003_add_auth_schema_local
-Revises: 20260306_002_add_tenant_isolation
+Revision ID: ent_003_auth_local
+Revises: ent_002_tenant_isolation
 Create Date: 2026-03-06 00:03:00.000000+00:00
 
 Background
@@ -77,8 +77,8 @@ from sqlalchemy import inspect as sa_inspect
 # Revision identifiers
 # ---------------------------------------------------------------------------
 
-revision: str = "20260306_003_add_auth_schema_local"
-down_revision: Union[str, None] = "20260306_002_add_tenant_isolation"
+revision: str = "ent_003_auth_local"
+down_revision: Union[str, None] = "ent_002_tenant_isolation"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

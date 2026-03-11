@@ -1,7 +1,7 @@
 """add PostgreSQL full-text search (tsvector) to marketplace_catalog_entries
 
-Revision ID: 20260310_0001_add_pg_fulltext_search
-Revises: 20260306_006_add_auth_indexes_constraints
+Revision ID: pg_001_fulltext_search
+Revises: ent_006_auth_indexes
 Create Date: 2026-03-10 00:01:00.000000+00:00
 
 Background
@@ -53,8 +53,8 @@ from sqlalchemy import text
 # Revision identifiers
 # ---------------------------------------------------------------------------
 
-revision: str = "20260310_0001_add_pg_fulltext_search"
-down_revision: Union[str, None] = "20260306_006_add_auth_indexes_constraints"
+revision: str = "pg_001_fulltext_search"
+down_revision: Union[str, None] = "ent_006_auth_indexes"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

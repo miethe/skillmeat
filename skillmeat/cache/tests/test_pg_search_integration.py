@@ -1,7 +1,7 @@
 """Integration tests for PostgreSQL tsvector full-text search.
 
 These tests exercise the ``search_vector`` column, GIN index, and trigger that
-are added by migration ``20260310_0001_add_pg_fulltext_search``.  They also
+are added by migration ``pg_001_fulltext_search``.  They also
 validate the ``MarketplaceCatalogRepository.search()`` and
 ``_search_tsvector()`` methods end-to-end against a real PostgreSQL database.
 
@@ -300,7 +300,7 @@ def test_migration_creates_search_vector_column(
     assert _SEARCH_VECTOR_COL in columns, (
         f"Column '{_SEARCH_VECTOR_COL}' not found in {_CATALOG_TABLE} after "
         "running migrations to head.  Check that "
-        "20260310_0001_add_pg_fulltext_search ran successfully."
+        "pg_001_fulltext_search ran successfully."
     )
 
 

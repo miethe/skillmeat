@@ -1,7 +1,7 @@
 """add enterprise auth schema: enterprise_users, enterprise_teams, enterprise_team_members, ownership columns
 
-Revision ID: 20260306_004_add_auth_schema_enterprise
-Revises: 20260306_003_add_auth_schema_local
+Revision ID: ent_004_auth_enterprise
+Revises: ent_003_auth_local
 Create Date: 2026-03-06 00:04:00.000000+00:00
 
 Background
@@ -63,8 +63,8 @@ from sqlalchemy.dialects import postgresql
 # Revision identifiers
 # ---------------------------------------------------------------------------
 
-revision: str = "20260306_004_add_auth_schema_enterprise"
-down_revision: Union[str, None] = "20260306_003_add_auth_schema_local"
+revision: str = "ent_004_auth_enterprise"
+down_revision: Union[str, None] = "ent_003_auth_local"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

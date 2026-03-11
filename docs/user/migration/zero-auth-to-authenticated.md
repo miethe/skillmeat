@@ -125,7 +125,7 @@ cd /path/to/skillmeat
 
 # Show current revision
 alembic current
-# Output: 20260306_001_create_enterprise_schema (or similar)
+# Output: ent_001_enterprise_schema (or similar)
 
 # Show pending migrations
 alembic upgrade --sql head
@@ -139,25 +139,25 @@ alembic upgrade --sql head
 alembic upgrade head
 
 # Output (local mode):
-# INFO  [alembic.migration] Running upgrade 20260306_001_create_enterprise_schema -> 20260306_002_add_tenant_isolation
-# INFO  [alembic.migration] Running upgrade 20260306_002_add_tenant_isolation -> 20260306_003_add_auth_schema_local
-# INFO  [alembic.migration] Running upgrade 20260306_003_add_auth_schema_local -> 20260306_004_add_auth_schema_enterprise
+# INFO  [alembic.migration] Running upgrade ent_001_enterprise_schema -> ent_002_tenant_isolation
+# INFO  [alembic.migration] Running upgrade ent_002_tenant_isolation -> ent_003_auth_local
+# INFO  [alembic.migration] Running upgrade ent_003_auth_local -> ent_004_auth_enterprise
 # INFO  [alembic.ddl.sqlite] Skipping enterprise migration for SQLite
 # INFO  [alembic.migration] upgrade complete
 ```
 
 **What migrations do:**
 
-- **20260306_002**: Adds `tenant_id` to collections (PostgreSQL only; no-op for SQLite)
-- **20260306_003**: Creates `users`, `teams`, `team_members` tables (SQLite)
-- **20260306_004**: Creates `enterprise_users`, `enterprise_teams`, `enterprise_team_members` tables (PostgreSQL only)
+- **ent_002**: Adds `tenant_id` to collections (PostgreSQL only; no-op for SQLite)
+- **ent_003**: Creates `users`, `teams`, `team_members` tables (SQLite)
+- **ent_004**: Creates `enterprise_users`, `enterprise_teams`, `enterprise_team_members` tables (PostgreSQL only)
 - **All migrations**: Add `owner_id`, `owner_type`, `visibility` columns to artifact-holding tables
 
 **2.3 Verify migrations applied:**
 
 ```bash
 alembic current
-# Output: 20260306_004_add_auth_schema_enterprise (or final migration)
+# Output: ent_004_auth_enterprise (or final migration)
 
 # For PostgreSQL, verify new tables
 psql -c "\dt enterprise_users;" # Shows table
@@ -632,7 +632,7 @@ To remove the new auth schema entirely:
 
 ```bash
 # Downgrade migrations
-alembic downgrade 20260306_001_create_enterprise_schema
+alembic downgrade ent_001_enterprise_schema
 
 # Verify it's downgraded
 alembic current

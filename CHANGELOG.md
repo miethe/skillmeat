@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### PostgreSQL Full-Text Search Backend (2026-03-10)
 
 - `TSVector` column added to `MarketplaceCatalogEntry` model for native PG full-text search
-- New Alembic migration `20260310_0001_add_pg_fulltext_search.py` with tsvector column, GIN index, and trigger-based auto-update
+- New Alembic migration `pg_001_fulltext_search.py` with tsvector column, GIN index, and trigger-based auto-update
 - Dialect-aware backend detection: automatically selects tsvector (PostgreSQL) or FTS5 (SQLite) at startup
 - `repositories.py` updated with `search_catalog_pg()` using `to_tsquery` / `plainto_tsquery` for ranked results
 - `/api/v1/marketplace/catalog/search` endpoint wired to PG backend when available

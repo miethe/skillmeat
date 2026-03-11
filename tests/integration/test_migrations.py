@@ -11,7 +11,7 @@ TestMigrationRollback
     test_upgrade_creates_enterprise_tables
         Apply head; assert all four enterprise tables exist.
     test_downgrade_removes_tenant_isolation
-        Downgrade one step (20260306_002 -> 20260306_001); verify
+        Downgrade one step (ent_002 -> ent_001); verify
         tenant_id column is gone from collections but enterprise tables remain.
     test_full_downgrade_removes_enterprise_tables
         Downgrade to the pre-enterprise base revision; verify all four
@@ -34,7 +34,7 @@ before running to enable these tests.
 
 Alembic + CONCURRENTLY
 -----------------------
-The 20260306_001 migration creates GIN and partial indexes with
+The ent_001 migration creates GIN and partial indexes with
 ``CREATE INDEX CONCURRENTLY``.  CONCURRENTLY cannot run inside an explicit
 transaction block.  We therefore connect with ``AUTOCOMMIT`` isolation level
 and run migrations with ``transaction_per_migration=False`` so Alembic does
@@ -104,8 +104,8 @@ _ALEMBIC_INI = os.path.join(
 _BASE_REVISION = "20260303_1100_add_workflow_to_artifact_type_check"
 
 # Revision IDs for the two enterprise migrations.
-_ENT_001 = "20260306_001_create_enterprise_schema"
-_ENT_002 = "20260306_002_add_tenant_isolation"
+_ENT_001 = "ent_001_enterprise_schema"
+_ENT_002 = "ent_002_tenant_isolation"
 
 # The four enterprise tables introduced by ENT-1.7.
 _ENTERPRISE_TABLES = frozenset(
@@ -265,7 +265,7 @@ class TestMigrationRollback:
         """Applying 'upgrade head' must create all four enterprise tables.
 
         Starting state: any revision (we upgrade to head unconditionally).
-        Ending state: head (20260306_002_add_tenant_isolation).
+        Ending state: head (ent_002_tenant_isolation).
 
         Verified:
         - All four enterprise tables exist.
@@ -320,9 +320,9 @@ class TestMigrationRollback:
         """Downgrading one step must remove tenant_id from collections only.
 
         Starting state: head (set by previous test).
-        Ending state: 20260306_001_create_enterprise_schema.
+        Ending state: ent_001_enterprise_schema.
 
-        The downgrade of 20260306_002 must:
+        The downgrade of ent_002 must:
         - Drop ``idx_collections_tenant_id`` index.
         - Drop the ``tenant_id`` column from ``collections``.
         - Leave the four enterprise tables intact.
@@ -369,7 +369,7 @@ class TestMigrationRollback:
     ):
         """Downgrading to the pre-enterprise base revision drops all four tables.
 
-        Starting state: 20260306_001 (set by previous test).
+        Starting state: ent_001 (set by previous test).
         Ending state: 20260303_1100_add_workflow_to_artifact_type_check.
 
         Verified:

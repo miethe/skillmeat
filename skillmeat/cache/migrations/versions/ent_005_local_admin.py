@@ -1,7 +1,7 @@
 """Populate local_admin user and backfill ownership on existing rows
 
-Revision ID: 20260306_005_populate_local_admin_defaults
-Revises: 20260306_004_add_auth_schema_enterprise
+Revision ID: ent_005_local_admin
+Revises: ent_004_auth_enterprise
 Create Date: 2026-03-06 00:05:00.000000+00:00
 
 Background
@@ -43,8 +43,8 @@ from alembic import op
 # Revision identifiers
 # ---------------------------------------------------------------------------
 
-revision: str = "20260306_005_populate_local_admin_defaults"
-down_revision: Union[str, None] = "20260306_004_add_auth_schema_enterprise"
+revision: str = "ent_005_local_admin"
+down_revision: Union[str, None] = "ent_004_auth_enterprise"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

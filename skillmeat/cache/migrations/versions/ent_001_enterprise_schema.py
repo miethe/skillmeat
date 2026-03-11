@@ -1,6 +1,6 @@
 """create enterprise schema: enterprise_artifacts, artifact_versions, enterprise_collections, enterprise_collection_artifacts
 
-Revision ID: 20260306_001_create_enterprise_schema
+Revision ID: ent_001_enterprise_schema
 Revises: 001_consolidated_schema
 Create Date: 2026-03-06 00:01:00.000000+00:00
 
@@ -68,7 +68,7 @@ from sqlalchemy.dialects import postgresql
 # Revision identifiers
 # ---------------------------------------------------------------------------
 
-revision: str = "20260306_001_create_enterprise_schema"
+revision: str = "ent_001_enterprise_schema"
 down_revision: Union[str, None] = "001_consolidated_schema"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

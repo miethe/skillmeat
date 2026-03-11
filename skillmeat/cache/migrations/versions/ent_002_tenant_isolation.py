@@ -1,7 +1,7 @@
 """add tenant_id to collections table for tenant isolation
 
-Revision ID: 20260306_002_add_tenant_isolation
-Revises: 20260306_001_create_enterprise_schema
+Revision ID: ent_002_tenant_isolation
+Revises: ent_001_enterprise_schema
 Create Date: 2026-03-06 00:02:00.000000+00:00
 
 Background
@@ -49,8 +49,8 @@ from sqlalchemy.dialects import postgresql
 # Revision identifiers
 # ---------------------------------------------------------------------------
 
-revision: str = "20260306_002_add_tenant_isolation"
-down_revision: Union[str, None] = "20260306_001_create_enterprise_schema"
+revision: str = "ent_002_tenant_isolation"
+down_revision: Union[str, None] = "ent_001_enterprise_schema"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

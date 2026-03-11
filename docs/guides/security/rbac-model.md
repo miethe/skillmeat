@@ -199,7 +199,7 @@ ctx.has_any_scope(Scope.artifact_read, Scope.artifact_write)  # OR match
 
 ### Local mode: ownership fields
 
-Migration `20260306_003_add_auth_schema_local` adds three columns to the four
+Migration `ent_003_auth_local` adds three columns to the four
 core entity tables (`artifacts`, `collections`, `projects`, `groups`):
 
 | Column | Type | Default | Meaning |
@@ -219,9 +219,9 @@ can see all data regardless of `owner_id` — equivalent to a superuser.
 
 ### Enterprise mode: tenant_id isolation
 
-Migration `20260306_002_add_tenant_isolation` adds `tenant_id UUID NOT NULL` to
+Migration `ent_002_tenant_isolation` adds `tenant_id UUID NOT NULL` to
 the `collections` table (and the enterprise-specific tables created in
-`20260306_004_add_auth_schema_enterprise`).
+`ent_004_auth_enterprise`).
 
 **Invariant:** Every enterprise repository method MUST include a
 `tenant_id` predicate. Omitting the filter is a security defect:
@@ -246,7 +246,7 @@ Enterprise tables and their tenant columns:
 
 | Table | tenant_id column | Notes |
 |-------|-----------------|-------|
-| `collections` | `tenant_id UUID NOT NULL` | Added by migration 002 |
+| `collections` | `tenant_id UUID NOT NULL` | Added by migration ent_002 |
 | `enterprise_users` | `tenant_id UUID NOT NULL` | Created by migration 004 |
 | `enterprise_teams` | `tenant_id UUID NOT NULL` | Created by migration 004 |
 | `enterprise_team_members` | `tenant_id UUID NOT NULL` | Denormalized for query performance |
@@ -532,9 +532,9 @@ erDiagram
 - `skillmeat/api/dependencies.py` — `require_auth`, `set_auth_provider`
 - `skillmeat/api/middleware/enterprise_auth.py` — PAT bootstrap auth
 - `skillmeat/api/middleware/tenant_context.py` — `TenantContext` propagation
-- `skillmeat/cache/migrations/versions/20260306_002_add_tenant_isolation.py`
-- `skillmeat/cache/migrations/versions/20260306_003_add_auth_schema_local.py`
-- `skillmeat/cache/migrations/versions/20260306_004_add_auth_schema_enterprise.py`
+- `skillmeat/cache/migrations/versions/ent_002_tenant_isolation.py`
+- `skillmeat/cache/migrations/versions/ent_003_auth_local.py`
+- `skillmeat/cache/migrations/versions/ent_004_auth_enterprise.py`
 - `.claude/context/key-context/tenant-scoping-strategy.md` — tenant scoping design decisions
 - `skillmeat/api/tests/test_rbac_scopes.py` — scope enforcement tests
 - `skillmeat/cache/tests/test_tenant_isolation.py` — tenant isolation tests
