@@ -244,11 +244,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             ent_engine = get_engine()
             with SASession(ent_engine) as ent_session:
                 ent_repo = EnterpriseCollectionRepository(session=ent_session)
-                existing = ent_repo.get_by_name("default")
+                existing = ent_repo.get_by_name("Default Collection")
                 if existing is None:
                     ent_repo.create(
-                        name="default",
-                        description="Default collection",
+                        name="Default Collection",
+                        description="Default artifact collection",
                     )
                     ent_session.commit()
                     logger.info(
