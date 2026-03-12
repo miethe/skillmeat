@@ -1,8 +1,8 @@
 # Repository Architecture (Hexagonal Pattern)
 
 **Status**: Active Policy
-**Phase**: Complete (gap-closure done)
-**Last Updated**: 2026-03-05
+**Phase**: Complete (enterprise parity v2 done)
+**Last Updated**: 2026-03-12
 
 ---
 
@@ -186,7 +186,10 @@ class MockArtifactRepository(IArtifactRepository):
 **Key Constraint**: No imports from other skillmeat modules except `skillmeat.core.enums` and `skillmeat.core.exceptions`.
 
 ### 2. Repository Implementations
+
 **Location**: `skillmeat/core/repositories/`
+
+#### Local Repositories (Filesystem-Backed)
 
 | File | Implements | Backing Store |
 |------|-----------|----------------|
@@ -201,13 +204,127 @@ class MockArtifactRepository(IArtifactRepository):
 | `local_marketplace_source.py` | IMarketplaceSourceRepository | SQLAlchemy cache only |
 | `local_project_template.py` | IProjectTemplateRepository | SQLAlchemy cache only |
 
-Each implementation:
+Each local implementation:
 - Receives **managers** (ArtifactManager, CollectionManager, etc.) via constructor DI
 - Receives **PathResolver** for filesystem navigation
 - Returns DTOs, never ORM models
 - Delegates to managers for complex logic (filesystem I/O, artifact parsing, etc.)
 
-### 3. Dependency Injection Factory
+#### Enterprise Repositories (PostgreSQL-Backed)
+
+| File | Implements | Pattern |
+|------|-----------|---------|
+| `enterprise_artifact.py` | IArtifactRepository | Tenant-filtered SELECT + DI-injected session |
+| `enterprise_collection.py` | ICollectionRepository | Tenant-filtered SELECT + multi-table scans |
+| `enterprise_deployment.py` | IDeploymentRepository | Stub (returns empty list, no-op mutations) |
+| `enterprise_tag.py` | ITagRepository | Tenant-filtered SELECT + DI-injected session |
+| `enterprise_group.py` | IGroupRepository | Tenant-filtered SELECT + child collection validation |
+| `enterprise_context_entity.py` | IContextEntityRepository | Stub (no-op) |
+| `enterprise_marketplace_source.py` | IMarketplaceSourceRepository | Stub (returns empty) |
+| `enterprise_project_template.py` | IProjectTemplateRepository | Stub (returns empty) |
+| `enterprise_project.py` | IProjectRepository | Stub (returns empty) |
+| `enterprise_settings.py` | ISettingsRepository | Stub (returns empty dict, no-op writes) |
+
+**Enterprise Pattern**: All enterprise repos:
+- Receive **SQLAlchemy Session** via DI (vs managers for local)
+- Use SQLAlchemy 2.x `select()` style (not 1.x `session.query()`)
+- Inherit from `EnterpriseRepositoryBase` for tenant filtering
+- UUID primary keys and `EnterpriseBase` declarative base
+- Use `flush()` never `commit()` — caller manages transactions
+- Implement stub (empty) methods for repos without enterprise storage (deployment, projects, settings, etc.)
+
+### 3. EnterpriseRepositoryBase — Tenant Isolation Pattern
+
+**Location**: `skillmeat/core/repositories/enterprise_base.py`
+
+All enterprise repositories inherit from `EnterpriseRepositoryBase`, which enforces tenant isolation across all SELECT queries.
+
+#### Core Methods
+
+```python
+class EnterpriseRepositoryBase:
+    def _get_tenant_id(self) -> UUID:
+        """Resolve tenant_id from TenantContext ContextVar."""
+        return get_tenant_id()  # Raises if not in enterprise context
+
+    def _tenant_select(self, model: Type[T]) -> Select[tuple[T]]:
+        """Return a select() pre-filtered by tenant_id."""
+        return select(model).where(model.tenant_id == self._get_tenant_id())
+
+    def _apply_tenant_filter(self, stmt: Select) -> Select:
+        """Apply tenant_id filter to an existing select statement."""
+        return stmt.where(stmt.model.tenant_id == self._get_tenant_id())
+
+    def _validate_collection_tenant(self, collection_id: UUID) -> UUID:
+        """Verify that a collection belongs to the current tenant.
+
+        Used for join tables without tenant_id column (e.g., EnterpriseCollectionArtifact).
+        Queries the parent EnterpriseCollection and asserts it belongs to the tenant.
+        Raises NotFoundError if collection not found or belongs to different tenant.
+        """
+        # Implementation queries EnterpriseCollection by (id, tenant_id)
+```
+
+#### Tenant Isolation Invariant
+
+**CRITICAL**: Every SELECT must filter by tenant. Failure to apply `_tenant_select()` or `_apply_tenant_filter()` will leak data across tenants.
+
+**Correct Example**:
+```python
+def get(self, id: UUID) -> ArtifactDTO | None:
+    stmt = self._tenant_select(EnterpriseArtifact).where(
+        EnterpriseArtifact.id == id
+    )
+    result = self.session.execute(stmt).scalar_one_or_none()
+    return self._to_dto(result) if result else None
+```
+
+**Wrong Example** (SECURITY BUG):
+```python
+def get(self, id: UUID) -> ArtifactDTO | None:
+    # WRONG: No tenant filter — returns artifacts from ANY tenant!
+    result = self.session.get(EnterpriseArtifact, id)
+    return self._to_dto(result) if result else None
+```
+
+#### Join Tables Without tenant_id
+
+When a join table lacks a `tenant_id` column (e.g., `EnterpriseCollectionArtifact` bridges `EnterpriseCollection` + `EnterpriseArtifact`), use `_validate_collection_tenant()` to verify ownership through the parent:
+
+```python
+def add_artifact_to_collection(self, collection_id: UUID, artifact_id: UUID):
+    # Verify collection belongs to current tenant
+    self._validate_collection_tenant(collection_id)
+
+    # Now safe to add artifact (artifact already validated elsewhere)
+    link = EnterpriseCollectionArtifact(
+        collection_id=collection_id,
+        artifact_id=artifact_id
+    )
+    self.session.add(link)
+    self.session.flush()
+```
+
+#### Session Management
+
+- **Always use `flush()`** for intermediate commits — caller manages transaction
+- **Never use `commit()`** — transactions are managed at router level
+- Return **DTOs**, never ORM models (same as local repos)
+
+**Transaction boundary**:
+```python
+# In router
+async def create_artifact(request, artifact_repo: ArtifactRepoDep, db: SessionDep):
+    try:
+        dto = artifact_repo.create(...)  # Uses session.flush()
+        db.commit()                       # Router commits
+        return dto
+    except Exception:
+        db.rollback()
+        raise
+```
+
+### 4. Dependency Injection Factory
 **Location**: `skillmeat/api/dependencies.py`
 
 | Function | Returns | DI Alias |
@@ -223,21 +340,34 @@ Each implementation:
 | `get_marketplace_source_repository()` | IMarketplaceSourceRepository | `MarketplaceSourceRepoDep` |
 | `get_project_template_repository()` | IProjectTemplateRepository | `ProjectTemplateRepoDep` |
 
-**Edition-Based Routing** (Future):
+**Edition-Based Routing** (Active):
+
+All factory functions follow the same pattern:
+
 ```python
-def get_artifact_repository(state: AppState) -> IArtifactRepository:
+def get_artifact_repository(
+    state: AppState,
+    session: SessionDep,  # For enterprise
+) -> IArtifactRepository:
     edition = state.settings.edition if state.settings else "local"
     if edition == "local":
-        return LocalArtifactRepository(...)
-    elif edition == "postgres":  # Future
-        return PostgresArtifactRepository(...)
+        return LocalArtifactRepository(
+            artifact_manager=state.artifact_manager,
+            path_resolver=state.path_resolver,
+        )
+    elif edition == "enterprise":
+        return EnterpriseArtifactRepository(session=session)
     else:
         raise HTTPException(503, f"Unsupported edition: {edition}")
 ```
 
-Currently, only `"local"` edition is implemented.
+**Available Editions**:
+- `"local"` (default): Single-tenant, filesystem-backed (Local* repos)
+- `"enterprise"`: Multi-tenant, PostgreSQL-backed (Enterprise* repos, DI-injected session)
 
-### 4. Mock Repositories (Testing)
+Set via `SKILLMEAT_EDITION=enterprise` env var or `settings.edition` config field.
+
+### 5. Mock Repositories (Testing)
 **Location**: `tests/mocks/repositories.py`
 
 | Class | Implements |
@@ -267,11 +397,95 @@ def test_list_artifacts(artifact_repo):
     assert len(artifacts) == 1
 ```
 
+### 6. Stub Repositories Pattern (Enterprise Edition)
+
+**Location**: `skillmeat/core/repositories/enterprise_*.py` (partial implementations)
+
+Repositories without enterprise storage (projects, deployments, settings, context_entity, marketplace_source, project_template) implement the interface with stub methods that:
+
+1. **Return empty responses** without queries:
+   - `list()` returns `[]`
+   - `get()` returns `None`
+   - `search()` returns `[]`
+
+2. **Log debug messages** for audit:
+   ```python
+   logger.debug(f"Stub operation on enterprise {repo_name}: {method}")
+   ```
+
+3. **No-op on writes**:
+   - `create()` returns synthetic DTO with sensible defaults
+   - `update()` returns input unchanged
+   - `delete()` returns `True` (success) without side effects
+
+4. **Raise `HTTPException(503)` on unsupported mutations** (if applicable):
+   ```python
+   async def deploy(self, ...) -> DeploymentDTO:
+       raise HTTPException(503, "Deployments not yet supported in enterprise edition")
+   ```
+
+**Why stubs?**: Enterprise repos follow the 16-repository parity model. All 10 abstract interfaces are implemented by all 2 editions (local + enterprise), even if enterprise doesn't yet store that entity. Stubs allow routers to be edition-agnostic — DI selects the right repo, and unsupported operations fail gracefully.
+
+**Example stub** (EnterpriseProjectRepository):
+```python
+class EnterpriseProjectRepository(IProjectRepository):
+    def __init__(self, session: Session):
+        self.session = session
+
+    def get(self, project_id: str) -> ProjectDTO | None:
+        logger.debug(f"Stub: get project {project_id} in enterprise edition")
+        return None
+
+    def create(self, ...) -> ProjectDTO:
+        logger.debug(f"Stub: create project in enterprise edition")
+        return ProjectDTO(id="stub", ...)  # Synthetic
+
+    def deploy(self, ...) -> DeploymentDTO:
+        raise HTTPException(503, "Project deployment not yet supported")
+```
+
 ---
 
 ## Quick Recipes
 
-### Recipe 1: Adding a New Endpoint
+### Recipe 1: Enterprise Tenant Isolation Check
+
+**Task**: Verify that an enterprise repository properly filters by tenant.
+
+**Steps**:
+
+1. **Identify the method** that queries data (e.g., `get()`, `list()`, `search()`).
+2. **Check the select statement**:
+   ```python
+   # CORRECT:
+   stmt = self._tenant_select(EnterpriseArtifact).where(
+       EnterpriseArtifact.id == id
+   )
+
+   # Or:
+   stmt = select(EnterpriseArtifact).where(
+       EnterpriseArtifact.tenant_id == self._get_tenant_id(),
+       EnterpriseArtifact.id == id
+   )
+   ```
+
+3. **For join tables without tenant_id**: Verify `_validate_collection_tenant()` is called before any mutations:
+   ```python
+   def add_artifact_to_collection(self, collection_id: UUID, artifact_id: UUID):
+       self._validate_collection_tenant(collection_id)  # MUST be present
+       # ... rest of method
+   ```
+
+4. **Anti-pattern** to catch:
+   ```python
+   # WRONG: No tenant filter
+   self.session.get(EnterpriseArtifact, id)
+
+   # WRONG: Using .query() (SQLAlchemy 1.x style in enterprise repo)
+   self.session.query(EnterpriseArtifact).filter(...).first()
+   ```
+
+### Recipe 2: Adding a New Endpoint
 
 **Task**: Create `GET /api/v1/artifacts/{id}/metadata` that returns artifact metadata.
 
@@ -335,26 +549,26 @@ def test_list_artifacts(artifact_repo):
 
 ---
 
-### Recipe 2: Adding a New Storage Backend (e.g., PostgreSQL)
+### Recipe 3: Adding a New Storage Backend (e.g., Future Editions)
 
-**Task**: Create a PostgreSQL adapter for artifacts.
+**Task**: Create a new edition adapter (e.g., future S3-backed or multi-cloud support).
 
 **Steps**:
 
 1. **Implement all 10 ABCs** (IArtifactRepository, IProjectRepository, ICollectionRepository, IDeploymentRepository, ITagRepository, ISettingsRepository, IGroupRepository, IContextEntityRepository, IMarketplaceSourceRepository, IProjectTemplateRepository):
    ```python
-   # skillmeat/core/repositories/postgres_artifact.py
+   # skillmeat/core/repositories/cloud_artifact.py
    from skillmeat.core.interfaces.repositories import IArtifactRepository
    from skillmeat.core.interfaces.dtos import ArtifactDTO
 
-   class PostgresArtifactRepository(IArtifactRepository):
-       def __init__(self, connection_string: str):
-           self.db = create_engine(connection_string)
+   class CloudArtifactRepository(IArtifactRepository):
+       def __init__(self, s3_client):
+           self.s3 = s3_client
 
        def get(self, id: str, ctx=None) -> ArtifactDTO | None:
-           # Query PostgreSQL
-           result = self.db.query(PostgresArtifact).filter_by(id=id).first()
-           if result:
+           # Query cloud storage
+           obj = self.s3.get_object(Bucket="artifacts", Key=id)
+           if obj:
                return ArtifactDTO(...)  # Convert to DTO
            return None
 
@@ -365,15 +579,14 @@ def test_list_artifacts(artifact_repo):
 
 2. **Register in factory** (`dependencies.py`):
    ```python
-   def get_artifact_repository(state: AppState) -> IArtifactRepository:
+   def get_artifact_repository(state: AppState, session: SessionDep) -> IArtifactRepository:
        edition = state.settings.edition if state.settings else "local"
        if edition == "local":
            return LocalArtifactRepository(...)
-       elif edition == "postgres":
-           from skillmeat.core.repositories import PostgresArtifactRepository
-           return PostgresArtifactRepository(
-               connection_string=state.settings.postgres_dsn
-           )
+       elif edition == "enterprise":
+           return EnterpriseArtifactRepository(session=session)
+       elif edition == "cloud":  # Future
+           return CloudArtifactRepository(s3_client=state.s3_client)
        else:
            raise HTTPException(503, f"Unsupported edition: {edition}")
    ```
@@ -381,15 +594,15 @@ def test_list_artifacts(artifact_repo):
 3. **Update config** (`skillmeat/api/config.py`):
    ```python
    class APISettings(BaseSettings):
-       edition: str = "local"  # New field
-       postgres_dsn: Optional[str] = None  # PostgreSQL connection string
+       edition: str = "local"  # "local" | "enterprise" | "cloud" (future)
+       s3_bucket: Optional[str] = None  # For cloud edition
    ```
 
 4. **No router changes needed** — the dependency injection handles the swap automatically.
 
 ---
 
-### Recipe 3: Updating Mock Repositories After ABC Changes
+### Recipe 5: Updating Mock Repositories After ABC Changes
 
 **Task**: You add a method `search_by_tags()` to IArtifactRepository.
 
@@ -436,14 +649,24 @@ def test_list_artifacts(artifact_repo):
            return results
    ```
 
-4. **Implement in PostgreSQL adapter**:
+4. **Implement in enterprise repository**:
    ```python
-   # skillmeat/core/repositories/postgres_artifact.py
-   class PostgresArtifactRepository(IArtifactRepository):
+   # skillmeat/core/repositories/enterprise_artifact.py
+   class EnterpriseArtifactRepository(IArtifactRepository):
        def search_by_tags(self, tags: List[str], ctx=None) -> List[ArtifactDTO]:
-           # Query PostgreSQL with JOIN to tags table
-           results = self.db.query(PostgresArtifact).join(...).filter(...).all()
-           return [ArtifactDTO(...) for result in results]
+           # Query PostgreSQL with tenant filter + JOIN to tags table
+           tenant_id = self._get_tenant_id()
+           stmt = (
+               select(EnterpriseArtifact)
+               .join(EnterpriseArtifactTag)
+               .where(
+                   EnterpriseArtifact.tenant_id == tenant_id,
+                   EnterpriseArtifactTag.tag.in_(tags)
+               )
+               .distinct()
+           )
+           results = self.session.execute(stmt).scalars().all()
+           return [self._to_dto(r) for r in results]
    ```
 
 ---
