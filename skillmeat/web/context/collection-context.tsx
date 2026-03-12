@@ -97,12 +97,20 @@ export function CollectionProvider({ children }: CollectionProviderProps) {
   // Clear invalid collection ID from localStorage if fetch fails
   useEffect(() => {
     if (collectionError && selectedCollectionId) {
-      // Collection doesn't exist or isn't accessible - clear invalid selection
-      console.warn(`Collection ${selectedCollectionId} not found, clearing selection`);
-      localStorage.removeItem(STORAGE_KEY);
-      setSelectedCollectionIdState(null);
+      // Collection doesn't exist or isn't accessible - try to select the first available
+      const fallback = collectionsData?.items?.[0];
+      if (fallback) {
+        console.warn(
+          `Collection ${selectedCollectionId} not found, falling back to "${fallback.name}" (${fallback.id})`
+        );
+        setSelectedCollectionId(fallback.id);
+      } else {
+        console.warn(`Collection ${selectedCollectionId} not found, no collections available`);
+        localStorage.removeItem(STORAGE_KEY);
+        setSelectedCollectionIdState(null);
+      }
     }
-  }, [collectionError, selectedCollectionId]);
+  }, [collectionError, selectedCollectionId, collectionsData, setSelectedCollectionId]);
 
   // Fetch groups for current collection
   const {
