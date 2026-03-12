@@ -925,17 +925,33 @@ def get_deployment_profile_repository(
     return DeploymentProfileRepository()
 
 
-def get_marketplace_source_repository_concrete() -> MarketplaceSourceRepository:
+def get_marketplace_source_repository_concrete(
+    state: Annotated["AppState", Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> MarketplaceSourceRepository:
     """Get concrete MarketplaceSourceRepository dependency.
 
-    Returns the concrete ``MarketplaceSourceRepository`` instance when the full
-    set of repository methods (beyond the ``IMarketplaceSourceRepository``
-    interface) is required — e.g. in the marketplace-sources router which uses
-    ORM-level helpers not exposed by the interface.
+    # enterprise: routes to EnterpriseMarketplaceSourceRepository (Phase 5)
+
+    Returns the concrete repository when the full set of ORM-level helpers
+    (beyond the ``IMarketplaceSourceRepository`` interface) is required — e.g.
+    in the marketplace-sources router.  Enterprise edition returns
+    ``EnterpriseMarketplaceSourceRepository`` (already implemented in Phase 5).
+
+    Args:
+        state: Application state (edition resolution).
+        session: Per-request SQLAlchemy session (enterprise path).
 
     Returns:
-        MarketplaceSourceRepository instance.
+        MarketplaceSourceRepository or EnterpriseMarketplaceSourceRepository.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseMarketplaceSourceRepository,
+        )
+
+        return EnterpriseMarketplaceSourceRepository(session=session)  # type: ignore[return-value]
     return MarketplaceSourceRepository()
 
 
@@ -1029,28 +1045,58 @@ def get_db_user_collection_repository(
     return DbUserCollectionRepository()
 
 
-def get_db_collection_artifact_repository() -> IDbCollectionArtifactRepository:
-    """Get DbCollectionArtifactRepository dependency.
+def get_db_collection_artifact_repository(
+    state: Annotated["AppState", Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> IDbCollectionArtifactRepository:
+    """Get IDbCollectionArtifactRepository dependency.
 
-    Returns a new ``DbCollectionArtifactRepository`` instance.  The repository
-    manages its own session lifecycle internally, so no state injection is
-    required.
+    # enterprise: full — v1 gap, critical for user-collections router
+
+    Returns an edition-aware repository.  Local edition returns
+    ``DbCollectionArtifactRepository`` (SQLite, self-managed session);
+    enterprise edition returns ``EnterpriseDbCollectionArtifactRepository``
+    (PostgreSQL, per-request session).
+
+    Args:
+        state: Application state (edition resolution).
+        session: Per-request SQLAlchemy session (enterprise path).
 
     Returns:
-        IDbCollectionArtifactRepository implementation backed by the SQLite cache.
+        IDbCollectionArtifactRepository implementation for the configured edition.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseDbCollectionArtifactRepository,
+        )
+
+        return EnterpriseDbCollectionArtifactRepository(session=session)  # type: ignore[return-value]
     return DbCollectionArtifactRepository()
 
 
-def get_duplicate_pair_repository() -> DuplicatePairRepository:
+def get_duplicate_pair_repository(
+    state: Annotated["AppState", Depends(get_app_state)],
+) -> DuplicatePairRepository:
     """Get DuplicatePairRepository dependency.
 
-    Returns a new ``DuplicatePairRepository`` instance.  The repository
-    manages its own session lifecycle internally.
+    # enterprise: stub — dedup is local-only in v2
+
+    Returns a new ``DuplicatePairRepository`` instance for local edition.
+    Enterprise edition returns ``EnterpriseDuplicatePairStub`` (empty results,
+    no DB access).
+
+    Args:
+        state: Application state (edition resolution).
 
     Returns:
-        DuplicatePairRepository instance.
+        DuplicatePairRepository instance or enterprise stub.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import EnterpriseDuplicatePairStub
+
+        return EnterpriseDuplicatePairStub()  # type: ignore[return-value]
     return DuplicatePairRepository()
 
 
@@ -1191,15 +1237,29 @@ async def get_resolved_ownership(
 ResolvedOwnershipDep = Annotated[ResolvedOwnership, Depends(get_resolved_ownership)]
 
 
-def get_db_artifact_history_repository() -> IDbArtifactHistoryRepository:
-    """Get DbArtifactHistoryRepository dependency.
+def get_db_artifact_history_repository(
+    state: Annotated["AppState", Depends(get_app_state)],
+) -> IDbArtifactHistoryRepository:
+    """Get IDbArtifactHistoryRepository dependency.
 
-    Returns a new ``DbArtifactHistoryRepository`` instance.  The repository
-    manages its own session lifecycle per operation.
+    # enterprise: stub — artifact history deferred
+
+    Returns a new ``DbArtifactHistoryRepository`` instance for local edition.
+    Enterprise edition returns ``EnterpriseArtifactHistoryStub`` (empty results,
+    no DB access) because artifact history is not yet ported to the enterprise
+    PostgreSQL schema.
+
+    Args:
+        state: Application state (edition resolution).
 
     Returns:
-        IDbArtifactHistoryRepository implementation backed by the SQLite cache.
+        IDbArtifactHistoryRepository implementation for the configured edition.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import EnterpriseArtifactHistoryStub
+
+        return EnterpriseArtifactHistoryStub()
     return DbArtifactHistoryRepository()
 
 

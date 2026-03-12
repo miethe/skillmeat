@@ -81,7 +81,11 @@ from sqlalchemy.sql import Select
 
 from skillmeat.cache.constants import DEFAULT_TENANT_ID
 
-from skillmeat.core.interfaces.repositories import IDbUserCollectionRepository
+from skillmeat.core.interfaces.repositories import (
+    IDbArtifactHistoryRepository,
+    IDbCollectionArtifactRepository,
+    IDbUserCollectionRepository,
+)
 
 if TYPE_CHECKING:
     from skillmeat.api.schemas.auth import AuthContext
@@ -9084,3 +9088,546 @@ class EnterpriseImportContext:
             error,
         )
         return updated_count
+
+
+# =============================================================================
+# EnterpriseDbCollectionArtifactRepository  (ENT2-6.1)
+# =============================================================================
+
+
+class EnterpriseDbCollectionArtifactRepository(
+    EnterpriseRepositoryBase["EnterpriseCollectionArtifact"],
+    IDbCollectionArtifactRepository,
+):
+    """Enterprise repository for collection-artifact membership.
+
+    Implements
+    :class:`~skillmeat.core.interfaces.repositories.IDbCollectionArtifactRepository`
+    for the enterprise PostgreSQL backend.
+
+    The underlying ``EnterpriseCollectionArtifact`` join table carries only
+    structural membership data (``collection_id``, ``artifact_id``,
+    ``order_index``, ``added_at``).  Richer metadata fields present on the
+    local ``CollectionArtifact`` ORM model (``description``, ``tags_json``,
+    ``source``, etc.) are resolved by joining through ``EnterpriseArtifact``.
+
+    Methods that have no meaningful enterprise equivalent (bootstrap helpers,
+    group lookups, etc.) return safe empty values rather than raising.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact as _ECA
+
+        super().__init__(session, _ECA)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _row_to_dto(self, row: "EnterpriseCollectionArtifact") -> "CollectionArtifactDTO":
+        """Convert an ``EnterpriseCollectionArtifact`` ORM row to a DTO.
+
+        Joins are lazy-loaded by SQLAlchemy; ``row.artifact`` and
+        ``row.collection`` relationships are expected to be accessible.
+        """
+        from skillmeat.core.interfaces.dtos import CollectionArtifactDTO
+
+        artifact = row.artifact  # type: ignore[attr-defined]
+        tags: List[str] = []
+        description: Optional[str] = None
+        source_url: Optional[str] = None
+        artifact_uuid: str = str(artifact.id).replace("-", "") if artifact is not None else ""
+
+        if artifact is not None:
+            description = getattr(artifact, "description", None)
+            raw_tags = getattr(artifact, "tags", None)
+            if isinstance(raw_tags, list):
+                tags = [str(t) for t in raw_tags]
+            source_url = getattr(artifact, "source_url", None)
+
+        added_at_val = row.added_at  # type: ignore[attr-defined]
+        added_at_str: Optional[str] = (
+            added_at_val.isoformat() if added_at_val is not None else None
+        )
+
+        return CollectionArtifactDTO(
+            collection_id=str(row.collection_id).replace("-", ""),  # type: ignore[attr-defined]
+            artifact_uuid=artifact_uuid,
+            added_at=added_at_str,
+            description=description,
+            tags=tags,
+            source=source_url,
+        )
+
+    def _parse_collection_uuid(self, collection_id: str) -> Optional[uuid.UUID]:
+        """Parse a collection_id string to a UUID, returning None on failure."""
+        try:
+            return uuid.UUID(collection_id)
+        except (ValueError, AttributeError):
+            logger.warning(
+                "EnterpriseDbCollectionArtifactRepository: invalid collection_id %r",
+                collection_id,
+            )
+            return None
+
+    # ------------------------------------------------------------------
+    # Queries
+    # ------------------------------------------------------------------
+
+    def list_by_collection(
+        self,
+        collection_id: str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        search: "str | None" = None,
+        artifact_type: "str | None" = None,
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.list_by_collection: %r", collection_id)
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseCollectionArtifact,
+        )
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return []
+
+        stmt = (
+            select(EnterpriseCollectionArtifact)
+            .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
+            .where(EnterpriseCollectionArtifact.collection_id == coll_uuid)
+        )
+        if artifact_type is not None:
+            stmt = stmt.where(EnterpriseArtifact.artifact_type == artifact_type)
+        if search is not None:
+            stmt = stmt.where(EnterpriseArtifact.name.ilike(f"%{search}%"))
+        stmt = stmt.order_by(EnterpriseCollectionArtifact.order_index).offset(offset).limit(limit)
+
+        rows = self.session.execute(stmt).scalars().all()
+        return [self._row_to_dto(r) for r in rows]
+
+    def get_by_pk(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: "Any | None" = None,
+    ) -> "Any | None":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.get_by_pk: %r %r", collection_id, artifact_uuid)
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return None
+        try:
+            art_uuid = uuid.UUID(artifact_uuid)
+        except (ValueError, AttributeError):
+            return None
+
+        stmt = select(EnterpriseCollectionArtifact).where(
+            EnterpriseCollectionArtifact.collection_id == coll_uuid,
+            EnterpriseCollectionArtifact.artifact_id == art_uuid,
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        return self._row_to_dto(row) if row is not None else None
+
+    def count_by_collection(
+        self,
+        collection_id: str,
+        ctx: "Any | None" = None,
+    ) -> int:
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return 0
+        stmt = select(func.count()).select_from(EnterpriseCollectionArtifact).where(
+            EnterpriseCollectionArtifact.collection_id == coll_uuid
+        )
+        result = self.session.execute(stmt).scalar()
+        return int(result) if result is not None else 0
+
+    def list_with_tags(
+        self,
+        collection_id: str,
+        *,
+        tag: "str | None" = None,
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.list_with_tags: %r tag=%r", collection_id, tag)
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseCollectionArtifact,
+        )
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return []
+
+        stmt = (
+            select(EnterpriseCollectionArtifact)
+            .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
+            .where(EnterpriseCollectionArtifact.collection_id == coll_uuid)
+        )
+        if tag is not None:
+            # PostgreSQL JSONB array contains operator
+            stmt = stmt.where(EnterpriseArtifact.tags.contains([tag]))
+        stmt = stmt.order_by(EnterpriseCollectionArtifact.order_index)
+
+        rows = self.session.execute(stmt).scalars().all()
+        return [self._row_to_dto(r) for r in rows]
+
+    def list_deployment_info(
+        self,
+        collection_id: str,
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.list_deployment_info: %r", collection_id)
+        # EnterpriseCollectionArtifact does not carry deployment_json; return basic membership
+        return self.list_by_collection(collection_id, limit=1000, ctx=ctx)
+
+    def get_source_deployments_batch(
+        self,
+        artifact_ids: "list[str]",
+        ctx: "Any | None" = None,
+    ) -> "list[dict]":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.get_source_deployments_batch: %d ids",
+            len(artifact_ids),
+        )
+        # EnterpriseCollectionArtifact does not carry deployments_json
+        return []
+
+    def add_artifacts(
+        self,
+        collection_id: str,
+        artifact_uuids: "list[str]",
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.add_artifacts: %r %d uuids",
+            collection_id,
+            len(artifact_uuids),
+        )
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            raise KeyError(f"Invalid collection_id: {collection_id!r}")
+
+        results = []
+        for art_uuid_str in artifact_uuids:
+            try:
+                art_uuid = uuid.UUID(art_uuid_str)
+            except (ValueError, AttributeError):
+                logger.warning(
+                    "EnterpriseDbCollectionArtifactRepository.add_artifacts: skipping invalid UUID %r",
+                    art_uuid_str,
+                )
+                continue
+
+            # Check for existing membership (idempotent)
+            stmt = select(EnterpriseCollectionArtifact).where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseCollectionArtifact.artifact_id == art_uuid,
+            )
+            existing = self.session.execute(stmt).scalar_one_or_none()
+            if existing is not None:
+                results.append(self._row_to_dto(existing))
+                continue
+
+            row = EnterpriseCollectionArtifact(
+                collection_id=coll_uuid,
+                artifact_id=art_uuid,
+            )
+            self.session.add(row)
+            self.session.flush()
+            results.append(self._row_to_dto(row))
+
+        self.session.commit()
+        return results
+
+    def remove_artifact(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: "Any | None" = None,
+    ) -> bool:
+        from sqlalchemy import delete as sa_delete
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return False
+        try:
+            art_uuid = uuid.UUID(artifact_uuid)
+        except (ValueError, AttributeError):
+            return False
+
+        result = self.session.execute(
+            sa_delete(EnterpriseCollectionArtifact).where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseCollectionArtifact.artifact_id == art_uuid,
+            )
+        )
+        self.session.commit()
+        return (result.rowcount or 0) > 0
+
+    def upsert_metadata(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: "Any | None" = None,
+        **metadata: "Any",
+    ) -> "Any":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.upsert_metadata: %r %r — metadata not stored in enterprise schema",
+            collection_id,
+            artifact_uuid,
+        )
+        # Enterprise schema does not carry rich metadata columns; return existing DTO
+        dto = self.get_by_pk(collection_id, artifact_uuid, ctx=ctx)
+        if dto is None:
+            from skillmeat.core.interfaces.dtos import CollectionArtifactDTO
+
+            return CollectionArtifactDTO(collection_id=collection_id, artifact_uuid=artifact_uuid)
+        return dto
+
+    def update_source_tracking(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        *,
+        source: "str | None" = None,
+        origin: "str | None" = None,
+        resolved_sha: "str | None" = None,
+        resolved_version: "str | None" = None,
+        ctx: "Any | None" = None,
+    ) -> "Any":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.update_source_tracking: %r %r — not stored in enterprise schema",
+            collection_id,
+            artifact_uuid,
+        )
+        dto = self.get_by_pk(collection_id, artifact_uuid, ctx=ctx)
+        if dto is None:
+            raise KeyError(f"No membership for ({collection_id!r}, {artifact_uuid!r})")
+        return dto
+
+    # ------------------------------------------------------------------
+    # Bootstrap / migration helpers
+    # ------------------------------------------------------------------
+
+    def get_existing_artifact_ids(self) -> "set[str]":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.get_existing_artifact_ids")
+        return set()
+
+    def ensure_artifact_rows(self, artifacts: "list", *, project_id: str) -> int:
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.ensure_artifact_rows: stub — enterprise manages artifact rows separately"
+        )
+        return 0
+
+    def list_artifact_ids_in_collection(self, collection_id: str) -> "set[str]":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.list_artifact_ids_in_collection: %r",
+            collection_id,
+        )
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseCollectionArtifact,
+        )
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return set()
+
+        stmt = (
+            select(EnterpriseArtifact.name, EnterpriseArtifact.artifact_type)
+            .join(EnterpriseCollectionArtifact, EnterpriseCollectionArtifact.artifact_id == EnterpriseArtifact.id)
+            .where(EnterpriseCollectionArtifact.collection_id == coll_uuid)
+        )
+        rows = self.session.execute(stmt).all()
+        return {f"{r.artifact_type}:{r.name}" for r in rows}
+
+    def resolve_uuid_by_id(self, artifact_id: str) -> "str | None":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.resolve_uuid_by_id: %r", artifact_id)
+        from skillmeat.cache.models_enterprise import EnterpriseArtifact
+
+        if ":" not in artifact_id:
+            return None
+        artifact_type, _, name = artifact_id.partition(":")
+        stmt = select(EnterpriseArtifact.id).where(
+            EnterpriseArtifact.name == name,
+            EnterpriseArtifact.artifact_type == artifact_type,
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        return str(row).replace("-", "") if row is not None else None
+
+    def list_all_with_tags(self) -> "list":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.list_all_with_tags")
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseCollectionArtifact,
+        )
+
+        stmt = (
+            select(EnterpriseCollectionArtifact)
+            .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
+            .where(EnterpriseArtifact.tags != None)  # noqa: E711
+        )
+        rows = self.session.execute(stmt).scalars().all()
+        return [self._row_to_dto(r) for r in rows if getattr(r.artifact, "tags", None)]
+
+    def resolve_uuid_to_id_batch(
+        self,
+        uuids: "list[str]",
+        ctx: "Any | None" = None,
+    ) -> "dict[str, str]":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.resolve_uuid_to_id_batch: %d uuids",
+            len(uuids),
+        )
+        from skillmeat.cache.models_enterprise import EnterpriseArtifact
+
+        if not uuids:
+            return {}
+
+        parsed: List[uuid.UUID] = []
+        for u in uuids:
+            try:
+                parsed.append(uuid.UUID(u))
+            except (ValueError, AttributeError):
+                pass
+
+        if not parsed:
+            return {}
+
+        stmt = select(EnterpriseArtifact.id, EnterpriseArtifact.name, EnterpriseArtifact.artifact_type).where(
+            EnterpriseArtifact.id.in_(parsed)
+        )
+        rows = self.session.execute(stmt).all()
+        return {
+            str(r.id).replace("-", ""): f"{r.artifact_type}:{r.name}"
+            for r in rows
+        }
+
+    def list_all_ordered(
+        self,
+        collection_id: str,
+        ctx: "Any | None" = None,
+    ) -> "list":
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseCollectionArtifact,
+        )
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return []
+
+        stmt = (
+            select(EnterpriseCollectionArtifact)
+            .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
+            .where(EnterpriseCollectionArtifact.collection_id == coll_uuid)
+            .order_by(EnterpriseArtifact.artifact_type, EnterpriseArtifact.name)
+        )
+        rows = self.session.execute(stmt).scalars().all()
+        return [self._row_to_dto(r) for r in rows]
+
+    def get_group_artifact_uuids(
+        self,
+        group_id: str,
+        ctx: "Any | None" = None,
+    ) -> "set[str]":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.get_group_artifact_uuids: %r — not supported in enterprise v1",
+            group_id,
+        )
+        return set()
+
+    def get_source_for_uuids(
+        self,
+        artifact_uuids: "list[str]",
+        ctx: "Any | None" = None,
+    ) -> "dict[str, str]":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.get_source_for_uuids: %d uuids — source not stored in enterprise v1 schema",
+            len(artifact_uuids),
+        )
+        return {}
+
+
+# =============================================================================
+# EnterpriseArtifactHistoryStub  (ENT2-6.2)
+# =============================================================================
+
+
+class EnterpriseArtifactHistoryStub(IDbArtifactHistoryRepository):
+    """Stub implementation of IDbArtifactHistoryRepository for enterprise mode.
+
+    Artifact history is a local-SQLite feature not yet ported to the enterprise
+    PostgreSQL schema.  All read methods return empty/None to keep the API
+    operational while suppressing expensive or impossible DB queries.
+    """
+
+    def get_cache_artifact_by_uuid(
+        self,
+        uuid_str: str,
+        ctx: "Any | None" = None,
+    ) -> "Any | None":
+        logger.debug("EnterpriseArtifactHistoryStub: stub — full implementation deferred")
+        return None
+
+    def list_cache_artifacts_by_name_type(
+        self,
+        name: str,
+        artifact_type: str,
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug("EnterpriseArtifactHistoryStub: stub — full implementation deferred")
+        return []
+
+    def list_versions_for_artifacts(
+        self,
+        artifact_ids: "list[str]",
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug("EnterpriseArtifactHistoryStub: stub — full implementation deferred")
+        return []
+
+
+# =============================================================================
+# EnterpriseDuplicatePairStub  (ENT2-6.3)
+# =============================================================================
+
+
+class EnterpriseDuplicatePairStub:
+    """Stub implementation of DuplicatePairRepository for enterprise mode.
+
+    Duplicate detection is a local-SQLite feature based on a single-tenant
+    similarity scan.  It is not ported to the enterprise multi-tenant schema
+    in v2.  All methods return empty/False results.
+    """
+
+    def get_by_id(self, pair_id: str) -> None:
+        logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
+        return None
+
+    def list_active(self, min_score: float = 0.0) -> "list":
+        logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
+        return []
+
+    def mark_pair_ignored(self, pair_id: str) -> bool:
+        logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
+        return False
+
+    def unmark_pair_ignored(self, pair_id: str) -> bool:
+        logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
+        return False
+
+    def list_pairs_for_artifact(self, artifact_uuid: str) -> "list":
+        logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
+        return []

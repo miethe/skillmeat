@@ -46,32 +46,32 @@ tasks:
   - ENT2-5.2
 - id: ENT2-5.5
   title: Unit tests for marketplace source repository
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
   - ENT2-5.4
 - id: ENT2-6.1
   title: Edition-aware wiring for DbCollectionArtifactRepository
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
 - id: ENT2-6.2
   title: Edition-aware wiring for DbArtifactHistoryRepository
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
 - id: ENT2-6.3
   title: Edition-aware wiring for DuplicatePairRepository
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
 - id: ENT2-6.4
   title: Edition-aware wiring for concrete MarketplaceSourceRepository
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -101,10 +101,10 @@ parallelization:
   batch_4:
   - ENT2-6.5
 total_tasks: 10
-completed_tasks: 4
+completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 40
+progress: 90
 ---
 
 # Phase 5-6: Repository Implementation (Marketplace) & Edition-Aware Wiring
