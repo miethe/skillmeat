@@ -362,7 +362,10 @@ export function StageEditor({ stage, open, onClose, onSave }: StageEditorProps) 
     id: 'artifacts',
     label: 'Tools',
     icon: Package,
-    useData: (params) => useEntityPickerArtifacts({ ...params, typeFilter: ['skill', 'command', 'mcp'] }),
+    useData: (params) => useEntityPickerArtifacts({
+      ...params,
+      typeFilter: params.typeFilter?.length ? params.typeFilter : ['skill', 'command', 'mcp'],
+    }),
     renderCard: renderToolCard,
     getId: (item) => item.uuid,
     typeFilters: [
