@@ -3,7 +3,48 @@
 Detailed reference for SkillMeat's canonical data flow standard.
 **Source**: `docs/project_plans/reports/data-flow-standardization-report.md`
 
-**Updated**: 2026-02-25
+**Updated**: 2026-03-12
+
+---
+
+## Edition-Specific Data Flow
+
+### Local Edition (Default)
+
+**Structure**: Filesystem-backed with SQLAlchemy cache layer.
+
+```
+Frontend → API (RouterDep: LocalRepository) → Filesystem / SQLAlchemy SQLite
+```
+
+- **Writes**: Write-through pattern (FS first → DB cache via `refresh_single_artifact_cache()`)
+- **Reads**: DB cache (source of truth for web)
+- **Session**: Single session per request, auto-committed by FastAPI lifecycle
+
+### Enterprise Edition
+
+**Structure**: PostgreSQL-backed with DI-injected session.
+
+```
+Frontend → API (RouterDep: EnterpriseRepository) → PostgreSQL (multi-tenant, tenant-filtered)
+```
+
+- **Writes**: DB-first (no filesystem); `flush()` called by repo, `commit()` by router
+- **Reads**: Tenant-filtered SELECT via `_tenant_select()` / `_apply_tenant_filter()`
+- **Session**: DI-injected SQLAlchemy Session; transaction lifecycle managed by router
+- **Activation**: Set `SKILLMEAT_EDITION=enterprise` env var or `settings.edition = "enterprise"`
+
+**Edition Selection** (in `dependencies.py`):
+```python
+def get_artifact_repository(state: AppState, session: SessionDep) -> IArtifactRepository:
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "local":
+        return LocalArtifactRepository(...)
+    elif edition == "enterprise":
+        return EnterpriseArtifactRepository(session=session)
+    else:
+        raise HTTPException(503, f"Unsupported edition: {edition}")
+```
 
 ---
 

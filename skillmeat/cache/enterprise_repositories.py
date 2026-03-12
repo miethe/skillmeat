@@ -81,7 +81,11 @@ from sqlalchemy.sql import Select
 
 from skillmeat.cache.constants import DEFAULT_TENANT_ID
 
-from skillmeat.core.interfaces.repositories import IDbUserCollectionRepository
+from skillmeat.core.interfaces.repositories import (
+    IDbArtifactHistoryRepository,
+    IDbCollectionArtifactRepository,
+    IDbUserCollectionRepository,
+)
 
 if TYPE_CHECKING:
     from skillmeat.api.schemas.auth import AuthContext
@@ -2368,3 +2372,7342 @@ class EnterpriseUserCollectionAdapter(IDbUserCollectionRepository):
     ) -> bool:
         """Enterprise does not support the same group model; returns False."""
         return False
+
+
+# ---------------------------------------------------------------------------
+# EnterpriseTagRepository  (ENT2-3.1)
+# ---------------------------------------------------------------------------
+
+
+class EnterpriseTagRepository(
+    EnterpriseRepositoryBase["EnterpriseTag"],
+):
+    """Repository for tenant-scoped CRUD on EnterpriseTag.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.ITagRepository`
+    for the enterprise PostgreSQL backend.
+
+    All queries are automatically scoped to the tenant stored in
+    ``TenantContext`` via ``_apply_tenant_filter()``.  Slug generation
+    normalises the tag name using a simple regex: lowercase, replace
+    non-alphanumeric runs with hyphens, strip leading/trailing hyphens.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    The interface defines ``id`` as ``str``; enterprise tag PKs are
+    ``uuid.UUID``.  All public methods accept and return ``str`` IDs and
+    convert internally.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseTag as _ET
+
+        super().__init__(session, _ET)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _slugify(name: str) -> str:
+        """Derive a URL-safe slug from *name*.
+
+        Lowercases the string, replaces every run of non-alphanumeric
+        characters (including spaces) with a single hyphen, and strips
+        leading/trailing hyphens.
+
+        Parameters
+        ----------
+        name:
+            Human-readable tag name, e.g. ``"AI & ML"``.
+
+        Returns
+        -------
+        str
+            Normalised slug, e.g. ``"ai-ml"``.
+        """
+        import re
+
+        slug = name.lower()
+        slug = re.sub(r"[^a-z0-9]+", "-", slug)
+        return slug.strip("-")
+
+    def _to_dto(self, tag: "EnterpriseTag", artifact_count: int = 0) -> "TagDTO":
+        """Map an ``EnterpriseTag`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.TagDTO`.
+
+        Parameters
+        ----------
+        tag:
+            ORM instance to convert.
+        artifact_count:
+            Number of artifacts currently carrying this tag.  Defaults to
+            ``0`` when the caller does not supply a pre-computed count.
+
+        Returns
+        -------
+        TagDTO
+            Immutable DTO ready for serialisation.
+        """
+        from skillmeat.core.interfaces.dtos import TagDTO
+
+        return TagDTO(
+            id=str(tag.id),
+            name=tag.name,
+            slug=tag.slug,
+            color=tag.color,
+            artifact_count=artifact_count,
+            deployment_set_count=0,
+            created_at=tag.created_at.isoformat() if tag.created_at else None,
+            updated_at=tag.updated_at.isoformat() if tag.updated_at else None,
+        )
+
+    # ------------------------------------------------------------------
+    # ITagRepository: get
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[TagDTO]":
+        """Return a :class:`~skillmeat.core.interfaces.dtos.TagDTO` by string UUID.
+
+        Parameters
+        ----------
+        id:
+            Tag UUID as a string (e.g. from an API path parameter).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        TagDTO or None
+            The matching DTO when found within the current tenant, ``None``
+            otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        try:
+            tag_uuid = uuid.UUID(id)
+        except (ValueError, AttributeError):
+            return None
+        stmt = self._tenant_select().where(EnterpriseTag.id == tag_uuid)
+        tag = self.session.execute(stmt).scalar_one_or_none()
+        if tag is None:
+            return None
+        return self._to_dto(tag, artifact_count=len(tag.artifact_tags))
+
+    # ------------------------------------------------------------------
+    # ITagRepository: get_by_slug
+    # ------------------------------------------------------------------
+
+    def get_by_slug(
+        self,
+        slug: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[TagDTO]":
+        """Return a :class:`~skillmeat.core.interfaces.dtos.TagDTO` by slug.
+
+        Parameters
+        ----------
+        slug:
+            URL-safe normalised tag slug (e.g. ``"ai-ml"``).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        TagDTO or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        stmt = self._tenant_select().where(EnterpriseTag.slug == slug)
+        tag = self.session.execute(stmt).scalar_one_or_none()
+        if tag is None:
+            return None
+        return self._to_dto(tag, artifact_count=len(tag.artifact_tags))
+
+    # ------------------------------------------------------------------
+    # ITagRepository: list
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        filters: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[TagDTO]":
+        """Return all tags for the current tenant.
+
+        Parameters
+        ----------
+        filters:
+            Optional filter map.  Recognised key: ``"name"`` — performs a
+            case-insensitive prefix filter.  Unknown keys are ignored.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[TagDTO]
+            Tags ordered alphabetically by name.
+        """
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        stmt = self._tenant_select().order_by(EnterpriseTag.name)
+        if filters:
+            name_filter = filters.get("name")
+            if name_filter:
+                stmt = stmt.where(
+                    func.lower(EnterpriseTag.name).like(
+                        f"{name_filter.lower()}%"
+                    )
+                )
+        tags = list(self.session.execute(stmt).scalars())
+        return [self._to_dto(t, artifact_count=len(t.artifact_tags)) for t in tags]
+
+    # ------------------------------------------------------------------
+    # ITagRepository: create
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        name: str,
+        color: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "TagDTO":
+        """Create a new tenant-scoped tag.
+
+        The slug is automatically derived from *name* via :meth:`_slugify`.
+
+        Parameters
+        ----------
+        name:
+            Human-readable tag name.  Must be unique within the tenant.
+        color:
+            Optional hex or CSS colour string (e.g. ``"#3B82F6"``).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        TagDTO
+            The newly created tag.
+
+        Raises
+        ------
+        ValueError
+            If a tag with the same derived slug already exists for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        tenant_id = self._get_tenant_id()
+        slug = self._slugify(name)
+
+        # Guard: uniqueness check on (tenant_id, slug) before insert.
+        existing = self.get_by_slug(slug)
+        if existing is not None:
+            raise ValueError(
+                f"A tag with slug {slug!r} already exists in this tenant."
+            )
+
+        tag = EnterpriseTag(
+            tenant_id=tenant_id,
+            name=name,
+            slug=slug,
+            color=color,
+        )
+        self.session.add(tag)
+        self.session.flush()
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseTag",
+            entity_id=tag.id,
+            metadata={"name": name, "slug": slug},
+        )
+        return self._to_dto(tag)
+
+    # ------------------------------------------------------------------
+    # ITagRepository: update
+    # ------------------------------------------------------------------
+
+    def update(
+        self,
+        id: str,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "TagDTO":
+        """Apply a partial update to an existing tag.
+
+        Parameters
+        ----------
+        id:
+            Tag UUID as a string.
+        updates:
+            Map of field names to new values.  Recognised keys:
+            ``"name"``, ``"color"``.  An updated ``"name"`` automatically
+            regenerates the slug unless ``"slug"`` is also provided
+            explicitly.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        TagDTO
+            The updated tag DTO.
+
+        Raises
+        ------
+        KeyError
+            If no tag with *id* exists in the current tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        try:
+            tag_uuid = uuid.UUID(id)
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(id) from exc
+
+        stmt = self._tenant_select().where(EnterpriseTag.id == tag_uuid)
+        tag = self.session.execute(stmt).scalar_one_or_none()
+        if tag is None:
+            raise KeyError(id)
+
+        changed: Dict[str, object] = {}
+        if "name" in updates:
+            tag.name = updates["name"]
+            changed["name"] = updates["name"]
+            # Auto-regenerate slug when name changes unless slug is explicit.
+            if "slug" not in updates:
+                tag.slug = self._slugify(updates["name"])
+                changed["slug"] = tag.slug
+        if "slug" in updates:
+            tag.slug = updates["slug"]
+            changed["slug"] = updates["slug"]
+        if "color" in updates:
+            tag.color = updates["color"]
+            changed["color"] = updates["color"]
+
+        tag.updated_at = datetime.utcnow()
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseTag",
+            entity_id=tag_uuid,
+            metadata=changed or None,
+        )
+        return self._to_dto(tag, artifact_count=len(tag.artifact_tags))
+
+    # ------------------------------------------------------------------
+    # ITagRepository: delete
+    # ------------------------------------------------------------------
+
+    def delete(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Delete a tag and remove all its artifact associations.
+
+        The ``ON DELETE CASCADE`` on ``enterprise_artifact_tags.tag_id``
+        removes association rows automatically at the database level.
+
+        Parameters
+        ----------
+        id:
+            Tag UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` when the tag was found and deleted, ``False`` otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        try:
+            tag_uuid = uuid.UUID(id)
+        except (ValueError, AttributeError):
+            return False
+
+        stmt = self._tenant_select().where(EnterpriseTag.id == tag_uuid)
+        tag = self.session.execute(stmt).scalar_one_or_none()
+        if tag is None:
+            return False
+
+        self.session.delete(tag)
+        self.session.flush()
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseTag",
+            entity_id=tag_uuid,
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # ITagRepository: assign
+    # ------------------------------------------------------------------
+
+    def assign(
+        self,
+        tag_id: str,
+        artifact_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Associate a tag with an artifact (idempotent).
+
+        Parameters
+        ----------
+        tag_id:
+            Tag UUID as a string.
+        artifact_id:
+            Artifact UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` on success (including when the association already existed).
+
+        Raises
+        ------
+        KeyError
+            If *tag_id* or *artifact_id* does not exist within the current
+            tenant.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseArtifactTag,
+            EnterpriseTag,
+        )
+
+        try:
+            tag_uuid = uuid.UUID(tag_id)
+            artifact_uuid = uuid.UUID(artifact_id)
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(tag_id) from exc
+
+        tenant_id = self._get_tenant_id()
+
+        # Validate both entities exist within the tenant.
+        tag_stmt = self._tenant_select().where(EnterpriseTag.id == tag_uuid)
+        tag = self.session.execute(tag_stmt).scalar_one_or_none()
+        if tag is None:
+            raise KeyError(tag_id)
+
+        art_stmt = self._apply_tenant_filter(
+            select(EnterpriseArtifact).where(EnterpriseArtifact.id == artifact_uuid)
+        )
+        artifact = self.session.execute(art_stmt).scalar_one_or_none()
+        if artifact is None:
+            raise KeyError(artifact_id)
+
+        # Idempotent: check if the association already exists.
+        existing_stmt = select(EnterpriseArtifactTag).where(
+            EnterpriseArtifactTag.tenant_id == tenant_id,
+            EnterpriseArtifactTag.tag_id == tag_uuid,
+            EnterpriseArtifactTag.artifact_uuid == artifact_uuid,
+        )
+        existing = self.session.execute(existing_stmt).scalar_one_or_none()
+        if existing is not None:
+            return True
+
+        assoc = EnterpriseArtifactTag(
+            tenant_id=tenant_id,
+            tag_id=tag_uuid,
+            artifact_uuid=artifact_uuid,
+        )
+        self.session.add(assoc)
+        self.session.flush()
+        self._log_operation(
+            operation="assign",
+            entity_type="EnterpriseArtifactTag",
+            entity_id=assoc.id,
+            metadata={"tag_id": str(tag_uuid), "artifact_uuid": str(artifact_uuid)},
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # ITagRepository: unassign
+    # ------------------------------------------------------------------
+
+    def unassign(
+        self,
+        tag_id: str,
+        artifact_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Remove the association between a tag and an artifact.
+
+        Parameters
+        ----------
+        tag_id:
+            Tag UUID as a string.
+        artifact_id:
+            Artifact UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` when the association existed and was removed, ``False``
+            if there was no such association.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseArtifactTag
+
+        try:
+            tag_uuid = uuid.UUID(tag_id)
+            artifact_uuid = uuid.UUID(artifact_id)
+        except (ValueError, AttributeError):
+            return False
+
+        tenant_id = self._get_tenant_id()
+        result = self.session.execute(
+            delete(EnterpriseArtifactTag).where(
+                EnterpriseArtifactTag.tenant_id == tenant_id,
+                EnterpriseArtifactTag.tag_id == tag_uuid,
+                EnterpriseArtifactTag.artifact_uuid == artifact_uuid,
+            )
+        )
+        removed = result.rowcount > 0
+        if removed:
+            self.session.flush()
+            self._log_operation(
+                operation="unassign",
+                entity_type="EnterpriseArtifactTag",
+                entity_id=None,
+                metadata={
+                    "tag_id": str(tag_uuid),
+                    "artifact_uuid": str(artifact_uuid),
+                },
+            )
+        return removed
+
+
+# ---------------------------------------------------------------------------
+# EnterpriseGroupRepository  (ENT2-3.2)
+# ---------------------------------------------------------------------------
+
+
+class EnterpriseGroupRepository(
+    EnterpriseRepositoryBase["EnterpriseGroup"],
+):
+    """Repository for tenant-scoped CRUD on EnterpriseGroup.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.IGroupRepository`
+    for the enterprise PostgreSQL backend.
+
+    Groups are named, position-ordered buckets within a collection.  All
+    queries are automatically scoped to the tenant stored in ``TenantContext``
+    via ``_apply_tenant_filter()``.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    The IGroupRepository interface uses ``int`` group IDs for historical
+    reasons (local SQLite model uses autoincrement integers).  The enterprise
+    model uses ``uuid.UUID`` PKs.  All public methods accept ``int | str``
+    IDs, attempt UUID parse first, and raise ``KeyError`` for invalid values.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseGroup as _EG
+
+        super().__init__(session, _EG)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _to_dto(
+        self,
+        group: "EnterpriseGroup",
+        artifact_count: int = 0,
+    ) -> "GroupDTO":
+        """Map an ``EnterpriseGroup`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.GroupDTO`.
+
+        Parameters
+        ----------
+        group:
+            ORM instance to convert.
+        artifact_count:
+            Number of artifacts currently in this group.
+
+        Returns
+        -------
+        GroupDTO
+        """
+        from skillmeat.core.interfaces.dtos import GroupDTO
+
+        return GroupDTO(
+            id=str(group.id),
+            name=group.name or "",
+            collection_id=str(group.collection_id) if group.collection_id else "",
+            description=group.description,
+            position=group.position or 0,
+            artifact_count=artifact_count,
+            tags=[],
+            color="slate",
+            icon="layers",
+            created_at=group.created_at.isoformat() if group.created_at else None,
+            updated_at=group.updated_at.isoformat() if group.updated_at else None,
+        )
+
+    def _ga_to_dto(
+        self,
+        ga: "EnterpriseGroupArtifact",
+    ) -> "GroupArtifactDTO":
+        """Map an ``EnterpriseGroupArtifact`` join row to a :class:`~skillmeat.core.interfaces.dtos.GroupArtifactDTO`.
+
+        Parameters
+        ----------
+        ga:
+            ORM join-table instance to convert.
+
+        Returns
+        -------
+        GroupArtifactDTO
+        """
+        from skillmeat.core.interfaces.dtos import GroupArtifactDTO
+
+        return GroupArtifactDTO(
+            group_id=str(ga.group_id),
+            artifact_uuid=str(ga.artifact_uuid),
+            position=ga.position or 0,
+            added_at=None,
+        )
+
+    def _resolve_group_uuid(self, group_id: "int | str") -> "Optional[uuid.UUID]":
+        """Coerce *group_id* to a ``uuid.UUID``, returning ``None`` on failure.
+
+        Accepts integer IDs (silently converted via ``str()`` before UUID
+        parse) or string UUIDs.
+
+        Parameters
+        ----------
+        group_id:
+            Raw group identifier from an API path or interface call.
+
+        Returns
+        -------
+        uuid.UUID or None
+        """
+        try:
+            return uuid.UUID(str(group_id))
+        except (ValueError, AttributeError):
+            return None
+
+    def _fetch_group(
+        self,
+        group_uuid: uuid.UUID,
+    ) -> "Optional[EnterpriseGroup]":
+        """Fetch a tenant-filtered group by UUID.
+
+        Parameters
+        ----------
+        group_uuid:
+            UUID of the group to retrieve.
+
+        Returns
+        -------
+        EnterpriseGroup or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroup
+
+        stmt = self._tenant_select().where(EnterpriseGroup.id == group_uuid)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: get_with_artifacts
+    # ------------------------------------------------------------------
+
+    def get_with_artifacts(
+        self,
+        group_id: int,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[GroupDTO]":
+        """Return a group by ID, including its artifact membership count.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key (integer or UUID string accepted).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        GroupDTO or None
+        """
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            return None
+        group = self._fetch_group(gid)
+        if group is None:
+            return None
+        artifact_count = len(group.group_artifacts)
+        return self._to_dto(group, artifact_count=artifact_count)
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: list
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        collection_id: str,
+        filters: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[GroupDTO]":
+        """Return all groups belonging to a collection, ordered by position.
+
+        Parameters
+        ----------
+        collection_id:
+            Collection UUID as a string.
+        filters:
+            Optional additional filter map.  Recognised key: ``"name"`` —
+            case-insensitive exact match.  Unknown keys are ignored.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[GroupDTO]
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroup
+
+        try:
+            col_uuid = uuid.UUID(str(collection_id))
+        except (ValueError, AttributeError):
+            return []
+
+        stmt = (
+            self._tenant_select()
+            .where(EnterpriseGroup.collection_id == col_uuid)
+            .order_by(EnterpriseGroup.position)
+        )
+        if filters:
+            name_filter = filters.get("name")
+            if name_filter:
+                stmt = stmt.where(EnterpriseGroup.name == name_filter)
+
+        groups = list(self.session.execute(stmt).scalars())
+        return [
+            self._to_dto(g, artifact_count=len(g.group_artifacts))
+            for g in groups
+        ]
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: create
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        name: str,
+        collection_id: str,
+        description: "Optional[str]" = None,
+        position: "Optional[int]" = None,
+        ctx: "Optional[object]" = None,
+        owner_target: "Optional[object]" = None,
+    ) -> "GroupDTO":
+        """Create a new group in the given collection.
+
+        If *position* is ``None``, the group is appended after all existing
+        groups in the collection (``max(position) + 1``).
+
+        Parameters
+        ----------
+        name:
+            Human-readable group name.
+        collection_id:
+            Owning collection UUID as a string.
+        description:
+            Optional free-text description.
+        position:
+            Explicit display position.  ``None`` = append at the end.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+        owner_target:
+            Optional ownership target (reserved for future use; unused in
+            the enterprise backend today).
+
+        Returns
+        -------
+        GroupDTO
+            The newly created group.
+
+        Raises
+        ------
+        ValueError
+            If a group with the same *name* already exists in the collection.
+        """
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseGroup
+
+        try:
+            col_uuid = uuid.UUID(str(collection_id))
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(
+                f"Invalid collection_id {collection_id!r}: not a valid UUID."
+            ) from exc
+
+        tenant_id = self._get_tenant_id()
+
+        # Guard: name uniqueness within (tenant, collection).
+        dup_stmt = (
+            self._tenant_select()
+            .where(
+                EnterpriseGroup.collection_id == col_uuid,
+                EnterpriseGroup.name == name,
+            )
+        )
+        if self.session.execute(dup_stmt).scalar_one_or_none() is not None:
+            raise ValueError(
+                f"A group named {name!r} already exists in collection "
+                f"{collection_id!r}."
+            )
+
+        if position is None:
+            max_pos_result = self.session.execute(
+                select(func.max(EnterpriseGroup.position)).where(
+                    EnterpriseGroup.tenant_id == tenant_id,
+                    EnterpriseGroup.collection_id == col_uuid,
+                )
+            ).scalar()
+            position = 0 if max_pos_result is None else max_pos_result + 1
+
+        group = EnterpriseGroup(
+            tenant_id=tenant_id,
+            name=name,
+            collection_id=col_uuid,
+            description=description,
+            position=position,
+        )
+        self.session.add(group)
+        self.session.flush()
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseGroup",
+            entity_id=group.id,
+            metadata={"name": name, "collection_id": str(col_uuid)},
+        )
+        return self._to_dto(group)
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: update
+    # ------------------------------------------------------------------
+
+    def update(
+        self,
+        group_id: int,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "GroupDTO":
+        """Apply a partial update to an existing group's metadata.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        updates:
+            Map of field names to new values.  Recognised keys:
+            ``"name"``, ``"description"``, ``"position"``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        GroupDTO
+            The updated group DTO.
+
+        Raises
+        ------
+        KeyError
+            If no group with *group_id* exists in the current tenant.
+        """
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        changed: Dict[str, object] = {}
+        if "name" in updates:
+            group.name = updates["name"]
+            changed["name"] = updates["name"]
+        if "description" in updates:
+            group.description = updates["description"]
+            changed["description"] = updates["description"]
+        if "position" in updates:
+            group.position = updates["position"]
+            changed["position"] = updates["position"]
+
+        group.updated_at = datetime.utcnow()
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseGroup",
+            entity_id=gid,
+            metadata=changed or None,
+        )
+        return self._to_dto(group, artifact_count=len(group.group_artifacts))
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: delete
+    # ------------------------------------------------------------------
+
+    def delete(
+        self,
+        group_id: int,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Delete a group and all its artifact membership records.
+
+        The ``ON DELETE CASCADE`` on ``enterprise_group_artifacts.group_id``
+        removes membership rows automatically at the database level.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If no group with *group_id* exists in the current tenant.
+        """
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        self.session.delete(group)
+        self.session.flush()
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseGroup",
+            entity_id=gid,
+        )
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: copy_to_collection
+    # ------------------------------------------------------------------
+
+    def copy_to_collection(
+        self,
+        group_id: int,
+        target_collection_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "GroupDTO":
+        """Duplicate a group and its artifact memberships into another collection.
+
+        The new group gets the same name, description, and position as the
+        source.  Artifact UUIDs are preserved.
+
+        Parameters
+        ----------
+        group_id:
+            Integer primary key of the source group.
+        target_collection_id:
+            UUID string of the destination collection.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        GroupDTO
+            The newly created group DTO in the target collection.
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist in the current tenant.
+        ValueError
+            If *target_collection_id* is not a valid UUID.
+        """
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseGroup,
+            EnterpriseGroupArtifact,
+        )
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        source = self._fetch_group(gid)
+        if source is None:
+            raise KeyError(group_id)
+
+        try:
+            target_col_uuid = uuid.UUID(str(target_collection_id))
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(
+                f"Invalid target_collection_id {target_collection_id!r}."
+            ) from exc
+
+        tenant_id = self._get_tenant_id()
+
+        # Compute append position in the target collection.
+        max_pos_result = self.session.execute(
+            select(func.max(EnterpriseGroup.position)).where(
+                EnterpriseGroup.tenant_id == tenant_id,
+                EnterpriseGroup.collection_id == target_col_uuid,
+            )
+        ).scalar()
+        new_position = 0 if max_pos_result is None else max_pos_result + 1
+
+        new_group = EnterpriseGroup(
+            tenant_id=tenant_id,
+            name=source.name,
+            collection_id=target_col_uuid,
+            description=source.description,
+            position=new_position,
+        )
+        self.session.add(new_group)
+        self.session.flush()
+
+        # Copy artifact memberships preserving positions.
+        source_memberships = list(
+            self.session.execute(
+                select(EnterpriseGroupArtifact).where(
+                    EnterpriseGroupArtifact.group_id == gid,
+                    EnterpriseGroupArtifact.tenant_id == tenant_id,
+                )
+            ).scalars()
+        )
+        for mem in source_memberships:
+            new_mem = EnterpriseGroupArtifact(
+                tenant_id=tenant_id,
+                group_id=new_group.id,
+                artifact_uuid=mem.artifact_uuid,
+                position=mem.position,
+            )
+            self.session.add(new_mem)
+
+        self.session.flush()
+        self._log_operation(
+            operation="copy_to_collection",
+            entity_type="EnterpriseGroup",
+            entity_id=new_group.id,
+            metadata={
+                "source_group_id": str(gid),
+                "target_collection_id": str(target_col_uuid),
+            },
+        )
+        return self._to_dto(
+            new_group,
+            artifact_count=len(source_memberships),
+        )
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: reorder_groups
+    # ------------------------------------------------------------------
+
+    def reorder_groups(
+        self,
+        collection_id: str,
+        ordered_ids: "list[int]",
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Bulk-update the display positions of all groups in a collection.
+
+        Parameters
+        ----------
+        collection_id:
+            Collection UUID as a string.
+        ordered_ids:
+            Complete list of group primary keys in the desired display order.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *collection_id* does not map to a valid UUID or any group in
+            *ordered_ids* is not found in the current tenant.
+        ValueError
+            If *ordered_ids* does not include all groups in the collection.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroup
+
+        try:
+            col_uuid = uuid.UUID(str(collection_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(collection_id) from exc
+
+        # Fetch all groups in the collection for this tenant.
+        stmt = (
+            self._tenant_select()
+            .where(EnterpriseGroup.collection_id == col_uuid)
+        )
+        groups = {g.id: g for g in self.session.execute(stmt).scalars()}
+
+        # Validate completeness.
+        ordered_uuids: list[uuid.UUID] = []
+        for raw_id in ordered_ids:
+            uid = self._resolve_group_uuid(raw_id)
+            if uid is None or uid not in groups:
+                raise KeyError(raw_id)
+            ordered_uuids.append(uid)
+
+        if len(ordered_uuids) != len(groups):
+            raise ValueError(
+                f"ordered_ids must include all {len(groups)} groups in the "
+                f"collection; got {len(ordered_uuids)}."
+            )
+
+        for position, gid in enumerate(ordered_uuids):
+            groups[gid].position = position
+            groups[gid].updated_at = datetime.utcnow()
+
+        self.session.flush()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: add_artifacts
+    # ------------------------------------------------------------------
+
+    def add_artifacts(
+        self,
+        group_id: int,
+        artifact_uuids: "list[str]",
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Add one or more artifacts to a group (idempotent).
+
+        Artifacts already in the group are silently skipped.  Newly added
+        artifacts are appended after existing members.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        artifact_uuids:
+            List of artifact UUID strings to add.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist in the current tenant.
+        """
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        tenant_id = self._get_tenant_id()
+
+        # Fetch current max position.
+        max_pos_result = self.session.execute(
+            select(func.max(EnterpriseGroupArtifact.position)).where(
+                EnterpriseGroupArtifact.group_id == gid,
+                EnterpriseGroupArtifact.tenant_id == tenant_id,
+            )
+        ).scalar()
+        next_position = 0 if max_pos_result is None else max_pos_result + 1
+
+        # Collect existing artifact UUIDs to deduplicate.
+        existing_stmt = select(EnterpriseGroupArtifact.artifact_uuid).where(
+            EnterpriseGroupArtifact.group_id == gid,
+            EnterpriseGroupArtifact.tenant_id == tenant_id,
+        )
+        existing_uuids: set[uuid.UUID] = {
+            row for row in self.session.execute(existing_stmt).scalars()
+        }
+
+        for raw_uuid in artifact_uuids:
+            try:
+                art_uuid = uuid.UUID(str(raw_uuid))
+            except (ValueError, AttributeError):
+                continue
+            if art_uuid in existing_uuids:
+                continue
+            mem = EnterpriseGroupArtifact(
+                tenant_id=tenant_id,
+                group_id=gid,
+                artifact_uuid=art_uuid,
+                position=next_position,
+            )
+            self.session.add(mem)
+            existing_uuids.add(art_uuid)
+            next_position += 1
+
+        self.session.flush()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: remove_artifact
+    # ------------------------------------------------------------------
+
+    def remove_artifact(
+        self,
+        group_id: int,
+        artifact_uuid: str,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Remove a single artifact from a group.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        artifact_uuid:
+            Artifact UUID string to remove.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist or *artifact_uuid* is not a member.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        try:
+            art_uuid = uuid.UUID(str(artifact_uuid))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(artifact_uuid) from exc
+
+        tenant_id = self._get_tenant_id()
+        result = self.session.execute(
+            delete(EnterpriseGroupArtifact).where(
+                EnterpriseGroupArtifact.group_id == gid,
+                EnterpriseGroupArtifact.artifact_uuid == art_uuid,
+                EnterpriseGroupArtifact.tenant_id == tenant_id,
+            )
+        )
+        if result.rowcount == 0:
+            raise KeyError(artifact_uuid)
+        self.session.flush()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: update_artifact_position
+    # ------------------------------------------------------------------
+
+    def update_artifact_position(
+        self,
+        group_id: int,
+        artifact_uuid: str,
+        position: int,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Update the display position of a single artifact within a group.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        artifact_uuid:
+            Artifact UUID string whose position to update.
+        position:
+            New zero-based display position.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist or *artifact_uuid* is not a member.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        try:
+            art_uuid = uuid.UUID(str(artifact_uuid))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(artifact_uuid) from exc
+
+        tenant_id = self._get_tenant_id()
+        stmt = select(EnterpriseGroupArtifact).where(
+            EnterpriseGroupArtifact.group_id == gid,
+            EnterpriseGroupArtifact.artifact_uuid == art_uuid,
+            EnterpriseGroupArtifact.tenant_id == tenant_id,
+        )
+        mem = self.session.execute(stmt).scalar_one_or_none()
+        if mem is None:
+            raise KeyError(artifact_uuid)
+
+        mem.position = position
+        self.session.flush()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: reorder_artifacts
+    # ------------------------------------------------------------------
+
+    def reorder_artifacts(
+        self,
+        group_id: int,
+        ordered_uuids: "list[str]",
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Bulk-update the display positions of all artifacts in a group.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        ordered_uuids:
+            Complete list of artifact UUID strings in the desired display
+            order.  Must include all current members.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist in the current tenant.
+        ValueError
+            If *ordered_uuids* does not cover all current members.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        tenant_id = self._get_tenant_id()
+        memberships_stmt = select(EnterpriseGroupArtifact).where(
+            EnterpriseGroupArtifact.group_id == gid,
+            EnterpriseGroupArtifact.tenant_id == tenant_id,
+        )
+        memberships = {
+            m.artifact_uuid: m
+            for m in self.session.execute(memberships_stmt).scalars()
+        }
+
+        parsed_uuids: list[uuid.UUID] = []
+        for raw in ordered_uuids:
+            try:
+                parsed_uuids.append(uuid.UUID(str(raw)))
+            except (ValueError, AttributeError):
+                continue
+
+        if len(parsed_uuids) != len(memberships):
+            raise ValueError(
+                f"ordered_uuids must include all {len(memberships)} current "
+                f"members; got {len(parsed_uuids)}."
+            )
+
+        for position, art_uuid in enumerate(parsed_uuids):
+            if art_uuid not in memberships:
+                raise ValueError(
+                    f"Artifact {art_uuid!s} is not a member of group {group_id!r}."
+                )
+            memberships[art_uuid].position = position
+
+        self.session.flush()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: list_group_artifacts
+    # ------------------------------------------------------------------
+
+    def list_group_artifacts(
+        self,
+        group_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "list[GroupArtifactDTO]":
+        """Return the ordered artifact membership records for a group.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key (string or integer).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[GroupArtifactDTO]
+            Membership records ordered by ``position`` ascending.  Returns an
+            empty list when the group does not exist or has no members.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            return []
+
+        tenant_id = self._get_tenant_id()
+        stmt = (
+            select(EnterpriseGroupArtifact)
+            .where(
+                EnterpriseGroupArtifact.group_id == gid,
+                EnterpriseGroupArtifact.tenant_id == tenant_id,
+            )
+            .order_by(EnterpriseGroupArtifact.position)
+        )
+        members = list(self.session.execute(stmt).scalars())
+        return [self._ga_to_dto(m) for m in members]
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: add_artifacts_at_position
+    # ------------------------------------------------------------------
+
+    def add_artifacts_at_position(
+        self,
+        group_id: str,
+        artifact_uuids: "list[str]",
+        position: int,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Insert artifacts at a specific position within a group.
+
+        Existing artifacts at or after *position* are shifted down by the
+        count of new insertions.  Artifacts already in the group are silently
+        skipped (deduplicated).
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key string.
+        artifact_uuids:
+            Ordered list of artifact UUID strings to insert.
+        position:
+            Zero-based target position for the first inserted artifact.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist in the current tenant.
+        RuntimeError
+            On unexpected database errors.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        tenant_id = self._get_tenant_id()
+
+        # Deduplicate: skip UUIDs already in the group.
+        existing_stmt = select(EnterpriseGroupArtifact.artifact_uuid).where(
+            EnterpriseGroupArtifact.group_id == gid,
+            EnterpriseGroupArtifact.tenant_id == tenant_id,
+        )
+        existing_uuids: set[uuid.UUID] = {
+            row for row in self.session.execute(existing_stmt).scalars()
+        }
+
+        new_uuids: list[uuid.UUID] = []
+        for raw in artifact_uuids:
+            try:
+                art_uuid = uuid.UUID(str(raw))
+            except (ValueError, AttributeError):
+                continue
+            if art_uuid not in existing_uuids:
+                new_uuids.append(art_uuid)
+
+        if not new_uuids:
+            return
+
+        # Shift existing members at or after *position* down by len(new_uuids).
+        shift = len(new_uuids)
+        shift_stmt = select(EnterpriseGroupArtifact).where(
+            EnterpriseGroupArtifact.group_id == gid,
+            EnterpriseGroupArtifact.tenant_id == tenant_id,
+            EnterpriseGroupArtifact.position >= position,
+        )
+        for mem in self.session.execute(shift_stmt).scalars():
+            if mem.position is not None:
+                mem.position = mem.position + shift
+
+        # Insert new membership rows starting at *position*.
+        for offset, art_uuid in enumerate(new_uuids):
+            new_mem = EnterpriseGroupArtifact(
+                tenant_id=tenant_id,
+                group_id=gid,
+                artifact_uuid=art_uuid,
+                position=position + offset,
+            )
+            self.session.add(new_mem)
+
+        self.session.flush()
+
+
+# =============================================================================
+# EnterpriseSettingsRepository  (ENT2-3.3)
+# =============================================================================
+
+
+class EnterpriseSettingsRepository(
+    EnterpriseRepositoryBase["EnterpriseSettings"],
+):
+    """Repository for tenant-scoped reads and writes on EnterpriseSettings.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.ISettingsRepository`
+    for the enterprise PostgreSQL backend.
+
+    The ``EnterpriseSettings`` table has a ``UNIQUE (tenant_id)`` constraint —
+    exactly one settings row per tenant.  :meth:`update` uses an ORM
+    check-then-insert/update pattern (no raw ``INSERT ON CONFLICT``) so it
+    works portably across SQLAlchemy dialects in unit tests.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    The interface defines ``github_token``, ``collection_path``,
+    ``default_scope``, ``edition``, and ``indexing_mode`` as first-class
+    fields; additional keys in the ``updates`` dict are stored in the JSONB
+    ``extra`` column.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseSettings as _ES
+
+        super().__init__(session, _ES)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    _KNOWN_FIELDS = frozenset(
+        {"github_token", "collection_path", "default_scope", "edition", "indexing_mode"}
+    )
+
+    def _to_dto(self, row: "EnterpriseSettings") -> "SettingsDTO":
+        """Map an ``EnterpriseSettings`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.SettingsDTO`.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        SettingsDTO
+        """
+        from skillmeat.core.interfaces.dtos import SettingsDTO
+
+        return SettingsDTO(
+            github_token=row.github_token,
+            collection_path=row.collection_path,
+            default_scope=row.default_scope or "user",
+            edition=row.edition or "enterprise",
+            indexing_mode=row.indexing_mode or "opt_in",
+            extra=dict(row.extra) if row.extra else {},
+        )
+
+    def _fetch_row(self) -> "Optional[EnterpriseSettings]":
+        """Fetch the single settings row for the current tenant.
+
+        Returns
+        -------
+        EnterpriseSettings or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseSettings
+
+        stmt = self._tenant_select()
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: get
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        ctx: "Optional[object]" = None,
+    ) -> "SettingsDTO":
+        """Return the current application settings snapshot for this tenant.
+
+        If no settings row exists yet, a default :class:`~skillmeat.core.interfaces.dtos.SettingsDTO`
+        is returned without writing to the database.
+
+        Parameters
+        ----------
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        SettingsDTO
+        """
+        from skillmeat.core.interfaces.dtos import SettingsDTO
+
+        row = self._fetch_row()
+        if row is None:
+            return SettingsDTO(edition="enterprise")
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: update
+    # ------------------------------------------------------------------
+
+    def update(
+        self,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "SettingsDTO":
+        """Apply a partial update to the application settings for this tenant.
+
+        Only provided keys are changed.  If no settings row exists yet, a new
+        one is created (upsert semantics via ORM check-then-insert/update).
+        Unknown keys are stored in the ``extra`` JSONB column.
+
+        Parameters
+        ----------
+        updates:
+            Map of setting keys to new values.  Recognised first-class keys:
+            ``github_token``, ``collection_path``, ``default_scope``,
+            ``edition``, ``indexing_mode``.  All other keys go into ``extra``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        SettingsDTO
+            The updated settings snapshot.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseSettings
+
+        tenant_id = self._get_tenant_id()
+        row = self._fetch_row()
+
+        if row is None:
+            # No row yet — create one with defaults then apply updates.
+            row = EnterpriseSettings(
+                tenant_id=tenant_id,
+                extra={},
+            )
+            self.session.add(row)
+
+        # Apply first-class field updates.
+        for field_name in self._KNOWN_FIELDS:
+            if field_name in updates:
+                setattr(row, field_name, updates[field_name])
+
+        # Remaining keys go into the extra JSONB bag.
+        extra_updates = {k: v for k, v in updates.items() if k not in self._KNOWN_FIELDS}
+        if extra_updates:
+            merged_extra = dict(row.extra or {})
+            merged_extra.update(extra_updates)
+            row.extra = merged_extra
+
+        row.updated_at = datetime.utcnow()
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseSettings",
+            entity_id=row.id,
+            metadata={k: str(v)[:80] for k, v in updates.items()},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: validate_github_token
+    # ------------------------------------------------------------------
+
+    def validate_github_token(
+        self,
+        token: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Validate a GitHub Personal Access Token against the API.
+
+        Delegates to the centralised :func:`~skillmeat.core.github_client.get_github_client`
+        singleton.  Returns ``False`` on any error rather than raising.
+
+        Parameters
+        ----------
+        token:
+            Raw GitHub PAT string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` if the token authenticates successfully, ``False``
+            otherwise.
+        """
+        try:
+            from skillmeat.core.github_client import GitHubClient
+
+            client = GitHubClient(token=token)
+            rate_limit = client.get_rate_limit()
+            return rate_limit is not None
+        except Exception:
+            return False
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: list_entity_type_configs
+    # ------------------------------------------------------------------
+
+    def list_entity_type_configs(
+        self,
+        ctx: "Optional[object]" = None,
+    ) -> "list[EntityTypeConfigDTO]":
+        """Return all registered entity type configurations for this tenant.
+
+        Parameters
+        ----------
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[EntityTypeConfigDTO]
+            Both system-defined (``is_system=True``) and user-created entries,
+            ordered by ``entity_type``.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityTypeConfig
+        from skillmeat.core.interfaces.dtos import EntityTypeConfigDTO
+
+        stmt = (
+            self._apply_tenant_filter(select(EnterpriseEntityTypeConfig))
+            .order_by(EnterpriseEntityTypeConfig.entity_type)
+        )
+        rows = list(self.session.execute(stmt).scalars())
+        return [
+            EntityTypeConfigDTO(
+                id=str(row.id),
+                entity_type=row.entity_type,
+                display_name=row.display_name or row.entity_type,
+                description=row.description,
+                icon=row.icon,
+                color=row.color,
+                is_system=bool(row.is_system),
+            )
+            for row in rows
+        ]
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: create_entity_type_config
+    # ------------------------------------------------------------------
+
+    def create_entity_type_config(
+        self,
+        entity_type: str,
+        display_name: str,
+        description: "Optional[str]" = None,
+        icon: "Optional[str]" = None,
+        color: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "EntityTypeConfigDTO":
+        """Create a new user-defined entity type configuration.
+
+        Parameters
+        ----------
+        entity_type:
+            Machine-readable entity type key, e.g. ``"workflow"``.  Must be
+            unique within the tenant.
+        display_name:
+            Human-readable display name.
+        description:
+            Optional description text.
+        icon:
+            Optional icon identifier or URL.
+        color:
+            Optional hex color code, e.g. ``"#FF5733"``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        EntityTypeConfigDTO
+            The newly created config.
+
+        Raises
+        ------
+        ValueError
+            If an entity type config with the same *entity_type* already exists
+            in this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityTypeConfig
+        from skillmeat.core.interfaces.dtos import EntityTypeConfigDTO
+
+        tenant_id = self._get_tenant_id()
+
+        # Guard: uniqueness check on (tenant_id, entity_type).
+        dup_stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityTypeConfig).where(
+                EnterpriseEntityTypeConfig.entity_type == entity_type
+            )
+        )
+        if self.session.execute(dup_stmt).scalar_one_or_none() is not None:
+            raise ValueError(
+                f"An entity type config for {entity_type!r} already exists in this tenant."
+            )
+
+        row = EnterpriseEntityTypeConfig(
+            tenant_id=tenant_id,
+            entity_type=entity_type,
+            display_name=display_name,
+            description=description,
+            icon=icon,
+            color=color,
+            is_system=False,
+        )
+        self.session.add(row)
+        self.session.flush()
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseEntityTypeConfig",
+            entity_id=row.id,
+            metadata={"entity_type": entity_type},
+        )
+        return EntityTypeConfigDTO(
+            id=str(row.id),
+            entity_type=row.entity_type,
+            display_name=row.display_name or row.entity_type,
+            description=row.description,
+            icon=row.icon,
+            color=row.color,
+            is_system=False,
+        )
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: update_entity_type_config
+    # ------------------------------------------------------------------
+
+    def update_entity_type_config(
+        self,
+        config_id: str,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "EntityTypeConfigDTO":
+        """Apply a partial update to an existing entity type configuration.
+
+        Parameters
+        ----------
+        config_id:
+            UUID string of the config record to update.
+        updates:
+            Map of field names to new values.  Recognised keys:
+            ``display_name``, ``description``, ``icon``, ``color``.
+            ``entity_type`` and ``is_system`` are immutable.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        EntityTypeConfigDTO
+            The updated config.
+
+        Raises
+        ------
+        KeyError
+            If no config with *config_id* exists in this tenant.
+        ValueError
+            If the update attempts to mutate ``entity_type`` or ``is_system``.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityTypeConfig
+        from skillmeat.core.interfaces.dtos import EntityTypeConfigDTO
+
+        if "entity_type" in updates or "is_system" in updates:
+            raise ValueError(
+                "The 'entity_type' and 'is_system' fields are immutable after creation."
+            )
+
+        try:
+            cfg_uuid = uuid.UUID(str(config_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(config_id) from exc
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityTypeConfig).where(
+                EnterpriseEntityTypeConfig.id == cfg_uuid
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(config_id)
+
+        for field_name in ("display_name", "description", "icon", "color"):
+            if field_name in updates:
+                setattr(row, field_name, updates[field_name])
+
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseEntityTypeConfig",
+            entity_id=cfg_uuid,
+            metadata=updates or None,
+        )
+        return EntityTypeConfigDTO(
+            id=str(row.id),
+            entity_type=row.entity_type,
+            display_name=row.display_name or row.entity_type,
+            description=row.description,
+            icon=row.icon,
+            color=row.color,
+            is_system=bool(row.is_system),
+        )
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: delete_entity_type_config
+    # ------------------------------------------------------------------
+
+    def delete_entity_type_config(
+        self,
+        config_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Delete a user-defined entity type configuration.
+
+        System-defined configs (``is_system=True``) cannot be deleted.
+
+        Parameters
+        ----------
+        config_id:
+            UUID string of the config record to delete.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If no config with *config_id* exists in this tenant.
+        ValueError
+            If the config is system-defined.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityTypeConfig
+
+        try:
+            cfg_uuid = uuid.UUID(str(config_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(config_id) from exc
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityTypeConfig).where(
+                EnterpriseEntityTypeConfig.id == cfg_uuid
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(config_id)
+        if row.is_system:
+            raise ValueError(
+                f"Cannot delete system-defined entity type config {config_id!r}."
+            )
+
+        self.session.delete(row)
+        self.session.flush()
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseEntityTypeConfig",
+            entity_id=cfg_uuid,
+        )
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: list_categories
+    # ------------------------------------------------------------------
+
+    def list_categories(
+        self,
+        entity_type: "Optional[str]" = None,
+        platform: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[CategoryDTO]":
+        """Return all categories for this tenant, optionally filtered.
+
+        Parameters
+        ----------
+        entity_type:
+            When provided, return only categories scoped to this entity type.
+        platform:
+            When provided, return only categories scoped to this platform.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[CategoryDTO]
+            Categories ordered by ``sort_order`` ascending.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityCategory
+        from skillmeat.core.interfaces.dtos import CategoryDTO
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityCategory)
+        ).order_by(EnterpriseEntityCategory.sort_order)
+
+        if entity_type is not None:
+            stmt = stmt.where(EnterpriseEntityCategory.entity_type == entity_type)
+        if platform is not None:
+            stmt = stmt.where(EnterpriseEntityCategory.platform == platform)
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [
+            CategoryDTO(
+                id=str(row.id),
+                name=row.name,
+                slug=row.slug or "",
+                entity_type=row.entity_type,
+                description=row.description,
+                color=row.color,
+                platform=row.platform,
+                sort_order=row.sort_order or 0,
+            )
+            for row in rows
+        ]
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: create_category
+    # ------------------------------------------------------------------
+
+    def create_category(
+        self,
+        name: str,
+        slug: "Optional[str]" = None,
+        entity_type: "Optional[str]" = None,
+        description: "Optional[str]" = None,
+        color: "Optional[str]" = None,
+        platform: "Optional[str]" = None,
+        sort_order: "Optional[int]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "CategoryDTO":
+        """Create a new category for this tenant.
+
+        Parameters
+        ----------
+        name:
+            Human-readable category name.
+        slug:
+            Optional URL-safe slug; auto-generated from *name* when omitted.
+        entity_type:
+            Optional entity type this category applies to.
+        description:
+            Optional description text.
+        color:
+            Optional hex color code for UI display.
+        platform:
+            Optional platform scope filter.
+        sort_order:
+            Optional explicit display order; defaults to 0.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        CategoryDTO
+            The newly created category.
+
+        Raises
+        ------
+        ValueError
+            If a category with the same resolved slug already exists in this
+            tenant.
+        """
+        import re
+
+        from skillmeat.cache.models_enterprise import EnterpriseEntityCategory
+        from skillmeat.core.interfaces.dtos import CategoryDTO
+
+        tenant_id = self._get_tenant_id()
+
+        if slug is None:
+            slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+        # Guard: uniqueness check on (tenant_id, slug).
+        dup_stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityCategory).where(
+                EnterpriseEntityCategory.slug == slug
+            )
+        )
+        if self.session.execute(dup_stmt).scalar_one_or_none() is not None:
+            raise ValueError(
+                f"A category with slug {slug!r} already exists in this tenant."
+            )
+
+        row = EnterpriseEntityCategory(
+            tenant_id=tenant_id,
+            name=name,
+            slug=slug,
+            entity_type=entity_type,
+            description=description,
+            color=color,
+            platform=platform,
+            sort_order=sort_order or 0,
+        )
+        self.session.add(row)
+        self.session.flush()
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseEntityCategory",
+            entity_id=row.id,
+            metadata={"name": name, "slug": slug},
+        )
+        return CategoryDTO(
+            id=str(row.id),
+            name=row.name,
+            slug=row.slug or "",
+            entity_type=row.entity_type,
+            description=row.description,
+            color=row.color,
+            platform=row.platform,
+            sort_order=row.sort_order or 0,
+        )
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: update_category
+    # ------------------------------------------------------------------
+
+    def update_category(
+        self,
+        category_id: int,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "CategoryDTO":
+        """Apply a partial update to an existing category.
+
+        Parameters
+        ----------
+        category_id:
+            UUID or integer primary key of the category to update.
+        updates:
+            Map of field names to new values.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        CategoryDTO
+            The updated category.
+
+        Raises
+        ------
+        KeyError
+            If no category with *category_id* exists in this tenant.
+        ValueError
+            If the requested new slug is already taken.
+        """
+        import re
+
+        from skillmeat.cache.models_enterprise import EnterpriseEntityCategory
+        from skillmeat.core.interfaces.dtos import CategoryDTO
+
+        try:
+            cat_uuid = uuid.UUID(str(category_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(category_id) from exc
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityCategory).where(
+                EnterpriseEntityCategory.id == cat_uuid
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(category_id)
+
+        if "slug" in updates:
+            new_slug = updates["slug"]
+            dup_stmt = self._apply_tenant_filter(
+                select(EnterpriseEntityCategory).where(
+                    EnterpriseEntityCategory.slug == new_slug,
+                    EnterpriseEntityCategory.id != cat_uuid,
+                )
+            )
+            if self.session.execute(dup_stmt).scalar_one_or_none() is not None:
+                raise ValueError(
+                    f"Slug {new_slug!r} is already used by another category in this tenant."
+                )
+
+        for field_name in ("name", "slug", "entity_type", "description", "color", "platform", "sort_order"):
+            if field_name in updates:
+                setattr(row, field_name, updates[field_name])
+
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseEntityCategory",
+            entity_id=cat_uuid,
+            metadata=updates or None,
+        )
+        return CategoryDTO(
+            id=str(row.id),
+            name=row.name,
+            slug=row.slug or "",
+            entity_type=row.entity_type,
+            description=row.description,
+            color=row.color,
+            platform=row.platform,
+            sort_order=row.sort_order or 0,
+        )
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: delete_category
+    # ------------------------------------------------------------------
+
+    def delete_category(
+        self,
+        category_id: int,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Delete a category by primary key.
+
+        Parameters
+        ----------
+        category_id:
+            UUID or integer primary key of the category to delete.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If no category with *category_id* exists in this tenant.
+        ValueError
+            If the category has artifact associations.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityCategory
+
+        try:
+            cat_uuid = uuid.UUID(str(category_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(category_id) from exc
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityCategory).where(
+                EnterpriseEntityCategory.id == cat_uuid
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(category_id)
+
+        if row.entity_category_associations:
+            raise ValueError(
+                f"Category {category_id!r} has existing associations and cannot be deleted."
+            )
+
+        self.session.delete(row)
+        self.session.flush()
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseEntityCategory",
+            entity_id=cat_uuid,
+        )
+
+
+# =============================================================================
+# EnterpriseContextEntityRepository  (ENT2-3.4)
+# =============================================================================
+
+
+class EnterpriseContextEntityRepository(
+    EnterpriseRepositoryBase["EnterpriseContextEntity"],
+):
+    """Repository for tenant-scoped CRUD on EnterpriseContextEntity.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.IContextEntityRepository`
+    for the enterprise PostgreSQL backend.
+
+    Context entities are special artifacts (CLAUDE.md, spec files, rule files,
+    context files, progress templates) stored in ``enterprise_context_entities``.
+    All queries are automatically scoped to the tenant stored in ``TenantContext``
+    via ``_apply_tenant_filter()``.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    The ``artifact_id`` FK is nullable — context entities may exist
+    independently of any artifact row.  The ``target_platforms`` and
+    ``category_associations`` fields are JSONB/relational respectively; JSONB
+    filters use standard equality (not ``@>``), so they are safe in SQLite-
+    backed unit tests.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseContextEntity as _ECE
+
+        super().__init__(session, _ECE)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _compute_content_hash(content: "Optional[str]") -> "Optional[str]":
+        """Return the SHA-256 hex digest of *content*, or ``None`` when empty.
+
+        Parameters
+        ----------
+        content:
+            Raw string content to hash.
+
+        Returns
+        -------
+        str or None
+        """
+        if not content:
+            return None
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    def _to_dto(self, row: "EnterpriseContextEntity") -> "ContextEntityDTO":
+        """Map an ``EnterpriseContextEntity`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.ContextEntityDTO`.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        ContextEntityDTO
+        """
+        from skillmeat.core.interfaces.dtos import ContextEntityDTO
+
+        category_ids: List[int] = []
+        if row.category_associations:
+            for assoc in row.category_associations:
+                try:
+                    category_ids.append(int(str(assoc.category_id)))
+                except (TypeError, ValueError):
+                    pass
+
+        return ContextEntityDTO(
+            id=str(row.id),
+            name=row.name,
+            entity_type=row.entity_type,
+            content=row.content or "",
+            path_pattern=row.path_pattern or "",
+            description=row.description,
+            category=row.category,
+            auto_load=bool(row.auto_load),
+            version=row.version,
+            target_platforms=list(row.target_platforms or []),
+            content_hash=self._compute_content_hash(row.content),
+            category_ids=category_ids,
+            created_at=row.created_at.isoformat() if row.created_at else None,
+            updated_at=row.updated_at.isoformat() if row.updated_at else None,
+        )
+
+    def _fetch_entity(
+        self,
+        entity_uuid: uuid.UUID,
+    ) -> "Optional[EnterpriseContextEntity]":
+        """Fetch a tenant-filtered context entity by UUID.
+
+        Parameters
+        ----------
+        entity_uuid:
+            UUID of the entity to retrieve.
+
+        Returns
+        -------
+        EnterpriseContextEntity or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseContextEntity
+
+        stmt = self._tenant_select().where(EnterpriseContextEntity.id == entity_uuid)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: list
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        filters: "Optional[dict]" = None,
+        limit: int = 20,
+        after: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[ContextEntityDTO]":
+        """Return a page of context entities matching optional filter criteria.
+
+        Supported filter keys: ``entity_type``, ``category``, ``auto_load``,
+        ``search`` (case-insensitive prefix on ``name``).
+
+        Parameters
+        ----------
+        filters:
+            Optional key/value filter map.
+        limit:
+            Maximum number of records to return (1-100).
+        after:
+            Opaque cursor (base64-encoded UUID string) for keyset pagination.
+            Pass the ``id`` of the last seen item.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[ContextEntityDTO]
+        """
+        import base64
+
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseContextEntity
+
+        stmt = self._tenant_select().order_by(EnterpriseContextEntity.created_at)
+
+        if filters:
+            entity_type = filters.get("entity_type")
+            if entity_type is not None:
+                stmt = stmt.where(EnterpriseContextEntity.entity_type == entity_type)
+
+            category = filters.get("category")
+            if category is not None:
+                stmt = stmt.where(EnterpriseContextEntity.category == category)
+
+            auto_load = filters.get("auto_load")
+            if auto_load is not None:
+                stmt = stmt.where(EnterpriseContextEntity.auto_load.is_(bool(auto_load)))
+
+            search = filters.get("search")
+            if search:
+                stmt = stmt.where(
+                    func.lower(EnterpriseContextEntity.name).like(
+                        f"{search.lower()}%"
+                    )
+                )
+
+        # Keyset pagination: skip rows whose id <= after cursor.
+        if after:
+            try:
+                cursor_id = uuid.UUID(base64.b64decode(after.encode()).decode())
+                stmt = stmt.where(EnterpriseContextEntity.id > cursor_id)
+            except Exception:
+                pass  # Ignore invalid cursor; return from beginning.
+
+        limit = max(1, min(limit, 100))
+        stmt = stmt.limit(limit)
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [self._to_dto(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: get
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        entity_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[ContextEntityDTO]":
+        """Return a context entity by its identifier.
+
+        Parameters
+        ----------
+        entity_id:
+            Entity UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ContextEntityDTO or None
+        """
+        try:
+            entity_uuid = uuid.UUID(str(entity_id))
+        except (ValueError, AttributeError):
+            return None
+
+        row = self._fetch_entity(entity_uuid)
+        if row is None:
+            return None
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: create
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        name: str,
+        entity_type: str,
+        content: str,
+        path_pattern: str,
+        description: "Optional[str]" = None,
+        category: "Optional[str]" = None,
+        auto_load: bool = False,
+        version: "Optional[str]" = None,
+        target_platforms: "Optional[list[str]]" = None,
+        category_ids: "Optional[list[int]]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "ContextEntityDTO":
+        """Persist a new context entity and return the stored representation.
+
+        Parameters
+        ----------
+        name:
+            Human-readable entity name.
+        entity_type:
+            Entity type key, e.g. ``"context_file"``, ``"rule_file"``.
+        content:
+            Assembled markdown content.
+        path_pattern:
+            Target deployment path (must start with ``".claude/"`` or a
+            supported prefix).
+        description:
+            Optional description.
+        category:
+            Optional category label string.
+        auto_load:
+            Whether to auto-load on platform startup.
+        version:
+            Optional version string.
+        target_platforms:
+            Optional list of platform identifiers.
+        category_ids:
+            Ordered list of category IDs to associate.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ContextEntityDTO
+            The persisted entity.
+
+        Raises
+        ------
+        ValueError
+            If *path_pattern* is blank.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseContextEntity,
+            EnterpriseEntityCategoryAssociation,
+        )
+
+        if not path_pattern:
+            raise ValueError("path_pattern must not be empty.")
+
+        tenant_id = self._get_tenant_id()
+
+        row = EnterpriseContextEntity(
+            tenant_id=tenant_id,
+            name=name,
+            entity_type=entity_type,
+            content=content,
+            path_pattern=path_pattern,
+            description=description,
+            category=category,
+            auto_load=auto_load,
+            version=version,
+            target_platforms=target_platforms or [],
+        )
+        self.session.add(row)
+        self.session.flush()  # Populate row.id before associations.
+
+        if category_ids:
+            for position, cat_id in enumerate(category_ids):
+                try:
+                    cat_uuid = uuid.UUID(str(cat_id))
+                except (ValueError, AttributeError):
+                    continue
+                assoc = EnterpriseEntityCategoryAssociation(
+                    tenant_id=tenant_id,
+                    entity_id=row.id,
+                    category_id=cat_uuid,
+                    position=position,
+                )
+                self.session.add(assoc)
+            self.session.flush()
+
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseContextEntity",
+            entity_id=row.id,
+            metadata={"name": name, "entity_type": entity_type},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: update
+    # ------------------------------------------------------------------
+
+    def update(
+        self,
+        entity_id: str,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "ContextEntityDTO":
+        """Apply a partial update to an existing context entity.
+
+        Parameters
+        ----------
+        entity_id:
+            Entity UUID as a string.
+        updates:
+            Map of field names to new values.  Supported keys:
+            ``name``, ``entity_type``, ``content``, ``path_pattern``,
+            ``description``, ``category``, ``auto_load``, ``version``,
+            ``target_platforms``, ``category_ids``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ContextEntityDTO
+            The updated entity.
+
+        Raises
+        ------
+        KeyError
+            If no entity with *entity_id* exists in this tenant.
+        ValueError
+            If *updates* contains invalid field values.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseContextEntity,
+            EnterpriseEntityCategoryAssociation,
+        )
+
+        try:
+            entity_uuid = uuid.UUID(str(entity_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(entity_id) from exc
+
+        row = self._fetch_entity(entity_uuid)
+        if row is None:
+            raise KeyError(entity_id)
+
+        for field_name in (
+            "name",
+            "entity_type",
+            "content",
+            "path_pattern",
+            "description",
+            "category",
+            "auto_load",
+            "version",
+            "target_platforms",
+        ):
+            if field_name in updates:
+                setattr(row, field_name, updates[field_name])
+
+        if "category_ids" in updates:
+            tenant_id = self._get_tenant_id()
+            # Replace all existing associations.
+            for assoc in list(row.category_associations):
+                self.session.delete(assoc)
+            self.session.flush()
+
+            for position, cat_id in enumerate(updates["category_ids"] or []):
+                try:
+                    cat_uuid = uuid.UUID(str(cat_id))
+                except (ValueError, AttributeError):
+                    continue
+                assoc = EnterpriseEntityCategoryAssociation(
+                    tenant_id=tenant_id,
+                    entity_id=row.id,
+                    category_id=cat_uuid,
+                    position=position,
+                )
+                self.session.add(assoc)
+
+        row.updated_at = datetime.utcnow()
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseContextEntity",
+            entity_id=entity_uuid,
+            metadata={k: str(v)[:80] for k, v in updates.items() if k != "content"},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: delete
+    # ------------------------------------------------------------------
+
+    def delete(
+        self,
+        entity_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Delete a context entity permanently.
+
+        The ``ON DELETE CASCADE`` on ``enterprise_entity_category_associations``
+        removes association rows automatically at the database level.
+
+        Parameters
+        ----------
+        entity_id:
+            Entity UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If no entity with *entity_id* exists in this tenant.
+        """
+        try:
+            entity_uuid = uuid.UUID(str(entity_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(entity_id) from exc
+
+        row = self._fetch_entity(entity_uuid)
+        if row is None:
+            raise KeyError(entity_id)
+
+        self.session.delete(row)
+        self.session.flush()
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseContextEntity",
+            entity_id=entity_uuid,
+        )
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: deploy
+    # ------------------------------------------------------------------
+
+    def deploy(
+        self,
+        entity_id: str,
+        project_path: str,
+        options: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Deploy a context entity's content to a filesystem project path.
+
+        Writes the assembled content to the location specified by
+        ``path_pattern``, resolved against *project_path*.
+
+        Parameters
+        ----------
+        entity_id:
+            Entity UUID as a string.
+        project_path:
+            Absolute filesystem path to the target project directory.
+        options:
+            Optional deployment options: ``overwrite`` (bool, default False).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *entity_id* does not exist.
+        FileExistsError
+            If the target file already exists and ``options["overwrite"]`` is
+            ``False``.
+        ValueError
+            If *project_path* does not exist or ``path_pattern`` is missing.
+        """
+        from pathlib import Path
+
+        try:
+            entity_uuid = uuid.UUID(str(entity_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(entity_id) from exc
+
+        row = self._fetch_entity(entity_uuid)
+        if row is None:
+            raise KeyError(entity_id)
+
+        if not row.path_pattern:
+            raise ValueError(f"Entity {entity_id!r} has no path_pattern set.")
+
+        project = Path(project_path)
+        if not project.exists():
+            raise ValueError(f"project_path {project_path!r} does not exist.")
+
+        target = project / row.path_pattern.lstrip("/")
+        overwrite = (options or {}).get("overwrite", False)
+
+        if target.exists() and not overwrite:
+            raise FileExistsError(
+                f"Target file {target} already exists. Pass overwrite=True to replace it."
+            )
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(row.content or "", encoding="utf-8")
+
+        self._log_operation(
+            operation="deploy",
+            entity_type="EnterpriseContextEntity",
+            entity_id=entity_uuid,
+            metadata={"project_path": project_path, "target": str(target)},
+        )
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: get_content
+    # ------------------------------------------------------------------
+
+    def get_content(
+        self,
+        entity_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[str]":
+        """Return the raw markdown content of a context entity.
+
+        Parameters
+        ----------
+        entity_id:
+            Entity UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        str or None
+            Raw content string when the entity exists, ``None`` otherwise.
+        """
+        try:
+            entity_uuid = uuid.UUID(str(entity_id))
+        except (ValueError, AttributeError):
+            return None
+
+        row = self._fetch_entity(entity_uuid)
+        if row is None:
+            return None
+        return row.content
+
+
+# =============================================================================
+# EnterpriseProjectRepository  (ENT2-4.1)
+# =============================================================================
+
+
+class EnterpriseProjectRepository(
+    EnterpriseRepositoryBase["EnterpriseProject"],
+):
+    """Repository for tenant-scoped CRUD on EnterpriseProject.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.IProjectRepository`
+    for the enterprise PostgreSQL backend.
+
+    Enterprise projects are DB records — ``path`` is an informational metadata
+    field recorded at registration time, NOT a live filesystem reference.
+    Methods that carry filesystem semantics in the local backend (e.g.
+    ``refresh``, ``get_artifacts``) operate purely on DB data and never touch
+    the filesystem.  A debug-level log is emitted for every method where
+    enterprise behaviour meaningfully diverges from the local implementation.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    - ``path`` is unique per tenant (``uq_enterprise_projects_tenant_path``).
+    - ``_apply_tenant_filter()`` is called on every ``select()`` statement.
+    - No filesystem operations are performed anywhere in this class.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseProject as _EP
+
+        super().__init__(session, _EP)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _to_dto(self, row: "EnterpriseProject") -> "ProjectDTO":
+        """Map an ``EnterpriseProject`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.ProjectDTO`.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        ProjectDTO
+        """
+        from skillmeat.core.interfaces.dtos import ProjectDTO
+
+        return ProjectDTO(
+            id=str(row.id),
+            name=row.name,
+            path=row.path or "",
+            description=row.description,
+            status=row.status or "active",
+            artifact_count=len(row.project_artifacts) if row.project_artifacts else 0,
+            created_at=row.created_at.isoformat() if row.created_at else None,
+            updated_at=row.updated_at.isoformat() if row.updated_at else None,
+        )
+
+    def _fetch_project(
+        self,
+        project_uuid: "uuid.UUID",
+    ) -> "Optional[EnterpriseProject]":
+        """Fetch a tenant-filtered project by UUID.
+
+        Parameters
+        ----------
+        project_uuid:
+            UUID of the project to retrieve.
+
+        Returns
+        -------
+        EnterpriseProject or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        stmt = self._tenant_select().where(EnterpriseProject.id == project_uuid)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: get
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[ProjectDTO]":
+        """Return the project with the given identifier.
+
+        Parameters
+        ----------
+        id:
+            Project UUID as a string (enterprise PK).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO or None
+        """
+        try:
+            project_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError):
+            return None
+
+        row = self._fetch_project(project_uuid)
+        if row is None:
+            return None
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: list
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        filters: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[ProjectDTO]":
+        """Return all known projects for the current tenant.
+
+        Parameters
+        ----------
+        filters:
+            Optional filter map.  Supported keys: ``status``, ``search``
+            (case-insensitive prefix on ``name``).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[ProjectDTO]
+        """
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        stmt = self._tenant_select().order_by(EnterpriseProject.created_at)
+
+        if filters:
+            status = filters.get("status")
+            if status is not None:
+                stmt = stmt.where(EnterpriseProject.status == status)
+
+            search = filters.get("search")
+            if search:
+                stmt = stmt.where(
+                    func.lower(EnterpriseProject.name).like(f"{search.lower()}%")
+                )
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [self._to_dto(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: create
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        dto: "ProjectDTO",
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectDTO":
+        """Register a new project record.
+
+        Parameters
+        ----------
+        dto:
+            Project data.  ``dto.path`` is stored as an informational field;
+            no filesystem access is performed.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO
+            The persisted project.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        tenant_id = self._get_tenant_id()
+
+        row = EnterpriseProject(
+            tenant_id=tenant_id,
+            name=dto.name,
+            path=dto.path or "",
+            status=dto.status or "active",
+            description=dto.description,
+        )
+        self.session.add(row)
+        self.session.flush()
+
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseProject",
+            entity_id=row.id,
+            metadata={"name": dto.name, "path": dto.path},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: update
+    # ------------------------------------------------------------------
+
+    def update(
+        self,
+        id: str,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectDTO":
+        """Apply a partial update to an existing project.
+
+        Parameters
+        ----------
+        id:
+            Project UUID as a string.
+        updates:
+            Map of field names to new values.  Supported keys:
+            ``name``, ``path``, ``status``, ``description``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO
+            The updated project.
+
+        Raises
+        ------
+        KeyError
+            If no project with *id* exists in this tenant.
+        """
+        try:
+            project_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(id) from exc
+
+        row = self._fetch_project(project_uuid)
+        if row is None:
+            raise KeyError(id)
+
+        for field_name in ("name", "path", "status", "description"):
+            if field_name in updates:
+                setattr(row, field_name, updates[field_name])
+
+        row.updated_at = datetime.utcnow()
+        self.session.flush()
+
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseProject",
+            entity_id=row.id,
+            metadata={k: str(v)[:80] for k, v in updates.items()},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: delete
+    # ------------------------------------------------------------------
+
+    def delete(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Remove a project record.
+
+        Does not delete anything on disk — only removes the DB entry.
+
+        Parameters
+        ----------
+        id:
+            Project UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` when the project was found and deleted, ``False``
+            otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        try:
+            project_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError):
+            return False
+
+        row = self._fetch_project(project_uuid)
+        if row is None:
+            return False
+
+        self.session.delete(row)
+        self.session.flush()
+
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseProject",
+            entity_id=project_uuid,
+            metadata={"id": id},
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: get_artifacts
+    # ------------------------------------------------------------------
+
+    def get_artifacts(
+        self,
+        project_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "list[ArtifactDTO]":
+        """Return all artifacts deployed to a project.
+
+        Queries ``enterprise_project_artifacts`` and resolves the associated
+        ``EnterpriseArtifact`` rows.  No filesystem access is performed.
+
+        Parameters
+        ----------
+        project_id:
+            Project UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[ArtifactDTO]
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseProjectArtifact,
+        )
+        from skillmeat.core.interfaces.dtos import ArtifactDTO
+
+        logger.debug(
+            "EnterpriseProjectRepository.get_artifacts: querying DB only "
+            "(no filesystem scan) for project_id=%s",
+            project_id,
+        )
+
+        try:
+            project_uuid = uuid.UUID(str(project_id))
+        except (ValueError, AttributeError):
+            return []
+
+        tenant_id = self._get_tenant_id()
+
+        stmt = (
+            select(EnterpriseArtifact)
+            .join(
+                EnterpriseProjectArtifact,
+                EnterpriseProjectArtifact.artifact_uuid == EnterpriseArtifact.id,
+            )
+            .where(
+                EnterpriseProjectArtifact.project_id == project_uuid,
+                EnterpriseProjectArtifact.tenant_id == tenant_id,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
+        )
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [
+            ArtifactDTO(
+                id=row.id or f"{row.artifact_type}:{row.name}",
+                name=row.name,
+                artifact_type=row.artifact_type or "",
+                uuid=str(row.id),
+                source=row.source,
+                version=row.version,
+                scope=row.scope,
+                description=row.description,
+                project_id=str(project_uuid),
+                created_at=row.created_at.isoformat() if row.created_at else None,
+                updated_at=row.updated_at.isoformat() if row.updated_at else None,
+            )
+            for row in rows
+        ]
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: refresh
+    # ------------------------------------------------------------------
+
+    def refresh(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectDTO":
+        """Trigger a cache refresh for a single project.
+
+        In the enterprise backend, the DB is the source of truth — no
+        filesystem rescan is possible from within the repository layer.
+        This method reloads the project record from DB (touching
+        ``updated_at``) and returns the current state.
+
+        Parameters
+        ----------
+        id:
+            Project UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO
+            The current project state.
+
+        Raises
+        ------
+        KeyError
+            If no project with *id* exists in this tenant.
+        """
+        logger.debug(
+            "EnterpriseProjectRepository.refresh: enterprise backend has no "
+            "filesystem rescan; returning current DB state for project_id=%s",
+            id,
+        )
+        try:
+            project_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(id) from exc
+
+        row = self._fetch_project(project_uuid)
+        if row is None:
+            raise KeyError(id)
+
+        row.updated_at = datetime.utcnow()
+        self.session.flush()
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: get_by_path
+    # ------------------------------------------------------------------
+
+    def get_by_path(
+        self,
+        path: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[ProjectDTO]":
+        """Return the project whose stored path matches *path*.
+
+        Matches against the ``path`` column (informational, stored at
+        registration time).  No live filesystem access is performed.
+
+        Parameters
+        ----------
+        path:
+            Path string to match against.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        logger.debug(
+            "EnterpriseProjectRepository.get_by_path: matching stored path "
+            "column only (no filesystem resolution) for path=%s",
+            path,
+        )
+
+        stmt = self._tenant_select().where(EnterpriseProject.path == path)
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: get_or_create_by_path
+    # ------------------------------------------------------------------
+
+    def get_or_create_by_path(
+        self,
+        path: str,
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectDTO":
+        """Return the project for *path*, creating a DB record if absent.
+
+        Looks up an existing project by its stored ``path`` column and
+        creates a new one if none is found.  No filesystem resolution
+        is performed.
+
+        Parameters
+        ----------
+        path:
+            Path string to match or register.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO
+            Existing or newly created project.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+        from skillmeat.core.interfaces.dtos import ProjectDTO as _ProjectDTO
+
+        logger.debug(
+            "EnterpriseProjectRepository.get_or_create_by_path: using stored "
+            "path column only (no filesystem resolution) for path=%s",
+            path,
+        )
+
+        existing = self.get_by_path(path, ctx=ctx)
+        if existing is not None:
+            return existing
+
+        # No existing record — create one using the path as both path and name.
+        # Derive a display name from the last path component (string-only, no I/O).
+        name = path.rstrip("/\\").rsplit("/", 1)[-1] or path
+        tenant_id = self._get_tenant_id()
+
+        row = EnterpriseProject(
+            tenant_id=tenant_id,
+            name=name,
+            path=path,
+            status="active",
+        )
+        self.session.add(row)
+        self.session.flush()
+
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseProject",
+            entity_id=row.id,
+            metadata={"name": name, "path": path, "via": "get_or_create_by_path"},
+        )
+        return self._to_dto(row)
+
+
+# =============================================================================
+# EnterpriseDeploymentRepository  (ENT2-4.2)
+# =============================================================================
+
+
+class EnterpriseDeploymentRepository(
+    EnterpriseRepositoryBase["EnterpriseDeployment"],
+):
+    """Repository for tenant-scoped CRUD on EnterpriseDeployment.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.IDeploymentRepository`
+    for the enterprise PostgreSQL backend.
+
+    Deployment records reference projects via ``project_id`` (nullable FK) and
+    artifacts via ``artifact_uuid`` (nullable FK) plus the text ``artifact_id``
+    field for backward compatibility with the ``sync_deployment_cache`` callers.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    - Both ``project_id`` and ``artifact_uuid`` are nullable FKs (SET NULL
+      on delete); callers must handle ``None`` values gracefully.
+    - ``artifact_id`` (text ``"type:name"`` format) is kept for write-through
+      compatibility with ``sync_deployment_cache`` and ``remove_deployment_cache``.
+    - ``_apply_tenant_filter()`` is called on every ``select()`` statement.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment as _ED
+
+        super().__init__(session, _ED)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _to_dto(self, row: "EnterpriseDeployment") -> "DeploymentDTO":
+        """Map an ``EnterpriseDeployment`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.DeploymentDTO`.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        DeploymentDTO
+        """
+        from skillmeat.core.interfaces.dtos import DeploymentDTO
+
+        artifact_id = row.artifact_id or ""
+        # Derive name and type from text identifier "type:name" when possible.
+        parts = artifact_id.split(":", 1)
+        artifact_type = parts[0] if len(parts) == 2 else ""
+        artifact_name = parts[1] if len(parts) == 2 else artifact_id
+
+        project_path: Optional[str] = None
+        project_name: Optional[str] = None
+        if row.project is not None:
+            project_path = row.project.path
+            project_name = row.project.name
+
+        return DeploymentDTO(
+            id=str(row.id),
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type,
+            project_id=str(row.project_id) if row.project_id else None,
+            project_path=project_path,
+            project_name=project_name,
+            status=row.status or "deployed",
+            deployed_at=row.deployed_at.isoformat() if row.deployed_at else None,
+            collection_sha=row.content_hash,
+            local_modifications=bool(row.local_modifications),
+            deployment_profile_id=(
+                str(row.deployment_profile_id) if row.deployment_profile_id else None
+            ),
+            platform=row.platform,
+        )
+
+    def _fetch_deployment(
+        self,
+        deployment_uuid: "uuid.UUID",
+    ) -> "Optional[EnterpriseDeployment]":
+        """Fetch a tenant-filtered deployment record by UUID.
+
+        Parameters
+        ----------
+        deployment_uuid:
+            UUID of the deployment to retrieve.
+
+        Returns
+        -------
+        EnterpriseDeployment or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment
+
+        stmt = self._tenant_select().where(EnterpriseDeployment.id == deployment_uuid)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: get
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[DeploymentDTO]":
+        """Return a deployment record by its identifier.
+
+        Parameters
+        ----------
+        id:
+            Deployment UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        DeploymentDTO or None
+        """
+        try:
+            deployment_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError):
+            return None
+
+        row = self._fetch_deployment(deployment_uuid)
+        if row is None:
+            return None
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: list
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        filters: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[DeploymentDTO]":
+        """Return deployment records matching optional filter criteria.
+
+        Parameters
+        ----------
+        filters:
+            Optional filter map.  Supported keys: ``project_id``,
+            ``artifact_id``, ``artifact_type``, ``status``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[DeploymentDTO]
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment
+
+        stmt = self._tenant_select().order_by(EnterpriseDeployment.deployed_at.desc())
+
+        if filters:
+            project_id = filters.get("project_id")
+            if project_id is not None:
+                try:
+                    proj_uuid = uuid.UUID(str(project_id))
+                    stmt = stmt.where(EnterpriseDeployment.project_id == proj_uuid)
+                except (ValueError, AttributeError):
+                    pass
+
+            artifact_id = filters.get("artifact_id")
+            if artifact_id is not None:
+                stmt = stmt.where(EnterpriseDeployment.artifact_id == artifact_id)
+
+            artifact_type = filters.get("artifact_type")
+            if artifact_type is not None:
+                # artifact_id is stored as "type:name" — filter by prefix.
+                stmt = stmt.where(
+                    EnterpriseDeployment.artifact_id.like(f"{artifact_type}:%")
+                )
+
+            status = filters.get("status")
+            if status is not None:
+                stmt = stmt.where(EnterpriseDeployment.status == status)
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [self._to_dto(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: deploy
+    # ------------------------------------------------------------------
+
+    def deploy(
+        self,
+        artifact_id: str,
+        project_id: str,
+        options: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "DeploymentDTO":
+        """Record an artifact deployment to a project.
+
+        Creates a new ``EnterpriseDeployment`` row.  Does not perform any
+        filesystem copy — the enterprise layer treats deployment tracking as
+        a DB write-through from the CLI layer.
+
+        Parameters
+        ----------
+        artifact_id:
+            Artifact primary key in ``"type:name"`` format.
+        project_id:
+            Target project UUID as a string.
+        options:
+            Optional deployment options.  Recognised keys: ``status``,
+            ``content_hash``, ``deployment_profile_id``, ``platform``,
+            ``local_modifications``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        DeploymentDTO
+            The created deployment record.
+
+        Raises
+        ------
+        KeyError
+            If *project_id* is not a valid UUID or does not exist for this
+            tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment
+
+        try:
+            proj_uuid = uuid.UUID(str(project_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(project_id) from exc
+
+        opts = options or {}
+        tenant_id = self._get_tenant_id()
+
+        profile_id: Optional[uuid.UUID] = None
+        raw_profile = opts.get("deployment_profile_id")
+        if raw_profile:
+            try:
+                profile_id = uuid.UUID(str(raw_profile))
+            except (ValueError, AttributeError):
+                pass
+
+        row = EnterpriseDeployment(
+            tenant_id=tenant_id,
+            artifact_id=artifact_id,
+            project_id=proj_uuid,
+            status=opts.get("status", "deployed"),
+            deployed_at=datetime.utcnow(),
+            content_hash=opts.get("content_hash"),
+            deployment_profile_id=profile_id,
+            local_modifications=bool(opts.get("local_modifications", False)),
+            platform=opts.get("platform"),
+        )
+        self.session.add(row)
+        self.session.flush()
+
+        self._log_operation(
+            operation="deploy",
+            entity_type="EnterpriseDeployment",
+            entity_id=row.id,
+            metadata={"artifact_id": artifact_id, "project_id": project_id},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: undeploy
+    # ------------------------------------------------------------------
+
+    def undeploy(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Remove a deployment record.
+
+        Parameters
+        ----------
+        id:
+            Deployment UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` when the record was found and deleted, ``False``
+            otherwise.
+        """
+        try:
+            deployment_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError):
+            return False
+
+        row = self._fetch_deployment(deployment_uuid)
+        if row is None:
+            return False
+
+        self.session.delete(row)
+        self.session.flush()
+
+        self._log_operation(
+            operation="undeploy",
+            entity_type="EnterpriseDeployment",
+            entity_id=deployment_uuid,
+            metadata={"id": id},
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: get_status
+    # ------------------------------------------------------------------
+
+    def get_status(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> str:
+        """Return the current status string for a deployment.
+
+        Parameters
+        ----------
+        id:
+            Deployment UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        str
+            Status string, e.g. ``"deployed"``, ``"undeployed"``.
+
+        Raises
+        ------
+        KeyError
+            If no deployment with *id* exists in this tenant.
+        """
+        try:
+            deployment_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(id) from exc
+
+        row = self._fetch_deployment(deployment_uuid)
+        if row is None:
+            raise KeyError(id)
+
+        return row.status or "deployed"
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: get_by_artifact
+    # ------------------------------------------------------------------
+
+    def get_by_artifact(
+        self,
+        artifact_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "list[DeploymentDTO]":
+        """Return all active deployments for a given artifact.
+
+        Parameters
+        ----------
+        artifact_id:
+            Artifact primary key in ``"type:name"`` format.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[DeploymentDTO]
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment
+
+        stmt = (
+            self._tenant_select()
+            .where(EnterpriseDeployment.artifact_id == artifact_id)
+            .order_by(EnterpriseDeployment.deployed_at.desc())
+        )
+        rows = list(self.session.execute(stmt).scalars())
+        return [self._to_dto(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: get_by_project  (enterprise extra)
+    # ------------------------------------------------------------------
+
+    def get_by_project(
+        self,
+        project_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "list[DeploymentDTO]":
+        """Return all deployments for a given project.
+
+        This is an enterprise-specific helper method.  The
+        :class:`~skillmeat.core.interfaces.repositories.IDeploymentRepository`
+        interface exposes the same via ``list(filters={"project_id": ...})``,
+        but this dedicated method is provided for clarity.
+
+        Parameters
+        ----------
+        project_id:
+            Project UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[DeploymentDTO]
+        """
+        return self.list(filters={"project_id": project_id}, ctx=ctx)
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: list_by_status  (enterprise extra)
+    # ------------------------------------------------------------------
+
+    def list_by_status(
+        self,
+        status: str,
+        ctx: "Optional[object]" = None,
+    ) -> "list[DeploymentDTO]":
+        """Return all deployments with the given status.
+
+        Enterprise-specific filtered query helper backed by the
+        ``idx_enterprise_deployments_tenant_status`` index.
+
+        Parameters
+        ----------
+        status:
+            Deployment status string, e.g. ``"deployed"``, ``"undeployed"``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[DeploymentDTO]
+        """
+        return self.list(filters={"status": status}, ctx=ctx)
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: upsert_idp_deployment_set
+    # ------------------------------------------------------------------
+
+    def upsert_idp_deployment_set(
+        self,
+        *,
+        remote_url: str,
+        name: str,
+        provisioned_by: str,
+        description: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "Tuple[str, bool]":
+        """Idempotently create or update a DeploymentSet for an IDP registration.
+
+        Parameters
+        ----------
+        remote_url:
+            Remote Git repository URL.
+        name:
+            Artifact target identifier used as the set name.
+        provisioned_by:
+            Audit field identifying the provisioning agent.
+        description:
+            Optional JSON-serialised metadata string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        tuple[str, bool]
+            ``(deployment_set_id, created)`` where *created* is ``True``
+            when a new record was inserted.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSet
+
+        tenant_id = self._get_tenant_id()
+
+        stmt = (
+            select(EnterpriseDeploymentSet)
+            .where(
+                EnterpriseDeploymentSet.tenant_id == tenant_id,
+                EnterpriseDeploymentSet.remote_url == remote_url,
+                EnterpriseDeploymentSet.name == name,
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+
+        created = False
+        if row is None:
+            row = EnterpriseDeploymentSet(
+                tenant_id=tenant_id,
+                remote_url=remote_url,
+                name=name,
+                provisioned_by=provisioned_by,
+                description=description,
+            )
+            self.session.add(row)
+            created = True
+        else:
+            row.provisioned_by = provisioned_by
+            if description is not None:
+                row.description = description
+            row.updated_at = datetime.utcnow()
+
+        self.session.flush()
+
+        self._log_operation(
+            operation="upsert_idp_deployment_set",
+            entity_type="EnterpriseDeploymentSet",
+            entity_id=row.id,
+            metadata={
+                "remote_url": remote_url,
+                "name": name,
+                "created": created,
+            },
+        )
+        return str(row.id), created
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: sync_deployment_cache
+    # ------------------------------------------------------------------
+
+    def sync_deployment_cache(
+        self,
+        artifact_id: str,
+        project_path: str,
+        project_name: str,
+        deployed_at: "Any",
+        content_hash: "Optional[str]" = None,
+        deployment_profile_id: "Optional[str]" = None,
+        local_modifications: bool = False,
+        platform: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Upsert a single deployment entry into the enterprise deployments table.
+
+        Performs a write-through update: looks up an existing active
+        deployment record for the ``(artifact_id, project_path)`` pair and
+        updates it, or creates a new row if none exists.
+
+        Parameters
+        ----------
+        artifact_id:
+            Artifact primary key in ``"type:name"`` format.
+        project_path:
+            Stored path of the target project.
+        project_name:
+            Human-readable project directory name.
+        deployed_at:
+            Deployment timestamp (``datetime`` or ISO string).
+        content_hash:
+            Optional SHA of the deployed content.
+        deployment_profile_id:
+            Optional deployment profile identifier.
+        local_modifications:
+            Whether local modifications are present.
+        platform:
+            Optional platform identifier string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            Always ``True`` for the enterprise backend (upsert always succeeds).
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment, EnterpriseProject
+
+        tenant_id = self._get_tenant_id()
+
+        # Resolve or create project row by stored path.
+        proj_stmt = select(EnterpriseProject).where(
+            EnterpriseProject.tenant_id == tenant_id,
+            EnterpriseProject.path == project_path,
+        )
+        project_row = self.session.execute(proj_stmt).scalar_one_or_none()
+        if project_row is None:
+            project_row = EnterpriseProject(
+                tenant_id=tenant_id,
+                name=project_name,
+                path=project_path,
+                status="active",
+            )
+            self.session.add(project_row)
+            self.session.flush()
+
+        # Normalise deployed_at to a datetime.
+        if isinstance(deployed_at, str):
+            try:
+                from datetime import timezone
+                deployed_dt = datetime.fromisoformat(deployed_at)
+            except (ValueError, TypeError):
+                deployed_dt = datetime.utcnow()
+        elif isinstance(deployed_at, datetime):
+            deployed_dt = deployed_at
+        else:
+            deployed_dt = datetime.utcnow()
+
+        # Look for an existing active deployment row for this artifact+project.
+        existing_stmt = self._tenant_select().where(
+            EnterpriseDeployment.artifact_id == artifact_id,
+            EnterpriseDeployment.project_id == project_row.id,
+            EnterpriseDeployment.status == "deployed",
+        )
+        row = self.session.execute(existing_stmt).scalar_one_or_none()
+
+        profile_id: Optional[uuid.UUID] = None
+        if deployment_profile_id:
+            try:
+                profile_id = uuid.UUID(str(deployment_profile_id))
+            except (ValueError, AttributeError):
+                pass
+
+        if row is None:
+            row = EnterpriseDeployment(
+                tenant_id=tenant_id,
+                artifact_id=artifact_id,
+                project_id=project_row.id,
+                status="deployed",
+                deployed_at=deployed_dt,
+                content_hash=content_hash,
+                deployment_profile_id=profile_id,
+                local_modifications=local_modifications,
+                platform=platform,
+            )
+            self.session.add(row)
+        else:
+            row.deployed_at = deployed_dt
+            row.content_hash = content_hash
+            row.deployment_profile_id = profile_id
+            row.local_modifications = local_modifications
+            row.platform = platform
+            row.updated_at = datetime.utcnow()
+
+        self.session.flush()
+
+        self._log_operation(
+            operation="sync_deployment_cache",
+            entity_type="EnterpriseDeployment",
+            entity_id=row.id,
+            metadata={"artifact_id": artifact_id, "project_path": project_path},
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: remove_deployment_cache
+    # ------------------------------------------------------------------
+
+    def remove_deployment_cache(
+        self,
+        artifact_id: str,
+        project_path: str,
+        profile_id: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Remove a deployment entry from the enterprise deployments table.
+
+        Marks matching ``EnterpriseDeployment`` rows as ``"undeployed"``
+        (soft delete) rather than physically removing them, so audit history
+        is preserved.
+
+        Parameters
+        ----------
+        artifact_id:
+            Artifact primary key in ``"type:name"`` format.
+        project_path:
+            Stored path of the target project.
+        profile_id:
+            Optional profile ID to narrow the removal to a specific entry.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` when at least one matching record was found and updated,
+            ``False`` otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment, EnterpriseProject
+
+        tenant_id = self._get_tenant_id()
+
+        # Resolve project by stored path.
+        proj_stmt = select(EnterpriseProject).where(
+            EnterpriseProject.tenant_id == tenant_id,
+            EnterpriseProject.path == project_path,
+        )
+        project_row = self.session.execute(proj_stmt).scalar_one_or_none()
+        if project_row is None:
+            logger.debug(
+                "EnterpriseDeploymentRepository.remove_deployment_cache: "
+                "project not found for path=%s — nothing to remove",
+                project_path,
+            )
+            return False
+
+        stmt = self._tenant_select().where(
+            EnterpriseDeployment.artifact_id == artifact_id,
+            EnterpriseDeployment.project_id == project_row.id,
+        )
+
+        if profile_id:
+            try:
+                prof_uuid = uuid.UUID(str(profile_id))
+                stmt = stmt.where(EnterpriseDeployment.deployment_profile_id == prof_uuid)
+            except (ValueError, AttributeError):
+                pass
+
+        rows = list(self.session.execute(stmt).scalars())
+        if not rows:
+            return False
+
+        for row in rows:
+            row.status = "undeployed"
+            row.updated_at = datetime.utcnow()
+
+        self.session.flush()
+
+        self._log_operation(
+            operation="remove_deployment_cache",
+            entity_type="EnterpriseDeployment",
+            entity_id=None,
+            metadata={
+                "artifact_id": artifact_id,
+                "project_path": project_path,
+                "rows_updated": len(rows),
+            },
+        )
+        return True
+
+
+# =============================================================================
+# EnterpriseDeploymentSetRepository  (ENT2-4.3)
+# =============================================================================
+
+
+class EnterpriseDeploymentSetRepository(
+    EnterpriseRepositoryBase["EnterpriseDeploymentSet"]
+):
+    """Enterprise repository for DeploymentSet CRUD with tenant-scoped access.
+
+    Implements the same callable interface as the local ``DeploymentSetRepository``
+    in ``repositories.py``, replacing the ``owner_id`` scope parameter with
+    automatic tenant filtering via ``TenantContext``.
+
+    Tag filtering uses the ``EnterpriseDeploymentSetTag`` join table rather
+    than the ``tags_json`` TEXT column so that queries leverage the indexed
+    ``tag`` column.
+
+    FR-10 delete semantics: Before deleting a set, any
+    ``EnterpriseDeploymentSetMember`` rows in *other* sets that reference the
+    doomed set via ``member_set_id`` are deleted first, preventing orphan
+    references.
+
+    Usage::
+
+        with tenant_scope(tenant_uuid):
+            repo = EnterpriseDeploymentSetRepository(db_session)
+            ds = repo.create(name="My Set", owner_id="user-1")
+            fetched = repo.get(str(ds.id), owner_id="user-1")
+            sets = repo.list(owner_id="user-1", tag="prod")
+            ok = repo.delete(str(ds.id), owner_id="user-1")
+
+    Notes
+    -----
+    * ``owner_id`` parameters are accepted for interface compatibility but are
+      not used for filtering — tenant isolation is enforced structurally via
+      ``TenantContext``.
+    * SQLAlchemy 2.x ``select()`` style throughout.
+    * UUID primary keys.
+    """
+
+    def __init__(self, session: Session) -> None:
+        """Initialise the enterprise deployment set repository.
+
+        Parameters
+        ----------
+        session:
+            Injected SQLAlchemy session bound to the PostgreSQL enterprise
+            database.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSet
+
+        super().__init__(session, EnterpriseDeploymentSet)
+
+    # =========================================================================
+    # Internal helpers
+    # =========================================================================
+
+    def _sync_tags(
+        self,
+        deployment_set_id: uuid.UUID,
+        tag_names: List[str],
+    ) -> None:
+        """Replace all tag associations for a deployment set.
+
+        Deletes existing ``EnterpriseDeploymentSetTag`` rows for the set, then
+        inserts one row per non-empty tag name.
+
+        Parameters
+        ----------
+        deployment_set_id:
+            UUID primary key of the parent deployment set.
+        tag_names:
+            List of tag name strings to associate with the set.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSetTag
+
+        tenant_id = self._get_tenant_id()
+
+        # Clear existing tag rows for this set.
+        self.session.execute(
+            delete(EnterpriseDeploymentSetTag).where(
+                EnterpriseDeploymentSetTag.set_id == deployment_set_id
+            )
+        )
+
+        now = datetime.utcnow()
+        for raw_name in tag_names:
+            name = raw_name.strip()
+            if not name:
+                continue
+            tag_row = EnterpriseDeploymentSetTag(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                set_id=deployment_set_id,
+                tag=name,
+                created_at=now,
+            )
+            self.session.add(tag_row)
+
+    # =========================================================================
+    # Create
+    # =========================================================================
+
+    def create(
+        self,
+        *,
+        name: str,
+        owner_id: str,
+        description: Optional[str] = None,
+        color: Optional[str] = None,
+        icon: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ) -> "EnterpriseDeploymentSet":
+        """Create and return a new ``EnterpriseDeploymentSet``.
+
+        Parameters
+        ----------
+        name:
+            Human-readable set name (required).
+        owner_id:
+            Accepted for interface compatibility; tenant filtering is applied
+            automatically via ``TenantContext``.
+        description:
+            Optional free-text description.
+        color:
+            Ignored — ``EnterpriseDeploymentSet`` has no ``color`` column.
+            Accepted for interface parity with the local repository.
+        icon:
+            Ignored — ``EnterpriseDeploymentSet`` has no ``icon`` column.
+            Accepted for interface parity with the local repository.
+        tags:
+            Optional list of tag name strings.
+
+        Returns
+        -------
+        EnterpriseDeploymentSet
+            Newly created and flushed instance.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back the session.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSet
+
+        tenant_id = self._get_tenant_id()
+        now = datetime.utcnow()
+
+        ds = EnterpriseDeploymentSet(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            name=name,
+            description=description,
+            provisioned_by=owner_id,
+            created_at=now,
+            updated_at=now,
+        )
+        try:
+            self.session.add(ds)
+            self.session.flush()
+            if tags:
+                self._sync_tags(ds.id, tags)
+            self.session.flush()
+            logger.debug(
+                "Created EnterpriseDeploymentSet id=%s tenant=%s",
+                ds.id,
+                tenant_id,
+            )
+            self._log_operation(
+                operation="create",
+                entity_type="EnterpriseDeploymentSet",
+                entity_id=ds.id,
+                metadata={"name": name, "owner_id": owner_id},
+            )
+            return ds
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # =========================================================================
+    # Read
+    # =========================================================================
+
+    def get(
+        self,
+        set_id: str,
+        owner_id: str,
+    ) -> "Optional[EnterpriseDeploymentSet]":
+        """Fetch a single deployment set by ID, scoped to the current tenant.
+
+        Parameters
+        ----------
+        set_id:
+            String representation of the deployment set UUID.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+
+        Returns
+        -------
+        EnterpriseDeploymentSet or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSet
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError):
+            return None
+
+        stmt = self._tenant_select().where(EnterpriseDeploymentSet.id == set_uuid)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # =========================================================================
+    # List
+    # =========================================================================
+
+    def list(
+        self,
+        owner_id: str,
+        *,
+        name: Optional[str] = None,
+        tag: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> "List[EnterpriseDeploymentSet]":
+        """Return a paginated, filterable list of deployment sets for the current tenant.
+
+        Parameters
+        ----------
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+        name:
+            Optional substring filter on ``name`` (case-insensitive).
+        tag:
+            Optional tag string to filter by; matches via the
+            ``EnterpriseDeploymentSetTag`` join table.
+        limit:
+            Maximum rows to return (default 50).
+        offset:
+            Rows to skip for pagination (default 0).
+
+        Returns
+        -------
+        List[EnterpriseDeploymentSet]
+            Ordered by ``created_at`` descending.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseDeploymentSet,
+            EnterpriseDeploymentSetTag,
+        )
+
+        stmt = self._tenant_select().order_by(EnterpriseDeploymentSet.created_at.desc())
+
+        if name is not None:
+            stmt = stmt.where(EnterpriseDeploymentSet.name.ilike(f"%{name}%"))
+
+        if tag is not None:
+            stmt = stmt.join(
+                EnterpriseDeploymentSetTag,
+                EnterpriseDeploymentSetTag.set_id == EnterpriseDeploymentSet.id,
+            ).where(EnterpriseDeploymentSetTag.tag == tag)
+
+        stmt = stmt.limit(limit).offset(offset)
+        return list(self.session.execute(stmt).scalars())
+
+    # =========================================================================
+    # Count
+    # =========================================================================
+
+    def count(
+        self,
+        owner_id: str,
+        *,
+        name: Optional[str] = None,
+        tag: Optional[str] = None,
+    ) -> int:
+        """Count deployment sets matching the given filters for the current tenant.
+
+        Parameters
+        ----------
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+        name:
+            Optional substring filter on ``name``.
+        tag:
+            Optional tag filter.
+
+        Returns
+        -------
+        int
+            Count of matching sets.
+        """
+        from sqlalchemy import func as sa_func
+
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseDeploymentSet,
+            EnterpriseDeploymentSetTag,
+        )
+
+        stmt = self._apply_tenant_filter(
+            select(sa_func.count(EnterpriseDeploymentSet.id))
+        )
+
+        if name is not None:
+            stmt = stmt.where(EnterpriseDeploymentSet.name.ilike(f"%{name}%"))
+
+        if tag is not None:
+            stmt = stmt.join(
+                EnterpriseDeploymentSetTag,
+                EnterpriseDeploymentSetTag.set_id == EnterpriseDeploymentSet.id,
+            ).where(EnterpriseDeploymentSetTag.tag == tag)
+
+        return self.session.execute(stmt).scalar() or 0
+
+    # =========================================================================
+    # Update
+    # =========================================================================
+
+    def update(
+        self,
+        set_id: str,
+        owner_id: str,
+        **kwargs: object,
+    ) -> "Optional[EnterpriseDeploymentSet]":
+        """Update mutable fields on a deployment set.
+
+        Accepted keyword arguments: ``name`` (str), ``description`` (str | None),
+        ``tags`` (list[str]).  ``color`` and ``icon`` are silently ignored as
+        ``EnterpriseDeploymentSet`` has no such columns.  ``updated_at`` is
+        refreshed on every successful update.
+
+        Parameters
+        ----------
+        set_id:
+            String UUID of the deployment set to update.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+        **kwargs:
+            Keyword arguments for fields to update.
+
+        Returns
+        -------
+        EnterpriseDeploymentSet or None
+            Updated instance, or ``None`` if not found.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back the session.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSet
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError):
+            return None
+
+        stmt = self._tenant_select().where(EnterpriseDeploymentSet.id == set_uuid)
+        ds = self.session.execute(stmt).scalar_one_or_none()
+        if ds is None:
+            return None
+
+        try:
+            if "name" in kwargs:
+                ds.name = kwargs["name"]  # type: ignore[assignment]
+            if "description" in kwargs:
+                ds.description = kwargs["description"]  # type: ignore[assignment]
+            if "tags" in kwargs:
+                tag_list = kwargs["tags"]
+                self._sync_tags(ds.id, list(tag_list) if tag_list else [])  # type: ignore[arg-type]
+
+            ds.updated_at = datetime.utcnow()
+            self.session.flush()
+            logger.debug(
+                "Updated EnterpriseDeploymentSet id=%s tenant=%s",
+                set_id,
+                self._get_tenant_id(),
+            )
+            self._log_operation(
+                operation="update",
+                entity_type="EnterpriseDeploymentSet",
+                entity_id=ds.id,
+                metadata={"fields": list(kwargs.keys())},
+            )
+            return ds
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # =========================================================================
+    # Delete  (FR-10)
+    # =========================================================================
+
+    def delete(self, set_id: str, owner_id: str) -> bool:
+        """Delete a deployment set, cleaning up cross-set member references first.
+
+        FR-10 semantics: Before deleting the target set, any
+        ``EnterpriseDeploymentSetMember`` rows in *other* sets that reference the
+        target via ``member_set_id`` are deleted to prevent orphan references.
+        The target set's own members are removed by the ``ON DELETE CASCADE``
+        on ``enterprise_deployment_set_members.set_id``.
+
+        Parameters
+        ----------
+        set_id:
+            String UUID of the deployment set to delete.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+
+        Returns
+        -------
+        bool
+            ``True`` if the set was found and deleted, ``False`` otherwise.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back the session.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseDeploymentSet,
+            EnterpriseDeploymentSetMember,
+        )
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError):
+            return False
+
+        stmt = self._tenant_select().where(EnterpriseDeploymentSet.id == set_uuid)
+        ds = self.session.execute(stmt).scalar_one_or_none()
+        if ds is None:
+            return False
+
+        try:
+            # FR-10: remove member rows in OTHER sets referencing this set as a
+            # nested member before deleting the set itself.
+            orphan_stmt = select(EnterpriseDeploymentSetMember).where(
+                EnterpriseDeploymentSetMember.member_set_id == set_uuid,
+                EnterpriseDeploymentSetMember.set_id != set_uuid,
+            )
+            orphans = list(self.session.execute(orphan_stmt).scalars())
+            for member in orphans:
+                self.session.delete(member)
+
+            self.session.delete(ds)
+            self.session.flush()
+            logger.debug(
+                "Deleted EnterpriseDeploymentSet id=%s (removed %d orphan member refs)",
+                set_id,
+                len(orphans),
+            )
+            self._log_operation(
+                operation="delete",
+                entity_type="EnterpriseDeploymentSet",
+                entity_id=set_uuid,
+                metadata={"orphan_members_removed": len(orphans)},
+            )
+            return True
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # =========================================================================
+    # Member management
+    # =========================================================================
+
+    def add_member(
+        self,
+        set_id: str,
+        owner_id: str,
+        *,
+        artifact_id: Optional[str] = None,
+        position: Optional[int] = None,
+    ) -> "EnterpriseDeploymentSetMember":
+        """Add a member artifact to a deployment set.
+
+        Parameters
+        ----------
+        set_id:
+            String UUID of the parent deployment set.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+        artifact_id:
+            Text artifact identifier (e.g. ``"skill:canvas"``).
+        position:
+            Explicit 0-based ordering position.  Auto-assigned (max + 1) when
+            omitted.
+
+        Returns
+        -------
+        EnterpriseDeploymentSetMember
+            Newly created member row.
+
+        Raises
+        ------
+        ValueError
+            If the parent set does not exist in the current tenant.
+        Exception
+            Re-raises any database error after rolling back the session.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseDeploymentSet,
+            EnterpriseDeploymentSetMember,
+        )
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(f"Invalid set_id: {set_id!r}") from exc
+
+        tenant_id = self._get_tenant_id()
+
+        # Verify the parent set belongs to this tenant.
+        stmt = self._tenant_select().where(EnterpriseDeploymentSet.id == set_uuid)
+        ds = self.session.execute(stmt).scalar_one_or_none()
+        if ds is None:
+            raise ValueError(
+                f"EnterpriseDeploymentSet {set_id!r} not found for current tenant"
+            )
+
+        # Auto-assign position if not supplied.
+        if position is None:
+            pos_stmt = select(EnterpriseDeploymentSetMember.position).where(
+                EnterpriseDeploymentSetMember.set_id == set_uuid
+            )
+            positions = list(self.session.execute(pos_stmt).scalars())
+            position = (max(positions) + 1) if positions else 0
+
+        try:
+            member = EnterpriseDeploymentSetMember(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                set_id=set_uuid,
+                artifact_id=artifact_id or "",
+                position=position,
+            )
+            self.session.add(member)
+            self.session.flush()
+            logger.debug(
+                "Added member artifact_id=%s to EnterpriseDeploymentSet id=%s",
+                artifact_id,
+                set_id,
+            )
+            return member
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def remove_member(
+        self,
+        set_id: str,
+        owner_id: str,
+        artifact_id: str,
+    ) -> bool:
+        """Remove a member artifact from a deployment set.
+
+        Parameters
+        ----------
+        set_id:
+            String UUID of the parent deployment set.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+        artifact_id:
+            Text artifact identifier of the member to remove.
+
+        Returns
+        -------
+        bool
+            ``True`` if a matching member was found and deleted, ``False``
+            otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSetMember
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError):
+            return False
+
+        stmt = select(EnterpriseDeploymentSetMember).where(
+            EnterpriseDeploymentSetMember.set_id == set_uuid,
+            EnterpriseDeploymentSetMember.artifact_id == artifact_id,
+            EnterpriseDeploymentSetMember.tenant_id == self._get_tenant_id(),
+        )
+        member = self.session.execute(stmt).scalar_one_or_none()
+        if member is None:
+            return False
+
+        try:
+            self.session.delete(member)
+            self.session.flush()
+            return True
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def list_members(
+        self,
+        set_id: str,
+        owner_id: str,
+    ) -> "List[EnterpriseDeploymentSetMember]":
+        """List all members of a deployment set ordered by position.
+
+        Parameters
+        ----------
+        set_id:
+            String UUID of the parent deployment set.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+
+        Returns
+        -------
+        List[EnterpriseDeploymentSetMember]
+            Members ordered by ``position`` ascending.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSetMember
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError):
+            return []
+
+        stmt = (
+            select(EnterpriseDeploymentSetMember)
+            .where(EnterpriseDeploymentSetMember.set_id == set_uuid)
+            .order_by(EnterpriseDeploymentSetMember.position.asc())
+        )
+        return list(self.session.execute(stmt).scalars())
+
+
+# =============================================================================
+# EnterpriseDeploymentProfileRepository  (ENT2-4.4)
+# =============================================================================
+
+
+class EnterpriseDeploymentProfileRepository(
+    EnterpriseRepositoryBase["EnterpriseDeploymentProfile"]
+):
+    """Enterprise repository for DeploymentProfile CRUD with tenant-scoped access.
+
+    Implements the same callable interface as the local ``DeploymentProfileRepository``
+    in ``repositories.py``.
+
+    The ``EnterpriseDeploymentProfile`` model stores flexible configuration in
+    the ``extra_metadata`` JSONB column (NOT ``metadata`` — that name conflicts
+    with SQLAlchemy's reserved ``DeclarativeBase.metadata`` attribute).
+
+    Usage::
+
+        with tenant_scope(tenant_uuid):
+            repo = EnterpriseDeploymentProfileRepository(db_session)
+            profile = repo.create(
+                project_id="proj-1",
+                profile_id="claude_code",
+                platform="claude_code",
+                root_dir=".claude",
+            )
+            fetched = repo.read_by_project_and_profile_id("proj-1", "claude_code")
+
+    Notes
+    -----
+    * ``project_id`` parameters are stored in ``extra_metadata["project_id"]``
+      since ``EnterpriseDeploymentProfile`` has no dedicated ``project_id``
+      column.
+    * ``profile_id`` is stored as a plain name tag in ``extra_metadata["profile_id"]``.
+    * SQLAlchemy 2.x ``select()`` style throughout.
+    * UUID primary keys.
+    """
+
+    def __init__(self, session: Session) -> None:
+        """Initialise the enterprise deployment profile repository.
+
+        Parameters
+        ----------
+        session:
+            Injected SQLAlchemy session bound to the PostgreSQL enterprise
+            database.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        super().__init__(session, EnterpriseDeploymentProfile)
+
+    # =========================================================================
+    # Create
+    # =========================================================================
+
+    def create(
+        self,
+        *,
+        project_id: str,
+        profile_id: str,
+        platform: str,
+        root_dir: str,
+        description: Optional[str] = None,
+        artifact_path_map: Optional[Dict[str, str]] = None,
+        config_filenames: Optional[List[str]] = None,
+        context_prefixes: Optional[List[str]] = None,
+        supported_types: Optional[List[str]] = None,
+    ) -> "EnterpriseDeploymentProfile":
+        """Create a deployment profile.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier; stored in ``extra_metadata["project_id"]``.
+        profile_id:
+            Profile identifier string (e.g. ``"claude_code"``); stored in
+            ``extra_metadata["profile_id"]``.
+        platform:
+            Target platform string (e.g. ``"claude_code"``).
+        root_dir:
+            Destination root directory (e.g. ``".claude"``).
+        description:
+            Optional free-text description.
+        artifact_path_map:
+            Optional mapping of artifact type to destination path.
+        config_filenames:
+            Optional list of config file names for this profile.
+        context_prefixes:
+            Optional list of context path prefixes.
+        supported_types:
+            Optional list of artifact type strings this profile supports.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile
+            Newly created and flushed instance.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        tenant_id = self._get_tenant_id()
+        now = datetime.utcnow()
+
+        meta: Dict[str, object] = {
+            "project_id": project_id,
+            "profile_id": profile_id,
+            "root_dir": root_dir,
+        }
+        if artifact_path_map is not None:
+            meta["artifact_path_map"] = artifact_path_map
+        if config_filenames is not None:
+            meta["config_filenames"] = config_filenames
+        if context_prefixes is not None:
+            meta["context_prefixes"] = context_prefixes
+        if supported_types is not None:
+            meta["supported_types"] = supported_types
+
+        profile = EnterpriseDeploymentProfile(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            name=f"{project_id}/{profile_id}",
+            scope="project",
+            dest_path=root_dir,
+            platform=platform,
+            overwrite=False,
+            extra_metadata=meta,
+            created_at=now,
+            updated_at=now,
+        )
+        if description is not None:
+            # Store in extra_metadata since the model has no description column.
+            profile.extra_metadata = {**meta, "description": description}
+
+        try:
+            self.session.add(profile)
+            self.session.flush()
+            logger.debug(
+                "Created EnterpriseDeploymentProfile id=%s project=%s profile_id=%s",
+                profile.id,
+                project_id,
+                profile_id,
+            )
+            self._log_operation(
+                operation="create",
+                entity_type="EnterpriseDeploymentProfile",
+                entity_id=profile.id,
+                metadata={"project_id": project_id, "profile_id": profile_id},
+            )
+            return profile
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # =========================================================================
+    # Read
+    # =========================================================================
+
+    def read_by_id(self, profile_db_id: str) -> "Optional[EnterpriseDeploymentProfile]":
+        """Read a deployment profile by its UUID primary key.
+
+        Parameters
+        ----------
+        profile_db_id:
+            String representation of the profile UUID.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        try:
+            profile_uuid = uuid.UUID(str(profile_db_id))
+        except (ValueError, AttributeError):
+            return None
+
+        stmt = self._tenant_select().where(
+            EnterpriseDeploymentProfile.id == profile_uuid
+        )
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    def read_by_project_and_profile_id(
+        self, project_id: str, profile_id: str
+    ) -> "Optional[EnterpriseDeploymentProfile]":
+        """Read a deployment profile by project and profile ID.
+
+        Matches against ``extra_metadata["project_id"]`` and
+        ``extra_metadata["profile_id"]`` stored in the JSONB column.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+        profile_id:
+            Profile identifier string (e.g. ``"claude_code"``).
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        # Construct a JSONB containment filter: extra_metadata @> {...}
+        # This requires the psycopg2 / asyncpg JSONB operator support.
+        # We use the canonical name match as a fallback via the stored name.
+        canonical_name = f"{project_id}/{profile_id}"
+        stmt = self._tenant_select().where(
+            EnterpriseDeploymentProfile.name == canonical_name
+        )
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # =========================================================================
+    # List
+    # =========================================================================
+
+    def list_by_project(
+        self, project_id: str
+    ) -> "List[EnterpriseDeploymentProfile]":
+        """List all deployment profiles for a project.
+
+        Matches profiles whose ``name`` starts with ``"{project_id}/"``
+        (the canonical naming format used by ``create()``).
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+
+        Returns
+        -------
+        List[EnterpriseDeploymentProfile]
+            Profiles ordered by ``name`` ascending.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        stmt = (
+            self._tenant_select()
+            .where(EnterpriseDeploymentProfile.name.like(f"{project_id}/%"))
+            .order_by(EnterpriseDeploymentProfile.name.asc())
+        )
+        return list(self.session.execute(stmt).scalars())
+
+    def list_all_profiles(
+        self, project_id: str
+    ) -> "List[EnterpriseDeploymentProfile]":
+        """Alias for ``list_by_project()`` — interface parity with local repo.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+
+        Returns
+        -------
+        List[EnterpriseDeploymentProfile]
+        """
+        return self.list_by_project(project_id)
+
+    # =========================================================================
+    # Platform / primary-profile helpers
+    # =========================================================================
+
+    def get_profile_by_platform(
+        self,
+        project_id: str,
+        platform: "str | object",
+    ) -> "Optional[EnterpriseDeploymentProfile]":
+        """Get the first deployment profile matching a project and platform.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+        platform:
+            Platform string or enum with ``.value``.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        platform_value = (
+            platform.value  # type: ignore[union-attr]
+            if hasattr(platform, "value")
+            else str(platform)
+        )
+        stmt = (
+            self._tenant_select()
+            .where(
+                EnterpriseDeploymentProfile.name.like(f"{project_id}/%"),
+                EnterpriseDeploymentProfile.platform == platform_value,
+            )
+            .order_by(EnterpriseDeploymentProfile.name.asc())
+        )
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    def get_primary_profile(
+        self, project_id: str
+    ) -> "Optional[EnterpriseDeploymentProfile]":
+        """Get the primary deployment profile for a project.
+
+        Preference order:
+        1. Explicit ``claude_code`` platform profile.
+        2. Profile whose name ends with ``/claude_code``.
+        3. First profile alphabetically.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile or None
+        """
+        primary = self.get_profile_by_platform(project_id, "claude_code")
+        if primary:
+            return primary
+
+        profile = self.read_by_project_and_profile_id(project_id, "claude_code")
+        if profile:
+            return profile
+
+        profiles = self.list_by_project(project_id)
+        return profiles[0] if profiles else None
+
+    def ensure_default_claude_profile(
+        self, project_id: str
+    ) -> "EnterpriseDeploymentProfile":
+        """Ensure a backward-compatible default Claude Code profile exists.
+
+        Returns an existing profile if one is found; otherwise creates a new
+        ``claude_code`` profile with sensible defaults.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile
+        """
+        primary = self.get_primary_profile(project_id)
+        if primary:
+            return primary
+
+        return self.create(
+            project_id=project_id,
+            profile_id="claude_code",
+            platform="claude_code",
+            root_dir=".claude",
+            artifact_path_map={
+                "skill": ".claude/skills",
+                "command": ".claude/commands",
+                "agent": ".claude/agents",
+                "hook": ".claude/hooks",
+                "mcp": ".claude/mcp",
+            },
+            config_filenames=["CLAUDE.md", "settings.json"],
+            context_prefixes=[".claude/context/", ".claude/"],
+            supported_types=["skill", "command", "agent", "hook", "mcp"],
+        )
+
+    def get_project_id_by_path(self, project_path: str) -> "Optional[str]":
+        """Return the project ID for the given filesystem path.
+
+        Delegates to the ``EnterpriseProject`` table.
+
+        Parameters
+        ----------
+        project_path:
+            Absolute path string to match against ``EnterpriseProject.path``.
+
+        Returns
+        -------
+        str or None
+            Project ID string when a matching row exists, ``None`` otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        tenant_id = self._get_tenant_id()
+        stmt = select(EnterpriseProject).where(
+            EnterpriseProject.tenant_id == tenant_id,
+            EnterpriseProject.path == project_path,
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        return str(row.id) if row else None
+
+    # =========================================================================
+    # Update
+    # =========================================================================
+
+    def update(
+        self,
+        project_id: str,
+        profile_id: str,
+        **updates: object,
+    ) -> "Optional[EnterpriseDeploymentProfile]":
+        """Update an existing deployment profile.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+        profile_id:
+            Profile identifier string.
+        **updates:
+            Keyword arguments for fields to update.  Supported: ``platform``,
+            ``dest_path``, ``scope``, ``overwrite``, ``extra_metadata``.
+            Any key present in ``extra_metadata`` is merged in.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile or None
+            Updated instance, or ``None`` if not found.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back.
+        """
+        profile = self.read_by_project_and_profile_id(project_id, profile_id)
+        if profile is None:
+            return None
+
+        try:
+            direct_fields = {"platform", "dest_path", "scope", "overwrite"}
+            meta_updates: Dict[str, object] = {}
+
+            for key, value in updates.items():
+                if key in direct_fields and value is not None:
+                    setattr(profile, key, value)
+                elif key not in {"project_id", "profile_id"}:
+                    meta_updates[key] = value
+
+            if meta_updates:
+                existing_meta = profile.extra_metadata or {}
+                profile.extra_metadata = {**existing_meta, **meta_updates}
+
+            profile.updated_at = datetime.utcnow()
+            self.session.flush()
+            logger.debug(
+                "Updated EnterpriseDeploymentProfile name=%s/%s",
+                project_id,
+                profile_id,
+            )
+            self._log_operation(
+                operation="update",
+                entity_type="EnterpriseDeploymentProfile",
+                entity_id=profile.id,
+                metadata={"project_id": project_id, "profile_id": profile_id},
+            )
+            return profile
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # =========================================================================
+    # Delete
+    # =========================================================================
+
+    def delete(self, project_id: str, profile_id: str) -> bool:
+        """Delete a deployment profile by project and profile ID.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+        profile_id:
+            Profile identifier string.
+
+        Returns
+        -------
+        bool
+            ``True`` if found and deleted, ``False`` otherwise.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back.
+        """
+        profile = self.read_by_project_and_profile_id(project_id, profile_id)
+        if profile is None:
+            return False
+
+        try:
+            self.session.delete(profile)
+            self.session.flush()
+            logger.debug(
+                "Deleted EnterpriseDeploymentProfile name=%s/%s",
+                project_id,
+                profile_id,
+            )
+            self._log_operation(
+                operation="delete",
+                entity_type="EnterpriseDeploymentProfile",
+                entity_id=profile.id,
+                metadata={"project_id": project_id, "profile_id": profile_id},
+            )
+            return True
+        except Exception:
+            self.session.rollback()
+            raise
+
+
+# =============================================================================
+# EnterpriseMarketplaceSourceRepository  (ENT2-5.1)
+# =============================================================================
+
+
+class EnterpriseMarketplaceSourceRepository(
+    EnterpriseRepositoryBase["EnterpriseMarketplaceSource"],
+):
+    """Enterprise repository for marketplace source and catalog-entry operations.
+
+    Implements
+    :class:`~skillmeat.core.interfaces.repositories.IMarketplaceSourceRepository`
+    for the enterprise PostgreSQL backend.
+
+    The enterprise model (``EnterpriseMarketplaceSource``) is GitHub-repo-
+    centric — each row represents a scanned GitHub repository — whereas the
+    interface's :class:`~skillmeat.core.interfaces.dtos.MarketplaceSourceDTO`
+    uses broker-centric terminology (``endpoint``, ``supports_publish``).
+    The ``_source_to_dto`` helper bridges the two schemas by mapping:
+
+    - ``repo_url`` → ``endpoint``
+    - ``name`` synthesised as ``"owner/repo_name"``
+    - ``scan_status == "done"`` → ``enabled = True``
+    - ``supports_publish = False`` (GitHub repos are read-only sources)
+
+    Catalog operations are backed by ``EnterpriseMarketplaceCatalogEntry``
+    which has a leaner schema than the local SQLite catalog model (no
+    ``excluded_at``, ``excluded_reason``, or ``path_segments`` columns).
+    Methods that reference those local-only columns are implemented with
+    best-effort equivalents using the available ``status`` column.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    * SQLAlchemy 2.x ``select()`` style throughout.
+    * ``_apply_tenant_filter()`` is called on every query.
+    * UUID primary keys for both sources and catalog entries.
+    * ``import_item`` and ``get_composite_members`` are not directly
+      supported by the enterprise schema; both return empty results and
+      log a debug note.  Full implementation is deferred to v3.
+    """
+
+    def __init__(self, session: Session) -> None:
+        """Initialise the enterprise marketplace source repository.
+
+        Parameters
+        ----------
+        session:
+            Injected SQLAlchemy session bound to the PostgreSQL enterprise
+            database.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        super().__init__(session, EnterpriseMarketplaceSource)
+
+    # ------------------------------------------------------------------
+    # DTO helpers
+    # ------------------------------------------------------------------
+
+    def _source_to_dto(self, row: "EnterpriseMarketplaceSource") -> "MarketplaceSourceDTO":
+        """Convert an ``EnterpriseMarketplaceSource`` ORM row to a DTO.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        MarketplaceSourceDTO
+        """
+        from skillmeat.core.interfaces.dtos import MarketplaceSourceDTO
+
+        name = (
+            f"{row.owner}/{row.repo_name}"
+            if row.owner and row.repo_name
+            else (row.owner or row.repo_name or str(row.id))
+        )
+        enabled = row.scan_status in ("done", "success") if row.scan_status else False
+        return MarketplaceSourceDTO(
+            id=str(row.id),
+            name=name,
+            enabled=enabled,
+            endpoint=row.repo_url or "",
+            description=None,
+            supports_publish=False,
+            created_at=row.created_at.isoformat() if row.created_at else None,
+            updated_at=row.updated_at.isoformat() if row.updated_at else None,
+        )
+
+    def _entry_to_catalog_dto(
+        self, row: "EnterpriseMarketplaceCatalogEntry"
+    ) -> "CatalogItemDTO":
+        """Convert an ``EnterpriseMarketplaceCatalogEntry`` ORM row to a DTO.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        CatalogItemDTO
+        """
+        from skillmeat.core.interfaces.dtos import CatalogItemDTO
+
+        return CatalogItemDTO(
+            listing_id=str(row.id),
+            name=row.name or "",
+            source_id=str(row.source_id),
+            publisher=None,
+            description=None,
+            license=None,
+            version=row.detected_sha,
+            artifact_count=1,
+            tags=[row.artifact_type] if row.artifact_type else [],
+            source_url=row.upstream_url,
+            bundle_url=None,
+            signature=None,
+            downloads=0,
+            rating=None,
+            price=None,
+            created_at=row.created_at.isoformat() if row.created_at else None,
+        )
+
+    # ------------------------------------------------------------------
+    # Source CRUD — IMarketplaceSourceRepository
+    # ------------------------------------------------------------------
+
+    def list_sources(
+        self,
+        filters: "Optional[Dict[str, object]]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "List[MarketplaceSourceDTO]":
+        """Return all marketplace sources for the current tenant.
+
+        Parameters
+        ----------
+        filters:
+            Optional filter map.  Supported keys: ``enabled`` (bool).
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Returns
+        -------
+        list[MarketplaceSourceDTO]
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        stmt = self._tenant_select().order_by(EnterpriseMarketplaceSource.created_at.asc())
+        rows = list(self.session.execute(stmt).scalars())
+
+        dtos = [self._source_to_dto(r) for r in rows]
+
+        if filters and "enabled" in filters:
+            want_enabled = bool(filters["enabled"])
+            dtos = [d for d in dtos if d.enabled == want_enabled]
+
+        return dtos
+
+    def get_source(
+        self,
+        source_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[MarketplaceSourceDTO]":
+        """Return a marketplace source by its identifier.
+
+        Parameters
+        ----------
+        source_id:
+            UUID string of the source row.
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Returns
+        -------
+        MarketplaceSourceDTO or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        try:
+            uid = uuid.UUID(source_id)
+        except ValueError:
+            logger.debug(
+                "EnterpriseMarketplaceSourceRepository.get_source: invalid UUID %r",
+                source_id,
+            )
+            return None
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceSource).where(EnterpriseMarketplaceSource.id == uid)
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        return self._source_to_dto(row) if row is not None else None
+
+    def create_source(
+        self,
+        name: str,
+        endpoint: str,
+        enabled: bool = True,
+        description: "Optional[str]" = None,
+        supports_publish: bool = False,
+        ctx: "Optional[object]" = None,
+    ) -> "MarketplaceSourceDTO":
+        """Register a new marketplace source.
+
+        Maps the broker-centric interface fields onto the GitHub-repo-centric
+        enterprise schema: ``endpoint`` is stored as ``repo_url``,
+        ``name`` is parsed into ``owner``/``repo_name`` when it contains a
+        ``"/"`` separator.  ``enabled`` is translated to an initial
+        ``scan_status``.
+
+        Parameters
+        ----------
+        name:
+            Human-readable name (``"owner/repo"`` convention for GitHub repos).
+        endpoint:
+            Base URL for the broker API / repository URL.
+        enabled:
+            Whether to activate the source immediately.
+        description:
+            Ignored by the enterprise backend (no description column on source).
+        supports_publish:
+            Ignored by the enterprise backend (GitHub sources are read-only).
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Returns
+        -------
+        MarketplaceSourceDTO
+            The created source.
+
+        Raises
+        ------
+        ValueError
+            If a source with the same ``endpoint`` (repo URL) already exists
+            for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        # Check uniqueness within tenant.
+        existing_stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceSource).where(
+                EnterpriseMarketplaceSource.repo_url == endpoint
+            )
+        )
+        existing = self.session.execute(existing_stmt).scalar_one_or_none()
+        if existing is not None:
+            raise ValueError(
+                f"A marketplace source with endpoint {endpoint!r} already exists "
+                f"for this tenant (id={existing.id})."
+            )
+
+        tenant_id = self._get_tenant_id()
+        now = datetime.utcnow()
+
+        # Parse owner / repo_name from the name field if possible.
+        owner: Optional[str] = None
+        repo_name: Optional[str] = None
+        if "/" in name:
+            parts = name.split("/", 1)
+            owner = parts[0] or None
+            repo_name = parts[1] or None
+
+        # Translate ``enabled`` to an initial scan_status.
+        initial_scan_status = "pending" if enabled else "disabled"
+
+        row = EnterpriseMarketplaceSource(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            repo_url=endpoint,
+            owner=owner,
+            repo_name=repo_name or name,
+            ref="main",
+            scan_status=initial_scan_status,
+            artifact_count=0,
+            created_at=now,
+            updated_at=now,
+        )
+        try:
+            self.session.add(row)
+            self.session.flush()
+            self._log_operation(
+                operation="create",
+                entity_type="EnterpriseMarketplaceSource",
+                entity_id=row.id,
+                metadata={"name": name, "endpoint": endpoint},
+            )
+            return self._source_to_dto(row)
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def update_source(
+        self,
+        source_id: str,
+        updates: "Dict[str, object]",
+        ctx: "Optional[object]" = None,
+    ) -> "MarketplaceSourceDTO":
+        """Apply a partial update to a marketplace source configuration.
+
+        Recognised update keys: ``enabled`` (bool), ``endpoint`` (str),
+        ``description`` (ignored — no column), ``supports_publish`` (ignored).
+        Additional keys in ``updates`` are silently ignored to avoid errors
+        when the caller passes broker-centric fields not present in the
+        enterprise schema.
+
+        Parameters
+        ----------
+        source_id:
+            UUID string of the source to update.
+        updates:
+            Map of field names to new values.
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Returns
+        -------
+        MarketplaceSourceDTO
+            The updated source.
+
+        Raises
+        ------
+        KeyError
+            If no source with *source_id* exists for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        try:
+            uid = uuid.UUID(source_id)
+        except ValueError:
+            raise KeyError(source_id)
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceSource).where(EnterpriseMarketplaceSource.id == uid)
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(source_id)
+
+        if "enabled" in updates:
+            row.scan_status = "pending" if updates["enabled"] else "disabled"
+        if "endpoint" in updates:
+            row.repo_url = str(updates["endpoint"])
+        if "ref" in updates:
+            row.ref = str(updates["ref"])
+        if "scan_status" in updates:
+            row.scan_status = str(updates["scan_status"])
+
+        row.updated_at = datetime.utcnow()
+
+        try:
+            self.session.flush()
+            self._log_operation(
+                operation="update",
+                entity_type="EnterpriseMarketplaceSource",
+                entity_id=row.id,
+                metadata={k: str(v)[:80] for k, v in updates.items()},
+            )
+            return self._source_to_dto(row)
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def delete_source(
+        self,
+        source_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Remove a marketplace source configuration.
+
+        Cascade-deletes all associated catalog entries (via the FK
+        ``ON DELETE CASCADE`` on ``enterprise_marketplace_catalog_entries``).
+
+        Parameters
+        ----------
+        source_id:
+            UUID string of the source to remove.
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If no source with *source_id* exists for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        try:
+            uid = uuid.UUID(source_id)
+        except ValueError:
+            raise KeyError(source_id)
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceSource).where(EnterpriseMarketplaceSource.id == uid)
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(source_id)
+
+        try:
+            self.session.delete(row)
+            self.session.flush()
+            self._log_operation(
+                operation="delete",
+                entity_type="EnterpriseMarketplaceSource",
+                entity_id=uid,
+                metadata={"source_id": source_id},
+            )
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # ------------------------------------------------------------------
+    # Catalog operations — IMarketplaceSourceRepository
+    # ------------------------------------------------------------------
+
+    def list_catalog_items(
+        self,
+        source_id: "Optional[str]" = None,
+        filters: "Optional[Dict[str, object]]" = None,
+        page: int = 1,
+        limit: int = 50,
+        ctx: "Optional[object]" = None,
+    ) -> "List[CatalogItemDTO]":
+        """Return paginated catalog listings from one or all sources.
+
+        Parameters
+        ----------
+        source_id:
+            When provided, restrict results to entries belonging to this
+            source UUID.  When ``None`` all tenant catalog entries are returned.
+        filters:
+            Optional filter map.  Supported keys: ``query`` (substring match
+            on ``name``), ``artifact_type``.
+        page:
+            One-based page number.
+        limit:
+            Maximum results per page (1-100).
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Returns
+        -------
+        list[CatalogItemDTO]
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceCatalogEntry
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceCatalogEntry)
+        ).order_by(EnterpriseMarketplaceCatalogEntry.created_at.desc())
+
+        if source_id is not None:
+            try:
+                src_uid = uuid.UUID(source_id)
+                stmt = stmt.where(EnterpriseMarketplaceCatalogEntry.source_id == src_uid)
+            except ValueError:
+                logger.debug(
+                    "EnterpriseMarketplaceSourceRepository.list_catalog_items: "
+                    "invalid source_id UUID %r — returning empty list",
+                    source_id,
+                )
+                return []
+
+        if filters:
+            if "query" in filters and filters["query"]:
+                q = f"%{filters['query']}%"
+                stmt = stmt.where(EnterpriseMarketplaceCatalogEntry.name.ilike(q))
+            if "artifact_type" in filters and filters["artifact_type"]:
+                stmt = stmt.where(
+                    EnterpriseMarketplaceCatalogEntry.artifact_type == filters["artifact_type"]
+                )
+
+        offset = (max(1, page) - 1) * limit
+        stmt = stmt.offset(offset).limit(limit)
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [self._entry_to_catalog_dto(r) for r in rows]
+
+    def import_item(
+        self,
+        listing_id: str,
+        source_id: "Optional[str]" = None,
+        strategy: str = "keep",
+        ctx: "Optional[object]" = None,
+    ) -> "List[ArtifactDTO]":
+        """Download and import a marketplace listing.
+
+        .. note::
+            Full import orchestration is not implemented at the enterprise DB
+            repository layer (it requires the CLI/source pipeline).  This
+            method logs a debug note and returns an empty list.  The API
+            layer's ``MarketplaceBrokerService`` handles the actual import
+            flow independently of this repository.
+
+        Parameters
+        ----------
+        listing_id:
+            Catalog entry primary key.
+        source_id:
+            Optional source UUID string.
+        strategy:
+            Conflict resolution strategy (unused by this stub).
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        list[ArtifactDTO]
+            Always empty — import orchestration is handled outside this repo.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.import_item: "
+            "import orchestration is deferred to the broker service layer; "
+            "listing_id=%r source_id=%r",
+            listing_id,
+            source_id,
+        )
+        return []
+
+    def get_composite_members(
+        self,
+        composite_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "List[ArtifactDTO]":
+        """Return child artifacts for a composite listing.
+
+        .. note::
+            Composite membership tracking is not modelled in the enterprise
+            schema.  Returns an empty list and logs a debug note.
+
+        Parameters
+        ----------
+        composite_id:
+            Artifact primary key of the composite artifact.
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        list[ArtifactDTO]
+            Always empty.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.get_composite_members: "
+            "composite membership not modelled in enterprise schema; "
+            "composite_id=%r",
+            composite_id,
+        )
+        return []
+
+    def get_catalog_entry_raw(
+        self,
+        entry_id: str,
+        source_id: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[object]":
+        """Return the raw ORM catalog entry for read-only inspection.
+
+        Parameters
+        ----------
+        entry_id:
+            UUID string of the catalog entry.
+        source_id:
+            When provided, verify the entry belongs to this source.
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        EnterpriseMarketplaceCatalogEntry or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceCatalogEntry
+
+        try:
+            entry_uid = uuid.UUID(entry_id)
+        except ValueError:
+            return None
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceCatalogEntry).where(
+                EnterpriseMarketplaceCatalogEntry.id == entry_uid
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+
+        if row is None:
+            return None
+
+        if source_id is not None:
+            try:
+                src_uid = uuid.UUID(source_id)
+            except ValueError:
+                return None
+            if row.source_id != src_uid:
+                return None
+
+        return row
+
+    def update_catalog_entry_exclusion(
+        self,
+        entry_id: str,
+        source_id: str,
+        excluded: bool,
+        reason: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "object":
+        """Toggle the exclusion status of a catalog entry.
+
+        The enterprise schema has no ``excluded_at`` or ``excluded_reason``
+        columns.  Exclusion is approximated by setting ``status`` to
+        ``"excluded"`` (when *excluded* is ``True``) or reverting to
+        ``"available"`` (when *excluded* is ``False``).
+
+        Parameters
+        ----------
+        entry_id:
+            UUID string of the catalog entry.
+        source_id:
+            Source the entry must belong to.
+        excluded:
+            ``True`` to exclude, ``False`` to restore.
+        reason:
+            Ignored by the enterprise backend (no ``excluded_reason`` column).
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        EnterpriseMarketplaceCatalogEntry
+            The updated ORM instance.
+
+        Raises
+        ------
+        KeyError
+            If *entry_id* is not found or does not belong to *source_id*.
+        """
+        row = self.get_catalog_entry_raw(entry_id, source_id=source_id, ctx=ctx)
+        if row is None:
+            raise KeyError(entry_id)
+
+        row.status = "excluded" if excluded else "available"
+        row.updated_at = datetime.utcnow()
+
+        try:
+            self.session.flush()
+            self._log_operation(
+                operation="update_exclusion",
+                entity_type="EnterpriseMarketplaceCatalogEntry",
+                entity_id=row.id,
+                metadata={"excluded": excluded, "reason": reason},
+            )
+            return row
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def update_catalog_entry_path_tags(
+        self,
+        entry_id: str,
+        source_id: str,
+        path_segments_json: str,
+        ctx: "Optional[object]" = None,
+    ) -> "object":
+        """Persist updated path_segments for a catalog entry.
+
+        The enterprise schema has no ``path_segments`` column.  This method
+        records the operation via audit log for traceability but does not
+        write the JSON to a column.  The catalog entry's ``updated_at`` is
+        refreshed so that callers can detect a change.
+
+        Parameters
+        ----------
+        entry_id:
+            UUID string of the catalog entry.
+        source_id:
+            Source the entry must belong to.
+        path_segments_json:
+            Serialised JSON (logged only; no enterprise column stores it).
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        EnterpriseMarketplaceCatalogEntry
+            The ORM instance with a refreshed ``updated_at``.
+
+        Raises
+        ------
+        KeyError
+            If *entry_id* is not found or does not belong to *source_id*.
+        """
+        row = self.get_catalog_entry_raw(entry_id, source_id=source_id, ctx=ctx)
+        if row is None:
+            raise KeyError(entry_id)
+
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.update_catalog_entry_path_tags: "
+            "path_segments column not present in enterprise schema; "
+            "entry_id=%r path_segments_json=%r",
+            entry_id,
+            path_segments_json,
+        )
+        row.updated_at = datetime.utcnow()
+
+        try:
+            self.session.flush()
+            self._log_operation(
+                operation="update_path_tags",
+                entity_type="EnterpriseMarketplaceCatalogEntry",
+                entity_id=row.id,
+                metadata={"path_segments_json": path_segments_json[:200]},
+            )
+            return row
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def get_artifact_row(
+        self,
+        artifact_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[object]":
+        """Return the raw ORM Artifact row for the given type:name id.
+
+        .. note::
+            The enterprise marketplace source repository does not hold
+            ``Artifact`` rows — those are managed by
+            :class:`EnterpriseArtifactRepository`.  This method always
+            returns ``None`` and logs a debug note.
+
+        Parameters
+        ----------
+        artifact_id:
+            Artifact primary key in ``"type:name"`` format.
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        None
+            Always ``None`` — enterprise marketplace sources do not own Artifact
+            rows.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.get_artifact_row: "
+            "Artifact rows are not managed by the marketplace source repo in the "
+            "enterprise backend; artifact_id=%r",
+            artifact_id,
+        )
+        return None
+
+    def upsert_composite_memberships(
+        self,
+        composite_id: str,
+        child_artifact_ids: "List[str]",
+        collection_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> int:
+        """Create or update CompositeMembership rows for a composite artifact.
+
+        .. note::
+            Composite membership is not modelled in the enterprise schema.
+            Returns 0 and logs a debug note.
+
+        Parameters
+        ----------
+        composite_id:
+            Primary key of the composite artifact.
+        child_artifact_ids:
+            Ordered list of child ``type:name`` artifact primary keys.
+        collection_id:
+            Collection the composite belongs to.
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        int
+            Always 0.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.upsert_composite_memberships: "
+            "composite membership not modelled in enterprise schema; "
+            "composite_id=%r child_count=%d",
+            composite_id,
+            len(child_artifact_ids),
+        )
+        return 0
+
+    def commit_source_session(
+        self,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Flush pending changes on the source repository session.
+
+        Parameters
+        ----------
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+        """
+        try:
+            self.session.flush()
+        except Exception:
+            self.session.rollback()
+            raise
+
+
+# =============================================================================
+# EnterpriseProjectTemplateRepository  (ENT2-5.2)
+# =============================================================================
+
+
+class EnterpriseProjectTemplateRepository(
+    EnterpriseRepositoryBase["EnterpriseRepositoryBase"],
+):
+    """Safe stub for project template operations in the enterprise backend.
+
+    Implements
+    :class:`~skillmeat.core.interfaces.repositories.IProjectTemplateRepository`
+    for the enterprise PostgreSQL backend.
+
+    .. note::
+        Full implementation is deferred to v3.  No database queries are
+        issued; all methods return empty collections or ``None`` and emit
+        a ``DEBUG`` log so callers know the stub was reached.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        The session is stored but never queried by this stub.
+    """
+
+    def __init__(self, session: Session) -> None:
+        """Initialise the enterprise project template repository stub.
+
+        Parameters
+        ----------
+        session:
+            Injected SQLAlchemy session.  Stored for interface compliance;
+            not used by any stub method.
+        """
+        # Use type(None) as a sentinel model_class; no DB queries are issued
+        # so this value is never passed to _apply_tenant_filter.  We pass it
+        # only to satisfy the Generic[T] contract of EnterpriseRepositoryBase.
+        super().__init__(session, type(None))  # type: ignore[arg-type]
+
+    # ------------------------------------------------------------------
+    # IProjectTemplateRepository: collection queries
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        filters: "Optional[Dict[str, object]]" = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: "Optional[object]" = None,
+    ) -> "List[ProjectTemplateDTO]":
+        """Return a page of project templates.
+
+        Returns
+        -------
+        list[ProjectTemplateDTO]
+            Always empty — full implementation deferred to v3.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        return []
+
+    def count(
+        self,
+        filters: "Optional[Dict[str, object]]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> int:
+        """Return the total number of project templates.
+
+        Returns
+        -------
+        int
+            Always 0 — full implementation deferred to v3.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        return 0
+
+    # ------------------------------------------------------------------
+    # IProjectTemplateRepository: single-item lookup
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        template_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[ProjectTemplateDTO]":
+        """Return a project template by its identifier.
+
+        Returns
+        -------
+        None
+            Always None — full implementation deferred to v3.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        return None
+
+    # ------------------------------------------------------------------
+    # IProjectTemplateRepository: mutations
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        name: str,
+        entity_ids: "List[str]",
+        description: "Optional[str]" = None,
+        collection_id: "Optional[str]" = None,
+        default_project_config_id: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectTemplateDTO":
+        """Create a new project template.
+
+        Returns a minimal stub DTO.  No data is persisted.
+
+        Returns
+        -------
+        ProjectTemplateDTO
+            Minimal stub DTO — full implementation deferred to v3.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        from skillmeat.core.interfaces.dtos import ProjectTemplateDTO
+
+        return ProjectTemplateDTO(
+            id="",
+            name=name,
+            description=description,
+            collection_id=collection_id,
+            default_project_config_id=default_project_config_id,
+            entities=[],
+            entity_count=0,
+        )
+
+    def update(
+        self,
+        template_id: str,
+        updates: "Dict[str, object]",
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectTemplateDTO":
+        """Apply a partial update to an existing project template.
+
+        Raises
+        ------
+        KeyError
+            Always — no templates are stored in this stub.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        raise KeyError(template_id)
+
+    def delete(
+        self,
+        template_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Delete a project template.
+
+        No-op stub.  Logs a debug message and returns silently.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+
+    # ------------------------------------------------------------------
+    # IProjectTemplateRepository: deployment
+    # ------------------------------------------------------------------
+
+    def deploy(
+        self,
+        template_id: str,
+        project_path: str,
+        options: "Optional[Dict[str, object]]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "Dict[str, object]":
+        """Deploy template entities to a target project directory.
+
+        Returns
+        -------
+        dict
+            Minimal result dict indicating no files were deployed.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        return {
+            "success": False,
+            "deployed_files": [],
+            "skipped_files": [],
+            "message": (
+                "EnterpriseProjectTemplateRepository is a stub; "
+                "full implementation deferred to v3."
+            ),
+        }
+
+
+# =============================================================================
+# EnterpriseMarketplaceTransactionHandler  (ENT2-5.3)
+# =============================================================================
+
+
+class EnterpriseMarketplaceTransactionHandler:
+    """Coordinates transactional marketplace operations for the enterprise backend.
+
+    Mirrors the interface of the local
+    :class:`~skillmeat.cache.repositories.MarketplaceTransactionHandler` but
+    operates on the enterprise PostgreSQL session rather than opening its own
+    SQLite connection.
+
+    Unlike most enterprise repositories this class does NOT extend
+    ``EnterpriseRepositoryBase`` because it manages multi-table operations
+    across both ``EnterpriseMarketplaceSource`` and
+    ``EnterpriseMarketplaceCatalogEntry`` and therefore cannot be bound to a
+    single model class.
+
+    Tenant filtering is applied explicitly inside each context method using the
+    current ``TenantContext``.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        The caller (FastAPI DI layer) is responsible for commit/rollback/close.
+    tenant_id:
+        Explicit tenant UUID for this handler instance.  Stored and used
+        to scope all queries without relying on ``TenantContext`` alone.
+
+    Example::
+
+        handler = EnterpriseMarketplaceTransactionHandler(
+            session=db_session, tenant_id=tenant_id
+        )
+        with handler.scan_update_transaction(source_id) as ctx:
+            ctx.update_source_status("success", artifact_count=5)
+            ctx.replace_catalog_entries(new_entries)
+    """
+
+    def __init__(self, session: Session, tenant_id: uuid.UUID) -> None:
+        """Initialise the enterprise marketplace transaction handler.
+
+        Parameters
+        ----------
+        session:
+            Injected SQLAlchemy session bound to the PostgreSQL enterprise
+            database.
+        tenant_id:
+            Tenant UUID that scopes all queries issued by this handler.
+        """
+        self.session = session
+        self.tenant_id = tenant_id
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _get_enterprise_source(self, source_id: str) -> "EnterpriseMarketplaceSource":
+        """Fetch an ``EnterpriseMarketplaceSource`` row scoped to the current tenant.
+
+        Parameters
+        ----------
+        source_id:
+            String representation of the source UUID.
+
+        Returns
+        -------
+        EnterpriseMarketplaceSource
+
+        Raises
+        ------
+        KeyError
+            If no matching row is found for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        try:
+            source_uuid = uuid.UUID(source_id)
+        except (ValueError, AttributeError):
+            raise KeyError(f"Invalid source UUID: {source_id!r}")
+
+        stmt = select(EnterpriseMarketplaceSource).where(
+            EnterpriseMarketplaceSource.id == source_uuid,
+            EnterpriseMarketplaceSource.tenant_id == self.tenant_id,
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(f"Source not found: {source_id!r}")
+        return row  # type: ignore[return-value]
+
+    # ------------------------------------------------------------------
+    # Context managers
+    # ------------------------------------------------------------------
+
+    @contextmanager
+    def scan_update_transaction(
+        self, source_id: str
+    ) -> Generator["EnterpriseScanUpdateContext", None, None]:
+        """Context manager for updating source and catalog after a scan.
+
+        Wraps the operation in a savepoint so that on error only this
+        logical unit is rolled back rather than the entire session.
+
+        Parameters
+        ----------
+        source_id:
+            The enterprise marketplace source UUID being updated.
+
+        Yields
+        ------
+        EnterpriseScanUpdateContext
+            Context object with helper methods for the scan update.
+
+        Raises
+        ------
+        RuntimeError
+            If the database operation fails.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceTransactionHandler: starting scan_update_transaction "
+            "source=%s tenant=%s",
+            source_id,
+            self.tenant_id,
+        )
+        try:
+            context = EnterpriseScanUpdateContext(
+                session=self.session,
+                source_id=source_id,
+                tenant_id=self.tenant_id,
+            )
+            yield context
+            self.session.flush()
+            logger.info(
+                "EnterpriseMarketplaceTransactionHandler: scan_update_transaction "
+                "flushed source=%s",
+                source_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "EnterpriseMarketplaceTransactionHandler: scan_update_transaction "
+                "failed source=%s error=%s",
+                source_id,
+                exc,
+            )
+            raise RuntimeError(
+                f"Enterprise scan update transaction failed: {exc}"
+            ) from exc
+
+    @contextmanager
+    def import_transaction(
+        self, source_id: str
+    ) -> Generator["EnterpriseImportContext", None, None]:
+        """Context manager for importing catalog entries to the collection.
+
+        Parameters
+        ----------
+        source_id:
+            The enterprise marketplace source UUID being imported from.
+
+        Yields
+        ------
+        EnterpriseImportContext
+            Context object with helper methods for marking import results.
+
+        Raises
+        ------
+        RuntimeError
+            If the database operation fails.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceTransactionHandler: starting import_transaction "
+            "source=%s tenant=%s",
+            source_id,
+            self.tenant_id,
+        )
+        try:
+            context = EnterpriseImportContext(
+                session=self.session,
+                source_id=source_id,
+                tenant_id=self.tenant_id,
+            )
+            yield context
+            self.session.flush()
+            logger.info(
+                "EnterpriseMarketplaceTransactionHandler: import_transaction "
+                "flushed source=%s",
+                source_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "EnterpriseMarketplaceTransactionHandler: import_transaction "
+                "failed source=%s error=%s",
+                source_id,
+                exc,
+            )
+            raise RuntimeError(
+                f"Enterprise import transaction failed: {exc}"
+            ) from exc
+
+
+class EnterpriseScanUpdateContext:
+    """Context for scan update operations within an enterprise transaction.
+
+    Mirrors :class:`~skillmeat.cache.repositories.ScanUpdateContext` for the
+    enterprise PostgreSQL backend using SQLAlchemy 2.x ``select()`` style.
+
+    Parameters
+    ----------
+    session:
+        Active SQLAlchemy session (managed by
+        :class:`EnterpriseMarketplaceTransactionHandler`).
+    source_id:
+        UUID string of the marketplace source being updated.
+    tenant_id:
+        Tenant UUID for row-level isolation.
+    """
+
+    def __init__(self, session: Session, source_id: str, tenant_id: uuid.UUID) -> None:
+        self.session = session
+        self.source_id = source_id
+        self.tenant_id = tenant_id
+
+    def update_source_status(
+        self,
+        status: str,
+        artifact_count: Optional[int] = None,
+        error_message: Optional[str] = None,
+        ref: Optional[str] = None,
+    ) -> None:
+        """Update source scan status and metadata.
+
+        Parameters
+        ----------
+        status:
+            New scan status (e.g. ``"success"``, ``"error"``).
+        artifact_count:
+            Number of artifacts discovered (``None`` leaves unchanged).
+        error_message:
+            Error message when *status* is ``"error"`` (``None`` clears).
+        ref:
+            Resolved git ref used during scan (``None`` leaves unchanged).
+
+        Raises
+        ------
+        KeyError
+            If no matching source row is found for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        try:
+            source_uuid = uuid.UUID(self.source_id)
+        except (ValueError, AttributeError):
+            raise KeyError(f"Invalid source UUID: {self.source_id!r}")
+
+        stmt = select(EnterpriseMarketplaceSource).where(
+            EnterpriseMarketplaceSource.id == source_uuid,
+            EnterpriseMarketplaceSource.tenant_id == self.tenant_id,
+        )
+        source = self.session.execute(stmt).scalar_one_or_none()
+        if source is None:
+            raise KeyError(f"Source not found: {self.source_id!r}")
+
+        source.scan_status = status
+        source.last_sync_at = datetime.utcnow()
+
+        if artifact_count is not None:
+            source.artifact_count = artifact_count
+
+        source.last_error = error_message
+
+        if ref is not None:
+            source.ref = ref
+            logger.info(
+                "EnterpriseScanUpdateContext: updated source %s ref to %r",
+                self.source_id,
+                ref,
+            )
+
+        logger.info(
+            "EnterpriseScanUpdateContext: updated source=%s status=%s count=%s",
+            self.source_id,
+            status,
+            artifact_count,
+        )
+
+    def replace_catalog_entries(
+        self, entries: "List[EnterpriseMarketplaceCatalogEntry]"
+    ) -> int:
+        """Delete existing catalog entries for the source and insert new ones.
+
+        Parameters
+        ----------
+        entries:
+            List of new ``EnterpriseMarketplaceCatalogEntry`` instances to insert.
+
+        Returns
+        -------
+        int
+            Number of entries inserted.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseMarketplaceCatalogEntry,
+            EnterpriseMarketplaceSource,
+        )
+
+        try:
+            source_uuid = uuid.UUID(self.source_id)
+        except (ValueError, AttributeError):
+            raise KeyError(f"Invalid source UUID: {self.source_id!r}")
+
+        # Delete existing entries scoped to this tenant's source
+        del_stmt = delete(EnterpriseMarketplaceCatalogEntry).where(
+            EnterpriseMarketplaceCatalogEntry.source_id == source_uuid,
+            EnterpriseMarketplaceCatalogEntry.tenant_id == self.tenant_id,
+        )
+        result = self.session.execute(del_stmt)
+        deleted_count = result.rowcount
+        logger.debug(
+            "EnterpriseScanUpdateContext: deleted %d existing entries for source=%s",
+            deleted_count,
+            self.source_id,
+        )
+
+        # Insert new entries
+        for entry in entries:
+            self.session.add(entry)
+
+        logger.info(
+            "EnterpriseScanUpdateContext: inserted %d entries for source=%s",
+            len(entries),
+            self.source_id,
+        )
+        return len(entries)
+
+
+class EnterpriseImportContext:
+    """Context for import operations within an enterprise transaction.
+
+    Mirrors :class:`~skillmeat.cache.repositories.ImportContext` for the
+    enterprise PostgreSQL backend using SQLAlchemy 2.x ``select()`` style.
+
+    Parameters
+    ----------
+    session:
+        Active SQLAlchemy session (managed by
+        :class:`EnterpriseMarketplaceTransactionHandler`).
+    source_id:
+        UUID string of the marketplace source being imported from.
+    tenant_id:
+        Tenant UUID for row-level isolation.
+    """
+
+    def __init__(self, session: Session, source_id: str, tenant_id: uuid.UUID) -> None:
+        self.session = session
+        self.source_id = source_id
+        self.tenant_id = tenant_id
+
+    def mark_imported(self, entry_ids: List[str], import_id: str) -> int:
+        """Mark catalog entries as imported.
+
+        Parameters
+        ----------
+        entry_ids:
+            List of catalog entry UUID strings to update.
+        import_id:
+            Unique identifier for this import operation.
+
+        Returns
+        -------
+        int
+            Number of entries updated.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceCatalogEntry
+
+        updated_count = 0
+        now = datetime.utcnow()
+
+        for entry_id_str in entry_ids:
+            try:
+                entry_uuid = uuid.UUID(entry_id_str)
+            except (ValueError, AttributeError):
+                logger.warning(
+                    "EnterpriseImportContext.mark_imported: skipping invalid UUID %r",
+                    entry_id_str,
+                )
+                continue
+
+            stmt = select(EnterpriseMarketplaceCatalogEntry).where(
+                EnterpriseMarketplaceCatalogEntry.id == entry_uuid,
+                EnterpriseMarketplaceCatalogEntry.tenant_id == self.tenant_id,
+            )
+            entry = self.session.execute(stmt).scalar_one_or_none()
+            if entry is None:
+                continue
+
+            entry.status = "imported"
+            entry.updated_at = now
+            updated_count += 1
+
+        logger.info(
+            "EnterpriseImportContext: marked %d entries imported (import_id=%s)",
+            updated_count,
+            import_id,
+        )
+        return updated_count
+
+    def mark_failed(self, entry_ids: List[str], error: str) -> int:
+        """Mark catalog entries as failed import.
+
+        Parameters
+        ----------
+        entry_ids:
+            List of catalog entry UUID strings to mark as failed.
+        error:
+            Error message describing the failure reason.
+
+        Returns
+        -------
+        int
+            Number of entries updated.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceCatalogEntry
+
+        updated_count = 0
+        now = datetime.utcnow()
+
+        for entry_id_str in entry_ids:
+            try:
+                entry_uuid = uuid.UUID(entry_id_str)
+            except (ValueError, AttributeError):
+                logger.warning(
+                    "EnterpriseImportContext.mark_failed: skipping invalid UUID %r",
+                    entry_id_str,
+                )
+                continue
+
+            stmt = select(EnterpriseMarketplaceCatalogEntry).where(
+                EnterpriseMarketplaceCatalogEntry.id == entry_uuid,
+                EnterpriseMarketplaceCatalogEntry.tenant_id == self.tenant_id,
+            )
+            entry = self.session.execute(stmt).scalar_one_or_none()
+            if entry is None:
+                continue
+
+            entry.status = "error"
+            entry.updated_at = now
+            updated_count += 1
+
+        logger.info(
+            "EnterpriseImportContext: marked %d entries failed error=%r",
+            updated_count,
+            error,
+        )
+        return updated_count
+
+
+# =============================================================================
+# EnterpriseDbCollectionArtifactRepository  (ENT2-6.1)
+# =============================================================================
+
+
+class EnterpriseDbCollectionArtifactRepository(
+    EnterpriseRepositoryBase["EnterpriseCollectionArtifact"],
+    IDbCollectionArtifactRepository,
+):
+    """Enterprise repository for collection-artifact membership.
+
+    Implements
+    :class:`~skillmeat.core.interfaces.repositories.IDbCollectionArtifactRepository`
+    for the enterprise PostgreSQL backend.
+
+    The underlying ``EnterpriseCollectionArtifact`` join table carries only
+    structural membership data (``collection_id``, ``artifact_id``,
+    ``order_index``, ``added_at``).  Richer metadata fields present on the
+    local ``CollectionArtifact`` ORM model (``description``, ``tags_json``,
+    ``source``, etc.) are resolved by joining through ``EnterpriseArtifact``.
+
+    Methods that have no meaningful enterprise equivalent (bootstrap helpers,
+    group lookups, etc.) return safe empty values rather than raising.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact as _ECA
+
+        super().__init__(session, _ECA)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _row_to_dto(self, row: "EnterpriseCollectionArtifact") -> "CollectionArtifactDTO":
+        """Convert an ``EnterpriseCollectionArtifact`` ORM row to a DTO.
+
+        Joins are lazy-loaded by SQLAlchemy; ``row.artifact`` and
+        ``row.collection`` relationships are expected to be accessible.
+        """
+        from skillmeat.core.interfaces.dtos import CollectionArtifactDTO
+
+        artifact = row.artifact  # type: ignore[attr-defined]
+        tags: List[str] = []
+        description: Optional[str] = None
+        source_url: Optional[str] = None
+        artifact_uuid: str = str(artifact.id).replace("-", "") if artifact is not None else ""
+
+        if artifact is not None:
+            description = getattr(artifact, "description", None)
+            raw_tags = getattr(artifact, "tags", None)
+            if isinstance(raw_tags, list):
+                tags = [str(t) for t in raw_tags]
+            source_url = getattr(artifact, "source_url", None)
+
+        added_at_val = row.added_at  # type: ignore[attr-defined]
+        added_at_str: Optional[str] = (
+            added_at_val.isoformat() if added_at_val is not None else None
+        )
+
+        return CollectionArtifactDTO(
+            collection_id=str(row.collection_id).replace("-", ""),  # type: ignore[attr-defined]
+            artifact_uuid=artifact_uuid,
+            added_at=added_at_str,
+            description=description,
+            tags=tags,
+            source=source_url,
+        )
+
+    def _parse_collection_uuid(self, collection_id: str) -> Optional[uuid.UUID]:
+        """Parse a collection_id string to a UUID, returning None on failure."""
+        try:
+            return uuid.UUID(collection_id)
+        except (ValueError, AttributeError):
+            logger.warning(
+                "EnterpriseDbCollectionArtifactRepository: invalid collection_id %r",
+                collection_id,
+            )
+            return None
+
+    # ------------------------------------------------------------------
+    # Tenant-safety helpers
+    # ------------------------------------------------------------------
+
+    def _validate_collection_tenant(self, collection_uuid: uuid.UUID) -> None:
+        """Verify *collection_uuid* belongs to the current tenant.
+
+        ``EnterpriseCollectionArtifact`` is a pure join table with no
+        ``tenant_id`` column of its own.  Tenant isolation for all
+        collection-scoped membership queries is enforced by confirming that the
+        parent ``EnterpriseCollection`` row is visible under the current tenant
+        before any membership query is executed.
+
+        We cannot use ``_apply_tenant_filter()`` here because that helper
+        filters against ``self.model_class.tenant_id``
+        (``EnterpriseCollectionArtifact.tenant_id``), which does not exist.
+        Instead we apply the filter manually against ``EnterpriseCollection``.
+
+        Raises
+        ------
+        ValueError
+            If no ``EnterpriseCollection`` row with that UUID exists for the
+            current tenant (either the collection does not exist, or it belongs
+            to a different tenant).
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseCollection
+
+        tenant_id = self._get_tenant_id()
+        stmt = select(EnterpriseCollection).where(
+            EnterpriseCollection.id == collection_uuid,
+            EnterpriseCollection.tenant_id == tenant_id,
+        )
+        result = self.session.execute(stmt).scalar_one_or_none()
+        if result is None:
+            raise ValueError(
+                f"Collection {collection_uuid} not found for current tenant"
+            )
+
+    # ------------------------------------------------------------------
+    # Queries
+    # ------------------------------------------------------------------
+
+    def list_by_collection(
+        self,
+        collection_id: str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        search: "str | None" = None,
+        artifact_type: "str | None" = None,
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.list_by_collection: %r", collection_id)
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseCollectionArtifact,
+        )
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return []
+        self._validate_collection_tenant(coll_uuid)
+
+        tenant_id = self._get_tenant_id()
+        stmt = (
+            select(EnterpriseCollectionArtifact)
+            .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
+            .where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
+        )
+        if artifact_type is not None:
+            stmt = stmt.where(EnterpriseArtifact.artifact_type == artifact_type)
+        if search is not None:
+            stmt = stmt.where(EnterpriseArtifact.name.ilike(f"%{search}%"))
+        stmt = stmt.order_by(EnterpriseCollectionArtifact.order_index).offset(offset).limit(limit)
+
+        rows = self.session.execute(stmt).scalars().all()
+        return [self._row_to_dto(r) for r in rows]
+
+    def get_by_pk(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: "Any | None" = None,
+    ) -> "Any | None":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.get_by_pk: %r %r", collection_id, artifact_uuid)
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return None
+        try:
+            art_uuid = uuid.UUID(artifact_uuid)
+        except (ValueError, AttributeError):
+            return None
+        self._validate_collection_tenant(coll_uuid)
+
+        from skillmeat.cache.models_enterprise import EnterpriseArtifact
+
+        tenant_id = self._get_tenant_id()
+        stmt = (
+            select(EnterpriseCollectionArtifact)
+            .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
+            .where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseCollectionArtifact.artifact_id == art_uuid,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        return self._row_to_dto(row) if row is not None else None
+
+    def count_by_collection(
+        self,
+        collection_id: str,
+        ctx: "Any | None" = None,
+    ) -> int:
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return 0
+        self._validate_collection_tenant(coll_uuid)
+
+        stmt = select(func.count()).select_from(EnterpriseCollectionArtifact).where(
+            EnterpriseCollectionArtifact.collection_id == coll_uuid
+        )
+        result = self.session.execute(stmt).scalar()
+        return int(result) if result is not None else 0
+
+    def list_with_tags(
+        self,
+        collection_id: str,
+        *,
+        tag: "str | None" = None,
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.list_with_tags: %r tag=%r", collection_id, tag)
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseCollectionArtifact,
+        )
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return []
+        self._validate_collection_tenant(coll_uuid)
+
+        tenant_id = self._get_tenant_id()
+        stmt = (
+            select(EnterpriseCollectionArtifact)
+            .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
+            .where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
+        )
+        if tag is not None:
+            # PostgreSQL JSONB array contains operator
+            stmt = stmt.where(EnterpriseArtifact.tags.contains([tag]))
+        stmt = stmt.order_by(EnterpriseCollectionArtifact.order_index)
+
+        rows = self.session.execute(stmt).scalars().all()
+        return [self._row_to_dto(r) for r in rows]
+
+    def list_deployment_info(
+        self,
+        collection_id: str,
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.list_deployment_info: %r", collection_id)
+        # EnterpriseCollectionArtifact does not carry deployment_json; return basic membership
+        return self.list_by_collection(collection_id, limit=1000, ctx=ctx)
+
+    def get_source_deployments_batch(
+        self,
+        artifact_ids: "list[str]",
+        ctx: "Any | None" = None,
+    ) -> "list[dict]":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.get_source_deployments_batch: %d ids",
+            len(artifact_ids),
+        )
+        # EnterpriseCollectionArtifact does not carry deployments_json
+        return []
+
+    def add_artifacts(
+        self,
+        collection_id: str,
+        artifact_uuids: "list[str]",
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.add_artifacts: %r %d uuids",
+            collection_id,
+            len(artifact_uuids),
+        )
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            raise KeyError(f"Invalid collection_id: {collection_id!r}")
+        self._validate_collection_tenant(coll_uuid)
+
+        results = []
+        for art_uuid_str in artifact_uuids:
+            try:
+                art_uuid = uuid.UUID(art_uuid_str)
+            except (ValueError, AttributeError):
+                logger.warning(
+                    "EnterpriseDbCollectionArtifactRepository.add_artifacts: skipping invalid UUID %r",
+                    art_uuid_str,
+                )
+                continue
+
+            # Check for existing membership (idempotent)
+            stmt = select(EnterpriseCollectionArtifact).where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseCollectionArtifact.artifact_id == art_uuid,
+            )
+            existing = self.session.execute(stmt).scalar_one_or_none()
+            if existing is not None:
+                results.append(self._row_to_dto(existing))
+                continue
+
+            row = EnterpriseCollectionArtifact(
+                collection_id=coll_uuid,
+                artifact_id=art_uuid,
+            )
+            self.session.add(row)
+            self.session.flush()
+            results.append(self._row_to_dto(row))
+
+        self.session.flush()
+        return results
+
+    def remove_artifact(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: "Any | None" = None,
+    ) -> bool:
+        from sqlalchemy import delete as sa_delete
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return False
+        try:
+            art_uuid = uuid.UUID(artifact_uuid)
+        except (ValueError, AttributeError):
+            return False
+        self._validate_collection_tenant(coll_uuid)
+
+        result = self.session.execute(
+            sa_delete(EnterpriseCollectionArtifact).where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseCollectionArtifact.artifact_id == art_uuid,
+            )
+        )
+        self.session.flush()
+        return (result.rowcount or 0) > 0
+
+    def upsert_metadata(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        ctx: "Any | None" = None,
+        **metadata: "Any",
+    ) -> "Any":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.upsert_metadata: %r %r — metadata not stored in enterprise schema",
+            collection_id,
+            artifact_uuid,
+        )
+        # Enterprise schema does not carry rich metadata columns; return existing DTO
+        dto = self.get_by_pk(collection_id, artifact_uuid, ctx=ctx)
+        if dto is None:
+            from skillmeat.core.interfaces.dtos import CollectionArtifactDTO
+
+            return CollectionArtifactDTO(collection_id=collection_id, artifact_uuid=artifact_uuid)
+        return dto
+
+    def update_source_tracking(
+        self,
+        collection_id: str,
+        artifact_uuid: str,
+        *,
+        source: "str | None" = None,
+        origin: "str | None" = None,
+        resolved_sha: "str | None" = None,
+        resolved_version: "str | None" = None,
+        ctx: "Any | None" = None,
+    ) -> "Any":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.update_source_tracking: %r %r — not stored in enterprise schema",
+            collection_id,
+            artifact_uuid,
+        )
+        dto = self.get_by_pk(collection_id, artifact_uuid, ctx=ctx)
+        if dto is None:
+            raise KeyError(f"No membership for ({collection_id!r}, {artifact_uuid!r})")
+        return dto
+
+    # ------------------------------------------------------------------
+    # Bootstrap / migration helpers
+    # ------------------------------------------------------------------
+
+    def get_existing_artifact_ids(self) -> "set[str]":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.get_existing_artifact_ids")
+        return set()
+
+    def ensure_artifact_rows(self, artifacts: "list", *, project_id: str) -> int:
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.ensure_artifact_rows: stub — enterprise manages artifact rows separately"
+        )
+        return 0
+
+    def list_artifact_ids_in_collection(self, collection_id: str) -> "set[str]":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.list_artifact_ids_in_collection: %r",
+            collection_id,
+        )
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseCollectionArtifact,
+        )
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return set()
+        self._validate_collection_tenant(coll_uuid)
+
+        tenant_id = self._get_tenant_id()
+        stmt = (
+            select(EnterpriseArtifact.name, EnterpriseArtifact.artifact_type)
+            .join(EnterpriseCollectionArtifact, EnterpriseCollectionArtifact.artifact_id == EnterpriseArtifact.id)
+            .where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
+        )
+        rows = self.session.execute(stmt).all()
+        return {f"{r.artifact_type}:{r.name}" for r in rows}
+
+    def resolve_uuid_by_id(self, artifact_id: str) -> "str | None":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.resolve_uuid_by_id: %r", artifact_id)
+        from skillmeat.cache.models_enterprise import EnterpriseArtifact
+
+        if ":" not in artifact_id:
+            return None
+        artifact_type, _, name = artifact_id.partition(":")
+        tenant_id = self._get_tenant_id()
+        stmt = select(EnterpriseArtifact.id).where(
+            EnterpriseArtifact.name == name,
+            EnterpriseArtifact.artifact_type == artifact_type,
+            EnterpriseArtifact.tenant_id == tenant_id,
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        return str(row).replace("-", "") if row is not None else None
+
+    def list_all_with_tags(self) -> "list":
+        logger.debug("EnterpriseDbCollectionArtifactRepository.list_all_with_tags")
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseCollectionArtifact,
+        )
+
+        tenant_id = self._get_tenant_id()
+        stmt = (
+            select(EnterpriseCollectionArtifact)
+            .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
+            .where(
+                EnterpriseArtifact.tags != None,  # noqa: E711
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
+        )
+        rows = self.session.execute(stmt).scalars().all()
+        return [self._row_to_dto(r) for r in rows if getattr(r.artifact, "tags", None)]
+
+    def resolve_uuid_to_id_batch(
+        self,
+        uuids: "list[str]",
+        ctx: "Any | None" = None,
+    ) -> "dict[str, str]":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.resolve_uuid_to_id_batch: %d uuids",
+            len(uuids),
+        )
+        from skillmeat.cache.models_enterprise import EnterpriseArtifact
+
+        if not uuids:
+            return {}
+
+        parsed: List[uuid.UUID] = []
+        for u in uuids:
+            try:
+                parsed.append(uuid.UUID(u))
+            except (ValueError, AttributeError):
+                pass
+
+        if not parsed:
+            return {}
+
+        tenant_id = self._get_tenant_id()
+        stmt = select(EnterpriseArtifact.id, EnterpriseArtifact.name, EnterpriseArtifact.artifact_type).where(
+            EnterpriseArtifact.id.in_(parsed),
+            EnterpriseArtifact.tenant_id == tenant_id,
+        )
+        rows = self.session.execute(stmt).all()
+        return {
+            str(r.id).replace("-", ""): f"{r.artifact_type}:{r.name}"
+            for r in rows
+        }
+
+    def list_all_ordered(
+        self,
+        collection_id: str,
+        ctx: "Any | None" = None,
+    ) -> "list":
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseCollectionArtifact,
+        )
+
+        coll_uuid = self._parse_collection_uuid(collection_id)
+        if coll_uuid is None:
+            return []
+        self._validate_collection_tenant(coll_uuid)
+
+        tenant_id = self._get_tenant_id()
+        stmt = (
+            select(EnterpriseCollectionArtifact)
+            .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
+            .where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
+            .order_by(EnterpriseArtifact.artifact_type, EnterpriseArtifact.name)
+        )
+        rows = self.session.execute(stmt).scalars().all()
+        return [self._row_to_dto(r) for r in rows]
+
+    def get_group_artifact_uuids(
+        self,
+        group_id: str,
+        ctx: "Any | None" = None,
+    ) -> "set[str]":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.get_group_artifact_uuids: %r — not supported in enterprise v1",
+            group_id,
+        )
+        return set()
+
+    def get_source_for_uuids(
+        self,
+        artifact_uuids: "list[str]",
+        ctx: "Any | None" = None,
+    ) -> "dict[str, str]":
+        logger.debug(
+            "EnterpriseDbCollectionArtifactRepository.get_source_for_uuids: %d uuids — source not stored in enterprise v1 schema",
+            len(artifact_uuids),
+        )
+        return {}
+
+
+# =============================================================================
+# EnterpriseArtifactHistoryStub  (ENT2-6.2)
+# =============================================================================
+
+
+class EnterpriseArtifactHistoryStub(IDbArtifactHistoryRepository):
+    """Stub implementation of IDbArtifactHistoryRepository for enterprise mode.
+
+    Artifact history is a local-SQLite feature not yet ported to the enterprise
+    PostgreSQL schema.  All read methods return empty/None to keep the API
+    operational while suppressing expensive or impossible DB queries.
+    """
+
+    def get_cache_artifact_by_uuid(
+        self,
+        uuid_str: str,
+        ctx: "Any | None" = None,
+    ) -> "Any | None":
+        logger.debug("EnterpriseArtifactHistoryStub: stub — full implementation deferred")
+        return None
+
+    def list_cache_artifacts_by_name_type(
+        self,
+        name: str,
+        artifact_type: str,
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug("EnterpriseArtifactHistoryStub: stub — full implementation deferred")
+        return []
+
+    def list_versions_for_artifacts(
+        self,
+        artifact_ids: "list[str]",
+        ctx: "Any | None" = None,
+    ) -> "list":
+        logger.debug("EnterpriseArtifactHistoryStub: stub — full implementation deferred")
+        return []
+
+
+# =============================================================================
+# EnterpriseDuplicatePairStub  (ENT2-6.3)
+# =============================================================================
+
+
+class EnterpriseDuplicatePairStub:
+    """Stub implementation of DuplicatePairRepository for enterprise mode.
+
+    Duplicate detection is a local-SQLite feature based on a single-tenant
+    similarity scan.  It is not ported to the enterprise multi-tenant schema
+    in v2.  All methods return empty/False results.
+    """
+
+    def get_by_id(self, pair_id: str) -> None:
+        logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
+        return None
+
+    def list_active(self, min_score: float = 0.0) -> "list":
+        logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
+        return []
+
+    def mark_pair_ignored(self, pair_id: str) -> bool:
+        logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
+        return False
+
+    def unmark_pair_ignored(self, pair_id: str) -> bool:
+        logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
+        return False
+
+    def list_pairs_for_artifact(self, artifact_uuid: str) -> "list":
+        logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
+        return []

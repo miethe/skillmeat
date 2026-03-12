@@ -1,10 +1,10 @@
 ---
-title: "Phases 5-6: Marketplace/Template Repositories + Non-DI Migration"
+title: 'Phases 5-6: Marketplace/Template Repositories + Non-DI Migration'
 schema_version: 2
 doc_type: phase_plan
-status: draft
+status: completed
 created: 2026-03-12
-updated: 2026-03-12
+updated: '2026-03-12'
 feature_slug: enterprise-repo-parity
 feature_version: v2
 phase: 5
@@ -12,13 +12,20 @@ phase_title: Marketplace/Template Repositories and Non-DI Repo Migration
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-repo-parity-v2.md
 plan_ref: docs/project_plans/implementation_plans/refactors/enterprise-repo-parity-v2.md
 entry_criteria:
-  - Phases 3 and 4 complete (all core repositories implemented and DI-wired)
-  - Phase 1 triage classification confirmed for Group B repos: MarketplaceCatalogRepository, MarketplaceTransactionHandler, DbCollectionArtifactRepository, DbArtifactHistoryRepository, DuplicatePairRepository, concrete MarketplaceSourceRepository
-  - Open questions OQ-2 (DbCollectionArtifactRepository v1 status) and OQ-3 (MarketplaceTransactionHandler tier) resolved from Phase 1 triage
+- Phases 3 and 4 complete (all core repositories implemented and DI-wired)
+- Phase 1 triage classification confirmed for Group B repos: MarketplaceCatalogRepository,
+    MarketplaceTransactionHandler, DbCollectionArtifactRepository, DbArtifactHistoryRepository,
+    DuplicatePairRepository, concrete MarketplaceSourceRepository
+- Open questions OQ-2 (DbCollectionArtifactRepository v1 status) and OQ-3 (MarketplaceTransactionHandler
+  tier) resolved from Phase 1 triage
 exit_criteria:
-  - Phase 5 exit: EnterpriseMarketplaceSourceRepository implemented and DI-wired; EnterpriseProjectTemplateRepository stub implemented and DI-wired; MarketplaceCatalogRepository and MarketplaceTransactionHandler edition-aware (or confirmed Passthrough); endpoints return 200 in enterprise mode
-  - Phase 6 exit: All remaining Group B repos edition-aware; grep audit finds zero hardcoded SQLite instantiations without edition check in `dependencies.py`; no SQLite writes for any Group B endpoint in enterprise mode
-  - Unit tests pass for all new Phase 5 classes
+- Phase 5 exit: EnterpriseMarketplaceSourceRepository implemented and DI-wired; EnterpriseProjectTemplateRepository
+    stub implemented and DI-wired; MarketplaceCatalogRepository and MarketplaceTransactionHandler
+    edition-aware (or confirmed Passthrough); endpoints return 200 in enterprise mode
+- Phase 6 exit: All remaining Group B repos edition-aware; grep audit finds zero hardcoded
+    SQLite instantiations without edition check in `dependencies.py`; no SQLite writes
+    for any Group B endpoint in enterprise mode
+- Unit tests pass for all new Phase 5 classes
 ---
 
 # Phases 5-6: Marketplace/Template Repositories + Non-DI Migration

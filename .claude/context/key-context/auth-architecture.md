@@ -102,13 +102,49 @@ router = APIRouter(dependencies=[Depends(verify_enterprise_pat)])
 
 ## Tenant Context (enterprise multi-tenant)
 
+### TenantContextDep Middleware
+
 Attach `TenantContextDep` to enterprise routers so that DB queries are scoped to the correct tenant automatically:
 
 ```python
 router = APIRouter(dependencies=[TenantContextDep])
 ```
 
-When `tenant_id` is `None` (local mode), the dependency is a no-op. Enterprise repos fall back to `DEFAULT_TENANT_ID`.
+When `tenant_id` is `None` (local mode), the dependency is a no-op. Enterprise repos access tenant via `TenantContext` ContextVar:
+
+```python
+from skillmeat.api.middleware.tenant_context import get_tenant_id
+
+# In enterprise repository
+class EnterpriseArtifactRepository(IArtifactRepository):
+    def _get_tenant_id(self) -> UUID:
+        """Resolve tenant_id from TenantContext ContextVar."""
+        return get_tenant_id()  # Raises if not in enterprise context
+```
+
+### Transaction Lifecycle (Enterprise Edition)
+
+Enterprise repos use DI-injected `Session` for query execution:
+
+```python
+@router.post("/artifacts")
+async def create_artifact(
+    request: ArtifactCreateRequest,
+    artifact_repo: ArtifactRepoDep,           # Gets enterprise repo + injected session
+    db: SessionDep,                           # Manages transaction boundary
+):
+    try:
+        # Repository calls session.flush() internally
+        artifact_dto = artifact_repo.create(...)
+        # Router commits transaction
+        db.commit()
+        return artifact_dto
+    except Exception:
+        db.rollback()
+        raise
+```
+
+The `TenantContextDep` must be declared **before** `AuthContextDep` in the dependency chain, as it depends on `AuthContext` being present.
 
 ## owner_id Type Mismatch
 
@@ -135,12 +171,22 @@ Never compare `uuid.UUID` directly to a string column — use `str_owner_id()`.
 
 ## Edition Configuration
 
-| `SKILLMEAT_EDITION` | Behavior | Repository Layer |
-|---|---|---|
-| `local` (default) | Single-tenant, filesystem-backed | Artifact/Collection repos use `LocalArtifactRepository`, `LocalCollectionRepository` |
-| `enterprise` | Multi-tenant, database-backed | Artifact/Collection repos use `EnterpriseArtifactRepository`, `EnterpriseCollectionRepository` |
+| `SKILLMEAT_EDITION` | Behavior | Repository Layer | Session Management |
+|---|---|---|---|
+| `local` (default) | Single-tenant, filesystem-backed | Artifact/Collection repos use `LocalArtifactRepository`, `LocalCollectionRepository` | Auto-committed per-request, no explicit flush |
+| `enterprise` | Multi-tenant, database-backed | Artifact/Collection repos use `EnterpriseArtifactRepository`, `EnterpriseCollectionRepository` | DI-injected session, explicit `flush()` per repo, `commit()` per router |
 
-Enterprise edition uses DB-backed SQLAlchemy repositories. Unsupported providers (project, deployment, tag, etc.) return 503 with actionable messaging.
+Enterprise edition uses DB-backed SQLAlchemy repositories with explicit transaction management. Unsupported providers (project, deployment, settings, etc.) return stubs (empty lists, no-ops).
+
+### Repository Session Semantics (Enterprise)
+
+- **Session ownership**: Routers own the transaction boundary, not repositories
+- **Flush vs Commit**:
+  - Repository calls `session.flush()` to persist changes within the transaction
+  - Router calls `session.commit()` to finalize the transaction
+  - Router calls `session.rollback()` on exception
+- **No-op repositories**: Stub implementations (EnterpriseProjectRepository, etc.) don't query the session — they log and return synthetic/empty responses
+- **Tenant context**: All queries automatically filtered by `_get_tenant_id()` from `TenantContext` ContextVar
 
 ## Visibility Model (Enterprise Edition)
 

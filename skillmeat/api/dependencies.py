@@ -525,10 +525,11 @@ def require_local_edition(
 # ---------------------------------------------------------------------------
 # Repository factory providers (hexagonal architecture)
 #
-# Enterprise Edition Provider Support (ENT2-002/003)
-# Supported:   artifact, collection
-# Unsupported: project, deployment, tag, settings, group, context_entity,
-#              marketplace_source, project_template
+# Enterprise Edition Provider Support (ENT2-002/003/ENT2-3.5/ENT2-5.3/ENT2-5.4)
+# Supported:   artifact, collection, tag, settings, group, context_entity,
+#              project, deployment, deployment_set, deployment_profile,
+#              marketplace_source, project_template (stub), marketplace_transaction_handler
+# Passthrough: marketplace_catalog (shared read-only cache)
 # ---------------------------------------------------------------------------
 
 
@@ -572,14 +573,18 @@ def get_artifact_repository(
 
 def get_project_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IProjectRepository:
     """Get IProjectRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IProjectRepository implementation for the configured edition
+        IProjectRepository implementation for the configured edition.
+        Local edition returns ``LocalProjectRepository``; enterprise edition
+        returns ``EnterpriseProjectRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -592,12 +597,15 @@ def get_project_repository(
             path_resolver=state.path_resolver,
             cache_manager=state.cache_manager,
         )
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseProjectRepository,
+        )
+
+        return EnterpriseProjectRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support project. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
@@ -641,14 +649,18 @@ def get_collection_repository(
 
 def get_deployment_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IDeploymentRepository:
     """Get IDeploymentRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IDeploymentRepository implementation for the configured edition
+        IDeploymentRepository implementation for the configured edition.
+        Local edition returns ``LocalDeploymentRepository``; enterprise edition
+        returns ``EnterpriseDeploymentRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -663,25 +675,32 @@ def get_deployment_repository(
             deployment_manager=deployment_manager,
             path_resolver=state.path_resolver,
         )
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseDeploymentRepository,
+        )
+
+        return EnterpriseDeploymentRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support deployment. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
 def get_tag_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> ITagRepository:
     """Get ITagRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        ITagRepository implementation for the configured edition
+        ITagRepository implementation for the configured edition.
+        Local edition returns ``LocalTagRepository``; enterprise edition
+        returns ``EnterpriseTagRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -691,25 +710,30 @@ def get_tag_repository(
         from skillmeat.core.repositories import LocalTagRepository
 
         return LocalTagRepository()
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import EnterpriseTagRepository
+
+        return EnterpriseTagRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support tag. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
 def get_settings_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> ISettingsRepository:
     """Get ISettingsRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        ISettingsRepository implementation for the configured edition
+        ISettingsRepository implementation for the configured edition.
+        Local edition returns ``LocalSettingsRepository``; enterprise edition
+        returns ``EnterpriseSettingsRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -722,25 +746,30 @@ def get_settings_repository(
             path_resolver=state.path_resolver,
             config_manager=state.config_manager,
         )
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import EnterpriseSettingsRepository
+
+        return EnterpriseSettingsRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support settings. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
 def get_group_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IGroupRepository:
     """Get IGroupRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IGroupRepository implementation for the configured edition
+        IGroupRepository implementation for the configured edition.
+        Local edition returns ``LocalGroupRepository``; enterprise edition
+        returns ``EnterpriseGroupRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -750,25 +779,31 @@ def get_group_repository(
         from skillmeat.core.repositories import LocalGroupRepository
 
         return LocalGroupRepository()
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import EnterpriseGroupRepository
+
+        return EnterpriseGroupRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support group. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
 def get_context_entity_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IContextEntityRepository:
     """Get IContextEntityRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IContextEntityRepository implementation for the configured edition
+        IContextEntityRepository implementation for the configured edition.
+        Local edition returns ``LocalContextEntityRepository``; enterprise
+        edition returns ``EnterpriseContextEntityRepository`` (wired directly
+        — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -778,25 +813,32 @@ def get_context_entity_repository(
         from skillmeat.core.repositories import LocalContextEntityRepository
 
         return LocalContextEntityRepository()
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseContextEntityRepository,
+        )
+
+        return EnterpriseContextEntityRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support context_entity. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
 def get_marketplace_source_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IMarketplaceSourceRepository:
     """Get IMarketplaceSourceRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IMarketplaceSourceRepository implementation for the configured edition
+        IMarketplaceSourceRepository implementation for the configured edition.
+        Local edition returns ``LocalMarketplaceSourceRepository``; enterprise
+        edition returns ``EnterpriseMarketplaceSourceRepository``.
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -806,25 +848,33 @@ def get_marketplace_source_repository(
         from skillmeat.core.repositories import LocalMarketplaceSourceRepository
 
         return LocalMarketplaceSourceRepository()
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseMarketplaceSourceRepository,
+        )
+
+        return EnterpriseMarketplaceSourceRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support marketplace_source. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
 def get_project_template_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IProjectTemplateRepository:
     """Get IProjectTemplateRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IProjectTemplateRepository implementation for the configured edition
+        IProjectTemplateRepository implementation for the configured edition.
+        Local edition returns ``LocalProjectTemplateRepository``; enterprise
+        edition returns ``EnterpriseProjectTemplateRepository`` (stub —
+        full implementation deferred to v3).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -834,52 +884,93 @@ def get_project_template_repository(
         from skillmeat.core.repositories import LocalProjectTemplateRepository
 
         return LocalProjectTemplateRepository()
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseProjectTemplateRepository,
+        )
+
+        return EnterpriseProjectTemplateRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support project_template. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
-def get_deployment_set_repository() -> DeploymentSetRepository:
+def get_deployment_set_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> DeploymentSetRepository:
     """Get DeploymentSetRepository dependency.
 
-    Returns a new ``DeploymentSetRepository`` instance.  The repository
-    manages its own session lifecycle internally, so no state injection is
-    required.
+    Args:
+        state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        DeploymentSetRepository instance.
+        DeploymentSetRepository instance for local edition; enterprise edition
+        returns ``EnterpriseDeploymentSetRepository``.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseDeploymentSetRepository,
+        )
+
+        return EnterpriseDeploymentSetRepository(session=session)  # type: ignore[return-value]
     return DeploymentSetRepository()
 
 
-def get_deployment_profile_repository() -> DeploymentProfileRepository:
+def get_deployment_profile_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> DeploymentProfileRepository:
     """Get DeploymentProfileRepository dependency.
 
-    Returns a new ``DeploymentProfileRepository`` instance.  The repository
-    manages its own session lifecycle internally, so no state injection is
-    required.
+    Args:
+        state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        DeploymentProfileRepository instance.
+        DeploymentProfileRepository instance for local edition; enterprise
+        edition returns ``EnterpriseDeploymentProfileRepository``.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseDeploymentProfileRepository,
+        )
+
+        return EnterpriseDeploymentProfileRepository(session=session)  # type: ignore[return-value]
     return DeploymentProfileRepository()
 
 
-def get_marketplace_source_repository_concrete() -> MarketplaceSourceRepository:
+def get_marketplace_source_repository_concrete(
+    state: Annotated["AppState", Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> MarketplaceSourceRepository:
     """Get concrete MarketplaceSourceRepository dependency.
 
-    Returns the concrete ``MarketplaceSourceRepository`` instance when the full
-    set of repository methods (beyond the ``IMarketplaceSourceRepository``
-    interface) is required — e.g. in the marketplace-sources router which uses
-    ORM-level helpers not exposed by the interface.
+    # enterprise: routes to EnterpriseMarketplaceSourceRepository (Phase 5)
+
+    Returns the concrete repository when the full set of ORM-level helpers
+    (beyond the ``IMarketplaceSourceRepository`` interface) is required — e.g.
+    in the marketplace-sources router.  Enterprise edition returns
+    ``EnterpriseMarketplaceSourceRepository`` (already implemented in Phase 5).
+
+    Args:
+        state: Application state (edition resolution).
+        session: Per-request SQLAlchemy session (enterprise path).
 
     Returns:
-        MarketplaceSourceRepository instance.
+        MarketplaceSourceRepository or EnterpriseMarketplaceSourceRepository.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseMarketplaceSourceRepository,
+        )
+
+        return EnterpriseMarketplaceSourceRepository(session=session)  # type: ignore[return-value]
     return MarketplaceSourceRepository()
 
 
@@ -889,21 +980,63 @@ def get_marketplace_catalog_repository() -> MarketplaceCatalogRepository:
     Returns a new ``MarketplaceCatalogRepository`` instance.  The repository
     manages its own session lifecycle internally.
 
+    # enterprise: passthrough — shared read-only catalog cache.
+    # No edition guard is intentional: the marketplace catalog is a shared,
+    # read-only SQLite cache populated by the marketplace import pipeline and
+    # consumed identically in both local and enterprise modes.  It is NOT
+    # tenant-scoped and does NOT hold user-mutable data, so routing to a
+    # separate PostgreSQL-backed implementation would provide no benefit and
+    # would break the shared-catalog contract.
+
     Returns:
         MarketplaceCatalogRepository instance.
     """
     return MarketplaceCatalogRepository()
 
 
-def get_marketplace_transaction_handler() -> MarketplaceTransactionHandler:
+def get_marketplace_transaction_handler(
+    state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+    request: Request,
+) -> MarketplaceTransactionHandler:
     """Get MarketplaceTransactionHandler dependency.
 
-    Returns a new ``MarketplaceTransactionHandler`` instance for coordinating
-    atomic cross-table marketplace operations.
+    Returns a handler for coordinating atomic cross-table marketplace
+    operations.  In enterprise mode returns
+    ``EnterpriseMarketplaceTransactionHandler`` wired with the per-request
+    session and tenant; local mode returns the standard
+    ``MarketplaceTransactionHandler``.
+
+    Args:
+        state: Application state (used to read the configured edition).
+        session: Per-request SQLAlchemy session (enterprise path).
+        request: Current FastAPI request (enterprise path reads tenant_id
+            from auth context stored on request.state).
 
     Returns:
-        MarketplaceTransactionHandler instance.
+        MarketplaceTransactionHandler or EnterpriseMarketplaceTransactionHandler.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseMarketplaceTransactionHandler,
+        )
+
+        auth_ctx: AuthContext | None = getattr(request.state, "auth_context", None)
+        tenant_id = (
+            auth_ctx.tenant_id
+            if auth_ctx is not None and auth_ctx.tenant_id is not None
+            else None
+        )
+        if tenant_id is None:
+            from skillmeat.cache.constants import DEFAULT_TENANT_ID
+            import uuid as _uuid
+
+            tenant_id = _uuid.UUID(DEFAULT_TENANT_ID)
+
+        return EnterpriseMarketplaceTransactionHandler(  # type: ignore[return-value]
+            session=session, tenant_id=tenant_id
+        )
     return MarketplaceTransactionHandler()
 
 
@@ -937,28 +1070,58 @@ def get_db_user_collection_repository(
     return DbUserCollectionRepository()
 
 
-def get_db_collection_artifact_repository() -> IDbCollectionArtifactRepository:
-    """Get DbCollectionArtifactRepository dependency.
+def get_db_collection_artifact_repository(
+    state: Annotated["AppState", Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> IDbCollectionArtifactRepository:
+    """Get IDbCollectionArtifactRepository dependency.
 
-    Returns a new ``DbCollectionArtifactRepository`` instance.  The repository
-    manages its own session lifecycle internally, so no state injection is
-    required.
+    # enterprise: full — v1 gap, critical for user-collections router
+
+    Returns an edition-aware repository.  Local edition returns
+    ``DbCollectionArtifactRepository`` (SQLite, self-managed session);
+    enterprise edition returns ``EnterpriseDbCollectionArtifactRepository``
+    (PostgreSQL, per-request session).
+
+    Args:
+        state: Application state (edition resolution).
+        session: Per-request SQLAlchemy session (enterprise path).
 
     Returns:
-        IDbCollectionArtifactRepository implementation backed by the SQLite cache.
+        IDbCollectionArtifactRepository implementation for the configured edition.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseDbCollectionArtifactRepository,
+        )
+
+        return EnterpriseDbCollectionArtifactRepository(session=session)  # type: ignore[return-value]
     return DbCollectionArtifactRepository()
 
 
-def get_duplicate_pair_repository() -> DuplicatePairRepository:
+def get_duplicate_pair_repository(
+    state: Annotated["AppState", Depends(get_app_state)],
+) -> DuplicatePairRepository:
     """Get DuplicatePairRepository dependency.
 
-    Returns a new ``DuplicatePairRepository`` instance.  The repository
-    manages its own session lifecycle internally.
+    # enterprise: stub — dedup is local-only in v2
+
+    Returns a new ``DuplicatePairRepository`` instance for local edition.
+    Enterprise edition returns ``EnterpriseDuplicatePairStub`` (empty results,
+    no DB access).
+
+    Args:
+        state: Application state (edition resolution).
 
     Returns:
-        DuplicatePairRepository instance.
+        DuplicatePairRepository instance or enterprise stub.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import EnterpriseDuplicatePairStub
+
+        return EnterpriseDuplicatePairStub()  # type: ignore[return-value]
     return DuplicatePairRepository()
 
 
@@ -1100,15 +1263,29 @@ async def get_resolved_ownership(
 ResolvedOwnershipDep = Annotated[ResolvedOwnership, Depends(get_resolved_ownership)]
 
 
-def get_db_artifact_history_repository() -> IDbArtifactHistoryRepository:
-    """Get DbArtifactHistoryRepository dependency.
+def get_db_artifact_history_repository(
+    state: Annotated["AppState", Depends(get_app_state)],
+) -> IDbArtifactHistoryRepository:
+    """Get IDbArtifactHistoryRepository dependency.
 
-    Returns a new ``DbArtifactHistoryRepository`` instance.  The repository
-    manages its own session lifecycle per operation.
+    # enterprise: stub — artifact history deferred
+
+    Returns a new ``DbArtifactHistoryRepository`` instance for local edition.
+    Enterprise edition returns ``EnterpriseArtifactHistoryStub`` (empty results,
+    no DB access) because artifact history is not yet ported to the enterprise
+    PostgreSQL schema.
+
+    Args:
+        state: Application state (edition resolution).
 
     Returns:
-        IDbArtifactHistoryRepository implementation backed by the SQLite cache.
+        IDbArtifactHistoryRepository implementation for the configured edition.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import EnterpriseArtifactHistoryStub
+
+        return EnterpriseArtifactHistoryStub()
     return DbArtifactHistoryRepository()
 
 
