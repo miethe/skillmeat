@@ -7612,3 +7612,1017 @@ class EnterpriseDeploymentProfileRepository(
         except Exception:
             self.session.rollback()
             raise
+
+
+# =============================================================================
+# EnterpriseMarketplaceSourceRepository  (ENT2-5.1)
+# =============================================================================
+
+
+class EnterpriseMarketplaceSourceRepository(
+    EnterpriseRepositoryBase["EnterpriseMarketplaceSource"],
+):
+    """Enterprise repository for marketplace source and catalog-entry operations.
+
+    Implements
+    :class:`~skillmeat.core.interfaces.repositories.IMarketplaceSourceRepository`
+    for the enterprise PostgreSQL backend.
+
+    The enterprise model (``EnterpriseMarketplaceSource``) is GitHub-repo-
+    centric — each row represents a scanned GitHub repository — whereas the
+    interface's :class:`~skillmeat.core.interfaces.dtos.MarketplaceSourceDTO`
+    uses broker-centric terminology (``endpoint``, ``supports_publish``).
+    The ``_source_to_dto`` helper bridges the two schemas by mapping:
+
+    - ``repo_url`` → ``endpoint``
+    - ``name`` synthesised as ``"owner/repo_name"``
+    - ``scan_status == "done"`` → ``enabled = True``
+    - ``supports_publish = False`` (GitHub repos are read-only sources)
+
+    Catalog operations are backed by ``EnterpriseMarketplaceCatalogEntry``
+    which has a leaner schema than the local SQLite catalog model (no
+    ``excluded_at``, ``excluded_reason``, or ``path_segments`` columns).
+    Methods that reference those local-only columns are implemented with
+    best-effort equivalents using the available ``status`` column.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    * SQLAlchemy 2.x ``select()`` style throughout.
+    * ``_apply_tenant_filter()`` is called on every query.
+    * UUID primary keys for both sources and catalog entries.
+    * ``import_item`` and ``get_composite_members`` are not directly
+      supported by the enterprise schema; both return empty results and
+      log a debug note.  Full implementation is deferred to v3.
+    """
+
+    def __init__(self, session: Session) -> None:
+        """Initialise the enterprise marketplace source repository.
+
+        Parameters
+        ----------
+        session:
+            Injected SQLAlchemy session bound to the PostgreSQL enterprise
+            database.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        super().__init__(session, EnterpriseMarketplaceSource)
+
+    # ------------------------------------------------------------------
+    # DTO helpers
+    # ------------------------------------------------------------------
+
+    def _source_to_dto(self, row: "EnterpriseMarketplaceSource") -> "MarketplaceSourceDTO":
+        """Convert an ``EnterpriseMarketplaceSource`` ORM row to a DTO.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        MarketplaceSourceDTO
+        """
+        from skillmeat.core.interfaces.dtos import MarketplaceSourceDTO
+
+        name = (
+            f"{row.owner}/{row.repo_name}"
+            if row.owner and row.repo_name
+            else (row.owner or row.repo_name or str(row.id))
+        )
+        enabled = row.scan_status in ("done", "success") if row.scan_status else False
+        return MarketplaceSourceDTO(
+            id=str(row.id),
+            name=name,
+            enabled=enabled,
+            endpoint=row.repo_url or "",
+            description=None,
+            supports_publish=False,
+            created_at=row.created_at.isoformat() if row.created_at else None,
+            updated_at=row.updated_at.isoformat() if row.updated_at else None,
+        )
+
+    def _entry_to_catalog_dto(
+        self, row: "EnterpriseMarketplaceCatalogEntry"
+    ) -> "CatalogItemDTO":
+        """Convert an ``EnterpriseMarketplaceCatalogEntry`` ORM row to a DTO.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        CatalogItemDTO
+        """
+        from skillmeat.core.interfaces.dtos import CatalogItemDTO
+
+        return CatalogItemDTO(
+            listing_id=str(row.id),
+            name=row.name or "",
+            source_id=str(row.source_id),
+            publisher=None,
+            description=None,
+            license=None,
+            version=row.detected_sha,
+            artifact_count=1,
+            tags=[row.artifact_type] if row.artifact_type else [],
+            source_url=row.upstream_url,
+            bundle_url=None,
+            signature=None,
+            downloads=0,
+            rating=None,
+            price=None,
+            created_at=row.created_at.isoformat() if row.created_at else None,
+        )
+
+    # ------------------------------------------------------------------
+    # Source CRUD — IMarketplaceSourceRepository
+    # ------------------------------------------------------------------
+
+    def list_sources(
+        self,
+        filters: "Optional[Dict[str, object]]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "List[MarketplaceSourceDTO]":
+        """Return all marketplace sources for the current tenant.
+
+        Parameters
+        ----------
+        filters:
+            Optional filter map.  Supported keys: ``enabled`` (bool).
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Returns
+        -------
+        list[MarketplaceSourceDTO]
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        stmt = self._tenant_select().order_by(EnterpriseMarketplaceSource.created_at.asc())
+        rows = list(self.session.execute(stmt).scalars())
+
+        dtos = [self._source_to_dto(r) for r in rows]
+
+        if filters and "enabled" in filters:
+            want_enabled = bool(filters["enabled"])
+            dtos = [d for d in dtos if d.enabled == want_enabled]
+
+        return dtos
+
+    def get_source(
+        self,
+        source_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[MarketplaceSourceDTO]":
+        """Return a marketplace source by its identifier.
+
+        Parameters
+        ----------
+        source_id:
+            UUID string of the source row.
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Returns
+        -------
+        MarketplaceSourceDTO or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        try:
+            uid = uuid.UUID(source_id)
+        except ValueError:
+            logger.debug(
+                "EnterpriseMarketplaceSourceRepository.get_source: invalid UUID %r",
+                source_id,
+            )
+            return None
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceSource).where(EnterpriseMarketplaceSource.id == uid)
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        return self._source_to_dto(row) if row is not None else None
+
+    def create_source(
+        self,
+        name: str,
+        endpoint: str,
+        enabled: bool = True,
+        description: "Optional[str]" = None,
+        supports_publish: bool = False,
+        ctx: "Optional[object]" = None,
+    ) -> "MarketplaceSourceDTO":
+        """Register a new marketplace source.
+
+        Maps the broker-centric interface fields onto the GitHub-repo-centric
+        enterprise schema: ``endpoint`` is stored as ``repo_url``,
+        ``name`` is parsed into ``owner``/``repo_name`` when it contains a
+        ``"/"`` separator.  ``enabled`` is translated to an initial
+        ``scan_status``.
+
+        Parameters
+        ----------
+        name:
+            Human-readable name (``"owner/repo"`` convention for GitHub repos).
+        endpoint:
+            Base URL for the broker API / repository URL.
+        enabled:
+            Whether to activate the source immediately.
+        description:
+            Ignored by the enterprise backend (no description column on source).
+        supports_publish:
+            Ignored by the enterprise backend (GitHub sources are read-only).
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Returns
+        -------
+        MarketplaceSourceDTO
+            The created source.
+
+        Raises
+        ------
+        ValueError
+            If a source with the same ``endpoint`` (repo URL) already exists
+            for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        # Check uniqueness within tenant.
+        existing_stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceSource).where(
+                EnterpriseMarketplaceSource.repo_url == endpoint
+            )
+        )
+        existing = self.session.execute(existing_stmt).scalar_one_or_none()
+        if existing is not None:
+            raise ValueError(
+                f"A marketplace source with endpoint {endpoint!r} already exists "
+                f"for this tenant (id={existing.id})."
+            )
+
+        tenant_id = self._get_tenant_id()
+        now = datetime.utcnow()
+
+        # Parse owner / repo_name from the name field if possible.
+        owner: Optional[str] = None
+        repo_name: Optional[str] = None
+        if "/" in name:
+            parts = name.split("/", 1)
+            owner = parts[0] or None
+            repo_name = parts[1] or None
+
+        # Translate ``enabled`` to an initial scan_status.
+        initial_scan_status = "pending" if enabled else "disabled"
+
+        row = EnterpriseMarketplaceSource(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            repo_url=endpoint,
+            owner=owner,
+            repo_name=repo_name or name,
+            ref="main",
+            scan_status=initial_scan_status,
+            artifact_count=0,
+            created_at=now,
+            updated_at=now,
+        )
+        try:
+            self.session.add(row)
+            self.session.flush()
+            self._log_operation(
+                operation="create",
+                entity_type="EnterpriseMarketplaceSource",
+                entity_id=row.id,
+                metadata={"name": name, "endpoint": endpoint},
+            )
+            return self._source_to_dto(row)
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def update_source(
+        self,
+        source_id: str,
+        updates: "Dict[str, object]",
+        ctx: "Optional[object]" = None,
+    ) -> "MarketplaceSourceDTO":
+        """Apply a partial update to a marketplace source configuration.
+
+        Recognised update keys: ``enabled`` (bool), ``endpoint`` (str),
+        ``description`` (ignored — no column), ``supports_publish`` (ignored).
+        Additional keys in ``updates`` are silently ignored to avoid errors
+        when the caller passes broker-centric fields not present in the
+        enterprise schema.
+
+        Parameters
+        ----------
+        source_id:
+            UUID string of the source to update.
+        updates:
+            Map of field names to new values.
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Returns
+        -------
+        MarketplaceSourceDTO
+            The updated source.
+
+        Raises
+        ------
+        KeyError
+            If no source with *source_id* exists for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        try:
+            uid = uuid.UUID(source_id)
+        except ValueError:
+            raise KeyError(source_id)
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceSource).where(EnterpriseMarketplaceSource.id == uid)
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(source_id)
+
+        if "enabled" in updates:
+            row.scan_status = "pending" if updates["enabled"] else "disabled"
+        if "endpoint" in updates:
+            row.repo_url = str(updates["endpoint"])
+        if "ref" in updates:
+            row.ref = str(updates["ref"])
+        if "scan_status" in updates:
+            row.scan_status = str(updates["scan_status"])
+
+        row.updated_at = datetime.utcnow()
+
+        try:
+            self.session.flush()
+            self._log_operation(
+                operation="update",
+                entity_type="EnterpriseMarketplaceSource",
+                entity_id=row.id,
+                metadata={k: str(v)[:80] for k, v in updates.items()},
+            )
+            return self._source_to_dto(row)
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def delete_source(
+        self,
+        source_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Remove a marketplace source configuration.
+
+        Cascade-deletes all associated catalog entries (via the FK
+        ``ON DELETE CASCADE`` on ``enterprise_marketplace_catalog_entries``).
+
+        Parameters
+        ----------
+        source_id:
+            UUID string of the source to remove.
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If no source with *source_id* exists for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        try:
+            uid = uuid.UUID(source_id)
+        except ValueError:
+            raise KeyError(source_id)
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceSource).where(EnterpriseMarketplaceSource.id == uid)
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(source_id)
+
+        try:
+            self.session.delete(row)
+            self.session.flush()
+            self._log_operation(
+                operation="delete",
+                entity_type="EnterpriseMarketplaceSource",
+                entity_id=uid,
+                metadata={"source_id": source_id},
+            )
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # ------------------------------------------------------------------
+    # Catalog operations — IMarketplaceSourceRepository
+    # ------------------------------------------------------------------
+
+    def list_catalog_items(
+        self,
+        source_id: "Optional[str]" = None,
+        filters: "Optional[Dict[str, object]]" = None,
+        page: int = 1,
+        limit: int = 50,
+        ctx: "Optional[object]" = None,
+    ) -> "List[CatalogItemDTO]":
+        """Return paginated catalog listings from one or all sources.
+
+        Parameters
+        ----------
+        source_id:
+            When provided, restrict results to entries belonging to this
+            source UUID.  When ``None`` all tenant catalog entries are returned.
+        filters:
+            Optional filter map.  Supported keys: ``query`` (substring match
+            on ``name``), ``artifact_type``.
+        page:
+            One-based page number.
+        limit:
+            Maximum results per page (1-100).
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+
+        Returns
+        -------
+        list[CatalogItemDTO]
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceCatalogEntry
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceCatalogEntry)
+        ).order_by(EnterpriseMarketplaceCatalogEntry.created_at.desc())
+
+        if source_id is not None:
+            try:
+                src_uid = uuid.UUID(source_id)
+                stmt = stmt.where(EnterpriseMarketplaceCatalogEntry.source_id == src_uid)
+            except ValueError:
+                logger.debug(
+                    "EnterpriseMarketplaceSourceRepository.list_catalog_items: "
+                    "invalid source_id UUID %r — returning empty list",
+                    source_id,
+                )
+                return []
+
+        if filters:
+            if "query" in filters and filters["query"]:
+                q = f"%{filters['query']}%"
+                stmt = stmt.where(EnterpriseMarketplaceCatalogEntry.name.ilike(q))
+            if "artifact_type" in filters and filters["artifact_type"]:
+                stmt = stmt.where(
+                    EnterpriseMarketplaceCatalogEntry.artifact_type == filters["artifact_type"]
+                )
+
+        offset = (max(1, page) - 1) * limit
+        stmt = stmt.offset(offset).limit(limit)
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [self._entry_to_catalog_dto(r) for r in rows]
+
+    def import_item(
+        self,
+        listing_id: str,
+        source_id: "Optional[str]" = None,
+        strategy: str = "keep",
+        ctx: "Optional[object]" = None,
+    ) -> "List[ArtifactDTO]":
+        """Download and import a marketplace listing.
+
+        .. note::
+            Full import orchestration is not implemented at the enterprise DB
+            repository layer (it requires the CLI/source pipeline).  This
+            method logs a debug note and returns an empty list.  The API
+            layer's ``MarketplaceBrokerService`` handles the actual import
+            flow independently of this repository.
+
+        Parameters
+        ----------
+        listing_id:
+            Catalog entry primary key.
+        source_id:
+            Optional source UUID string.
+        strategy:
+            Conflict resolution strategy (unused by this stub).
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        list[ArtifactDTO]
+            Always empty — import orchestration is handled outside this repo.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.import_item: "
+            "import orchestration is deferred to the broker service layer; "
+            "listing_id=%r source_id=%r",
+            listing_id,
+            source_id,
+        )
+        return []
+
+    def get_composite_members(
+        self,
+        composite_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "List[ArtifactDTO]":
+        """Return child artifacts for a composite listing.
+
+        .. note::
+            Composite membership tracking is not modelled in the enterprise
+            schema.  Returns an empty list and logs a debug note.
+
+        Parameters
+        ----------
+        composite_id:
+            Artifact primary key of the composite artifact.
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        list[ArtifactDTO]
+            Always empty.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.get_composite_members: "
+            "composite membership not modelled in enterprise schema; "
+            "composite_id=%r",
+            composite_id,
+        )
+        return []
+
+    def get_catalog_entry_raw(
+        self,
+        entry_id: str,
+        source_id: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[object]":
+        """Return the raw ORM catalog entry for read-only inspection.
+
+        Parameters
+        ----------
+        entry_id:
+            UUID string of the catalog entry.
+        source_id:
+            When provided, verify the entry belongs to this source.
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        EnterpriseMarketplaceCatalogEntry or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceCatalogEntry
+
+        try:
+            entry_uid = uuid.UUID(entry_id)
+        except ValueError:
+            return None
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseMarketplaceCatalogEntry).where(
+                EnterpriseMarketplaceCatalogEntry.id == entry_uid
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+
+        if row is None:
+            return None
+
+        if source_id is not None:
+            try:
+                src_uid = uuid.UUID(source_id)
+            except ValueError:
+                return None
+            if row.source_id != src_uid:
+                return None
+
+        return row
+
+    def update_catalog_entry_exclusion(
+        self,
+        entry_id: str,
+        source_id: str,
+        excluded: bool,
+        reason: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "object":
+        """Toggle the exclusion status of a catalog entry.
+
+        The enterprise schema has no ``excluded_at`` or ``excluded_reason``
+        columns.  Exclusion is approximated by setting ``status`` to
+        ``"excluded"`` (when *excluded* is ``True``) or reverting to
+        ``"available"`` (when *excluded* is ``False``).
+
+        Parameters
+        ----------
+        entry_id:
+            UUID string of the catalog entry.
+        source_id:
+            Source the entry must belong to.
+        excluded:
+            ``True`` to exclude, ``False`` to restore.
+        reason:
+            Ignored by the enterprise backend (no ``excluded_reason`` column).
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        EnterpriseMarketplaceCatalogEntry
+            The updated ORM instance.
+
+        Raises
+        ------
+        KeyError
+            If *entry_id* is not found or does not belong to *source_id*.
+        """
+        row = self.get_catalog_entry_raw(entry_id, source_id=source_id, ctx=ctx)
+        if row is None:
+            raise KeyError(entry_id)
+
+        row.status = "excluded" if excluded else "available"
+        row.updated_at = datetime.utcnow()
+
+        try:
+            self.session.flush()
+            self._log_operation(
+                operation="update_exclusion",
+                entity_type="EnterpriseMarketplaceCatalogEntry",
+                entity_id=row.id,
+                metadata={"excluded": excluded, "reason": reason},
+            )
+            return row
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def update_catalog_entry_path_tags(
+        self,
+        entry_id: str,
+        source_id: str,
+        path_segments_json: str,
+        ctx: "Optional[object]" = None,
+    ) -> "object":
+        """Persist updated path_segments for a catalog entry.
+
+        The enterprise schema has no ``path_segments`` column.  This method
+        records the operation via audit log for traceability but does not
+        write the JSON to a column.  The catalog entry's ``updated_at`` is
+        refreshed so that callers can detect a change.
+
+        Parameters
+        ----------
+        entry_id:
+            UUID string of the catalog entry.
+        source_id:
+            Source the entry must belong to.
+        path_segments_json:
+            Serialised JSON (logged only; no enterprise column stores it).
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        EnterpriseMarketplaceCatalogEntry
+            The ORM instance with a refreshed ``updated_at``.
+
+        Raises
+        ------
+        KeyError
+            If *entry_id* is not found or does not belong to *source_id*.
+        """
+        row = self.get_catalog_entry_raw(entry_id, source_id=source_id, ctx=ctx)
+        if row is None:
+            raise KeyError(entry_id)
+
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.update_catalog_entry_path_tags: "
+            "path_segments column not present in enterprise schema; "
+            "entry_id=%r path_segments_json=%r",
+            entry_id,
+            path_segments_json,
+        )
+        row.updated_at = datetime.utcnow()
+
+        try:
+            self.session.flush()
+            self._log_operation(
+                operation="update_path_tags",
+                entity_type="EnterpriseMarketplaceCatalogEntry",
+                entity_id=row.id,
+                metadata={"path_segments_json": path_segments_json[:200]},
+            )
+            return row
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def get_artifact_row(
+        self,
+        artifact_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[object]":
+        """Return the raw ORM Artifact row for the given type:name id.
+
+        .. note::
+            The enterprise marketplace source repository does not hold
+            ``Artifact`` rows — those are managed by
+            :class:`EnterpriseArtifactRepository`.  This method always
+            returns ``None`` and logs a debug note.
+
+        Parameters
+        ----------
+        artifact_id:
+            Artifact primary key in ``"type:name"`` format.
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        None
+            Always ``None`` — enterprise marketplace sources do not own Artifact
+            rows.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.get_artifact_row: "
+            "Artifact rows are not managed by the marketplace source repo in the "
+            "enterprise backend; artifact_id=%r",
+            artifact_id,
+        )
+        return None
+
+    def upsert_composite_memberships(
+        self,
+        composite_id: str,
+        child_artifact_ids: "List[str]",
+        collection_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> int:
+        """Create or update CompositeMembership rows for a composite artifact.
+
+        .. note::
+            Composite membership is not modelled in the enterprise schema.
+            Returns 0 and logs a debug note.
+
+        Parameters
+        ----------
+        composite_id:
+            Primary key of the composite artifact.
+        child_artifact_ids:
+            Ordered list of child ``type:name`` artifact primary keys.
+        collection_id:
+            Collection the composite belongs to.
+        ctx:
+            Optional per-request metadata.
+
+        Returns
+        -------
+        int
+            Always 0.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.upsert_composite_memberships: "
+            "composite membership not modelled in enterprise schema; "
+            "composite_id=%r child_count=%d",
+            composite_id,
+            len(child_artifact_ids),
+        )
+        return 0
+
+    def commit_source_session(
+        self,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Flush pending changes on the source repository session.
+
+        Parameters
+        ----------
+        ctx:
+            Optional per-request metadata (unused by enterprise backend).
+        """
+        try:
+            self.session.flush()
+        except Exception:
+            self.session.rollback()
+            raise
+
+
+# =============================================================================
+# EnterpriseProjectTemplateRepository  (ENT2-5.2)
+# =============================================================================
+
+
+class EnterpriseProjectTemplateRepository(
+    EnterpriseRepositoryBase["EnterpriseRepositoryBase"],
+):
+    """Safe stub for project template operations in the enterprise backend.
+
+    Implements
+    :class:`~skillmeat.core.interfaces.repositories.IProjectTemplateRepository`
+    for the enterprise PostgreSQL backend.
+
+    .. note::
+        Full implementation is deferred to v3.  No database queries are
+        issued; all methods return empty collections or ``None`` and emit
+        a ``DEBUG`` log so callers know the stub was reached.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        The session is stored but never queried by this stub.
+    """
+
+    def __init__(self, session: Session) -> None:
+        """Initialise the enterprise project template repository stub.
+
+        Parameters
+        ----------
+        session:
+            Injected SQLAlchemy session.  Stored for interface compliance;
+            not used by any stub method.
+        """
+        # Use type(None) as a sentinel model_class; no DB queries are issued
+        # so this value is never passed to _apply_tenant_filter.  We pass it
+        # only to satisfy the Generic[T] contract of EnterpriseRepositoryBase.
+        super().__init__(session, type(None))  # type: ignore[arg-type]
+
+    # ------------------------------------------------------------------
+    # IProjectTemplateRepository: collection queries
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        filters: "Optional[Dict[str, object]]" = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: "Optional[object]" = None,
+    ) -> "List[ProjectTemplateDTO]":
+        """Return a page of project templates.
+
+        Returns
+        -------
+        list[ProjectTemplateDTO]
+            Always empty — full implementation deferred to v3.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        return []
+
+    def count(
+        self,
+        filters: "Optional[Dict[str, object]]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> int:
+        """Return the total number of project templates.
+
+        Returns
+        -------
+        int
+            Always 0 — full implementation deferred to v3.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        return 0
+
+    # ------------------------------------------------------------------
+    # IProjectTemplateRepository: single-item lookup
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        template_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[ProjectTemplateDTO]":
+        """Return a project template by its identifier.
+
+        Returns
+        -------
+        None
+            Always None — full implementation deferred to v3.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        return None
+
+    # ------------------------------------------------------------------
+    # IProjectTemplateRepository: mutations
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        name: str,
+        entity_ids: "List[str]",
+        description: "Optional[str]" = None,
+        collection_id: "Optional[str]" = None,
+        default_project_config_id: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectTemplateDTO":
+        """Create a new project template.
+
+        Returns a minimal stub DTO.  No data is persisted.
+
+        Returns
+        -------
+        ProjectTemplateDTO
+            Minimal stub DTO — full implementation deferred to v3.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        from skillmeat.core.interfaces.dtos import ProjectTemplateDTO
+
+        return ProjectTemplateDTO(
+            id="",
+            name=name,
+            description=description,
+            collection_id=collection_id,
+            default_project_config_id=default_project_config_id,
+            entities=[],
+            entity_count=0,
+        )
+
+    def update(
+        self,
+        template_id: str,
+        updates: "Dict[str, object]",
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectTemplateDTO":
+        """Apply a partial update to an existing project template.
+
+        Raises
+        ------
+        KeyError
+            Always — no templates are stored in this stub.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        raise KeyError(template_id)
+
+    def delete(
+        self,
+        template_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Delete a project template.
+
+        No-op stub.  Logs a debug message and returns silently.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+
+    # ------------------------------------------------------------------
+    # IProjectTemplateRepository: deployment
+    # ------------------------------------------------------------------
+
+    def deploy(
+        self,
+        template_id: str,
+        project_path: str,
+        options: "Optional[Dict[str, object]]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "Dict[str, object]":
+        """Deploy template entities to a target project directory.
+
+        Returns
+        -------
+        dict
+            Minimal result dict indicating no files were deployed.
+        """
+        logger.debug(
+            "EnterpriseProjectTemplateRepository: stub — full implementation deferred to v3"
+        )
+        return {
+            "success": False,
+            "deployed_files": [],
+            "skipped_files": [],
+            "message": (
+                "EnterpriseProjectTemplateRepository is a stub; "
+                "full implementation deferred to v3."
+            ),
+        }

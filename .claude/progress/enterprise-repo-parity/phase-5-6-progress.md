@@ -5,75 +5,106 @@ doc_type: progress
 prd: enterprise-repo-parity
 feature_slug: enterprise-repo-parity
 phase: 5-6
-phase_title: "Repository Implementation (Marketplace) & Edition-Aware Wiring"
+phase_title: Repository Implementation (Marketplace) & Edition-Aware Wiring
 status: pending
 created: 2026-03-12
-updated: 2026-03-12
+updated: '2026-03-12'
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-repo-parity-v2.md
 plan_ref: docs/project_plans/implementation_plans/refactors/enterprise-repo-parity-v2.md
 commit_refs: []
 pr_refs: []
-
-owners: ["python-backend-engineer"]
-contributors: ["backend-architect"]
-
+owners:
+- python-backend-engineer
+contributors:
+- backend-architect
 tasks:
-  - id: "ENT2-5.1"
-    title: "EnterpriseMarketplaceSourceRepository implementation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-5.2"
-    title: "EnterpriseProjectTemplateRepository stub"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-5.3"
-    title: "Audit marketplace catalog service & transaction handler"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-5.4"
-    title: "Update DI providers for Phase 5 repositories"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT2-5.1", "ENT2-5.2"]
-  - id: "ENT2-5.5"
-    title: "Unit tests for marketplace source repository"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT2-5.4"]
-  - id: "ENT2-6.1"
-    title: "Edition-aware wiring for DbCollectionArtifactRepository"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-6.2"
-    title: "Edition-aware wiring for DbArtifactHistoryRepository"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-6.3"
-    title: "Edition-aware wiring for DuplicatePairRepository"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-6.4"
-    title: "Edition-aware wiring for concrete MarketplaceSourceRepository"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-6.5"
-    title: "Full grep audit for remaining SQLite instantiations"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT2-6.1", "ENT2-6.2", "ENT2-6.3", "ENT2-6.4"]
-
+- id: ENT2-5.1
+  title: EnterpriseMarketplaceSourceRepository implementation
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-5.2
+  title: EnterpriseProjectTemplateRepository stub
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-5.3
+  title: Audit marketplace catalog service & transaction handler
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-5.4
+  title: Update DI providers for Phase 5 repositories
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT2-5.1
+  - ENT2-5.2
+- id: ENT2-5.5
+  title: Unit tests for marketplace source repository
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT2-5.4
+- id: ENT2-6.1
+  title: Edition-aware wiring for DbCollectionArtifactRepository
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-6.2
+  title: Edition-aware wiring for DbArtifactHistoryRepository
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-6.3
+  title: Edition-aware wiring for DuplicatePairRepository
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-6.4
+  title: Edition-aware wiring for concrete MarketplaceSourceRepository
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-6.5
+  title: Full grep audit for remaining SQLite instantiations
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT2-6.1
+  - ENT2-6.2
+  - ENT2-6.3
+  - ENT2-6.4
 parallelization:
-  batch_1: ["ENT2-5.1", "ENT2-5.2"]
-  batch_2: ["ENT2-5.3", "ENT2-5.4", "ENT2-5.5"]
-  batch_3: ["ENT2-6.1", "ENT2-6.2", "ENT2-6.3", "ENT2-6.4"]
-  batch_4: ["ENT2-6.5"]
+  batch_1:
+  - ENT2-5.1
+  - ENT2-5.2
+  batch_2:
+  - ENT2-5.3
+  - ENT2-5.4
+  - ENT2-5.5
+  batch_3:
+  - ENT2-6.1
+  - ENT2-6.2
+  - ENT2-6.3
+  - ENT2-6.4
+  batch_4:
+  - ENT2-6.5
+total_tasks: 10
+completed_tasks: 2
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 20
 ---
 
 # Phase 5-6: Repository Implementation (Marketplace) & Edition-Aware Wiring
