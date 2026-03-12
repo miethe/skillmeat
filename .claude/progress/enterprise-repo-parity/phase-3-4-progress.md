@@ -61,19 +61,19 @@ tasks:
   - ENT2-3.5
 - id: ENT2-4.1
   title: EnterpriseProjectRepository implementation
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
 - id: ENT2-4.2
   title: EnterpriseDeploymentRepository implementation
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
 - id: ENT2-4.3
   title: EnterpriseDeploymentSetRepository & EnterpriseDeploymentProfileRepository
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -112,10 +112,10 @@ parallelization:
   - ENT2-4.4
   - ENT2-4.5
 total_tasks: 11
-completed_tasks: 6
+completed_tasks: 8
 in_progress_tasks: 1
 blocked_tasks: 0
-progress: 54
+progress: 72
 ---
 
 # Phase 3-4: Repository Implementation (Core & Deployment)

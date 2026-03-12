@@ -6471,3 +6471,1144 @@ class EnterpriseDeploymentRepository(
             },
         )
         return True
+
+
+# =============================================================================
+# EnterpriseDeploymentSetRepository  (ENT2-4.3)
+# =============================================================================
+
+
+class EnterpriseDeploymentSetRepository(
+    EnterpriseRepositoryBase["EnterpriseDeploymentSet"]
+):
+    """Enterprise repository for DeploymentSet CRUD with tenant-scoped access.
+
+    Implements the same callable interface as the local ``DeploymentSetRepository``
+    in ``repositories.py``, replacing the ``owner_id`` scope parameter with
+    automatic tenant filtering via ``TenantContext``.
+
+    Tag filtering uses the ``EnterpriseDeploymentSetTag`` join table rather
+    than the ``tags_json`` TEXT column so that queries leverage the indexed
+    ``tag`` column.
+
+    FR-10 delete semantics: Before deleting a set, any
+    ``EnterpriseDeploymentSetMember`` rows in *other* sets that reference the
+    doomed set via ``member_set_id`` are deleted first, preventing orphan
+    references.
+
+    Usage::
+
+        with tenant_scope(tenant_uuid):
+            repo = EnterpriseDeploymentSetRepository(db_session)
+            ds = repo.create(name="My Set", owner_id="user-1")
+            fetched = repo.get(str(ds.id), owner_id="user-1")
+            sets = repo.list(owner_id="user-1", tag="prod")
+            ok = repo.delete(str(ds.id), owner_id="user-1")
+
+    Notes
+    -----
+    * ``owner_id`` parameters are accepted for interface compatibility but are
+      not used for filtering — tenant isolation is enforced structurally via
+      ``TenantContext``.
+    * SQLAlchemy 2.x ``select()`` style throughout.
+    * UUID primary keys.
+    """
+
+    def __init__(self, session: Session) -> None:
+        """Initialise the enterprise deployment set repository.
+
+        Parameters
+        ----------
+        session:
+            Injected SQLAlchemy session bound to the PostgreSQL enterprise
+            database.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSet
+
+        super().__init__(session, EnterpriseDeploymentSet)
+
+    # =========================================================================
+    # Internal helpers
+    # =========================================================================
+
+    def _sync_tags(
+        self,
+        deployment_set_id: uuid.UUID,
+        tag_names: List[str],
+    ) -> None:
+        """Replace all tag associations for a deployment set.
+
+        Deletes existing ``EnterpriseDeploymentSetTag`` rows for the set, then
+        inserts one row per non-empty tag name.
+
+        Parameters
+        ----------
+        deployment_set_id:
+            UUID primary key of the parent deployment set.
+        tag_names:
+            List of tag name strings to associate with the set.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSetTag
+
+        tenant_id = self._get_tenant_id()
+
+        # Clear existing tag rows for this set.
+        self.session.execute(
+            delete(EnterpriseDeploymentSetTag).where(
+                EnterpriseDeploymentSetTag.set_id == deployment_set_id
+            )
+        )
+
+        now = datetime.utcnow()
+        for raw_name in tag_names:
+            name = raw_name.strip()
+            if not name:
+                continue
+            tag_row = EnterpriseDeploymentSetTag(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                set_id=deployment_set_id,
+                tag=name,
+                created_at=now,
+            )
+            self.session.add(tag_row)
+
+    # =========================================================================
+    # Create
+    # =========================================================================
+
+    def create(
+        self,
+        *,
+        name: str,
+        owner_id: str,
+        description: Optional[str] = None,
+        color: Optional[str] = None,
+        icon: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ) -> "EnterpriseDeploymentSet":
+        """Create and return a new ``EnterpriseDeploymentSet``.
+
+        Parameters
+        ----------
+        name:
+            Human-readable set name (required).
+        owner_id:
+            Accepted for interface compatibility; tenant filtering is applied
+            automatically via ``TenantContext``.
+        description:
+            Optional free-text description.
+        color:
+            Ignored — ``EnterpriseDeploymentSet`` has no ``color`` column.
+            Accepted for interface parity with the local repository.
+        icon:
+            Ignored — ``EnterpriseDeploymentSet`` has no ``icon`` column.
+            Accepted for interface parity with the local repository.
+        tags:
+            Optional list of tag name strings.
+
+        Returns
+        -------
+        EnterpriseDeploymentSet
+            Newly created and flushed instance.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back the session.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSet
+
+        tenant_id = self._get_tenant_id()
+        now = datetime.utcnow()
+
+        ds = EnterpriseDeploymentSet(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            name=name,
+            description=description,
+            provisioned_by=owner_id,
+            created_at=now,
+            updated_at=now,
+        )
+        try:
+            self.session.add(ds)
+            self.session.flush()
+            if tags:
+                self._sync_tags(ds.id, tags)
+            self.session.flush()
+            logger.debug(
+                "Created EnterpriseDeploymentSet id=%s tenant=%s",
+                ds.id,
+                tenant_id,
+            )
+            self._log_operation(
+                operation="create",
+                entity_type="EnterpriseDeploymentSet",
+                entity_id=ds.id,
+                metadata={"name": name, "owner_id": owner_id},
+            )
+            return ds
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # =========================================================================
+    # Read
+    # =========================================================================
+
+    def get(
+        self,
+        set_id: str,
+        owner_id: str,
+    ) -> "Optional[EnterpriseDeploymentSet]":
+        """Fetch a single deployment set by ID, scoped to the current tenant.
+
+        Parameters
+        ----------
+        set_id:
+            String representation of the deployment set UUID.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+
+        Returns
+        -------
+        EnterpriseDeploymentSet or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSet
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError):
+            return None
+
+        stmt = self._tenant_select().where(EnterpriseDeploymentSet.id == set_uuid)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # =========================================================================
+    # List
+    # =========================================================================
+
+    def list(
+        self,
+        owner_id: str,
+        *,
+        name: Optional[str] = None,
+        tag: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> "List[EnterpriseDeploymentSet]":
+        """Return a paginated, filterable list of deployment sets for the current tenant.
+
+        Parameters
+        ----------
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+        name:
+            Optional substring filter on ``name`` (case-insensitive).
+        tag:
+            Optional tag string to filter by; matches via the
+            ``EnterpriseDeploymentSetTag`` join table.
+        limit:
+            Maximum rows to return (default 50).
+        offset:
+            Rows to skip for pagination (default 0).
+
+        Returns
+        -------
+        List[EnterpriseDeploymentSet]
+            Ordered by ``created_at`` descending.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseDeploymentSet,
+            EnterpriseDeploymentSetTag,
+        )
+
+        stmt = self._tenant_select().order_by(EnterpriseDeploymentSet.created_at.desc())
+
+        if name is not None:
+            stmt = stmt.where(EnterpriseDeploymentSet.name.ilike(f"%{name}%"))
+
+        if tag is not None:
+            stmt = stmt.join(
+                EnterpriseDeploymentSetTag,
+                EnterpriseDeploymentSetTag.set_id == EnterpriseDeploymentSet.id,
+            ).where(EnterpriseDeploymentSetTag.tag == tag)
+
+        stmt = stmt.limit(limit).offset(offset)
+        return list(self.session.execute(stmt).scalars())
+
+    # =========================================================================
+    # Count
+    # =========================================================================
+
+    def count(
+        self,
+        owner_id: str,
+        *,
+        name: Optional[str] = None,
+        tag: Optional[str] = None,
+    ) -> int:
+        """Count deployment sets matching the given filters for the current tenant.
+
+        Parameters
+        ----------
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+        name:
+            Optional substring filter on ``name``.
+        tag:
+            Optional tag filter.
+
+        Returns
+        -------
+        int
+            Count of matching sets.
+        """
+        from sqlalchemy import func as sa_func
+
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseDeploymentSet,
+            EnterpriseDeploymentSetTag,
+        )
+
+        stmt = self._apply_tenant_filter(
+            select(sa_func.count(EnterpriseDeploymentSet.id))
+        )
+
+        if name is not None:
+            stmt = stmt.where(EnterpriseDeploymentSet.name.ilike(f"%{name}%"))
+
+        if tag is not None:
+            stmt = stmt.join(
+                EnterpriseDeploymentSetTag,
+                EnterpriseDeploymentSetTag.set_id == EnterpriseDeploymentSet.id,
+            ).where(EnterpriseDeploymentSetTag.tag == tag)
+
+        return self.session.execute(stmt).scalar() or 0
+
+    # =========================================================================
+    # Update
+    # =========================================================================
+
+    def update(
+        self,
+        set_id: str,
+        owner_id: str,
+        **kwargs: object,
+    ) -> "Optional[EnterpriseDeploymentSet]":
+        """Update mutable fields on a deployment set.
+
+        Accepted keyword arguments: ``name`` (str), ``description`` (str | None),
+        ``tags`` (list[str]).  ``color`` and ``icon`` are silently ignored as
+        ``EnterpriseDeploymentSet`` has no such columns.  ``updated_at`` is
+        refreshed on every successful update.
+
+        Parameters
+        ----------
+        set_id:
+            String UUID of the deployment set to update.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+        **kwargs:
+            Keyword arguments for fields to update.
+
+        Returns
+        -------
+        EnterpriseDeploymentSet or None
+            Updated instance, or ``None`` if not found.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back the session.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSet
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError):
+            return None
+
+        stmt = self._tenant_select().where(EnterpriseDeploymentSet.id == set_uuid)
+        ds = self.session.execute(stmt).scalar_one_or_none()
+        if ds is None:
+            return None
+
+        try:
+            if "name" in kwargs:
+                ds.name = kwargs["name"]  # type: ignore[assignment]
+            if "description" in kwargs:
+                ds.description = kwargs["description"]  # type: ignore[assignment]
+            if "tags" in kwargs:
+                tag_list = kwargs["tags"]
+                self._sync_tags(ds.id, list(tag_list) if tag_list else [])  # type: ignore[arg-type]
+
+            ds.updated_at = datetime.utcnow()
+            self.session.flush()
+            logger.debug(
+                "Updated EnterpriseDeploymentSet id=%s tenant=%s",
+                set_id,
+                self._get_tenant_id(),
+            )
+            self._log_operation(
+                operation="update",
+                entity_type="EnterpriseDeploymentSet",
+                entity_id=ds.id,
+                metadata={"fields": list(kwargs.keys())},
+            )
+            return ds
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # =========================================================================
+    # Delete  (FR-10)
+    # =========================================================================
+
+    def delete(self, set_id: str, owner_id: str) -> bool:
+        """Delete a deployment set, cleaning up cross-set member references first.
+
+        FR-10 semantics: Before deleting the target set, any
+        ``EnterpriseDeploymentSetMember`` rows in *other* sets that reference the
+        target via ``member_set_id`` are deleted to prevent orphan references.
+        The target set's own members are removed by the ``ON DELETE CASCADE``
+        on ``enterprise_deployment_set_members.set_id``.
+
+        Parameters
+        ----------
+        set_id:
+            String UUID of the deployment set to delete.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+
+        Returns
+        -------
+        bool
+            ``True`` if the set was found and deleted, ``False`` otherwise.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back the session.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseDeploymentSet,
+            EnterpriseDeploymentSetMember,
+        )
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError):
+            return False
+
+        stmt = self._tenant_select().where(EnterpriseDeploymentSet.id == set_uuid)
+        ds = self.session.execute(stmt).scalar_one_or_none()
+        if ds is None:
+            return False
+
+        try:
+            # FR-10: remove member rows in OTHER sets referencing this set as a
+            # nested member before deleting the set itself.
+            orphan_stmt = select(EnterpriseDeploymentSetMember).where(
+                EnterpriseDeploymentSetMember.member_set_id == set_uuid,
+                EnterpriseDeploymentSetMember.set_id != set_uuid,
+            )
+            orphans = list(self.session.execute(orphan_stmt).scalars())
+            for member in orphans:
+                self.session.delete(member)
+
+            self.session.delete(ds)
+            self.session.flush()
+            logger.debug(
+                "Deleted EnterpriseDeploymentSet id=%s (removed %d orphan member refs)",
+                set_id,
+                len(orphans),
+            )
+            self._log_operation(
+                operation="delete",
+                entity_type="EnterpriseDeploymentSet",
+                entity_id=set_uuid,
+                metadata={"orphan_members_removed": len(orphans)},
+            )
+            return True
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # =========================================================================
+    # Member management
+    # =========================================================================
+
+    def add_member(
+        self,
+        set_id: str,
+        owner_id: str,
+        *,
+        artifact_id: Optional[str] = None,
+        position: Optional[int] = None,
+    ) -> "EnterpriseDeploymentSetMember":
+        """Add a member artifact to a deployment set.
+
+        Parameters
+        ----------
+        set_id:
+            String UUID of the parent deployment set.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+        artifact_id:
+            Text artifact identifier (e.g. ``"skill:canvas"``).
+        position:
+            Explicit 0-based ordering position.  Auto-assigned (max + 1) when
+            omitted.
+
+        Returns
+        -------
+        EnterpriseDeploymentSetMember
+            Newly created member row.
+
+        Raises
+        ------
+        ValueError
+            If the parent set does not exist in the current tenant.
+        Exception
+            Re-raises any database error after rolling back the session.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseDeploymentSet,
+            EnterpriseDeploymentSetMember,
+        )
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(f"Invalid set_id: {set_id!r}") from exc
+
+        tenant_id = self._get_tenant_id()
+
+        # Verify the parent set belongs to this tenant.
+        stmt = self._tenant_select().where(EnterpriseDeploymentSet.id == set_uuid)
+        ds = self.session.execute(stmt).scalar_one_or_none()
+        if ds is None:
+            raise ValueError(
+                f"EnterpriseDeploymentSet {set_id!r} not found for current tenant"
+            )
+
+        # Auto-assign position if not supplied.
+        if position is None:
+            pos_stmt = select(EnterpriseDeploymentSetMember.position).where(
+                EnterpriseDeploymentSetMember.set_id == set_uuid
+            )
+            positions = list(self.session.execute(pos_stmt).scalars())
+            position = (max(positions) + 1) if positions else 0
+
+        try:
+            member = EnterpriseDeploymentSetMember(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                set_id=set_uuid,
+                artifact_id=artifact_id or "",
+                position=position,
+            )
+            self.session.add(member)
+            self.session.flush()
+            logger.debug(
+                "Added member artifact_id=%s to EnterpriseDeploymentSet id=%s",
+                artifact_id,
+                set_id,
+            )
+            return member
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def remove_member(
+        self,
+        set_id: str,
+        owner_id: str,
+        artifact_id: str,
+    ) -> bool:
+        """Remove a member artifact from a deployment set.
+
+        Parameters
+        ----------
+        set_id:
+            String UUID of the parent deployment set.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+        artifact_id:
+            Text artifact identifier of the member to remove.
+
+        Returns
+        -------
+        bool
+            ``True`` if a matching member was found and deleted, ``False``
+            otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSetMember
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError):
+            return False
+
+        stmt = select(EnterpriseDeploymentSetMember).where(
+            EnterpriseDeploymentSetMember.set_id == set_uuid,
+            EnterpriseDeploymentSetMember.artifact_id == artifact_id,
+        )
+        member = self.session.execute(stmt).scalar_one_or_none()
+        if member is None:
+            return False
+
+        try:
+            self.session.delete(member)
+            self.session.flush()
+            return True
+        except Exception:
+            self.session.rollback()
+            raise
+
+    def list_members(
+        self,
+        set_id: str,
+        owner_id: str,
+    ) -> "List[EnterpriseDeploymentSetMember]":
+        """List all members of a deployment set ordered by position.
+
+        Parameters
+        ----------
+        set_id:
+            String UUID of the parent deployment set.
+        owner_id:
+            Accepted for interface compatibility; not used for filtering.
+
+        Returns
+        -------
+        List[EnterpriseDeploymentSetMember]
+            Members ordered by ``position`` ascending.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSetMember
+
+        try:
+            set_uuid = uuid.UUID(str(set_id))
+        except (ValueError, AttributeError):
+            return []
+
+        stmt = (
+            select(EnterpriseDeploymentSetMember)
+            .where(EnterpriseDeploymentSetMember.set_id == set_uuid)
+            .order_by(EnterpriseDeploymentSetMember.position.asc())
+        )
+        return list(self.session.execute(stmt).scalars())
+
+
+# =============================================================================
+# EnterpriseDeploymentProfileRepository  (ENT2-4.4)
+# =============================================================================
+
+
+class EnterpriseDeploymentProfileRepository(
+    EnterpriseRepositoryBase["EnterpriseDeploymentProfile"]
+):
+    """Enterprise repository for DeploymentProfile CRUD with tenant-scoped access.
+
+    Implements the same callable interface as the local ``DeploymentProfileRepository``
+    in ``repositories.py``.
+
+    The ``EnterpriseDeploymentProfile`` model stores flexible configuration in
+    the ``extra_metadata`` JSONB column (NOT ``metadata`` — that name conflicts
+    with SQLAlchemy's reserved ``DeclarativeBase.metadata`` attribute).
+
+    Usage::
+
+        with tenant_scope(tenant_uuid):
+            repo = EnterpriseDeploymentProfileRepository(db_session)
+            profile = repo.create(
+                project_id="proj-1",
+                profile_id="claude_code",
+                platform="claude_code",
+                root_dir=".claude",
+            )
+            fetched = repo.read_by_project_and_profile_id("proj-1", "claude_code")
+
+    Notes
+    -----
+    * ``project_id`` parameters are stored in ``extra_metadata["project_id"]``
+      since ``EnterpriseDeploymentProfile`` has no dedicated ``project_id``
+      column.
+    * ``profile_id`` is stored as a plain name tag in ``extra_metadata["profile_id"]``.
+    * SQLAlchemy 2.x ``select()`` style throughout.
+    * UUID primary keys.
+    """
+
+    def __init__(self, session: Session) -> None:
+        """Initialise the enterprise deployment profile repository.
+
+        Parameters
+        ----------
+        session:
+            Injected SQLAlchemy session bound to the PostgreSQL enterprise
+            database.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        super().__init__(session, EnterpriseDeploymentProfile)
+
+    # =========================================================================
+    # Create
+    # =========================================================================
+
+    def create(
+        self,
+        *,
+        project_id: str,
+        profile_id: str,
+        platform: str,
+        root_dir: str,
+        description: Optional[str] = None,
+        artifact_path_map: Optional[Dict[str, str]] = None,
+        config_filenames: Optional[List[str]] = None,
+        context_prefixes: Optional[List[str]] = None,
+        supported_types: Optional[List[str]] = None,
+    ) -> "EnterpriseDeploymentProfile":
+        """Create a deployment profile.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier; stored in ``extra_metadata["project_id"]``.
+        profile_id:
+            Profile identifier string (e.g. ``"claude_code"``); stored in
+            ``extra_metadata["profile_id"]``.
+        platform:
+            Target platform string (e.g. ``"claude_code"``).
+        root_dir:
+            Destination root directory (e.g. ``".claude"``).
+        description:
+            Optional free-text description.
+        artifact_path_map:
+            Optional mapping of artifact type to destination path.
+        config_filenames:
+            Optional list of config file names for this profile.
+        context_prefixes:
+            Optional list of context path prefixes.
+        supported_types:
+            Optional list of artifact type strings this profile supports.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile
+            Newly created and flushed instance.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        tenant_id = self._get_tenant_id()
+        now = datetime.utcnow()
+
+        meta: Dict[str, object] = {
+            "project_id": project_id,
+            "profile_id": profile_id,
+            "root_dir": root_dir,
+        }
+        if artifact_path_map is not None:
+            meta["artifact_path_map"] = artifact_path_map
+        if config_filenames is not None:
+            meta["config_filenames"] = config_filenames
+        if context_prefixes is not None:
+            meta["context_prefixes"] = context_prefixes
+        if supported_types is not None:
+            meta["supported_types"] = supported_types
+
+        profile = EnterpriseDeploymentProfile(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            name=f"{project_id}/{profile_id}",
+            scope="project",
+            dest_path=root_dir,
+            platform=platform,
+            overwrite=False,
+            extra_metadata=meta,
+            created_at=now,
+            updated_at=now,
+        )
+        if description is not None:
+            # Store in extra_metadata since the model has no description column.
+            profile.extra_metadata = {**meta, "description": description}
+
+        try:
+            self.session.add(profile)
+            self.session.flush()
+            logger.debug(
+                "Created EnterpriseDeploymentProfile id=%s project=%s profile_id=%s",
+                profile.id,
+                project_id,
+                profile_id,
+            )
+            self._log_operation(
+                operation="create",
+                entity_type="EnterpriseDeploymentProfile",
+                entity_id=profile.id,
+                metadata={"project_id": project_id, "profile_id": profile_id},
+            )
+            return profile
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # =========================================================================
+    # Read
+    # =========================================================================
+
+    def read_by_id(self, profile_db_id: str) -> "Optional[EnterpriseDeploymentProfile]":
+        """Read a deployment profile by its UUID primary key.
+
+        Parameters
+        ----------
+        profile_db_id:
+            String representation of the profile UUID.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        try:
+            profile_uuid = uuid.UUID(str(profile_db_id))
+        except (ValueError, AttributeError):
+            return None
+
+        stmt = self._tenant_select().where(
+            EnterpriseDeploymentProfile.id == profile_uuid
+        )
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    def read_by_project_and_profile_id(
+        self, project_id: str, profile_id: str
+    ) -> "Optional[EnterpriseDeploymentProfile]":
+        """Read a deployment profile by project and profile ID.
+
+        Matches against ``extra_metadata["project_id"]`` and
+        ``extra_metadata["profile_id"]`` stored in the JSONB column.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+        profile_id:
+            Profile identifier string (e.g. ``"claude_code"``).
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        # Construct a JSONB containment filter: extra_metadata @> {...}
+        # This requires the psycopg2 / asyncpg JSONB operator support.
+        # We use the canonical name match as a fallback via the stored name.
+        canonical_name = f"{project_id}/{profile_id}"
+        stmt = self._tenant_select().where(
+            EnterpriseDeploymentProfile.name == canonical_name
+        )
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # =========================================================================
+    # List
+    # =========================================================================
+
+    def list_by_project(
+        self, project_id: str
+    ) -> "List[EnterpriseDeploymentProfile]":
+        """List all deployment profiles for a project.
+
+        Matches profiles whose ``name`` starts with ``"{project_id}/"``
+        (the canonical naming format used by ``create()``).
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+
+        Returns
+        -------
+        List[EnterpriseDeploymentProfile]
+            Profiles ordered by ``name`` ascending.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        stmt = (
+            self._tenant_select()
+            .where(EnterpriseDeploymentProfile.name.like(f"{project_id}/%"))
+            .order_by(EnterpriseDeploymentProfile.name.asc())
+        )
+        return list(self.session.execute(stmt).scalars())
+
+    def list_all_profiles(
+        self, project_id: str
+    ) -> "List[EnterpriseDeploymentProfile]":
+        """Alias for ``list_by_project()`` — interface parity with local repo.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+
+        Returns
+        -------
+        List[EnterpriseDeploymentProfile]
+        """
+        return self.list_by_project(project_id)
+
+    # =========================================================================
+    # Platform / primary-profile helpers
+    # =========================================================================
+
+    def get_profile_by_platform(
+        self,
+        project_id: str,
+        platform: "str | object",
+    ) -> "Optional[EnterpriseDeploymentProfile]":
+        """Get the first deployment profile matching a project and platform.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+        platform:
+            Platform string or enum with ``.value``.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentProfile
+
+        platform_value = (
+            platform.value  # type: ignore[union-attr]
+            if hasattr(platform, "value")
+            else str(platform)
+        )
+        stmt = (
+            self._tenant_select()
+            .where(
+                EnterpriseDeploymentProfile.name.like(f"{project_id}/%"),
+                EnterpriseDeploymentProfile.platform == platform_value,
+            )
+            .order_by(EnterpriseDeploymentProfile.name.asc())
+        )
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    def get_primary_profile(
+        self, project_id: str
+    ) -> "Optional[EnterpriseDeploymentProfile]":
+        """Get the primary deployment profile for a project.
+
+        Preference order:
+        1. Explicit ``claude_code`` platform profile.
+        2. Profile whose name ends with ``/claude_code``.
+        3. First profile alphabetically.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile or None
+        """
+        primary = self.get_profile_by_platform(project_id, "claude_code")
+        if primary:
+            return primary
+
+        profile = self.read_by_project_and_profile_id(project_id, "claude_code")
+        if profile:
+            return profile
+
+        profiles = self.list_by_project(project_id)
+        return profiles[0] if profiles else None
+
+    def ensure_default_claude_profile(
+        self, project_id: str
+    ) -> "EnterpriseDeploymentProfile":
+        """Ensure a backward-compatible default Claude Code profile exists.
+
+        Returns an existing profile if one is found; otherwise creates a new
+        ``claude_code`` profile with sensible defaults.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile
+        """
+        primary = self.get_primary_profile(project_id)
+        if primary:
+            return primary
+
+        return self.create(
+            project_id=project_id,
+            profile_id="claude_code",
+            platform="claude_code",
+            root_dir=".claude",
+            artifact_path_map={
+                "skill": ".claude/skills",
+                "command": ".claude/commands",
+                "agent": ".claude/agents",
+                "hook": ".claude/hooks",
+                "mcp": ".claude/mcp",
+            },
+            config_filenames=["CLAUDE.md", "settings.json"],
+            context_prefixes=[".claude/context/", ".claude/"],
+            supported_types=["skill", "command", "agent", "hook", "mcp"],
+        )
+
+    def get_project_id_by_path(self, project_path: str) -> "Optional[str]":
+        """Return the project ID for the given filesystem path.
+
+        Delegates to the ``EnterpriseProject`` table.
+
+        Parameters
+        ----------
+        project_path:
+            Absolute path string to match against ``EnterpriseProject.path``.
+
+        Returns
+        -------
+        str or None
+            Project ID string when a matching row exists, ``None`` otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        tenant_id = self._get_tenant_id()
+        stmt = select(EnterpriseProject).where(
+            EnterpriseProject.tenant_id == tenant_id,
+            EnterpriseProject.path == project_path,
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        return str(row.id) if row else None
+
+    # =========================================================================
+    # Update
+    # =========================================================================
+
+    def update(
+        self,
+        project_id: str,
+        profile_id: str,
+        **updates: object,
+    ) -> "Optional[EnterpriseDeploymentProfile]":
+        """Update an existing deployment profile.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+        profile_id:
+            Profile identifier string.
+        **updates:
+            Keyword arguments for fields to update.  Supported: ``platform``,
+            ``dest_path``, ``scope``, ``overwrite``, ``extra_metadata``.
+            Any key present in ``extra_metadata`` is merged in.
+
+        Returns
+        -------
+        EnterpriseDeploymentProfile or None
+            Updated instance, or ``None`` if not found.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back.
+        """
+        profile = self.read_by_project_and_profile_id(project_id, profile_id)
+        if profile is None:
+            return None
+
+        try:
+            direct_fields = {"platform", "dest_path", "scope", "overwrite"}
+            meta_updates: Dict[str, object] = {}
+
+            for key, value in updates.items():
+                if key in direct_fields and value is not None:
+                    setattr(profile, key, value)
+                elif key not in {"project_id", "profile_id"}:
+                    meta_updates[key] = value
+
+            if meta_updates:
+                existing_meta = profile.extra_metadata or {}
+                profile.extra_metadata = {**existing_meta, **meta_updates}
+
+            profile.updated_at = datetime.utcnow()
+            self.session.flush()
+            logger.debug(
+                "Updated EnterpriseDeploymentProfile name=%s/%s",
+                project_id,
+                profile_id,
+            )
+            self._log_operation(
+                operation="update",
+                entity_type="EnterpriseDeploymentProfile",
+                entity_id=profile.id,
+                metadata={"project_id": project_id, "profile_id": profile_id},
+            )
+            return profile
+        except Exception:
+            self.session.rollback()
+            raise
+
+    # =========================================================================
+    # Delete
+    # =========================================================================
+
+    def delete(self, project_id: str, profile_id: str) -> bool:
+        """Delete a deployment profile by project and profile ID.
+
+        Parameters
+        ----------
+        project_id:
+            Project identifier.
+        profile_id:
+            Profile identifier string.
+
+        Returns
+        -------
+        bool
+            ``True`` if found and deleted, ``False`` otherwise.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database error after rolling back.
+        """
+        profile = self.read_by_project_and_profile_id(project_id, profile_id)
+        if profile is None:
+            return False
+
+        try:
+            self.session.delete(profile)
+            self.session.flush()
+            logger.debug(
+                "Deleted EnterpriseDeploymentProfile name=%s/%s",
+                project_id,
+                profile_id,
+            )
+            self._log_operation(
+                operation="delete",
+                entity_type="EnterpriseDeploymentProfile",
+                entity_id=profile.id,
+                metadata={"project_id": project_id, "profile_id": profile_id},
+            )
+            return True
+        except Exception:
+            self.session.rollback()
+            raise
