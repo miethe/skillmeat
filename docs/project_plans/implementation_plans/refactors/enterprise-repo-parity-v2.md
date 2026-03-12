@@ -2,8 +2,8 @@
 title: 'Implementation Plan: Enterprise Repository Parity v2'
 schema_version: 2
 doc_type: implementation_plan
-status: in-progress
-created: 2026-03-12
+status: completed
+created: '2026-03-12'
 updated: '2026-03-12'
 feature_slug: enterprise-repo-parity
 feature_version: v2
@@ -32,7 +32,11 @@ tags:
 - postgresql
 - parity
 milestone: null
-commit_refs: []
+commit_refs:
+- 7adfbe88
+- 586ed863
+- 7ef3ef06
+- f9e401c9
 pr_refs: []
 files_affected:
 - skillmeat/api/dependencies.py
