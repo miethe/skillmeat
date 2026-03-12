@@ -1,84 +1,92 @@
 ---
-title: "Enterprise Repository Parity - PRD"
+title: Enterprise Repository Parity - PRD
 schema_version: 2
 doc_type: prd
-status: draft
+status: inferred_complete
 created: 2026-03-12
 updated: 2026-03-12
 feature_slug: enterprise-repo-parity
 feature_version: v2
 prd_ref: null
 plan_ref: docs/project_plans/implementation_plans/refactors/enterprise-repo-parity-v2.md
-scope: Complete enterprise repository implementations for full feature parity in enterprise mode
+scope: Complete enterprise repository implementations for full feature parity in enterprise
+  mode
 effort_estimate: 55-70 story points
-architecture_summary: Enterprise repository implementations for all DI-routed interfaces plus edition-aware migration of non-DI repositories
+architecture_summary: Enterprise repository implementations for all DI-routed interfaces
+  plus edition-aware migration of non-DI repositories
 related_documents:
-  - .claude/findings/ENTERPRISE_503_REPOSITORY_GAPS.md
-  - docs/project_plans/PRDs/refactors/enterprise-db-storage-v1.md
-  - docs/project_plans/implementation_plans/refactors/enterprise-db-storage-v1.md
-  - docs/project_plans/PRDs/refactors/repo-pattern-refactor-v1.md
-  - docs/project_plans/PRDs/refactors/enterprise-governance-3-tier.md
+- .claude/findings/ENTERPRISE_503_REPOSITORY_GAPS.md
+- docs/project_plans/PRDs/refactors/enterprise-db-storage-v1.md
+- docs/project_plans/implementation_plans/refactors/enterprise-db-storage-v1.md
+- docs/project_plans/PRDs/refactors/repo-pattern-refactor-v1.md
+- docs/project_plans/PRDs/refactors/enterprise-governance-3-tier.md
 owner: python-backend-engineer
 contributors:
-  - data-layer-expert
-  - backend-architect
+- data-layer-expert
+- backend-architect
 priority: high
 risk_level: medium
 category: product-planning
 tags:
-  - enterprise
-  - repository
-  - postgresql
-  - parity
+- enterprise
+- repository
+- postgresql
+- parity
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/api/dependencies.py
-  - skillmeat/api/server.py
-  - skillmeat/cache/enterprise_repositories.py
-  - skillmeat/cache/models_enterprise.py
-  - skillmeat/cache/migrations/
-  - skillmeat/cache/repositories.py
-problem_statement: "Enterprise mode (`SKILLMEAT_EDITION=enterprise`) renders 8 API
+- skillmeat/api/dependencies.py
+- skillmeat/api/server.py
+- skillmeat/cache/enterprise_repositories.py
+- skillmeat/cache/models_enterprise.py
+- skillmeat/cache/migrations/
+- skillmeat/cache/repositories.py
+problem_statement: Enterprise mode (`SKILLMEAT_EDITION=enterprise`) renders 8 API
   endpoint groups unusable via HTTP 503 and silently corrupts 8 more by writing SQLite
-  data inside a PostgreSQL deployment. This was an intentional scope gap in
-  enterprise-db-storage-v1, not a regression."
+  data inside a PostgreSQL deployment. This was an intentional scope gap in enterprise-db-storage-v1,
+  not a regression.
 personas:
-  - enterprise-admin
-  - platform-engineer
+- enterprise-admin
+- platform-engineer
 goals:
-  - All API endpoint groups functional in enterprise mode
-  - No SQLite writes occur when edition=enterprise
-  - Tenant isolation maintained across all new repository implementations
+- All API endpoint groups functional in enterprise mode
+- No SQLite writes occur when edition=enterprise
+- Tenant isolation maintained across all new repository implementations
 non_goals:
-  - Workflow engine enterprise support (intentionally local-only in this version)
-  - Memory/context intelligence enterprise support (out of scope)
-  - Analytics enterprise support (out of scope)
-  - Filesystem-sync features (deploy/sync CLI) — addressed by enterprise-db-storage-v1 CLI phases
+- Workflow engine enterprise support (intentionally local-only in this version)
+- Memory/context intelligence enterprise support (out of scope)
+- Analytics enterprise support (out of scope)
+- Filesystem-sync features (deploy/sync CLI) — addressed by enterprise-db-storage-v1
+  CLI phases
 requirements:
-  - Enterprise implementations for IProjectRepository, IDeploymentRepository, ITagRepository, ISettingsRepository, IGroupRepository, IContextEntityRepository, IMarketplaceSourceRepository, IProjectTemplateRepository
-  - Edition-aware DI wiring in dependencies.py for all 8 interfaces
-  - Edition-aware instantiation for 8 non-DI repositories
-  - Alembic migrations for any new enterprise schema tables
-  - All new repositories pass tenant isolation tests
-  - Zero SQLite writes when SKILLMEAT_EDITION=enterprise
+- Enterprise implementations for IProjectRepository, IDeploymentRepository, ITagRepository,
+  ISettingsRepository, IGroupRepository, IContextEntityRepository, IMarketplaceSourceRepository,
+  IProjectTemplateRepository
+- Edition-aware DI wiring in dependencies.py for all 8 interfaces
+- Edition-aware instantiation for 8 non-DI repositories
+- Alembic migrations for any new enterprise schema tables
+- All new repositories pass tenant isolation tests
+- Zero SQLite writes when SKILLMEAT_EDITION=enterprise
 success_metrics:
-  - HTTP 503 count in enterprise mode reaches 0
-  - All non-DI repository instantiations are edition-aware
-  - Full pytest suite passes for both local and enterprise modes
-  - Alembic migration history is linear (no branch heads)
+- HTTP 503 count in enterprise mode reaches 0
+- All non-DI repository instantiations are edition-aware
+- Full pytest suite passes for both local and enterprise modes
+- Alembic migration history is linear (no branch heads)
 dependencies:
-  - enterprise-db-storage-v1 (complete — provides EnterpriseRepositoryBase, TenantContext, models_enterprise.py, DI pattern)
-  - repo-pattern-refactor-v1 (complete — provides all I*Repository interfaces and DI aliases)
-  - aaa-rbac-foundation-v1 (complete — provides AuthContext with tenant_id)
+- enterprise-db-storage-v1 (complete — provides EnterpriseRepositoryBase, TenantContext,
+  models_enterprise.py, DI pattern)
+- repo-pattern-refactor-v1 (complete — provides all I*Repository interfaces and DI
+  aliases)
+- aaa-rbac-foundation-v1 (complete — provides AuthContext with tenant_id)
 risks:
-  - Filesystem-centric repositories (IProjectRepository, IDeploymentRepository) require new enterprise schema tables and schema design decisions
-  - Some feature domains (workflows, memory) may be intentionally unsupported in enterprise v1 — classification error could cause over-engineering
-  - SQLAlchemy 2.x style must not bleed into local repositories (intentional divergence)
-  - Alembic migration ordering must remain linear; each phase must add to existing head
+- Filesystem-centric repositories (IProjectRepository, IDeploymentRepository) require
+  new enterprise schema tables and schema design decisions
+- Some feature domains (workflows, memory) may be intentionally unsupported in enterprise
+  v1 — classification error could cause over-engineering
+- SQLAlchemy 2.x style must not bleed into local repositories (intentional divergence)
+- Alembic migration ordering must remain linear; each phase must add to existing head
 ---
-
 # Feature brief & metadata
 
 **Feature name:**

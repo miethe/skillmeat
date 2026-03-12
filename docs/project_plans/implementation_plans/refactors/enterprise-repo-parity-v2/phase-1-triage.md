@@ -1,8 +1,8 @@
 ---
-title: "Phase 1: Triage & Classify"
+title: 'Phase 1: Triage & Classify'
 schema_version: 2
 doc_type: phase_plan
-status: draft
+status: inferred_complete
 created: 2026-03-12
 updated: 2026-03-12
 feature_slug: enterprise-repo-parity
@@ -12,18 +12,18 @@ phase_title: Triage & Classify
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-repo-parity-v2.md
 plan_ref: docs/project_plans/implementation_plans/refactors/enterprise-repo-parity-v2.md
 entry_criteria:
-  - enterprise-db-storage-v1 Phase 2 confirmed complete (EnterpriseRepositoryBase available)
-  - repo-pattern-refactor-v1 confirmed complete (all I*Repository interfaces available)
-  - aaa-rbac-foundation-v1 confirmed complete (AuthContext with tenant_id available)
+- enterprise-db-storage-v1 Phase 2 confirmed complete (EnterpriseRepositoryBase available)
+- repo-pattern-refactor-v1 confirmed complete (all I*Repository interfaces available)
+- aaa-rbac-foundation-v1 confirmed complete (AuthContext with tenant_id available)
 exit_criteria:
-  - Triage document produced classifying all 16 repositories into Full/Passthrough/Stub/Excluded tiers
-  - Rationale documented for every classification decision
-  - Schema design sketch produced for all Full-tier items
-  - Open questions OQ-1 through OQ-4 from the PRD answered or deferred with owner
-  - backend-architect review sign-off on triage document
-  - Phase 2 scope confirmed (which domains need new enterprise models)
+- Triage document produced classifying all 16 repositories into Full/Passthrough/Stub/Excluded
+  tiers
+- Rationale documented for every classification decision
+- Schema design sketch produced for all Full-tier items
+- Open questions OQ-1 through OQ-4 from the PRD answered or deferred with owner
+- backend-architect review sign-off on triage document
+- Phase 2 scope confirmed (which domains need new enterprise models)
 ---
-
 # Phase 1: Triage & Classify
 
 ## Overview

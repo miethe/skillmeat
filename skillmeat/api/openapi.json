@@ -26066,7 +26066,7 @@
               }
             ],
             "title": "Owner Type",
-            "description": "Owner type: 'user' or 'team'. Defaults to 'user' when not provided."
+            "description": "Owner type: 'user', 'team', or 'enterprise'. Defaults to 'user' when not provided."
           },
           "visibility": {
             "anyOf": [
@@ -27399,7 +27399,7 @@
               }
             ],
             "title": "Owner Type",
-            "description": "Owner type: 'user' or 'team'"
+            "description": "Owner type: 'user', 'team', or 'enterprise'"
           },
           "visibility": {
             "anyOf": [
@@ -27887,7 +27887,7 @@
               }
             ],
             "title": "Owner Type",
-            "description": "Owner type: 'user' or 'team'."
+            "description": "Owner type: 'user', 'team', or 'enterprise'."
           },
           "visibility": {
             "anyOf": [
@@ -32485,7 +32485,7 @@
               }
             ],
             "title": "Owner Type",
-            "description": "Owner type: 'user' or 'team'"
+            "description": "Owner type: 'user', 'team', or 'enterprise'"
           },
           "visibility": {
             "anyOf": [
