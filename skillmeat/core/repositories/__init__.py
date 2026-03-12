@@ -66,6 +66,12 @@ LocalMarketplaceSourceRepository
     and :class:`~skillmeat.cache.repositories.MarketplaceCatalogRepository`,
     converting ORM rows to DTOs at the boundary.
 
+EnterpriseMembershipRepository
+    PostgreSQL-backed implementation of
+    :class:`~skillmeat.core.interfaces.repositories.IMembershipRepository`.
+    Queries ``EnterpriseTeamMember`` rows with automatic tenant scoping via
+    ``TenantContext`` (matching the ``EnterpriseRepositoryBase`` convention).
+
 Usage::
 
     from skillmeat.core.repositories import (
@@ -109,6 +115,9 @@ Usage::
     settings = settings_repo.get()
 """
 
+from skillmeat.core.repositories.enterprise_membership import (
+    EnterpriseMembershipRepository,
+)
 from skillmeat.core.repositories.local_artifact import LocalArtifactRepository
 from skillmeat.core.repositories.local_collection import LocalCollectionRepository
 from skillmeat.core.repositories.local_context_entity import LocalContextEntityRepository
@@ -125,6 +134,7 @@ from skillmeat.core.repositories.local_settings_repo import LocalSettingsReposit
 from skillmeat.core.repositories.local_tag import LocalTagRepository
 
 __all__ = [
+    "EnterpriseMembershipRepository",
     "LocalArtifactRepository",
     "LocalCollectionRepository",
     "LocalContextEntityRepository",

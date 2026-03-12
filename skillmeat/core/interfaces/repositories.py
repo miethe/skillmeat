@@ -32,6 +32,7 @@ Usage::
 from __future__ import annotations
 
 import abc
+import uuid
 from typing import TYPE_CHECKING, Any
 
 from skillmeat.core.interfaces.context import RequestContext
@@ -74,6 +75,7 @@ __all__ = [
     "IProjectTemplateRepository",
     "IDbCollectionArtifactRepository",
     "IDbArtifactHistoryRepository",
+    "IMembershipRepository",
 ]
 
 
@@ -4012,5 +4014,65 @@ class IDbArtifactHistoryRepository(abc.ABC):
             A (possibly empty) list of
             :class:`~skillmeat.core.interfaces.dtos.ArtifactVersionDTO`
             ordered by ``created_at`` descending.
+        """
+        raise NotImplementedError
+
+
+# =============================================================================
+# IMembershipRepository
+# =============================================================================
+
+
+class IMembershipRepository(abc.ABC):
+    """Lookup interface for team/org membership, used by OwnershipResolver.
+
+    Implementations are responsible for tenant scoping internally (e.g. via a
+    ContextVar).  Callers do not pass ``tenant_id`` directly — this keeps the
+    interface simple and aligns with how enterprise repositories already manage
+    per-request tenant context.
+    """
+
+    # ------------------------------------------------------------------
+    # Membership queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_team_ids_for_user(self, user_id: uuid.UUID) -> list[uuid.UUID]:
+        """Return the IDs of every team the user is a member of.
+
+        Args:
+            user_id: The UUID of the user whose team memberships are queried.
+
+        Returns:
+            A (possibly empty) list of team UUIDs.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_team_role(
+        self, user_id: uuid.UUID, team_id: uuid.UUID
+    ) -> str | None:
+        """Return the user's role in a specific team, or ``None`` if not a member.
+
+        Args:
+            user_id: The UUID of the user.
+            team_id: The UUID of the team.
+
+        Returns:
+            A role string (e.g. ``"owner"``, ``"member"``) when the user
+            belongs to the team, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def is_member_of(self, user_id: uuid.UUID, team_id: uuid.UUID) -> bool:
+        """Check whether a user is a member of the given team.
+
+        Args:
+            user_id: The UUID of the user.
+            team_id: The UUID of the team.
+
+        Returns:
+            ``True`` when the user is a member, ``False`` otherwise.
         """
         raise NotImplementedError
