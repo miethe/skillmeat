@@ -135,3 +135,130 @@ Tables to be created in Phase 2 (all in PostgreSQL with `EnterpriseBase`, UUID P
 **PRD tier proposals validated:** 14 of 16 match. Two adjustments:
 1. `MarketplaceCatalogRepository` — PRD proposed Passthrough, confirmed **Passthrough** (matches).
 2. `DbCollectionArtifactRepository` — PRD proposed Full, confirmed **Full** but noted it is a v1 gap (DI provider has no edition check), not a new item.
+
+---
+
+## Architecture Review
+
+**Sign-off status**: Approved with Changes
+
+**Reviewer**: backend-architect (ENT2-1.6)
+
+**Review date**: 2026-03-12
+
+---
+
+### Invariant Compliance Assessment
+
+All tier assignments were evaluated against the six architecture invariants defined in the triage header.
+
+#### SQLAlchemy 2.x `select()` style
+
+Confirmed correct for all Full-tier items. The existing `EnterpriseRepositoryBase` in `enterprise_repositories.py` enforces 2.x style through its `_apply_tenant_filter()` / `_tenant_select()` / `_apply_tenant_filter()` base methods, which all receive and return SQLAlchemy 2.x `Select` objects. Every new enterprise repository class must extend `EnterpriseRepositoryBase[T]` and use only `select(Model)` — never `session.query()`.
+
+One specific risk identified: `IGroupRepository`'s rationale notes that `LocalGroupRepository` uses `session.query()` throughout. The enterprise port must not carry this pattern forward. Implementors must rewrite all queries in the 2.x `select()` style when porting — this is already noted in the `cache/CLAUDE.md` invariant but worth flagging explicitly here since `IGroupRepository` is the interface most likely to be ported by copying from the local implementation.
+
+#### `EnterpriseBase` declarative base
+
+All schema sketches are validated as requiring `EnterpriseBase` (from `models_enterprise.py`). The existing seven enterprise models (`EnterpriseArtifact`, `EnterpriseArtifactVersion`, `EnterpriseCollection`, `EnterpriseCollectionArtifact`, `EnterpriseUser`, `EnterpriseTeam`, `EnterpriseTeamMember`) all extend `EnterpriseBase`. The `EnterpriseCollectionArtifact` model referenced under `DbCollectionArtifactRepository` (Group B, Full) already exists and already extends `EnterpriseBase` — this is correct and no model change is needed for that item.
+
+No schema sketch in the triage proposes using `Base` from `models.py`. Assessment: clean.
+
+#### UUID primary keys on all enterprise models
+
+All Full-tier schema sketches specify `id UUID PK DEFAULT gen_random_uuid()`. The existing models confirm UUID PKs as the pattern (`EnterpriseArtifact.id`, `EnterpriseCollection.id`, etc., all using `UUID(as_uuid=True)` with `default=uuid.uuid4`).
+
+One precision concern: the schema sketches use PostgreSQL DDL notation `DEFAULT gen_random_uuid()`. In the SQLAlchemy ORM the correct Python-side equivalent is `server_default=text("gen_random_uuid()")` or `default=uuid.uuid4` (client-side). The existing models use `default=uuid.uuid4` (client-side generation). Implementation must be consistent with the existing pattern — use `default=uuid.uuid4` on the Python column definition. Do not mix `server_default=text("gen_random_uuid()")` with `default=uuid.uuid4` on the same column.
+
+#### `tenant_id UUID NOT NULL` on every new table
+
+All Full-tier schema sketches include `tenant_id UUID NOT NULL`. The join tables (`enterprise_artifact_tags`, `enterprise_group_artifacts`, `enterprise_entity_category_associations`, `enterprise_project_artifacts`, `enterprise_deployment_set_members`) all carry `tenant_id` — this is correct and consistent with `EnterpriseCollectionArtifact` which already has `tenant_id` on the join table. Do not omit `tenant_id` from join tables under the assumption that the parent row provides coverage — tenant filtering on joins must be applied independently per table.
+
+One index gap: the sketches do not explicitly call out indexes. Every new table must have at minimum:
+- `Index("ix_<table>_tenant_id", "<table>.tenant_id")`
+- Unique constraints where noted (e.g., `enterprise_settings` is one-row-per-tenant, needs `UNIQUE(tenant_id)`)
+- Join tables need a composite `UNIQUE(parent_id, child_id, tenant_id)` or at minimum a `UNIQUE(parent_id, child_id)` with tenant enforced through filter (existing `EnterpriseCollectionArtifact` uses `UniqueConstraint("collection_id", "artifact_uuid", "tenant_id")` — match this pattern for all new join tables)
+
+#### `_apply_tenant_filter()` on every query
+
+The `EnterpriseRepositoryBase._apply_tenant_filter()` method is already provided and documented. All new repository implementations must call it via `self._apply_tenant_filter(stmt)` or the `self._tenant_select()` shorthand on every `select()`. This is the highest-risk area for implementation errors. The `MarketplaceTransactionHandler` enterprise variant (OQ-3) is a particular watch point because it uses context managers (`ScanUpdateContext`, `ImportContext`) that build their own queries — each internal query inside those contexts must also apply tenant filtering.
+
+#### Edition routing via `APISettings.edition == "enterprise"`
+
+The DI pattern in `dependencies.py` is confirmed correct. The two already-wired providers (`get_artifact_repository`, `get_collection_repository`) check `edition == "enterprise"` before returning the enterprise implementation. The `get_db_user_collection_repository` provider uses the same pattern and also correctly checks `edition == "enterprise"`. The `get_membership_repository` provider uses the alternative pattern (checking `auth_context.tenant_id` rather than `edition` string) — this is intentional for that provider and is not a defect.
+
+All twelve providers listed in the Phase 2 scope must add the `edition == "enterprise"` branch. The three Stub items (`IProjectTemplateRepository`, `DbArtifactHistoryRepository`, `DuplicatePairRepository`) must return an appropriate empty-result stub class (not raise 503) so that callers in enterprise mode get empty lists rather than errors. The current 503 pattern for Group A unimplemented repos is correct for the period before Phase 2 but must be replaced on delivery.
+
+---
+
+### Classification Changes
+
+#### No reclassifications required.
+
+All 16 tier assignments are validated as correct. No Full items can be safely downgraded to Stub based on current information.
+
+One note on `MarketplaceCatalogRepository` (Passthrough): the Passthrough tier is correct for now, but Phase 2 implementors should be aware that the enterprise `IMarketplaceSourceRepository` Full implementation will write to `enterprise_marketplace_catalog_entries`. If the `MarketplaceCatalogRepository` Passthrough path continues reading from the local SQLite `marketplace_catalog_entries` table in enterprise mode, catalog reads (e.g., search) will silently miss any records written through the enterprise path. This does not change the tier assignment for Phase 2, but it must be tracked as a known inconsistency and addressed in Phase 3 when the marketplace scanner is adapted for multi-tenant operation.
+
+---
+
+### IProjectRepository Filesystem Decision (OQ-1) — Confirmation
+
+The OQ-1 resolution is architecturally sound. Storing `path TEXT NOT NULL` as an informational column is the correct approach. The critical design constraint is:
+
+**The enterprise `IProjectRepository` implementation must never initiate filesystem scans from within repository methods.** The path column is a record of registration, not a trigger for FS I/O.
+
+The proposed UUID-primary-key design with `path` as a unique indexed column per tenant is correct and avoids the fragility of the local base64-encoded path PK. The fallback lookup helper (UUID parse → base64-decode + path lookup) is required for backward compatibility with existing callers that pass base64 path IDs via the API. This lookup helper must be implemented as a helper on the enterprise repository class, not in the router layer.
+
+The `refresh()` method behavior in enterprise mode (re-reads from DB rather than rescanning disk) must be clearly documented in the enterprise implementation class — the interface contract says "refresh project data" which is ambiguous between FS rescan and DB reread. Add an explicit docstring override noting the enterprise semantics.
+
+One gap in the schema sketch: the `enterprise_projects` table is missing a `UNIQUE(tenant_id, path)` constraint. The path must be unique per tenant (two tenants can register the same filesystem path; a single tenant cannot register the same path twice). The migration must include `UniqueConstraint("tenant_id", "path", name="uq_enterprise_projects_tenant_path")`.
+
+---
+
+### Schema Design Concerns
+
+#### `enterprise_settings` — UNIQUE constraint required
+
+The table is documented as "one row per tenant" but the schema sketch only states `tenant_id UUID NOT NULL UNIQUE`. Confirm that the Alembic migration includes `UniqueConstraint("tenant_id", name="uq_enterprise_settings_tenant")`. This constraint prevents accidental double-insert on tenant provisioning.
+
+The `extra JSONB` column is appropriate for forward-compatible extension but should have a `server_default=text("'{}'::jsonb")` to avoid null-check burden in application code. Existing models (`EnterpriseArtifact.extra_data`) set a `server_default` on JSONB columns — follow the same pattern.
+
+#### `enterprise_deployments` — `artifact_id` type concern
+
+The schema sketch uses `artifact_id TEXT NOT NULL` for the deployment record. This matches the existing `sync_deployment_cache()` interface which takes `artifact_id: str` in `"type:name"` format. However, `enterprise_artifacts.id` is a UUID PK in the enterprise model. In enterprise mode the deployment record should reference `enterprise_artifacts.id` (UUID FK) rather than a text-format artifact identifier. The text `artifact_id` would be appropriate only as a transitional field or a denormalized cache. Recommend adding `artifact_uuid UUID` as the primary FK alongside the `artifact_id TEXT` field (or replacing it) during implementation. This is a **Phase 2 implementation decision** that must be resolved before the migration is written — it is not a blocker for tier classification but is a blocker for the migration DDL.
+
+#### `enterprise_context_entities` — join table naming inconsistency
+
+The Phase 2 scope lists both `enterprise_entity_category_associations` (from `ISettingsRepository`) and `enterprise_context_entity_category_associations` (from `IContextEntityRepository`). These are two distinct join tables with different semantics:
+- `enterprise_entity_category_associations`: links `entity_type_configs` to `entity_categories` (settings domain)
+- `enterprise_context_entity_category_associations`: links `context_entities` to `entity_categories` (context entity domain)
+
+This is correct — they should remain separate tables. The naming is sufficiently distinct. No change required, but the migration author must create both and not conflate them.
+
+#### `enterprise_deployment_set_tags` — missing from schema sketches
+
+The Phase 2 scope table lists `enterprise_deployment_set_tags` as a new table, but no schema sketch is provided in the Group B `DeploymentSetRepository` entry. The local `DeploymentSetTag` model maps string tags to deployment sets. The enterprise table should follow the join-table pattern: `enterprise_deployment_set_tags(set_id UUID FK, tag TEXT NOT NULL, tenant_id UUID NOT NULL)` with `UNIQUE(set_id, tag)`. This table must be added to the migration.
+
+#### `MarketplaceTransactionHandler` — no new tables needed
+
+OQ-3 confirms Full tier with a note that no new tables are needed (operates on `enterprise_marketplace_sources` and `enterprise_marketplace_catalog_entries`). This is correct. The enterprise transaction handler is purely an orchestration class that accepts an injected `Session` — it is not an `EnterpriseRepositoryBase` subclass since it manages multi-table operations. It must still apply `tenant_id` filters on every query it issues, even though it does not inherit the base's `_apply_tenant_filter()` helper. The implementation should accept `tenant_id: uuid.UUID` as a constructor parameter and apply it explicitly.
+
+---
+
+### Phase 2 Scope — Confirmed with Amendments
+
+The scope as listed is confirmed correct with the following amendments:
+
+1. **Add** `enterprise_deployment_set_tags` to the "new tables" list (was in the scope table but missing a schema sketch).
+
+2. **Add** `UNIQUE(tenant_id, path)` constraint requirement to `enterprise_projects`.
+
+3. **Resolve** `enterprise_deployments.artifact_id` type (TEXT vs UUID FK) before writing the migration. Recommend adding `artifact_uuid UUID REFERENCES enterprise_artifacts(id)` with a separate `artifact_id TEXT` kept for backward compatibility during transition.
+
+4. **Note** that `get_project_repository()` in `dependencies.py` does not yet accept a `Session` parameter (unlike the artifact and collection providers). Adding an enterprise branch requires adding `session: Annotated[Session, Depends(get_db_session)]` to its signature — a one-line provider signature change required before the enterprise implementation can be wired.
+
+5. **Note** that all three Stub providers (`get_project_template_repository`, `get_db_artifact_history_repository`, `get_duplicate_pair_repository`) currently either raise 503 or return the local SQLite-backed class with no edition check. Phase 2 must replace these with proper Stub implementations that return empty results in enterprise mode rather than routing to SQLite.
+
+6. **Confirmed**: `DbCollectionArtifactRepository` is a v1 gap — the `get_db_collection_artifact_repository()` provider has no edition check and no `session` parameter. Wiring this is critical-path for the user-collections router in enterprise mode and must be treated as a P0 item within Phase 2.
+
+No items should be removed from scope. The 15 new tables, 4 tables-already-exist items, and 12 DI provider changes are all confirmed necessary.

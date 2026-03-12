@@ -6,7 +6,7 @@ prd: enterprise-repo-parity
 feature_slug: enterprise-repo-parity
 phase: 1
 phase_title: Triage & Classify
-status: pending
+status: completed
 created: 2026-03-12
 updated: '2026-03-12'
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-repo-parity-v2.md
@@ -54,7 +54,7 @@ tasks:
   - ENT2-1.4
 - id: ENT2-1.6
   title: Architecture review of triage document
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -69,10 +69,10 @@ parallelization:
   batch_2:
   - ENT2-1.6
 total_tasks: 6
-completed_tasks: 5
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 83
+progress: 100
 ---
 
 # Phase 1: Triage & Classify
