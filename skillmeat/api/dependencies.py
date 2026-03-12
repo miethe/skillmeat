@@ -28,12 +28,15 @@ from skillmeat.core.interfaces.repositories import (
     IDbUserCollectionRepository,
     IDeploymentRepository,
     IGroupRepository,
+    IMembershipRepository,
     IMarketplaceSourceRepository,
     IProjectRepository,
     IProjectTemplateRepository,
     ISettingsRepository,
     ITagRepository,
 )
+from skillmeat.core.ownership import ResolvedOwnership
+from skillmeat.core.services.ownership_resolver import OwnershipResolver
 from skillmeat.cache.repositories import (
     DbArtifactHistoryRepository,
     DbCollectionArtifactRepository,
@@ -977,6 +980,87 @@ DbUserCollectionRepoDep = Annotated[
 DbCollectionArtifactRepoDep = Annotated[
     IDbCollectionArtifactRepository, Depends(get_db_collection_artifact_repository)
 ]
+
+
+# ---------------------------------------------------------------------------
+# Membership + Ownership DI chain
+# ---------------------------------------------------------------------------
+
+
+def get_membership_repository(
+    request: Request,
+    session: Annotated[Session, Depends(get_db_session)],
+) -> IMembershipRepository:
+    """Return edition-appropriate membership repository.
+
+    Reads the auth context already stored on ``request.state`` by the
+    router-level ``require_auth`` dependency.  When ``auth_context.tenant_id``
+    is present the request is running in enterprise mode and the enterprise
+    implementation is returned.  Otherwise the local implementation is used.
+
+    Args:
+        request: The current FastAPI request (auth_context read from state).
+        session: Per-request SQLAlchemy session for enterprise repositories.
+
+    Returns:
+        :class:`~skillmeat.core.repositories.enterprise_membership.EnterpriseMembershipRepository`
+        when ``tenant_id`` is set on the auth context;
+        :class:`~skillmeat.core.repositories.local_membership.LocalMembershipRepository`
+        otherwise.
+    """
+    auth_ctx: AuthContext | None = getattr(request.state, "auth_context", None)
+    tenant_id = auth_ctx.tenant_id if auth_ctx is not None else None
+
+    if tenant_id is not None:
+        from skillmeat.core.repositories.enterprise_membership import (
+            EnterpriseMembershipRepository,
+        )
+
+        return EnterpriseMembershipRepository(session=session)
+
+    from skillmeat.core.repositories.local_membership import LocalMembershipRepository
+
+    return LocalMembershipRepository()
+
+
+def get_ownership_resolver(
+    membership_repo: Annotated[IMembershipRepository, Depends(get_membership_repository)],
+) -> OwnershipResolver:
+    """Return an :class:`~skillmeat.core.services.ownership_resolver.OwnershipResolver`.
+
+    Args:
+        membership_repo: Edition-appropriate membership repository.
+
+    Returns:
+        A new :class:`~skillmeat.core.services.ownership_resolver.OwnershipResolver`
+        wired with the provided membership repository.
+    """
+    return OwnershipResolver(membership_repo)
+
+
+async def get_resolved_ownership(
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
+    resolver: Annotated[OwnershipResolver, Depends(get_ownership_resolver)],
+) -> ResolvedOwnership:
+    """Resolve and return the full ownership context for the current request.
+
+    Combines the authenticated :class:`~skillmeat.api.schemas.auth.AuthContext`
+    with membership lookups to produce a
+    :class:`~skillmeat.core.ownership.ResolvedOwnership` that encodes all
+    readable and writable owner scopes for this request.
+
+    Args:
+        auth_context: Authenticated request context (from ``get_auth_context``).
+        resolver: Ownership resolver wired with the correct membership repository.
+
+    Returns:
+        :class:`~skillmeat.core.ownership.ResolvedOwnership` instance.
+    """
+    return resolver.resolve(auth_context)
+
+
+#: Pre-built ``Annotated`` alias for routes that need the resolved ownership context.
+ResolvedOwnershipDep = Annotated[ResolvedOwnership, Depends(get_resolved_ownership)]
 
 
 def get_db_artifact_history_repository() -> IDbArtifactHistoryRepository:
