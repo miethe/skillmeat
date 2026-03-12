@@ -5,54 +5,70 @@ doc_type: progress
 prd: enterprise-repo-parity
 feature_slug: enterprise-repo-parity
 phase: 2
-phase_title: "Enterprise Models & Migration"
-status: pending
+phase_title: Enterprise Models & Migration
+status: in_progress
 created: 2026-03-12
-updated: 2026-03-12
+updated: '2026-03-12'
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-repo-parity-v2.md
 plan_ref: docs/project_plans/implementation_plans/refactors/enterprise-repo-parity-v2.md
 commit_refs: []
 pr_refs: []
-
-owners: ["data-layer-expert"]
-contributors: ["backend-architect"]
-
+owners:
+- data-layer-expert
+contributors:
+- backend-architect
 tasks:
-  - id: "ENT2-2.1"
-    title: "Enterprise models for tags, groups, settings"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-  - id: "ENT2-2.2"
-    title: "Enterprise models for context entities"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-  - id: "ENT2-2.3"
-    title: "Enterprise models for projects and deployments"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-  - id: "ENT2-2.4"
-    title: "Enterprise models for marketplace sources"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-  - id: "ENT2-2.5"
-    title: "Generate Alembic migration for all enterprise models"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT2-2.1", "ENT2-2.2", "ENT2-2.3", "ENT2-2.4"]
-  - id: "ENT2-2.6"
-    title: "Validate migration on PostgreSQL"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["ENT2-2.5"]
-
+- id: ENT2-2.1
+  title: Enterprise models for tags, groups, settings
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+- id: ENT2-2.2
+  title: Enterprise models for context entities
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+- id: ENT2-2.3
+  title: Enterprise models for projects and deployments
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+- id: ENT2-2.4
+  title: Enterprise models for marketplace sources
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+- id: ENT2-2.5
+  title: Generate Alembic migration for all enterprise models
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT2-2.1
+  - ENT2-2.2
+  - ENT2-2.3
+  - ENT2-2.4
+- id: ENT2-2.6
+  title: Validate migration on PostgreSQL
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - ENT2-2.5
 parallelization:
-  batch_1: ["ENT2-2.1", "ENT2-2.2", "ENT2-2.3", "ENT2-2.4"]
-  batch_2: ["ENT2-2.5"]
-  batch_3: ["ENT2-2.6"]
+  batch_1:
+  - ENT2-2.1
+  - ENT2-2.2
+  - ENT2-2.3
+  - ENT2-2.4
+  batch_2:
+  - ENT2-2.5
+  batch_3:
+  - ENT2-2.6
 ---
 
 # Phase 2: Enterprise Models & Migration
