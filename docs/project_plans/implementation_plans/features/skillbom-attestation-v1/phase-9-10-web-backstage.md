@@ -1,15 +1,16 @@
 ---
 schema_version: 2
 doc_type: phase_plan
-title: "SkillBOM & Attestation - Phases 9-10: Web & Backstage"
+title: "SkillBOM & Attestation - Phases 9-10: Web & Backstage Backend"
 description: >
-  Web app provenance UI (Phase 9) + Backstage plugin integration (Phase 10).
-  Frontend surfaces for BOM and attestation data.
+  Web app provenance UI (Phase 9) + Backstage backend integration (Phase 10).
+  Frontend provenance surfaces plus backend/scaffolder integration.
 audience:
   - ai-agents
   - developers
   - frontend-engineers
   - ui-engineers
+  - platform-engineers
 tags:
   - implementation-plan
   - phases
@@ -18,35 +19,39 @@ tags:
   - backstage
   - ui
 created: 2026-03-10
-updated: 2026-03-10
+updated: 2026-03-11
 phase: 9-10
-phase_title: "Web & Backstage: Frontend Surfaces"
+phase_title: "Web & Backstage Backend: Provenance Surfaces"
 prd_ref: /docs/project_plans/PRDs/features/skillbom-attestation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md
 entry_criteria:
   - Phase 7 API endpoints stable and tested
   - Phase 8 CLI commands functional
-  - OpenAPI spec finalized
+  - OpenAPI spec and typed client artifacts finalized
 exit_criteria:
   - ProvenanceTab component renders on artifact detail pages
-  - BomViewer displays context.lock contents
-  - HistoryTimeline with keyboard navigation (WCAG 2.1 AA)
-  - Backstage BOM card data shape correct
-  - All API hooks (useArtifactHistory, etc) tested
-  - E2E tests pass for all components
+  - BomViewer displays `context.lock` contents
+  - ActivityTimeline distinguishes provenance activity from existing version history
+  - Backstage backend payload contract finalized
+  - All new API hooks tested
+  - Web component and backend integration tests pass
 feature_slug: skillbom-attestation
-effort_estimate: "22-26 story points"
+effort_estimate: "19-23 story points"
 timeline: "2 weeks"
 parallelization: "Phase 9 and Phase 10 can run in parallel after Phase 7 API stable"
 ---
 
-# SkillBOM & Attestation System - Phases 9-10: Web & Backstage
+# SkillBOM & Attestation System - Phases 9-10: Web & Backstage Backend
 
 ## Overview
 
-Phase 9 implements React components for the web app (ProvenanceTab, BomViewer, HistoryTimeline, API hooks). Phase 10 extends the Backstage plugin with BOM card data shape and scaffolder actions.
+Phase 9 implements React components and hooks for the web app’s provenance surfaces. Phase 10 extends the existing Backstage backend/scaffolder integration with BOM payloads and actions.
 
-Both phases consume the Phase 7 API endpoints — no duplicate data storage.
+Important UI boundary:
+
+- Existing artifact version-history UI stays in place.
+- New provenance/activity UI is added beside it, not as a replacement.
+- Backstage frontend EntityPage UI is explicitly out of scope for this plan version and should be tracked separately.
 
 ---
 
@@ -56,35 +61,34 @@ Both phases consume the Phase 7 API endpoints — no duplicate data storage.
 
 ### Overview
 
-Add frontend components for viewing BOM, history, and attestation data on artifact detail pages and project dashboards.
+Add frontend components for viewing BOM, activity history, and attestation data on artifact detail pages and project dashboards. The work should integrate with current artifact detail modals/pages and existing query conventions rather than creating parallel history surfaces.
 
 ### Tasks
 
 | ID | Task | Description | Acceptance Criteria | Estimate | Status |
 |----|------|-------------|-------------------|----------|--------|
-| 9.1 | `ProvenanceTab` component | New tab on artifact detail pages showing BOM snapshot and attestation metadata. Displays: (1) artifact name + version, (2) owner (user/team), (3) creation timestamp, (4) signature status, (5) related artifacts (if any). | Component renders without errors; displays all fields; responsive on mobile; matches design system | 2 | Pending |
-| 9.2 | `BomViewer` component | Display context.lock contents in structured format. Shows: (1) BOM version + schema, (2) list of artifacts (name, type, version, hash, metadata), (3) timestamps. Filterable by artifact type. Copyable as JSON. | Component renders BOM JSON as structured table/tree view; filtering works; JSON export works; performance acceptable for 100+ artifacts | 2 | Pending |
-| 9.3 | `AttestationBadge` component | Inline badge showing attestation status (user/team owner, signature status). Appears on artifact cards and detail pages. Tooltip shows owner ID and signature details. | Badge renders correctly; displays owner scope and signature status; tooltip readable; no layout shifts | 1 | Pending |
-| 9.4 | `HistoryTimeline` component | Chronological event log with expandable event details. Shows: (1) event type (create/update/delete/deploy/sync), (2) timestamp, (3) actor (user/team), (4) diff preview (if available). Keyboard navigable (arrow keys to expand/collapse). Screen-reader friendly (ARIA labels). | Timeline renders events in chronological order; events expandable; keyboard navigation works; WCAG 2.1 AA compliant | 2 | Pending |
-| 9.5 | Attestation filter panel | Sidebar/modal to filter attestations by owner scope, date range, artifact type. Integration with existing filter UI patterns. | Panel allows filtering by owner_scope, date range, artifact_id; filters apply to list; results update reactively | 1 | Pending |
-| 9.6 | API hooks: `useArtifactHistory` | React hook to fetch artifact history. Signature: `useArtifactHistory(artifactId, filters)`. Returns: `{ events, isLoading, error, hasNextPage, nextCursor, pageSize }`. Handles pagination. | Hook fetches data from `/api/v1/bom/history` endpoint; returns correct shape; pagination works; errors handled | 2 | Pending |
-| 9.7 | API hooks: `useBomSnapshot` | React hook to fetch current BOM snapshot. Signature: `useBomSnapshot(projectId, options)`. Returns: `{ bom, isLoading, error, signature }`. | Hook fetches from `/api/v1/bom/snapshot` endpoint; returns BOM JSON and signature; stale-time correctly set (30s for interactive) | 2 | Pending |
-| 9.8 | API hooks: `useAttestations` | React hook to fetch attestations. Signature: `useAttestations(filters)`. Returns: `{ attestations, isLoading, error, hasNextPage }`. Owner-scoped by default. | Hook calls `/api/v1/attestations` endpoint; filters applied; pagination works; owner scope enforced | 1 | Pending |
-| 9.9 | Integration with artifact detail page | Add ProvenanceTab to artifact detail page tabs. Tab appears alongside existing tabs (metadata, deployment, etc). | ProvenanceTab renders on artifact detail; data loads correctly; no breaking changes to existing tabs | 2 | Pending |
-| 9.10 | BOM history timeline on project dashboard | Add new section to project dashboard showing recent BOM generation events and attestations. Shows: (1) last BOM snapshot timestamp, (2) recent history events (5-10), (3) team attestations (if applicable). | Dashboard section renders; shows live data; updates reactively; no performance regression | 2 | Pending |
-| 9.11 | Cache invalidation for attestation mutations | When user creates attestation or triggers BOM generation, invalidate relevant cache keys to refresh UI. Uses React Query cache invalidation. | Cache invalidated correctly after mutations; UI updates without full page reload; stale times respected | 1 | Pending |
-| 9.12 | Accessibility audit (WCAG 2.1 AA) | Audit all new components for keyboard navigation, screen reader compatibility, color contrast, focus management. Fix any violations. | Audit report generated; all violations fixed; components meet WCAG 2.1 AA; tested with screen readers | 2 | Pending |
-| 9.13 | E2E tests for web components | Tests for component rendering, user interactions (filtering, pagination), data loading, error states. Use Playwright or Cypress. | Tests cover all component functionality; E2E tests pass; visual regression tests optional but recommended | 2 | Pending |
-| 9.14 | Design system alignment | Ensure all new components match existing design system (colors, typography, spacing, shadows). Use shadcn/Radix primitives. | Components visually consistent with app; no custom CSS needed (use Tailwind); design review approved | 1 | Pending |
+| 9.1 | `ProvenanceTab` component | New tab on artifact detail surfaces showing BOM snapshot and attestation metadata. Displays artifact name/version, owner scope, creation timestamp, signature status, and related artifacts. | Component renders without errors; displays all fields; responsive on mobile; matches design system | 2 | Pending |
+| 9.2 | `BomViewer` component | Display `context.lock` contents in structured format with artifact-type filtering and JSON export. | Component renders structured BOM JSON; filtering works; JSON export works; performance acceptable for 100+ artifacts | 2 | Pending |
+| 9.3 | `AttestationBadge` component | Inline badge showing attestation status (user/team/enterprise owner, signature status). Appears on artifact cards and detail pages. | Badge renders correctly; tooltip readable; no layout shifts | 1 | Pending |
+| 9.4 | `ActivityTimeline` component | Chronological activity log with expandable event details. Shows event type, timestamp, actor, owner scope, and diff preview or metadata. Keyboard navigable and screen-reader friendly. | Timeline renders activity events in order; events expandable; keyboard navigation works; WCAG 2.1 AA compliant | 2 | Pending |
+| 9.5 | Attestation filter panel | Sidebar/modal to filter attestations by owner scope, date range, and artifact type. | Panel allows filtering; results update reactively; aligns with existing filter patterns | 1 | Pending |
+| 9.6 | API hook: `useArtifactActivityHistory` | React hook to fetch artifact activity history from the new Phase 7 endpoint. | Hook fetches from the activity-history endpoint; pagination works; errors handled correctly | 2 | Pending |
+| 9.7 | API hook: `useBomSnapshot` | React hook to fetch current BOM snapshot. | Hook fetches BOM snapshot endpoint; returns BOM JSON and signature metadata; stale time tuned appropriately | 2 | Pending |
+| 9.8 | API hook: `useAttestations` | React hook to fetch attestations. | Hook calls attestation endpoint; filters applied; pagination works; owner scope enforced | 1 | Pending |
+| 9.9 | Integrate with existing artifact detail surfaces | Add `ProvenanceTab` to existing artifact detail page/modal tab sets. Do not replace the current History tab. | ProvenanceTab renders alongside the current History tab; no breaking changes to existing tabs or URL state | 2 | Pending |
+| 9.10 | Project dashboard provenance section | Add section to project dashboard showing latest BOM snapshot, recent activity events, and recent attestations. | Dashboard section renders; shows live data; updates reactively; no performance regression | 2 | Pending |
+| 9.11 | Cache invalidation for provenance mutations | Invalidate relevant cache keys after attestation creation or BOM generation. | Cache invalidated correctly after mutations; UI updates without full page reload | 1 | Pending |
+| 9.12 | Accessibility audit (WCAG 2.1 AA) | Audit all new components for keyboard navigation, screen reader compatibility, color contrast, and focus management. | Audit report generated; violations fixed; components meet WCAG 2.1 AA | 2 | Pending |
+| 9.13 | E2E tests for web components | Tests for rendering, filtering, pagination, data loading, and error states. | Tests cover component functionality; E2E tests pass | 2 | Pending |
+| 9.14 | Design system alignment | Ensure all new components follow the existing design system and current artifact-detail interaction patterns. | Components visually consistent with app; integrates cleanly with existing modal/page components | 1 | Pending |
 
 ### Key Design Notes
 
-- **Stale Times**: History queries 30s (interactive), attestation queries 2min (lighter traffic).
-- **Pagination**: React Query cursor-based pagination; show "Load More" button or infinite scroll.
-- **Error UI**: Show user-friendly error messages; retry buttons for transient failures.
-- **Loading States**: Skeleton loaders for initial load; spinners for refresh.
-- **ARIA Labels**: All timeline events and timeline markers have aria-labels for screen readers.
-- **Keyboard Navigation**: Arrow keys to expand/collapse timeline events; Tab to navigate buttons.
+- **Do Not Replace Existing History**: Preserve current version-history components and query hooks. Add provenance/activity as a separate tab or panel.
+- **Hook Naming**: Use explicit provenance/activity hook names; do not overload the existing `useArtifactHistory`.
+- **Query Clients**: Prefer the generated SDK/client artifacts or existing API helper patterns rather than raw one-off fetch helpers.
+- **Error UI**: Show user-friendly error messages with retry actions for transient failures.
+- **Loading States**: Skeleton loaders for initial load; light spinners for refresh.
 
 ### Deliverables
 
@@ -92,23 +96,26 @@ Add frontend components for viewing BOM, history, and attestation data on artifa
    - `skillmeat/web/components/provenance/provenance-tab.tsx` — ProvenanceTab component
    - `skillmeat/web/components/bom/bom-viewer.tsx` — BomViewer component
    - `skillmeat/web/components/bom/attestation-badge.tsx` — AttestationBadge component
-   - `skillmeat/web/components/bom/history-timeline.tsx` — HistoryTimeline component
-   - `skillmeat/web/hooks/useBom.ts` — useArtifactHistory, useBomSnapshot, useAttestations hooks
-   - `skillmeat/web/lib/bom-utils.ts` — Utility functions for BOM/history data
+   - `skillmeat/web/components/bom/activity-timeline.tsx` — ActivityTimeline component
+   - `skillmeat/web/hooks/useArtifactActivityHistory.ts` — Activity-history hook
+   - `skillmeat/web/hooks/useBomSnapshot.ts` — BOM snapshot hook
+   - `skillmeat/web/hooks/useAttestations.ts` — Attestation hook
+   - Existing artifact detail surfaces under `skillmeat/web/components/collection/` and `skillmeat/web/components/entity/` updated to register the Provenance tab
 
 2. **Tests**:
    - `skillmeat/web/__tests__/provenance-tab.test.tsx` — Component tests
    - `skillmeat/web/__tests__/bom-viewer.test.tsx` — BomViewer tests
-   - `skillmeat/web/__tests__/history-timeline.test.tsx` — HistoryTimeline tests (keyboard nav)
-   - `skillmeat/web/__tests__/useBom.test.ts` — Hook tests
+   - `skillmeat/web/__tests__/activity-timeline.test.tsx` — ActivityTimeline tests
+   - `skillmeat/web/__tests__/useArtifactActivityHistory.test.ts` — Hook tests
    - `skillmeat/web/e2e/bom-workflow.e2e.ts` — End-to-end tests
 
 ### Exit Criteria
 
-- [ ] ProvenanceTab renders on artifact detail pages
-- [ ] BomViewer displays context.lock with filtering and export
-- [ ] HistoryTimeline shows events with keyboard navigation and ARIA labels
-- [ ] API hooks correctly fetch and cache data
+- [ ] ProvenanceTab renders on artifact detail surfaces
+- [ ] BomViewer displays `context.lock` with filtering and export
+- [ ] ActivityTimeline shows provenance activity with keyboard navigation and ARIA labels
+- [ ] New hooks correctly fetch and cache provenance data
+- [ ] Existing version-history UI remains intact
 - [ ] All components responsive on mobile
 - [ ] WCAG 2.1 AA compliance verified
 - [ ] E2E tests pass
@@ -116,70 +123,69 @@ Add frontend components for viewing BOM, history, and attestation data on artifa
 
 ---
 
-## Phase 10: Backstage Plugin Integration
+## Phase 10: Backstage Backend Integration
 
-**Duration**: 1 week | **Effort**: 8-10 story points | **Assigned**: python-backend-engineer (API), ui-engineer-enhanced (plugin UI)
+**Duration**: 1 week | **Effort**: 5-7 story points | **Assigned**: python-backend-engineer
 
 ### Overview
 
-Extend Backstage plugin with BOM card data shape and scaffolder actions. Plugin calls Phase 7 API endpoints to fetch live data without separate storage.
+Extend the existing Backstage backend/scaffolder integration with BOM payloads and scaffolder actions. This phase is explicitly backend-only for this plan version.
+
+Out of scope for this phase:
+
+- Backstage frontend package work
+- EntityPage card React component
+- Frontend E2E inside a Backstage app shell
 
 ### Tasks
 
 | ID | Task | Description | Acceptance Criteria | Estimate | Status |
 |----|------|-------------|-------------------|----------|--------|
-| 10.1 | Extend `/integrations/idp/bom-card/{project_id}` endpoint | API endpoint returns Backstage-compatible BOM card payload. Response shape: { projectId, bomSnapshot: { ... }, recentEvents: [...], attestations: [...], cardMetadata: { ... } }. Load time < 500ms. | Endpoint implemented in `idp_integration.py`; response format validated against Backstage spec; performance tested | 2 | Pending |
-| 10.2 | Backstage entity card data shape | Define Backstage entity card data shape (catalog-info.yaml compatible). Fields: (1) projectId, (2) artifactCount, (3) lastBomSnapshot timestamp, (4) recentEvents count, (5) attestationStatus. | Data shape matches Backstage EntityPage card requirements; all fields populated correctly | 1 | Pending |
-| 10.3 | Backstage EntityPage card component | New React component for Backstage EntityPage showing BOM card data. Displays: (1) project name, (2) artifact list from BOM, (3) recent history events, (4) attestation summary, (5) signature status. Styled to match Backstage theme. | Component renders correctly in Backstage EntityPage; data updates live via API; styling consistent with Backstage | 2 | Pending |
-| 10.4 | `skillmeat:attest` scaffolder action | New scaffolder action (template step) to create attestation. Parameters: (1) artifact_ids (multi-select from BOM), (2) compliance_notes (text). Action calls `/api/v1/attestations` endpoint. | Action appears in Backstage scaffolder; artifact selection works; attestation created correctly; result shown to user | 2 | Pending |
-| 10.5 | `skillmeat:bom-generate` scaffolder action | New scaffolder action to trigger BOM generation. Parameters: (1) include_memory_items (checkbox), (2) auto_sign (checkbox). Calls `/api/v1/bom/generate` endpoint. | Action appears in scaffolder; parameters respected; BOM generated and artifact created; success message shown | 1 | Pending |
-| 10.6 | Scaffolder action integration with plugin | Actions registered in scaffolder template system. Templates can include SkillMeat actions in workflow steps. | Actions registered correctly; callable from Backstage scaffolder; error handling clear | 1 | Pending |
-| 10.7 | E2E test: Backstage card renders and loads data | E2E test in Backstage environment: navigate to component catalog entry, verify BOM card appears, loads data from API, updates in real time. Card load time < 500ms. | Test passes; card renders correctly; API calls succeed; card load time measured and logged | 2 | Pending |
+| 10.1 | Extend `/integrations/idp/bom-card/{project_id}` endpoint | API endpoint returns a BOM payload for Backstage backend/scaffolder consumers. Response includes `projectId`, `bomSnapshot`, recent activity events, attestation summary, and payload metadata. | Endpoint implemented in `idp_integration.py`; payload validated against agreed contract; performance tested | 2 | Pending |
+| 10.2 | Define stable payload contract for future frontend consumers | Document the payload shape that a future Backstage frontend card can consume. | Payload contract documented; fields populated correctly; no duplicate storage introduced | 1 | Pending |
+| 10.3 | `skillmeat:attest` scaffolder action | New scaffolder action to create attestation from Backstage workflows. | Action appears in Backstage scaffolder backend; attestation created correctly; result shown to user | 2 | Pending |
+| 10.4 | `skillmeat:bom-generate` scaffolder action | New scaffolder action to trigger BOM generation. | Action appears in scaffolder backend; parameters respected; BOM generated successfully | 1 | Pending |
+| 10.5 | Scaffolder action registration and tests | Register actions in the existing backend module and add automated tests. | Actions registered correctly; callable from Backstage scaffolder; backend tests pass | 1 | Pending |
 
 ### Key Design Notes
 
-- **No Separate Storage**: All data from Phase 7 API; no duplicate BOM storage in Backstage or separate DB.
-- **Enterprise PAT Auth**: Use existing `verify_enterprise_pat` middleware for authentication.
-- **Backstage Theme**: Match EntityPage card styling; follow Backstage design patterns.
-- **Real-Time Updates**: Optional WebSocket polling for live BOM updates (future enhancement).
-- **Error Handling**: Show user-friendly errors if API unreachable; fallback to cached snapshot if available.
+- **No Separate Storage**: All data comes from SkillMeat APIs; do not duplicate BOM state in Backstage.
+- **Backend Only**: Keep this phase inside the existing `backstage-plugin-scaffolder-backend` module.
+- **Future Frontend Follow-On**: Track Backstage EntityPage UI in a separate plan or follow-up phase.
+- **Error Handling**: Return user-friendly action errors if API calls fail; support fallback messaging.
 
 ### Deliverables
 
 1. **Code**:
-   - Extended `skillmeat/api/routers/idp_integration.py` — BOM card endpoint
+   - Extended `skillmeat/api/routers/idp_integration.py` — BOM payload endpoint
    - `plugins/backstage-plugin-scaffolder-backend/src/actions/skillmeat-attest.ts` — Attest scaffolder action
-   - `plugins/backstage-plugin-scaffolder-backend/src/actions/skillmeat-bom-generate.ts` — BOM generate action
-   - `plugins/backstage-plugin-scaffolder-backend/src/components/SkillBOMCard.tsx` — EntityPage card component
+   - `plugins/backstage-plugin-scaffolder-backend/src/actions/skillmeat-bom-generate.ts` — BOM generate scaffolder action
+   - `plugins/backstage-plugin-scaffolder-backend/src/index.ts` — Action registration updates
 
 2. **Tests**:
    - `skillmeat/api/tests/test_bom_card_endpoint.py` — API endpoint tests
    - `plugins/backstage-plugin-scaffolder-backend/src/__tests__/skillmeat-actions.test.ts` — Action tests
-   - `plugins/backstage-plugin-scaffolder-backend/e2e/bom-card.e2e.ts` — E2E test in Backstage
 
 ### Exit Criteria
 
 - [ ] `/integrations/idp/bom-card/{project_id}` endpoint implemented and tested
-- [ ] Backstage card data shape Backstage-compatible
-- [ ] EntityPage card component renders correctly
+- [ ] Stable backend payload contract defined for future frontend consumers
 - [ ] `skillmeat:attest` scaffolder action functional
 - [ ] `skillmeat:bom-generate` scaffolder action functional
-- [ ] Card load time < 500ms
-- [ ] E2E test passes in Backstage environment
-- [ ] No separate BOM storage (API-driven only)
+- [ ] Backend tests pass
+- [ ] No separate BOM storage introduced in Backstage
 
 ---
 
 ## Integration Points
 
 ### From Phase 7 API
-- Both phases consume Phase 7 endpoints
-- Phase 9 React hooks call Phase 7 endpoints
-- Phase 10 Backstage card fetches from Phase 7 endpoint
+- Phase 9 hooks call activity-history, BOM, and attestation endpoints
+- Phase 10 backend integration consumes the IDP payload endpoint and write endpoints
 
 ### Between Phase 9 and 10
-- ProvenanceTab can link to Backstage component entry (if applicable)
-- Backstage card can link back to SkillMeat web app
+- ProvenanceTab may link out to external platform integrations later, but no direct Backstage frontend coupling is required in this plan version
+- The Backstage backend payload contract should stay aligned with the web app’s provenance data model
 
 ---
 
@@ -187,29 +193,30 @@ Extend Backstage plugin with BOM card data shape and scaffolder actions. Plugin 
 
 | Risk | Mitigation |
 |------|-----------|
-| Backstage API rate limit | Cache BOM card data for 5min; implement exponential backoff for retries |
-| Web component performance with large BOMs | Virtual scrolling for long lists; paginate history events (50 per page default) |
-| WCAG compliance gaps | Accessibility audit by external expert; automated testing with axe-core |
-| Backstage plugin breaks on minor API changes | Semantic versioning; backward-compatible API schema; deprecation period before breaking changes |
+| Users confuse provenance activity with version history | Keep the new UI explicitly labeled and preserve the existing History tab |
+| Web component performance with large BOMs | Use filtering, pagination, and lightweight rendering patterns for long lists |
+| Backstage scope expands into frontend work mid-phase | Keep frontend EntityPage card explicitly out of scope and track separately |
+| Payload contract churn breaks downstream consumers | Define stable payload contract and version changes conservatively |
 
 ---
 
 ## Success Metrics
 
 - **Web Component Tests**: >= 80% code coverage
-- **E2E Tests**: All scenarios pass (rendering, filtering, pagination, error states)
 - **Accessibility**: WCAG 2.1 AA compliance verified
-- **Performance**: Backstage card loads in < 500ms; ProvenanceTab renders in < 200ms
-- **API Adoption**: Phase 9-10 components use Phase 7 API exclusively (no direct DB access)
+- **Performance**: ProvenanceTab renders in < 200ms for typical payloads
+- **Backend Payload**: IDP payload endpoint responds in < 500ms for typical projects
+- **API Adoption**: New provenance surfaces use Phase 7 API/contracts exclusively
 
 ---
 
 ## Next Steps (Gate to Phase 11)
 
 1. ✅ Phase 9-10 exit criteria verified
-2. ✅ Web components tested and accessible
-3. ✅ Backstage plugin tested in real Backstage environment
-4. ✅ Phase 11 (Testing, Docs, Deployment) can begin with all surfaces stable
+2. ✅ Web provenance components tested and accessible
+3. ✅ Backstage backend integration tested
+4. ✅ Any future Backstage frontend card tracked separately
+5. ✅ Phase 11 can begin with all current-scope surfaces stable
 
 ---
 
@@ -219,6 +226,4 @@ Extend Backstage plugin with BOM card data shape and scaffolder actions. Plugin 
 - **Main Plan**: `/docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md`
 - **Web CLAUDE.md**: `skillmeat/web/CLAUDE.md`
 - **Component Patterns**: `.claude/context/key-context/component-patterns.md`
-- **NextJS Patterns**: `.claude/context/key-context/nextjs-patterns.md`
 - **Testing Patterns**: `.claude/context/key-context/testing-patterns.md`
-- **Backstage Docs**: https://backstage.io/docs/overview/what-is-backstage

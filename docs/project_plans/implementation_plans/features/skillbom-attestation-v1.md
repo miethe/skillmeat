@@ -18,7 +18,7 @@ tags:
   - security
   - attestation
 created: 2026-03-10
-updated: 2026-03-10
+updated: 2026-03-11
 category: product-planning
 status: draft
 priority: HIGH
@@ -33,6 +33,7 @@ critical_path: "Phase 1 → Phase 2 → Phase 3 → Phase 7 → Phase 9"
 parallelization_strategy: "Parallel tracks after Phase 2 (DB models established)"
 related_documents:
   - /docs/project_plans/PRDs/features/skillbom-attestation-v1.md
+  - /docs/project_plans/design-specs/skillbom-point-in-time-environment-recovery.md
   - /.claude/context/key-context/repository-architecture.md
   - /.claude/context/key-context/data-flow-patterns.md
   - /.claude/context/key-context/auth-architecture.md
@@ -60,8 +61,8 @@ The plan follows MeatyPrompts' layered hexagonal architecture, with clear separa
 
 **Critical Dependencies:**
 - Completion of Phase 1 (models) gates all subsequent phases
-- Phase 2 (BOM generator) must complete before Phase 3 (history capture)
-- Phase 7 (API) is gateway to Phases 9-10 (front-end surfaces)
+- Phase 2 (BOM generator) must complete before Phase 3 (activity capture)
+- Phase 7 (API) is gateway to Phases 9-10 (web and backend integration surfaces)
 
 ---
 
@@ -77,7 +78,7 @@ The plan follows MeatyPrompts' layered hexagonal architecture, with clear separa
 | 6 | Cryptographic Signing | 1 wk | 6-8 pts | Ed25519 signing/verification, signature chain validation | python-backend-engineer |
 | 7 | API Layer | 2 wks | 16-18 pts | 8 endpoints, auth middleware, response pagination | python-backend-engineer |
 | 8 | CLI Commands | 2 wks | 12-14 pts | bom/history/attest commands, scaffolder integration | python-backend-engineer |
-| 9 | Web App Integration | 2 wks | 14-16 pts | ProvenanceTab, BomViewer, AttestationBadge, HistoryTimeline, hooks | ui-engineer-enhanced |
+| 9 | Web App Integration | 2 wks | 14-16 pts | ProvenanceTab, BomViewer, AttestationBadge, ActivityTimeline, hooks | ui-engineer-enhanced |
 | 10 | Backstage Backend Integration | 1 wk | 5-7 pts | Extend idp_integration router, payload contract, scaffolder actions | python-backend-engineer |
 | 11 | Testing, Docs, Deployment | 2 wks | 14-16 pts | Unit, integration, migration tests; API docs; CI/CD guides | python-backend-engineer, documentation-writer |
 
@@ -99,14 +100,14 @@ The plan follows MeatyPrompts' layered hexagonal architecture, with clear separa
 ### Parallel Work Opportunities
 
 **After Phase 2 (models + generator ready):**
-- Phase 3 (history capture) can run parallel to Phase 4 (RBAC metadata)
+- Phase 3 (activity capture) can run parallel to Phase 4 (RBAC metadata)
 - Phase 5-6 (Git + crypto) are largely independent, can parallelize
-- Phase 9-10 (web + Backstage) can parallelize after Phase 7 API is stable
+- Phase 9-10 (web + Backstage backend) can parallelize after Phase 7 API is stable
 
 **Sequential Dependencies (Critical Path):**
 1. Phase 1 (models) → Phase 2 (BomGenerator) → Phase 7 (API)
-2. Phase 3 (history) → Phase 7 (API) [history endpoint needs history data]
-3. Phase 7 (API) → Phases 9-10 (front-end surfaces)
+2. Phase 3 (activity history) → Phase 7 (API) [activity-history and provenance endpoints need event data]
+3. Phase 7 (API) → Phases 9-10 (web and backend integration surfaces)
 
 ### Risk Mitigation
 
@@ -202,7 +203,7 @@ Implementation details for each phase are in the following linked documents:
 
 ### Phase 8 Exit Criteria
 - `skillmeat bom generate`, `verify`, `restore` CLI commands fully functional
-- `skillmeat history [artifact-name]` returns formatted timeline
+- `skillmeat history [artifact-name]` returns formatted activity timeline
 - `skillmeat attest create/list/show` commands manage attestation records
 - CLI help text and error messages clear and actionable
 - All commands work in local and enterprise editions
@@ -210,7 +211,7 @@ Implementation details for each phase are in the following linked documents:
 ### Phase 9 Exit Criteria
 - ProvenanceTab component renders on artifact detail pages
 - BomViewer displays structured context.lock contents
-- HistoryTimeline shows time-ordered events with keyboard navigation
+- ActivityTimeline shows time-ordered events with keyboard navigation
 - WCAG 2.1 AA compliance verified with accessibility audit
 - API hooks (`useArtifactActivityHistory`, `useBomSnapshot`, `useAttestations`) tested
 
@@ -261,7 +262,7 @@ Implementation details for each phase are in the following linked documents:
 ### Web (Phase 9)
 - `skillmeat/web/components/provenance/provenance-tab.tsx` — Artifact detail provenance tab
 - `skillmeat/web/components/bom/bom-viewer.tsx` — context.lock viewer
-- `skillmeat/web/components/bom/history-timeline.tsx` — Event timeline
+- `skillmeat/web/components/bom/activity-timeline.tsx` — Event timeline
 - `skillmeat/web/hooks/useArtifactActivityHistory.ts` — Provenance/activity history hook
 - `skillmeat/web/hooks/useBomSnapshot.ts` / `useAttestations.ts` — BOM and attestation data hooks
 
@@ -279,10 +280,10 @@ Implementation details for each phase are in the following linked documents:
 | Metric | Target | Measurement |
 |--------|--------|-------------|
 | Artifact types in BOM schema | 13+ | Schema validation test |
-| History event capture latency | < 50ms p95 | OpenTelemetry span timing |
+| Activity event capture latency | < 50ms p95 | OpenTelemetry span timing |
 | BOM generation time (50 artifacts) | < 2s | CLI benchmark |
-| API response for history query (100 events) | < 200ms p95 | Load test |
-| Backstage card load time | < 500ms | E2E test |
+| API response for activity query (100 events) | < 200ms p95 | Load test |
+| Backstage backend payload generation | < 500ms | Integration test |
 | API endpoint code coverage | >= 80% | pytest coverage report |
 | Repository tests (local + enterprise) | 100% pass | pytest run on both editions |
 
@@ -299,13 +300,13 @@ Implementation details for each phase are in the following linked documents:
 ```
 Week 1-2: Phase 1 (Models)
   └─→ Phase 2 (BOM Generator) Weeks 2-3
-      ├─→ Phase 3 (History) Weeks 4-5 [parallel with Phase 4]
+      ├─→ Phase 3 (Activity History) Weeks 4-5 [parallel with Phase 4]
       └─→ Phase 4 (RBAC) Weeks 4-5
           ├─→ Phase 5-6 (Git+Crypto) Weeks 6-8 [parallel]
           └─→ Phase 7 (API) Weeks 9-10 [gate for Phases 9-10]
               ├─→ Phase 8 (CLI) Weeks 10-11 [parallel with Phase 9]
               ├─→ Phase 9 (Web) Weeks 11-12 [parallel with Phase 10]
-              └─→ Phase 10 (Backstage) Weeks 12-13
+              └─→ Phase 10 (Backstage Backend) Weeks 12-13
                   └─→ Phase 11 (Testing+Docs) Weeks 14-16
 ```
 
@@ -340,6 +341,11 @@ All attestation/activity queries are filtered by resolved `user|team|enterprise`
 BOM snapshots use SHA-256 content hashes (from existing drift detection) as the versioning primitive — no sequential version numbers.
 
 **Rationale**: Aligns with Git's commit-hash model; enables cryptographic trust.
+
+### 6. Point-in-Time Recovery Foundation
+The current plan establishes the manifest and commit-linkage foundation for future exact point-in-time recovery. Universal exact restore still requires a later restore-source architecture covering every BOM entry type.
+
+**Reference**: `/docs/project_plans/design-specs/skillbom-point-in-time-environment-recovery.md`
 
 ---
 
