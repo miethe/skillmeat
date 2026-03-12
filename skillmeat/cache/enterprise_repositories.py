@@ -5197,3 +5197,1277 @@ class EnterpriseContextEntityRepository(
         if row is None:
             return None
         return row.content
+
+
+# =============================================================================
+# EnterpriseProjectRepository  (ENT2-4.1)
+# =============================================================================
+
+
+class EnterpriseProjectRepository(
+    EnterpriseRepositoryBase["EnterpriseProject"],
+):
+    """Repository for tenant-scoped CRUD on EnterpriseProject.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.IProjectRepository`
+    for the enterprise PostgreSQL backend.
+
+    Enterprise projects are DB records — ``path`` is an informational metadata
+    field recorded at registration time, NOT a live filesystem reference.
+    Methods that carry filesystem semantics in the local backend (e.g.
+    ``refresh``, ``get_artifacts``) operate purely on DB data and never touch
+    the filesystem.  A debug-level log is emitted for every method where
+    enterprise behaviour meaningfully diverges from the local implementation.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    - ``path`` is unique per tenant (``uq_enterprise_projects_tenant_path``).
+    - ``_apply_tenant_filter()`` is called on every ``select()`` statement.
+    - No filesystem operations are performed anywhere in this class.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseProject as _EP
+
+        super().__init__(session, _EP)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _to_dto(self, row: "EnterpriseProject") -> "ProjectDTO":
+        """Map an ``EnterpriseProject`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.ProjectDTO`.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        ProjectDTO
+        """
+        from skillmeat.core.interfaces.dtos import ProjectDTO
+
+        return ProjectDTO(
+            id=str(row.id),
+            name=row.name,
+            path=row.path or "",
+            description=row.description,
+            status=row.status or "active",
+            artifact_count=len(row.project_artifacts) if row.project_artifacts else 0,
+            created_at=row.created_at.isoformat() if row.created_at else None,
+            updated_at=row.updated_at.isoformat() if row.updated_at else None,
+        )
+
+    def _fetch_project(
+        self,
+        project_uuid: "uuid.UUID",
+    ) -> "Optional[EnterpriseProject]":
+        """Fetch a tenant-filtered project by UUID.
+
+        Parameters
+        ----------
+        project_uuid:
+            UUID of the project to retrieve.
+
+        Returns
+        -------
+        EnterpriseProject or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        stmt = self._tenant_select().where(EnterpriseProject.id == project_uuid)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: get
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[ProjectDTO]":
+        """Return the project with the given identifier.
+
+        Parameters
+        ----------
+        id:
+            Project UUID as a string (enterprise PK).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO or None
+        """
+        try:
+            project_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError):
+            return None
+
+        row = self._fetch_project(project_uuid)
+        if row is None:
+            return None
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: list
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        filters: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[ProjectDTO]":
+        """Return all known projects for the current tenant.
+
+        Parameters
+        ----------
+        filters:
+            Optional filter map.  Supported keys: ``status``, ``search``
+            (case-insensitive prefix on ``name``).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[ProjectDTO]
+        """
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        stmt = self._tenant_select().order_by(EnterpriseProject.created_at)
+
+        if filters:
+            status = filters.get("status")
+            if status is not None:
+                stmt = stmt.where(EnterpriseProject.status == status)
+
+            search = filters.get("search")
+            if search:
+                stmt = stmt.where(
+                    func.lower(EnterpriseProject.name).like(f"{search.lower()}%")
+                )
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [self._to_dto(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: create
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        dto: "ProjectDTO",
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectDTO":
+        """Register a new project record.
+
+        Parameters
+        ----------
+        dto:
+            Project data.  ``dto.path`` is stored as an informational field;
+            no filesystem access is performed.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO
+            The persisted project.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        tenant_id = self._get_tenant_id()
+
+        row = EnterpriseProject(
+            tenant_id=tenant_id,
+            name=dto.name,
+            path=dto.path or "",
+            status=dto.status or "active",
+            description=dto.description,
+        )
+        self.session.add(row)
+        self.session.flush()
+
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseProject",
+            entity_id=row.id,
+            metadata={"name": dto.name, "path": dto.path},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: update
+    # ------------------------------------------------------------------
+
+    def update(
+        self,
+        id: str,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectDTO":
+        """Apply a partial update to an existing project.
+
+        Parameters
+        ----------
+        id:
+            Project UUID as a string.
+        updates:
+            Map of field names to new values.  Supported keys:
+            ``name``, ``path``, ``status``, ``description``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO
+            The updated project.
+
+        Raises
+        ------
+        KeyError
+            If no project with *id* exists in this tenant.
+        """
+        try:
+            project_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(id) from exc
+
+        row = self._fetch_project(project_uuid)
+        if row is None:
+            raise KeyError(id)
+
+        for field_name in ("name", "path", "status", "description"):
+            if field_name in updates:
+                setattr(row, field_name, updates[field_name])
+
+        row.updated_at = datetime.utcnow()
+        self.session.flush()
+
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseProject",
+            entity_id=row.id,
+            metadata={k: str(v)[:80] for k, v in updates.items()},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: delete
+    # ------------------------------------------------------------------
+
+    def delete(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Remove a project record.
+
+        Does not delete anything on disk — only removes the DB entry.
+
+        Parameters
+        ----------
+        id:
+            Project UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` when the project was found and deleted, ``False``
+            otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        try:
+            project_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError):
+            return False
+
+        row = self._fetch_project(project_uuid)
+        if row is None:
+            return False
+
+        self.session.delete(row)
+        self.session.flush()
+
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseProject",
+            entity_id=project_uuid,
+            metadata={"id": id},
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: get_artifacts
+    # ------------------------------------------------------------------
+
+    def get_artifacts(
+        self,
+        project_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "list[ArtifactDTO]":
+        """Return all artifacts deployed to a project.
+
+        Queries ``enterprise_project_artifacts`` and resolves the associated
+        ``EnterpriseArtifact`` rows.  No filesystem access is performed.
+
+        Parameters
+        ----------
+        project_id:
+            Project UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[ArtifactDTO]
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseProjectArtifact,
+        )
+        from skillmeat.core.interfaces.dtos import ArtifactDTO
+
+        logger.debug(
+            "EnterpriseProjectRepository.get_artifacts: querying DB only "
+            "(no filesystem scan) for project_id=%s",
+            project_id,
+        )
+
+        try:
+            project_uuid = uuid.UUID(str(project_id))
+        except (ValueError, AttributeError):
+            return []
+
+        tenant_id = self._get_tenant_id()
+
+        stmt = (
+            select(EnterpriseArtifact)
+            .join(
+                EnterpriseProjectArtifact,
+                EnterpriseProjectArtifact.artifact_uuid == EnterpriseArtifact.id,
+            )
+            .where(
+                EnterpriseProjectArtifact.project_id == project_uuid,
+                EnterpriseProjectArtifact.tenant_id == tenant_id,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
+        )
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [
+            ArtifactDTO(
+                id=row.id or f"{row.artifact_type}:{row.name}",
+                name=row.name,
+                artifact_type=row.artifact_type or "",
+                uuid=str(row.id),
+                source=row.source,
+                version=row.version,
+                scope=row.scope,
+                description=row.description,
+                project_id=str(project_uuid),
+                created_at=row.created_at.isoformat() if row.created_at else None,
+                updated_at=row.updated_at.isoformat() if row.updated_at else None,
+            )
+            for row in rows
+        ]
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: refresh
+    # ------------------------------------------------------------------
+
+    def refresh(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectDTO":
+        """Trigger a cache refresh for a single project.
+
+        In the enterprise backend, the DB is the source of truth — no
+        filesystem rescan is possible from within the repository layer.
+        This method reloads the project record from DB (touching
+        ``updated_at``) and returns the current state.
+
+        Parameters
+        ----------
+        id:
+            Project UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO
+            The current project state.
+
+        Raises
+        ------
+        KeyError
+            If no project with *id* exists in this tenant.
+        """
+        logger.debug(
+            "EnterpriseProjectRepository.refresh: enterprise backend has no "
+            "filesystem rescan; returning current DB state for project_id=%s",
+            id,
+        )
+        try:
+            project_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(id) from exc
+
+        row = self._fetch_project(project_uuid)
+        if row is None:
+            raise KeyError(id)
+
+        row.updated_at = datetime.utcnow()
+        self.session.flush()
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: get_by_path
+    # ------------------------------------------------------------------
+
+    def get_by_path(
+        self,
+        path: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[ProjectDTO]":
+        """Return the project whose stored path matches *path*.
+
+        Matches against the ``path`` column (informational, stored at
+        registration time).  No live filesystem access is performed.
+
+        Parameters
+        ----------
+        path:
+            Path string to match against.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+
+        logger.debug(
+            "EnterpriseProjectRepository.get_by_path: matching stored path "
+            "column only (no filesystem resolution) for path=%s",
+            path,
+        )
+
+        stmt = self._tenant_select().where(EnterpriseProject.path == path)
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IProjectRepository: get_or_create_by_path
+    # ------------------------------------------------------------------
+
+    def get_or_create_by_path(
+        self,
+        path: str,
+        ctx: "Optional[object]" = None,
+    ) -> "ProjectDTO":
+        """Return the project for *path*, creating a DB record if absent.
+
+        Looks up an existing project by its stored ``path`` column and
+        creates a new one if none is found.  No filesystem resolution
+        is performed.
+
+        Parameters
+        ----------
+        path:
+            Path string to match or register.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ProjectDTO
+            Existing or newly created project.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseProject
+        from skillmeat.core.interfaces.dtos import ProjectDTO as _ProjectDTO
+
+        logger.debug(
+            "EnterpriseProjectRepository.get_or_create_by_path: using stored "
+            "path column only (no filesystem resolution) for path=%s",
+            path,
+        )
+
+        existing = self.get_by_path(path, ctx=ctx)
+        if existing is not None:
+            return existing
+
+        # No existing record — create one using the path as both path and name.
+        # Derive a display name from the last path component (string-only, no I/O).
+        name = path.rstrip("/\\").rsplit("/", 1)[-1] or path
+        tenant_id = self._get_tenant_id()
+
+        row = EnterpriseProject(
+            tenant_id=tenant_id,
+            name=name,
+            path=path,
+            status="active",
+        )
+        self.session.add(row)
+        self.session.flush()
+
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseProject",
+            entity_id=row.id,
+            metadata={"name": name, "path": path, "via": "get_or_create_by_path"},
+        )
+        return self._to_dto(row)
+
+
+# =============================================================================
+# EnterpriseDeploymentRepository  (ENT2-4.2)
+# =============================================================================
+
+
+class EnterpriseDeploymentRepository(
+    EnterpriseRepositoryBase["EnterpriseDeployment"],
+):
+    """Repository for tenant-scoped CRUD on EnterpriseDeployment.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.IDeploymentRepository`
+    for the enterprise PostgreSQL backend.
+
+    Deployment records reference projects via ``project_id`` (nullable FK) and
+    artifacts via ``artifact_uuid`` (nullable FK) plus the text ``artifact_id``
+    field for backward compatibility with the ``sync_deployment_cache`` callers.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    - Both ``project_id`` and ``artifact_uuid`` are nullable FKs (SET NULL
+      on delete); callers must handle ``None`` values gracefully.
+    - ``artifact_id`` (text ``"type:name"`` format) is kept for write-through
+      compatibility with ``sync_deployment_cache`` and ``remove_deployment_cache``.
+    - ``_apply_tenant_filter()`` is called on every ``select()`` statement.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment as _ED
+
+        super().__init__(session, _ED)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _to_dto(self, row: "EnterpriseDeployment") -> "DeploymentDTO":
+        """Map an ``EnterpriseDeployment`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.DeploymentDTO`.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        DeploymentDTO
+        """
+        from skillmeat.core.interfaces.dtos import DeploymentDTO
+
+        artifact_id = row.artifact_id or ""
+        # Derive name and type from text identifier "type:name" when possible.
+        parts = artifact_id.split(":", 1)
+        artifact_type = parts[0] if len(parts) == 2 else ""
+        artifact_name = parts[1] if len(parts) == 2 else artifact_id
+
+        project_path: Optional[str] = None
+        project_name: Optional[str] = None
+        if row.project is not None:
+            project_path = row.project.path
+            project_name = row.project.name
+
+        return DeploymentDTO(
+            id=str(row.id),
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type,
+            project_id=str(row.project_id) if row.project_id else None,
+            project_path=project_path,
+            project_name=project_name,
+            status=row.status or "deployed",
+            deployed_at=row.deployed_at.isoformat() if row.deployed_at else None,
+            collection_sha=row.content_hash,
+            local_modifications=bool(row.local_modifications),
+            deployment_profile_id=(
+                str(row.deployment_profile_id) if row.deployment_profile_id else None
+            ),
+            platform=row.platform,
+        )
+
+    def _fetch_deployment(
+        self,
+        deployment_uuid: "uuid.UUID",
+    ) -> "Optional[EnterpriseDeployment]":
+        """Fetch a tenant-filtered deployment record by UUID.
+
+        Parameters
+        ----------
+        deployment_uuid:
+            UUID of the deployment to retrieve.
+
+        Returns
+        -------
+        EnterpriseDeployment or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment
+
+        stmt = self._tenant_select().where(EnterpriseDeployment.id == deployment_uuid)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: get
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[DeploymentDTO]":
+        """Return a deployment record by its identifier.
+
+        Parameters
+        ----------
+        id:
+            Deployment UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        DeploymentDTO or None
+        """
+        try:
+            deployment_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError):
+            return None
+
+        row = self._fetch_deployment(deployment_uuid)
+        if row is None:
+            return None
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: list
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        filters: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[DeploymentDTO]":
+        """Return deployment records matching optional filter criteria.
+
+        Parameters
+        ----------
+        filters:
+            Optional filter map.  Supported keys: ``project_id``,
+            ``artifact_id``, ``artifact_type``, ``status``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[DeploymentDTO]
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment
+
+        stmt = self._tenant_select().order_by(EnterpriseDeployment.deployed_at.desc())
+
+        if filters:
+            project_id = filters.get("project_id")
+            if project_id is not None:
+                try:
+                    proj_uuid = uuid.UUID(str(project_id))
+                    stmt = stmt.where(EnterpriseDeployment.project_id == proj_uuid)
+                except (ValueError, AttributeError):
+                    pass
+
+            artifact_id = filters.get("artifact_id")
+            if artifact_id is not None:
+                stmt = stmt.where(EnterpriseDeployment.artifact_id == artifact_id)
+
+            artifact_type = filters.get("artifact_type")
+            if artifact_type is not None:
+                # artifact_id is stored as "type:name" — filter by prefix.
+                stmt = stmt.where(
+                    EnterpriseDeployment.artifact_id.like(f"{artifact_type}:%")
+                )
+
+            status = filters.get("status")
+            if status is not None:
+                stmt = stmt.where(EnterpriseDeployment.status == status)
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [self._to_dto(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: deploy
+    # ------------------------------------------------------------------
+
+    def deploy(
+        self,
+        artifact_id: str,
+        project_id: str,
+        options: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "DeploymentDTO":
+        """Record an artifact deployment to a project.
+
+        Creates a new ``EnterpriseDeployment`` row.  Does not perform any
+        filesystem copy — the enterprise layer treats deployment tracking as
+        a DB write-through from the CLI layer.
+
+        Parameters
+        ----------
+        artifact_id:
+            Artifact primary key in ``"type:name"`` format.
+        project_id:
+            Target project UUID as a string.
+        options:
+            Optional deployment options.  Recognised keys: ``status``,
+            ``content_hash``, ``deployment_profile_id``, ``platform``,
+            ``local_modifications``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        DeploymentDTO
+            The created deployment record.
+
+        Raises
+        ------
+        KeyError
+            If *project_id* is not a valid UUID or does not exist for this
+            tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment
+
+        try:
+            proj_uuid = uuid.UUID(str(project_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(project_id) from exc
+
+        opts = options or {}
+        tenant_id = self._get_tenant_id()
+
+        profile_id: Optional[uuid.UUID] = None
+        raw_profile = opts.get("deployment_profile_id")
+        if raw_profile:
+            try:
+                profile_id = uuid.UUID(str(raw_profile))
+            except (ValueError, AttributeError):
+                pass
+
+        row = EnterpriseDeployment(
+            tenant_id=tenant_id,
+            artifact_id=artifact_id,
+            project_id=proj_uuid,
+            status=opts.get("status", "deployed"),
+            deployed_at=datetime.utcnow(),
+            content_hash=opts.get("content_hash"),
+            deployment_profile_id=profile_id,
+            local_modifications=bool(opts.get("local_modifications", False)),
+            platform=opts.get("platform"),
+        )
+        self.session.add(row)
+        self.session.flush()
+
+        self._log_operation(
+            operation="deploy",
+            entity_type="EnterpriseDeployment",
+            entity_id=row.id,
+            metadata={"artifact_id": artifact_id, "project_id": project_id},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: undeploy
+    # ------------------------------------------------------------------
+
+    def undeploy(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Remove a deployment record.
+
+        Parameters
+        ----------
+        id:
+            Deployment UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` when the record was found and deleted, ``False``
+            otherwise.
+        """
+        try:
+            deployment_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError):
+            return False
+
+        row = self._fetch_deployment(deployment_uuid)
+        if row is None:
+            return False
+
+        self.session.delete(row)
+        self.session.flush()
+
+        self._log_operation(
+            operation="undeploy",
+            entity_type="EnterpriseDeployment",
+            entity_id=deployment_uuid,
+            metadata={"id": id},
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: get_status
+    # ------------------------------------------------------------------
+
+    def get_status(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> str:
+        """Return the current status string for a deployment.
+
+        Parameters
+        ----------
+        id:
+            Deployment UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        str
+            Status string, e.g. ``"deployed"``, ``"undeployed"``.
+
+        Raises
+        ------
+        KeyError
+            If no deployment with *id* exists in this tenant.
+        """
+        try:
+            deployment_uuid = uuid.UUID(str(id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(id) from exc
+
+        row = self._fetch_deployment(deployment_uuid)
+        if row is None:
+            raise KeyError(id)
+
+        return row.status or "deployed"
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: get_by_artifact
+    # ------------------------------------------------------------------
+
+    def get_by_artifact(
+        self,
+        artifact_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "list[DeploymentDTO]":
+        """Return all active deployments for a given artifact.
+
+        Parameters
+        ----------
+        artifact_id:
+            Artifact primary key in ``"type:name"`` format.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[DeploymentDTO]
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment
+
+        stmt = (
+            self._tenant_select()
+            .where(EnterpriseDeployment.artifact_id == artifact_id)
+            .order_by(EnterpriseDeployment.deployed_at.desc())
+        )
+        rows = list(self.session.execute(stmt).scalars())
+        return [self._to_dto(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: get_by_project  (enterprise extra)
+    # ------------------------------------------------------------------
+
+    def get_by_project(
+        self,
+        project_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "list[DeploymentDTO]":
+        """Return all deployments for a given project.
+
+        This is an enterprise-specific helper method.  The
+        :class:`~skillmeat.core.interfaces.repositories.IDeploymentRepository`
+        interface exposes the same via ``list(filters={"project_id": ...})``,
+        but this dedicated method is provided for clarity.
+
+        Parameters
+        ----------
+        project_id:
+            Project UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[DeploymentDTO]
+        """
+        return self.list(filters={"project_id": project_id}, ctx=ctx)
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: list_by_status  (enterprise extra)
+    # ------------------------------------------------------------------
+
+    def list_by_status(
+        self,
+        status: str,
+        ctx: "Optional[object]" = None,
+    ) -> "list[DeploymentDTO]":
+        """Return all deployments with the given status.
+
+        Enterprise-specific filtered query helper backed by the
+        ``idx_enterprise_deployments_tenant_status`` index.
+
+        Parameters
+        ----------
+        status:
+            Deployment status string, e.g. ``"deployed"``, ``"undeployed"``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[DeploymentDTO]
+        """
+        return self.list(filters={"status": status}, ctx=ctx)
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: upsert_idp_deployment_set
+    # ------------------------------------------------------------------
+
+    def upsert_idp_deployment_set(
+        self,
+        *,
+        remote_url: str,
+        name: str,
+        provisioned_by: str,
+        description: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "Tuple[str, bool]":
+        """Idempotently create or update a DeploymentSet for an IDP registration.
+
+        Parameters
+        ----------
+        remote_url:
+            Remote Git repository URL.
+        name:
+            Artifact target identifier used as the set name.
+        provisioned_by:
+            Audit field identifying the provisioning agent.
+        description:
+            Optional JSON-serialised metadata string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        tuple[str, bool]
+            ``(deployment_set_id, created)`` where *created* is ``True``
+            when a new record was inserted.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeploymentSet
+
+        tenant_id = self._get_tenant_id()
+
+        stmt = (
+            select(EnterpriseDeploymentSet)
+            .where(
+                EnterpriseDeploymentSet.tenant_id == tenant_id,
+                EnterpriseDeploymentSet.remote_url == remote_url,
+                EnterpriseDeploymentSet.name == name,
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+
+        created = False
+        if row is None:
+            row = EnterpriseDeploymentSet(
+                tenant_id=tenant_id,
+                remote_url=remote_url,
+                name=name,
+                provisioned_by=provisioned_by,
+                description=description,
+            )
+            self.session.add(row)
+            created = True
+        else:
+            row.provisioned_by = provisioned_by
+            if description is not None:
+                row.description = description
+            row.updated_at = datetime.utcnow()
+
+        self.session.flush()
+
+        self._log_operation(
+            operation="upsert_idp_deployment_set",
+            entity_type="EnterpriseDeploymentSet",
+            entity_id=row.id,
+            metadata={
+                "remote_url": remote_url,
+                "name": name,
+                "created": created,
+            },
+        )
+        return str(row.id), created
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: sync_deployment_cache
+    # ------------------------------------------------------------------
+
+    def sync_deployment_cache(
+        self,
+        artifact_id: str,
+        project_path: str,
+        project_name: str,
+        deployed_at: "Any",
+        content_hash: "Optional[str]" = None,
+        deployment_profile_id: "Optional[str]" = None,
+        local_modifications: bool = False,
+        platform: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Upsert a single deployment entry into the enterprise deployments table.
+
+        Performs a write-through update: looks up an existing active
+        deployment record for the ``(artifact_id, project_path)`` pair and
+        updates it, or creates a new row if none exists.
+
+        Parameters
+        ----------
+        artifact_id:
+            Artifact primary key in ``"type:name"`` format.
+        project_path:
+            Stored path of the target project.
+        project_name:
+            Human-readable project directory name.
+        deployed_at:
+            Deployment timestamp (``datetime`` or ISO string).
+        content_hash:
+            Optional SHA of the deployed content.
+        deployment_profile_id:
+            Optional deployment profile identifier.
+        local_modifications:
+            Whether local modifications are present.
+        platform:
+            Optional platform identifier string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            Always ``True`` for the enterprise backend (upsert always succeeds).
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment, EnterpriseProject
+
+        tenant_id = self._get_tenant_id()
+
+        # Resolve or create project row by stored path.
+        proj_stmt = select(EnterpriseProject).where(
+            EnterpriseProject.tenant_id == tenant_id,
+            EnterpriseProject.path == project_path,
+        )
+        project_row = self.session.execute(proj_stmt).scalar_one_or_none()
+        if project_row is None:
+            project_row = EnterpriseProject(
+                tenant_id=tenant_id,
+                name=project_name,
+                path=project_path,
+                status="active",
+            )
+            self.session.add(project_row)
+            self.session.flush()
+
+        # Normalise deployed_at to a datetime.
+        if isinstance(deployed_at, str):
+            try:
+                from datetime import timezone
+                deployed_dt = datetime.fromisoformat(deployed_at)
+            except (ValueError, TypeError):
+                deployed_dt = datetime.utcnow()
+        elif isinstance(deployed_at, datetime):
+            deployed_dt = deployed_at
+        else:
+            deployed_dt = datetime.utcnow()
+
+        # Look for an existing active deployment row for this artifact+project.
+        existing_stmt = self._tenant_select().where(
+            EnterpriseDeployment.artifact_id == artifact_id,
+            EnterpriseDeployment.project_id == project_row.id,
+            EnterpriseDeployment.status == "deployed",
+        )
+        row = self.session.execute(existing_stmt).scalar_one_or_none()
+
+        profile_id: Optional[uuid.UUID] = None
+        if deployment_profile_id:
+            try:
+                profile_id = uuid.UUID(str(deployment_profile_id))
+            except (ValueError, AttributeError):
+                pass
+
+        if row is None:
+            row = EnterpriseDeployment(
+                tenant_id=tenant_id,
+                artifact_id=artifact_id,
+                project_id=project_row.id,
+                status="deployed",
+                deployed_at=deployed_dt,
+                content_hash=content_hash,
+                deployment_profile_id=profile_id,
+                local_modifications=local_modifications,
+                platform=platform,
+            )
+            self.session.add(row)
+        else:
+            row.deployed_at = deployed_dt
+            row.content_hash = content_hash
+            row.deployment_profile_id = profile_id
+            row.local_modifications = local_modifications
+            row.platform = platform
+            row.updated_at = datetime.utcnow()
+
+        self.session.flush()
+
+        self._log_operation(
+            operation="sync_deployment_cache",
+            entity_type="EnterpriseDeployment",
+            entity_id=row.id,
+            metadata={"artifact_id": artifact_id, "project_path": project_path},
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # IDeploymentRepository: remove_deployment_cache
+    # ------------------------------------------------------------------
+
+    def remove_deployment_cache(
+        self,
+        artifact_id: str,
+        project_path: str,
+        profile_id: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Remove a deployment entry from the enterprise deployments table.
+
+        Marks matching ``EnterpriseDeployment`` rows as ``"undeployed"``
+        (soft delete) rather than physically removing them, so audit history
+        is preserved.
+
+        Parameters
+        ----------
+        artifact_id:
+            Artifact primary key in ``"type:name"`` format.
+        project_path:
+            Stored path of the target project.
+        profile_id:
+            Optional profile ID to narrow the removal to a specific entry.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` when at least one matching record was found and updated,
+            ``False`` otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseDeployment, EnterpriseProject
+
+        tenant_id = self._get_tenant_id()
+
+        # Resolve project by stored path.
+        proj_stmt = select(EnterpriseProject).where(
+            EnterpriseProject.tenant_id == tenant_id,
+            EnterpriseProject.path == project_path,
+        )
+        project_row = self.session.execute(proj_stmt).scalar_one_or_none()
+        if project_row is None:
+            logger.debug(
+                "EnterpriseDeploymentRepository.remove_deployment_cache: "
+                "project not found for path=%s — nothing to remove",
+                project_path,
+            )
+            return False
+
+        stmt = self._tenant_select().where(
+            EnterpriseDeployment.artifact_id == artifact_id,
+            EnterpriseDeployment.project_id == project_row.id,
+        )
+
+        if profile_id:
+            try:
+                prof_uuid = uuid.UUID(str(profile_id))
+                stmt = stmt.where(EnterpriseDeployment.deployment_profile_id == prof_uuid)
+            except (ValueError, AttributeError):
+                pass
+
+        rows = list(self.session.execute(stmt).scalars())
+        if not rows:
+            return False
+
+        for row in rows:
+            row.status = "undeployed"
+            row.updated_at = datetime.utcnow()
+
+        self.session.flush()
+
+        self._log_operation(
+            operation="remove_deployment_cache",
+            entity_type="EnterpriseDeployment",
+            entity_id=None,
+            metadata={
+                "artifact_id": artifact_id,
+                "project_path": project_path,
+                "rows_updated": len(rows),
+            },
+        )
+        return True

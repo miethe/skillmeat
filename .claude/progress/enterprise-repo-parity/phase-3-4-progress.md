@@ -44,7 +44,7 @@ tasks:
   dependencies: []
 - id: ENT2-3.5
   title: Update DI providers for Phase 3 repositories
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -54,14 +54,14 @@ tasks:
   - ENT2-3.4
 - id: ENT2-3.6
   title: Unit tests for Phase 3 repositories
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
   - ENT2-3.5
 - id: ENT2-4.1
   title: EnterpriseProjectRepository implementation
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -112,10 +112,10 @@ parallelization:
   - ENT2-4.4
   - ENT2-4.5
 total_tasks: 11
-completed_tasks: 4
+completed_tasks: 6
 in_progress_tasks: 1
 blocked_tasks: 0
-progress: 36
+progress: 54
 ---
 
 # Phase 3-4: Repository Implementation (Core & Deployment)
