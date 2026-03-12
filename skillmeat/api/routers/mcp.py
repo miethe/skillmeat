@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from skillmeat.api.dependencies import (
     CollectionManagerDep,
     ConfigManagerDep,
+    require_local_edition,
     verify_api_key,
     get_auth_context,
     require_auth,
@@ -39,7 +40,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/mcp",
     tags=["mcp"],
-    dependencies=[Depends(verify_api_key)],  # All endpoints require API key
+    dependencies=[
+        Depends(verify_api_key),  # All endpoints require API key
+        Depends(require_local_edition),  # MCP management is filesystem-only; not available in enterprise edition
+    ],
 )
 
 

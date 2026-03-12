@@ -34,7 +34,6 @@ from .routers import (
     bundles,
     enterprise_content,
     cache,
-    collections,
     colors,
     composites,
     config,
@@ -499,12 +498,6 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(health.router)
 
     # API routers under API prefix
-    app.include_router(
-        collections.router,
-        prefix=settings.api_prefix,
-        tags=["collections"],
-        dependencies=_auth_deps,
-    )
     app.include_router(
         user_collections.router,
         prefix=settings.api_prefix,

@@ -48,7 +48,12 @@ from skillmeat.api.dependencies import (
     get_app_state,
     get_auth_context,
     require_auth,
+    require_local_edition,
     verify_api_key,
+)
+from skillmeat.core.interfaces.repositories import (
+    IArtifactRepository,
+    ICollectionRepository,
 )
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.auth import AuthContext
@@ -352,6 +357,7 @@ def resolve_collection_name(
     collection_mgr,
     db_user_coll_repo=None,
     db_session=None,
+    collection_repo: Optional[ICollectionRepository] = None,
 ) -> Optional[str]:
     """Resolve a collection parameter to a collection name.
 
@@ -366,14 +372,36 @@ def resolve_collection_name(
             not provided.
         db_session: Deprecated — kept for backward compatibility only.
             Use db_user_coll_repo instead.
+        collection_repo: Optional ICollectionRepository for enterprise-mode
+            resolution. When provided, also checks the DB-backed collection
+            list so that collections that exist only in the database (not on
+            the local filesystem) are resolved correctly.
 
     Returns:
         The collection name if found, None if not resolvable.
     """
-    # Fast path: check as a name first
+    # Fast path: check as a name first (filesystem)
     collection_names = collection_mgr.list_collections()
     if collection_param in collection_names:
         return collection_param
+
+    # Enterprise-mode path: if a collection_repo is provided, check whether
+    # the param matches a known DB collection name directly (handles the case
+    # where no local filesystem collections exist).
+    if collection_repo is not None:
+        try:
+            db_collections = collection_repo.list()
+            db_names = [c.name for c in db_collections]
+            if collection_param in db_names:
+                return collection_param
+            # Also attempt case-insensitive match against DB names
+            db_names_lower = {n.lower(): n for n in db_names}
+            if collection_param.lower() in db_names_lower:
+                return db_names_lower[collection_param.lower()]
+        except Exception as e:
+            logger.debug(
+                "collection_repo.list() failed during resolve_collection_name: %s", e
+            )
 
     # Try as a UUID - look up in DB via repository
     collection_record = None
@@ -404,6 +432,17 @@ def resolve_collection_name(
             )
             return filesystem_name
 
+        # Enterprise-mode: UUID resolved to a DB collection name that has no
+        # corresponding filesystem directory — return the DB name directly so
+        # the caller can proceed with DB-backed lookups.
+        if collection_repo is not None:
+            logger.debug(
+                "Resolved collection UUID '%s' to DB name '%s' (no filesystem counterpart).",
+                collection_param,
+                collection_record.name,
+            )
+            return collection_record.name
+
     return None
 
 
@@ -413,6 +452,7 @@ def _find_artifact_in_collections(
     collection_mgr,
     preferred_collection: Optional[str] = None,
     db_session=None,
+    artifact_repo: Optional[IArtifactRepository] = None,
 ) -> tuple:
     """Find an artifact across collections, with optional preferred collection hint.
 
@@ -430,10 +470,13 @@ def _find_artifact_in_collections(
         collection_mgr: CollectionManager instance
         preferred_collection: Optional collection name or UUID to search first
         db_session: Optional SQLAlchemy session for UUID resolution
+        artifact_repo: Optional IArtifactRepository for enterprise-mode lookup.
+            When provided and the filesystem search yields no result, the
+            function falls back to querying the DB-backed repository.
 
     Returns:
-        Tuple of (artifact, collection_name) where collection_name is the
-        filesystem collection name. Returns (None, None) if not found anywhere.
+        Tuple of (artifact_or_dto, collection_name) where collection_name is the
+        collection name. Returns (None, None) if not found anywhere.
     """
     # If a preferred collection is specified, try it first
     if preferred_collection:
@@ -458,7 +501,7 @@ def _find_artifact_in_collections(
                 preferred_collection,
             )
 
-    # Search across all collections
+    # Search across all filesystem collections
     for coll_name in collection_mgr.list_collections():
         try:
             coll = collection_mgr.load_collection(coll_name)
@@ -467,6 +510,23 @@ def _find_artifact_in_collections(
                 return artifact, coll_name
         except ValueError:
             continue
+
+    # Enterprise-mode fallback: if no artifact was found on the filesystem and
+    # an artifact_repo is available, query the DB-backed repository.
+    if artifact_repo is not None:
+        try:
+            artifact_id = f"{artifact_type.value}:{artifact_name}"
+            dto = artifact_repo.get(artifact_id)
+            if dto is not None:
+                collection_name = getattr(dto, "collection_name", None) or "default"
+                return dto, collection_name
+        except Exception as e:
+            logger.debug(
+                "artifact_repo.get('%s:%s') failed in _find_artifact_in_collections: %s",
+                artifact_type.value,
+                artifact_name,
+                e,
+            )
 
     return None, None
 
@@ -624,10 +684,17 @@ async def build_version_graph(
     collection_sha: Optional[str] = None
 
     if collection_mgr:
+        # Guard: in enterprise mode the local collections directory may not
+        # exist.  If it is absent and no explicit collection_name is provided
+        # (which would also fail load), skip the filesystem search entirely so
+        # the function can still return partial data from project deployments.
+        _collections_dir = collection_mgr.config.get_collections_dir()
+        _fs_search_enabled = bool(collection_name) or _collections_dir.exists()
+
         # Search for artifact in collection
         collections_to_search = (
             [collection_name] if collection_name else collection_mgr.list_collections()
-        )
+        ) if _fs_search_enabled else []
 
         for coll_name in collections_to_search:
             try:
@@ -1014,6 +1081,7 @@ async def discover_artifacts(
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+    _edition: None = Depends(require_local_edition),
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
@@ -1160,6 +1228,7 @@ async def discover_project_artifacts(
     collection_mgr: CollectionManagerDep = None,
     _token: TokenDep = None,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+    _edition: None = Depends(require_local_edition),
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
@@ -1971,8 +2040,12 @@ async def create_artifact(
                                 detail="No collections found. Create a collection first.",
                             )
         else:
-            # Verify collection exists (resolve UUID if needed)
-            resolved = resolve_collection_name(collection_name, collection_mgr)
+            # Verify collection exists (resolve UUID if needed).
+            # Pass collection_repo so enterprise-mode (DB-only) collections
+            # are resolved without a separate manual lookup.
+            resolved = resolve_collection_name(
+                collection_name, collection_mgr, collection_repo=collection_repo
+            )
             if not resolved:
                 # Not found on filesystem — try repository (handles enterprise mode)
                 repo_collection = collection_repo.get_by_id(
@@ -2166,6 +2239,7 @@ async def list_artifacts(
     artifact_mgr: ArtifactManagerDep,
     artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
     coll_artifact_repo: DbCollectionArtifactRepoDep,
     marketplace_catalog_repo: MarketplaceCatalogRepoDep,
     db_session: DbSessionDep,
@@ -2294,7 +2368,9 @@ async def list_artifacts(
         # Get artifacts from specified collection or all collections
         if collection:
             # Check if collection exists (resolve UUID if needed)
-            resolved = resolve_collection_name(collection, collection_mgr)
+            resolved = resolve_collection_name(
+                collection, collection_mgr, collection_repo=collection_repo
+            )
             if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -2562,6 +2638,7 @@ async def get_artifact(
     artifact_mgr: ArtifactManagerDep,
     artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
     db_session: DbSessionDep,
     token: TokenDep,
     auth_context: AuthContext = Depends(get_auth_context),
@@ -2614,7 +2691,9 @@ async def get_artifact(
         artifact = None
         if collection:
             # Search in specified collection (resolve UUID if needed)
-            resolved = resolve_collection_name(collection, collection_mgr)
+            resolved = resolve_collection_name(
+                collection, collection_mgr, collection_repo=collection_repo
+            )
             if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -2706,6 +2785,7 @@ async def check_artifact_upstream(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
     token: TokenDep,
     auth_context: AuthContext = Depends(get_auth_context),
     collection: Optional[str] = Query(
@@ -2745,7 +2825,9 @@ async def check_artifact_upstream(
         artifact = None
         collection_name = collection
         if collection:
-            resolved = resolve_collection_name(collection, collection_mgr)
+            resolved = resolve_collection_name(
+                collection, collection_mgr, collection_repo=collection_repo
+            )
             if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -2882,6 +2964,7 @@ async def update_artifact(
     update_request: ArtifactUpdateRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
     token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
@@ -2925,7 +3008,9 @@ async def update_artifact(
 
         if collection:
             # Search in specified collection (resolve UUID if needed)
-            resolved = resolve_collection_name(collection, collection_mgr)
+            resolved = resolve_collection_name(
+                collection, collection_mgr, collection_repo=collection_repo
+            )
             if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -3069,6 +3154,7 @@ async def update_artifact_parameters(
     artifact_mgr: ArtifactManagerDep,
     artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
     token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
     collection: Optional[str] = Query(
@@ -3127,7 +3213,9 @@ async def update_artifact_parameters(
 
         if collection:
             # Search in specified collection (resolve UUID if needed)
-            resolved = resolve_collection_name(collection, collection_mgr)
+            resolved = resolve_collection_name(
+                collection, collection_mgr, collection_repo=collection_repo
+            )
             if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -3340,6 +3428,7 @@ async def delete_artifact(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
     db_session: DbSessionDep,
     catalog_repo: MarketplaceCatalogRepoDep,
     token: TokenDep,
@@ -3381,7 +3470,9 @@ async def delete_artifact(
 
         if collection:
             # Check specified collection (resolve UUID if needed)
-            resolved = resolve_collection_name(collection, collection_mgr)
+            resolved = resolve_collection_name(
+                collection, collection_mgr, collection_repo=collection_repo
+            )
             if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -3498,6 +3589,7 @@ async def deploy_artifact(
     request: ArtifactDeployRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
     settings: SettingsDep,
     token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
@@ -3562,7 +3654,9 @@ async def deploy_artifact(
 
         # Get or create collection
         if collection:
-            resolved = resolve_collection_name(collection, collection_mgr)
+            resolved = resolve_collection_name(
+                collection, collection_mgr, collection_repo=collection_repo
+            )
             if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -3988,6 +4082,7 @@ async def sync_artifact(
     request: ArtifactSyncRequest,
     sync_mgr: SyncManagerDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
     artifact_mgr: ArtifactManagerDep,
     settings: SettingsDep,
     _token: TokenDep,
@@ -4108,7 +4203,9 @@ async def sync_artifact(
             collection_name = getattr(target_deployment, "from_collection", "default")
 
         # Verify collection exists (resolve UUID if needed)
-        resolved = resolve_collection_name(collection_name, collection_mgr)
+        resolved = resolve_collection_name(
+            collection_name, collection_mgr, collection_repo=collection_repo
+        )
         if not resolved:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -4479,6 +4576,7 @@ async def get_version_graph(
 async def get_artifact_diff(
     artifact_id: str,
     _artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     settings: SettingsDep,
     _token: TokenDep,
@@ -4619,6 +4717,7 @@ async def get_artifact_diff(
             artifact_type,
             collection_mgr,
             preferred_collection=collection_name,
+            artifact_repo=artifact_repo,
         )
 
         if not artifact:
@@ -4902,6 +5001,7 @@ async def get_artifact_diff(
 async def get_artifact_upstream_diff(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     settings: SettingsDep,
     _token: TokenDep,
@@ -5004,6 +5104,7 @@ async def get_artifact_upstream_diff(
             artifact_type,
             collection_mgr,
             preferred_collection=collection,
+            artifact_repo=artifact_repo,
         )
 
         if not artifact:
@@ -5355,6 +5456,7 @@ async def get_artifact_upstream_diff(
 async def get_artifact_source_project_diff(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     settings: SettingsDep,
     _token: TokenDep,
@@ -5460,6 +5562,7 @@ async def get_artifact_source_project_diff(
             artifact_type,
             collection_mgr,
             preferred_collection=collection_name,
+            artifact_repo=artifact_repo,
         )
 
         if not artifact:
@@ -5801,6 +5904,7 @@ async def get_artifact_source_project_diff(
 async def list_artifact_files(
     artifact_id: str,
     _artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
     auth_context: AuthContext = Depends(get_auth_context),
@@ -5876,6 +5980,7 @@ async def list_artifact_files(
             artifact_type,
             collection_mgr,
             preferred_collection=collection,
+            artifact_repo=artifact_repo,
         )
 
         if not artifact:
@@ -6023,6 +6128,7 @@ async def get_artifact_file_content(
     artifact_id: str,
     file_path: str,
     _artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
     auth_context: AuthContext = Depends(get_auth_context),
@@ -6093,6 +6199,7 @@ async def get_artifact_file_content(
             artifact_type,
             collection_mgr,
             preferred_collection=collection,
+            artifact_repo=artifact_repo,
         )
 
         if not artifact:
@@ -6270,6 +6377,7 @@ async def update_artifact_file_content(
     file_path: str,
     request: FileUpdateRequest,
     _artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
@@ -6348,6 +6456,7 @@ async def update_artifact_file_content(
             artifact_type,
             collection_mgr,
             preferred_collection=collection,
+            artifact_repo=artifact_repo,
         )
 
         if not artifact:
@@ -6533,6 +6642,7 @@ async def create_artifact_file(
     file_path: str,
     request: FileUpdateRequest,
     _artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
@@ -6611,6 +6721,7 @@ async def create_artifact_file(
             artifact_type,
             collection_mgr,
             preferred_collection=collection,
+            artifact_repo=artifact_repo,
         )
 
         if not artifact:
@@ -6802,6 +6913,7 @@ async def delete_artifact_file(
     artifact_id: str,
     file_path: str,
     _artifact_mgr: ArtifactManagerDep,
+    artifact_repo: ArtifactRepoDep,
     collection_mgr: CollectionManagerDep,
     _token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
@@ -6866,6 +6978,7 @@ async def delete_artifact_file(
             artifact_type,
             collection_mgr,
             preferred_collection=collection,
+            artifact_repo=artifact_repo,
         )
 
         if not artifact:
@@ -8726,6 +8839,7 @@ async def get_artifact_associations(
             artifact_type=artifact_type_enum,
             collection_mgr=collection_mgr,
             preferred_collection=preferred_collection,
+            artifact_repo=artifact_repo,
         )
         if artifact_obj is None or resolved_collection_name is None:
             raise HTTPException(

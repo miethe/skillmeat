@@ -12,11 +12,13 @@ from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
 from skillmeat import __version__ as skillmeat_version
 from skillmeat.api.dependencies import (
     CollectionManagerDep,
     ConfigManagerDep,
+    DbSessionDep,
     SettingsDep,
 )
 from skillmeat.core.services.memory_service import MemoryService
@@ -153,13 +155,15 @@ async def detailed_health_check(
     settings: SettingsDep,
     config_manager: ConfigManagerDep,
     collection_manager: CollectionManagerDep,
+    db_session: DbSessionDep,
 ) -> DetailedHealthStatus:
     """Detailed health check with component status.
 
     Args:
         settings: API settings dependency
         config_manager: Config manager dependency
-        collection_manager: Collection manager dependency
+        collection_manager: Collection manager dependency (local edition only)
+        db_session: Per-request DB session (used for enterprise DB connectivity check)
 
     Returns:
         DetailedHealthStatus with component and system information
@@ -167,20 +171,36 @@ async def detailed_health_check(
     components = {}
     overall_status = "healthy"
 
-    # Check collection manager
-    try:
-        collections = collection_manager.list_collections()
-        components["collection_manager"] = {
-            "status": "healthy",
-            "details": f"{len(collections)} collections available",
-        }
-    except Exception as e:
-        logger.error(f"Collection manager health check failed: {e}")
-        components["collection_manager"] = {
-            "status": "unhealthy",
-            "details": str(e),
-        }
-        overall_status = "degraded"
+    if settings.edition == "enterprise":
+        # Enterprise mode: check DB connectivity instead of filesystem collections
+        try:
+            db_session.execute(text("SELECT 1"))
+            components["collection_manager"] = {
+                "status": "healthy",
+                "details": "enterprise DB connectivity verified",
+            }
+        except Exception as e:
+            logger.error(f"Enterprise DB connectivity check failed: {e}")
+            components["collection_manager"] = {
+                "status": "unhealthy",
+                "details": str(e),
+            }
+            overall_status = "degraded"
+    else:
+        # Local mode: check filesystem collections
+        try:
+            collections = collection_manager.list_collections()
+            components["collection_manager"] = {
+                "status": "healthy",
+                "details": f"{len(collections)} collections available",
+            }
+        except Exception as e:
+            logger.error(f"Collection manager health check failed: {e}")
+            components["collection_manager"] = {
+                "status": "unhealthy",
+                "details": str(e),
+            }
+            overall_status = "degraded"
 
     # Check config manager
     try:
@@ -276,12 +296,16 @@ async def detailed_health_check(
     """,
 )
 async def readiness_check(
+    settings: SettingsDep,
     collection_manager: CollectionManagerDep,
+    db_session: DbSessionDep,
 ) -> Dict[str, str]:
     """Readiness check for orchestrators.
 
     Args:
-        collection_manager: Collection manager dependency
+        settings: API settings dependency
+        collection_manager: Collection manager dependency (local edition only)
+        db_session: Per-request DB session (enterprise edition readiness check)
 
     Returns:
         Readiness status
@@ -289,8 +313,13 @@ async def readiness_check(
     Raises:
         HTTPException 503 if not ready
     """
-    # Service is ready if collection manager is initialized
-    # Additional checks can be added here (DB connections, etc.)
+    if settings.edition == "enterprise":
+        # Enterprise: verify DB connectivity as the readiness gate
+        db_session.execute(text("SELECT 1"))
+    else:
+        # Local: service is ready if collection manager is initialized
+        # (dependency injection will raise 503 if AppState is not yet set up)
+        pass
     return {
         "status": "ready",
         "timestamp": datetime.utcnow().isoformat() + "Z",

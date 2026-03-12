@@ -503,6 +503,25 @@ def require_memory_context_enabled(
     return
 
 
+def require_local_edition(
+    settings: Annotated[APISettings, Depends(get_settings)],
+) -> None:
+    """Dependency that blocks enterprise mode for filesystem-only features.
+
+    Use this as a guard on endpoints that rely on local filesystem access and
+    have not yet been migrated to enterprise DB backends.  Local mode is
+    completely unaffected.
+
+    Raises:
+        HTTPException 501: When the configured edition is ``enterprise``.
+    """
+    if settings.edition == "enterprise":
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="This feature is not yet available in enterprise edition",
+        )
+
+
 # ---------------------------------------------------------------------------
 # Repository factory providers (hexagonal architecture)
 #
@@ -953,6 +972,7 @@ ContextSyncServiceDep = Annotated[ContextSyncService, Depends(get_context_sync_s
 SettingsDep = Annotated[APISettings, Depends(get_settings)]
 APIKeyDep = Annotated[None, Depends(verify_api_key)]
 MemoryContextEnabledDep = Annotated[None, Depends(require_memory_context_enabled)]
+LocalEditionDep = Annotated[None, Depends(require_local_edition)]
 
 # Repository DI aliases (hexagonal architecture)
 ArtifactRepoDep = Annotated[IArtifactRepository, Depends(get_artifact_repository)]
