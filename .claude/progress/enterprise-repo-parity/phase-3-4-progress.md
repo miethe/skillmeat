@@ -32,19 +32,19 @@ tasks:
   dependencies: []
 - id: ENT2-3.3
   title: EnterpriseSettingsRepository implementation
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
 - id: ENT2-3.4
   title: EnterpriseContextEntityRepository implementation
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
 - id: ENT2-3.5
   title: Update DI providers for Phase 3 repositories
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -112,10 +112,10 @@ parallelization:
   - ENT2-4.4
   - ENT2-4.5
 total_tasks: 11
-completed_tasks: 2
+completed_tasks: 4
 in_progress_tasks: 1
 blocked_tasks: 0
-progress: 18
+progress: 36
 ---
 
 # Phase 3-4: Repository Implementation (Core & Deployment)

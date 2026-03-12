@@ -506,10 +506,9 @@ def require_memory_context_enabled(
 # ---------------------------------------------------------------------------
 # Repository factory providers (hexagonal architecture)
 #
-# Enterprise Edition Provider Support (ENT2-002/003)
-# Supported:   artifact, collection
-# Unsupported: project, deployment, tag, settings, group, context_entity,
-#              marketplace_source, project_template
+# Enterprise Edition Provider Support (ENT2-002/003/ENT2-3.5)
+# Supported:   artifact, collection, tag, settings, group, context_entity
+# Unsupported: project, deployment, marketplace_source, project_template
 # ---------------------------------------------------------------------------
 
 
@@ -655,14 +654,18 @@ def get_deployment_repository(
 
 def get_tag_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> ITagRepository:
     """Get ITagRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        ITagRepository implementation for the configured edition
+        ITagRepository implementation for the configured edition.
+        Local edition returns ``LocalTagRepository``; enterprise edition
+        returns ``EnterpriseTagRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -672,25 +675,30 @@ def get_tag_repository(
         from skillmeat.core.repositories import LocalTagRepository
 
         return LocalTagRepository()
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import EnterpriseTagRepository
+
+        return EnterpriseTagRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support tag. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
 def get_settings_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> ISettingsRepository:
     """Get ISettingsRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        ISettingsRepository implementation for the configured edition
+        ISettingsRepository implementation for the configured edition.
+        Local edition returns ``LocalSettingsRepository``; enterprise edition
+        returns ``EnterpriseSettingsRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -703,25 +711,30 @@ def get_settings_repository(
             path_resolver=state.path_resolver,
             config_manager=state.config_manager,
         )
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import EnterpriseSettingsRepository
+
+        return EnterpriseSettingsRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support settings. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
 def get_group_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IGroupRepository:
     """Get IGroupRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IGroupRepository implementation for the configured edition
+        IGroupRepository implementation for the configured edition.
+        Local edition returns ``LocalGroupRepository``; enterprise edition
+        returns ``EnterpriseGroupRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -731,25 +744,31 @@ def get_group_repository(
         from skillmeat.core.repositories import LocalGroupRepository
 
         return LocalGroupRepository()
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import EnterpriseGroupRepository
+
+        return EnterpriseGroupRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support group. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
 def get_context_entity_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IContextEntityRepository:
     """Get IContextEntityRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IContextEntityRepository implementation for the configured edition
+        IContextEntityRepository implementation for the configured edition.
+        Local edition returns ``LocalContextEntityRepository``; enterprise
+        edition returns ``EnterpriseContextEntityRepository`` (wired directly
+        — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -759,12 +778,15 @@ def get_context_entity_repository(
         from skillmeat.core.repositories import LocalContextEntityRepository
 
         return LocalContextEntityRepository()
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseContextEntityRepository,
+        )
+
+        return EnterpriseContextEntityRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support context_entity. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
