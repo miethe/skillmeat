@@ -552,14 +552,18 @@ def get_artifact_repository(
 
 def get_project_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IProjectRepository:
     """Get IProjectRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IProjectRepository implementation for the configured edition
+        IProjectRepository implementation for the configured edition.
+        Local edition returns ``LocalProjectRepository``; enterprise edition
+        returns ``EnterpriseProjectRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -572,12 +576,15 @@ def get_project_repository(
             path_resolver=state.path_resolver,
             cache_manager=state.cache_manager,
         )
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseProjectRepository,
+        )
+
+        return EnterpriseProjectRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support project. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
@@ -621,14 +628,18 @@ def get_collection_repository(
 
 def get_deployment_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IDeploymentRepository:
     """Get IDeploymentRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IDeploymentRepository implementation for the configured edition
+        IDeploymentRepository implementation for the configured edition.
+        Local edition returns ``LocalDeploymentRepository``; enterprise edition
+        returns ``EnterpriseDeploymentRepository`` (wired directly — no adapter).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -643,12 +654,15 @@ def get_deployment_repository(
             deployment_manager=deployment_manager,
             path_resolver=state.path_resolver,
         )
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseDeploymentRepository,
+        )
+
+        return EnterpriseDeploymentRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support deployment. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
@@ -846,29 +860,51 @@ def get_project_template_repository(
     )
 
 
-def get_deployment_set_repository() -> DeploymentSetRepository:
+def get_deployment_set_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> DeploymentSetRepository:
     """Get DeploymentSetRepository dependency.
 
-    Returns a new ``DeploymentSetRepository`` instance.  The repository
-    manages its own session lifecycle internally, so no state injection is
-    required.
+    Args:
+        state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        DeploymentSetRepository instance.
+        DeploymentSetRepository instance for local edition; enterprise edition
+        returns ``EnterpriseDeploymentSetRepository``.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseDeploymentSetRepository,
+        )
+
+        return EnterpriseDeploymentSetRepository(session=session)  # type: ignore[return-value]
     return DeploymentSetRepository()
 
 
-def get_deployment_profile_repository() -> DeploymentProfileRepository:
+def get_deployment_profile_repository(
+    state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> DeploymentProfileRepository:
     """Get DeploymentProfileRepository dependency.
 
-    Returns a new ``DeploymentProfileRepository`` instance.  The repository
-    manages its own session lifecycle internally, so no state injection is
-    required.
+    Args:
+        state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        DeploymentProfileRepository instance.
+        DeploymentProfileRepository instance for local edition; enterprise
+        edition returns ``EnterpriseDeploymentProfileRepository``.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseDeploymentProfileRepository,
+        )
+
+        return EnterpriseDeploymentProfileRepository(session=session)  # type: ignore[return-value]
     return DeploymentProfileRepository()
 
 

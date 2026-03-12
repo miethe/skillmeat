@@ -73,13 +73,13 @@ tasks:
   dependencies: []
 - id: ENT2-4.3
   title: EnterpriseDeploymentSetRepository & EnterpriseDeploymentProfileRepository
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
 - id: ENT2-4.4
   title: Update DI providers for Phase 4 repositories
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -112,10 +112,10 @@ parallelization:
   - ENT2-4.4
   - ENT2-4.5
 total_tasks: 11
-completed_tasks: 8
+completed_tasks: 9
 in_progress_tasks: 1
 blocked_tasks: 0
-progress: 72
+progress: 81
 ---
 
 # Phase 3-4: Repository Implementation (Core & Deployment)
