@@ -3864,3 +3864,1336 @@ class EnterpriseGroupRepository(
             self.session.add(new_mem)
 
         self.session.flush()
+
+
+# =============================================================================
+# EnterpriseSettingsRepository  (ENT2-3.3)
+# =============================================================================
+
+
+class EnterpriseSettingsRepository(
+    EnterpriseRepositoryBase["EnterpriseSettings"],
+):
+    """Repository for tenant-scoped reads and writes on EnterpriseSettings.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.ISettingsRepository`
+    for the enterprise PostgreSQL backend.
+
+    The ``EnterpriseSettings`` table has a ``UNIQUE (tenant_id)`` constraint —
+    exactly one settings row per tenant.  :meth:`update` uses an ORM
+    check-then-insert/update pattern (no raw ``INSERT ON CONFLICT``) so it
+    works portably across SQLAlchemy dialects in unit tests.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    The interface defines ``github_token``, ``collection_path``,
+    ``default_scope``, ``edition``, and ``indexing_mode`` as first-class
+    fields; additional keys in the ``updates`` dict are stored in the JSONB
+    ``extra`` column.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseSettings as _ES
+
+        super().__init__(session, _ES)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    _KNOWN_FIELDS = frozenset(
+        {"github_token", "collection_path", "default_scope", "edition", "indexing_mode"}
+    )
+
+    def _to_dto(self, row: "EnterpriseSettings") -> "SettingsDTO":
+        """Map an ``EnterpriseSettings`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.SettingsDTO`.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        SettingsDTO
+        """
+        from skillmeat.core.interfaces.dtos import SettingsDTO
+
+        return SettingsDTO(
+            github_token=row.github_token,
+            collection_path=row.collection_path,
+            default_scope=row.default_scope or "user",
+            edition=row.edition or "enterprise",
+            indexing_mode=row.indexing_mode or "opt_in",
+            extra=dict(row.extra) if row.extra else {},
+        )
+
+    def _fetch_row(self) -> "Optional[EnterpriseSettings]":
+        """Fetch the single settings row for the current tenant.
+
+        Returns
+        -------
+        EnterpriseSettings or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseSettings
+
+        stmt = self._tenant_select()
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: get
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        ctx: "Optional[object]" = None,
+    ) -> "SettingsDTO":
+        """Return the current application settings snapshot for this tenant.
+
+        If no settings row exists yet, a default :class:`~skillmeat.core.interfaces.dtos.SettingsDTO`
+        is returned without writing to the database.
+
+        Parameters
+        ----------
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        SettingsDTO
+        """
+        from skillmeat.core.interfaces.dtos import SettingsDTO
+
+        row = self._fetch_row()
+        if row is None:
+            return SettingsDTO(edition="enterprise")
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: update
+    # ------------------------------------------------------------------
+
+    def update(
+        self,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "SettingsDTO":
+        """Apply a partial update to the application settings for this tenant.
+
+        Only provided keys are changed.  If no settings row exists yet, a new
+        one is created (upsert semantics via ORM check-then-insert/update).
+        Unknown keys are stored in the ``extra`` JSONB column.
+
+        Parameters
+        ----------
+        updates:
+            Map of setting keys to new values.  Recognised first-class keys:
+            ``github_token``, ``collection_path``, ``default_scope``,
+            ``edition``, ``indexing_mode``.  All other keys go into ``extra``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        SettingsDTO
+            The updated settings snapshot.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseSettings
+
+        tenant_id = self._get_tenant_id()
+        row = self._fetch_row()
+
+        if row is None:
+            # No row yet — create one with defaults then apply updates.
+            row = EnterpriseSettings(
+                tenant_id=tenant_id,
+                extra={},
+            )
+            self.session.add(row)
+
+        # Apply first-class field updates.
+        for field_name in self._KNOWN_FIELDS:
+            if field_name in updates:
+                setattr(row, field_name, updates[field_name])
+
+        # Remaining keys go into the extra JSONB bag.
+        extra_updates = {k: v for k, v in updates.items() if k not in self._KNOWN_FIELDS}
+        if extra_updates:
+            merged_extra = dict(row.extra or {})
+            merged_extra.update(extra_updates)
+            row.extra = merged_extra
+
+        row.updated_at = datetime.utcnow()
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseSettings",
+            entity_id=row.id,
+            metadata={k: str(v)[:80] for k, v in updates.items()},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: validate_github_token
+    # ------------------------------------------------------------------
+
+    def validate_github_token(
+        self,
+        token: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Validate a GitHub Personal Access Token against the API.
+
+        Delegates to the centralised :func:`~skillmeat.core.github_client.get_github_client`
+        singleton.  Returns ``False`` on any error rather than raising.
+
+        Parameters
+        ----------
+        token:
+            Raw GitHub PAT string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` if the token authenticates successfully, ``False``
+            otherwise.
+        """
+        try:
+            from skillmeat.core.github_client import GitHubClient
+
+            client = GitHubClient(token=token)
+            rate_limit = client.get_rate_limit()
+            return rate_limit is not None
+        except Exception:
+            return False
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: list_entity_type_configs
+    # ------------------------------------------------------------------
+
+    def list_entity_type_configs(
+        self,
+        ctx: "Optional[object]" = None,
+    ) -> "list[EntityTypeConfigDTO]":
+        """Return all registered entity type configurations for this tenant.
+
+        Parameters
+        ----------
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[EntityTypeConfigDTO]
+            Both system-defined (``is_system=True``) and user-created entries,
+            ordered by ``entity_type``.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityTypeConfig
+        from skillmeat.core.interfaces.dtos import EntityTypeConfigDTO
+
+        stmt = (
+            self._apply_tenant_filter(select(EnterpriseEntityTypeConfig))
+            .order_by(EnterpriseEntityTypeConfig.entity_type)
+        )
+        rows = list(self.session.execute(stmt).scalars())
+        return [
+            EntityTypeConfigDTO(
+                id=str(row.id),
+                entity_type=row.entity_type,
+                display_name=row.display_name or row.entity_type,
+                description=row.description,
+                icon=row.icon,
+                color=row.color,
+                is_system=bool(row.is_system),
+            )
+            for row in rows
+        ]
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: create_entity_type_config
+    # ------------------------------------------------------------------
+
+    def create_entity_type_config(
+        self,
+        entity_type: str,
+        display_name: str,
+        description: "Optional[str]" = None,
+        icon: "Optional[str]" = None,
+        color: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "EntityTypeConfigDTO":
+        """Create a new user-defined entity type configuration.
+
+        Parameters
+        ----------
+        entity_type:
+            Machine-readable entity type key, e.g. ``"workflow"``.  Must be
+            unique within the tenant.
+        display_name:
+            Human-readable display name.
+        description:
+            Optional description text.
+        icon:
+            Optional icon identifier or URL.
+        color:
+            Optional hex color code, e.g. ``"#FF5733"``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        EntityTypeConfigDTO
+            The newly created config.
+
+        Raises
+        ------
+        ValueError
+            If an entity type config with the same *entity_type* already exists
+            in this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityTypeConfig
+        from skillmeat.core.interfaces.dtos import EntityTypeConfigDTO
+
+        tenant_id = self._get_tenant_id()
+
+        # Guard: uniqueness check on (tenant_id, entity_type).
+        dup_stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityTypeConfig).where(
+                EnterpriseEntityTypeConfig.entity_type == entity_type
+            )
+        )
+        if self.session.execute(dup_stmt).scalar_one_or_none() is not None:
+            raise ValueError(
+                f"An entity type config for {entity_type!r} already exists in this tenant."
+            )
+
+        row = EnterpriseEntityTypeConfig(
+            tenant_id=tenant_id,
+            entity_type=entity_type,
+            display_name=display_name,
+            description=description,
+            icon=icon,
+            color=color,
+            is_system=False,
+        )
+        self.session.add(row)
+        self.session.flush()
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseEntityTypeConfig",
+            entity_id=row.id,
+            metadata={"entity_type": entity_type},
+        )
+        return EntityTypeConfigDTO(
+            id=str(row.id),
+            entity_type=row.entity_type,
+            display_name=row.display_name or row.entity_type,
+            description=row.description,
+            icon=row.icon,
+            color=row.color,
+            is_system=False,
+        )
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: update_entity_type_config
+    # ------------------------------------------------------------------
+
+    def update_entity_type_config(
+        self,
+        config_id: str,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "EntityTypeConfigDTO":
+        """Apply a partial update to an existing entity type configuration.
+
+        Parameters
+        ----------
+        config_id:
+            UUID string of the config record to update.
+        updates:
+            Map of field names to new values.  Recognised keys:
+            ``display_name``, ``description``, ``icon``, ``color``.
+            ``entity_type`` and ``is_system`` are immutable.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        EntityTypeConfigDTO
+            The updated config.
+
+        Raises
+        ------
+        KeyError
+            If no config with *config_id* exists in this tenant.
+        ValueError
+            If the update attempts to mutate ``entity_type`` or ``is_system``.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityTypeConfig
+        from skillmeat.core.interfaces.dtos import EntityTypeConfigDTO
+
+        if "entity_type" in updates or "is_system" in updates:
+            raise ValueError(
+                "The 'entity_type' and 'is_system' fields are immutable after creation."
+            )
+
+        try:
+            cfg_uuid = uuid.UUID(str(config_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(config_id) from exc
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityTypeConfig).where(
+                EnterpriseEntityTypeConfig.id == cfg_uuid
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(config_id)
+
+        for field_name in ("display_name", "description", "icon", "color"):
+            if field_name in updates:
+                setattr(row, field_name, updates[field_name])
+
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseEntityTypeConfig",
+            entity_id=cfg_uuid,
+            metadata=updates or None,
+        )
+        return EntityTypeConfigDTO(
+            id=str(row.id),
+            entity_type=row.entity_type,
+            display_name=row.display_name or row.entity_type,
+            description=row.description,
+            icon=row.icon,
+            color=row.color,
+            is_system=bool(row.is_system),
+        )
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: delete_entity_type_config
+    # ------------------------------------------------------------------
+
+    def delete_entity_type_config(
+        self,
+        config_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Delete a user-defined entity type configuration.
+
+        System-defined configs (``is_system=True``) cannot be deleted.
+
+        Parameters
+        ----------
+        config_id:
+            UUID string of the config record to delete.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If no config with *config_id* exists in this tenant.
+        ValueError
+            If the config is system-defined.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityTypeConfig
+
+        try:
+            cfg_uuid = uuid.UUID(str(config_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(config_id) from exc
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityTypeConfig).where(
+                EnterpriseEntityTypeConfig.id == cfg_uuid
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(config_id)
+        if row.is_system:
+            raise ValueError(
+                f"Cannot delete system-defined entity type config {config_id!r}."
+            )
+
+        self.session.delete(row)
+        self.session.flush()
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseEntityTypeConfig",
+            entity_id=cfg_uuid,
+        )
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: list_categories
+    # ------------------------------------------------------------------
+
+    def list_categories(
+        self,
+        entity_type: "Optional[str]" = None,
+        platform: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[CategoryDTO]":
+        """Return all categories for this tenant, optionally filtered.
+
+        Parameters
+        ----------
+        entity_type:
+            When provided, return only categories scoped to this entity type.
+        platform:
+            When provided, return only categories scoped to this platform.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[CategoryDTO]
+            Categories ordered by ``sort_order`` ascending.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityCategory
+        from skillmeat.core.interfaces.dtos import CategoryDTO
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityCategory)
+        ).order_by(EnterpriseEntityCategory.sort_order)
+
+        if entity_type is not None:
+            stmt = stmt.where(EnterpriseEntityCategory.entity_type == entity_type)
+        if platform is not None:
+            stmt = stmt.where(EnterpriseEntityCategory.platform == platform)
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [
+            CategoryDTO(
+                id=str(row.id),
+                name=row.name,
+                slug=row.slug or "",
+                entity_type=row.entity_type,
+                description=row.description,
+                color=row.color,
+                platform=row.platform,
+                sort_order=row.sort_order or 0,
+            )
+            for row in rows
+        ]
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: create_category
+    # ------------------------------------------------------------------
+
+    def create_category(
+        self,
+        name: str,
+        slug: "Optional[str]" = None,
+        entity_type: "Optional[str]" = None,
+        description: "Optional[str]" = None,
+        color: "Optional[str]" = None,
+        platform: "Optional[str]" = None,
+        sort_order: "Optional[int]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "CategoryDTO":
+        """Create a new category for this tenant.
+
+        Parameters
+        ----------
+        name:
+            Human-readable category name.
+        slug:
+            Optional URL-safe slug; auto-generated from *name* when omitted.
+        entity_type:
+            Optional entity type this category applies to.
+        description:
+            Optional description text.
+        color:
+            Optional hex color code for UI display.
+        platform:
+            Optional platform scope filter.
+        sort_order:
+            Optional explicit display order; defaults to 0.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        CategoryDTO
+            The newly created category.
+
+        Raises
+        ------
+        ValueError
+            If a category with the same resolved slug already exists in this
+            tenant.
+        """
+        import re
+
+        from skillmeat.cache.models_enterprise import EnterpriseEntityCategory
+        from skillmeat.core.interfaces.dtos import CategoryDTO
+
+        tenant_id = self._get_tenant_id()
+
+        if slug is None:
+            slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+        # Guard: uniqueness check on (tenant_id, slug).
+        dup_stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityCategory).where(
+                EnterpriseEntityCategory.slug == slug
+            )
+        )
+        if self.session.execute(dup_stmt).scalar_one_or_none() is not None:
+            raise ValueError(
+                f"A category with slug {slug!r} already exists in this tenant."
+            )
+
+        row = EnterpriseEntityCategory(
+            tenant_id=tenant_id,
+            name=name,
+            slug=slug,
+            entity_type=entity_type,
+            description=description,
+            color=color,
+            platform=platform,
+            sort_order=sort_order or 0,
+        )
+        self.session.add(row)
+        self.session.flush()
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseEntityCategory",
+            entity_id=row.id,
+            metadata={"name": name, "slug": slug},
+        )
+        return CategoryDTO(
+            id=str(row.id),
+            name=row.name,
+            slug=row.slug or "",
+            entity_type=row.entity_type,
+            description=row.description,
+            color=row.color,
+            platform=row.platform,
+            sort_order=row.sort_order or 0,
+        )
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: update_category
+    # ------------------------------------------------------------------
+
+    def update_category(
+        self,
+        category_id: int,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "CategoryDTO":
+        """Apply a partial update to an existing category.
+
+        Parameters
+        ----------
+        category_id:
+            UUID or integer primary key of the category to update.
+        updates:
+            Map of field names to new values.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        CategoryDTO
+            The updated category.
+
+        Raises
+        ------
+        KeyError
+            If no category with *category_id* exists in this tenant.
+        ValueError
+            If the requested new slug is already taken.
+        """
+        import re
+
+        from skillmeat.cache.models_enterprise import EnterpriseEntityCategory
+        from skillmeat.core.interfaces.dtos import CategoryDTO
+
+        try:
+            cat_uuid = uuid.UUID(str(category_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(category_id) from exc
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityCategory).where(
+                EnterpriseEntityCategory.id == cat_uuid
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(category_id)
+
+        if "slug" in updates:
+            new_slug = updates["slug"]
+            dup_stmt = self._apply_tenant_filter(
+                select(EnterpriseEntityCategory).where(
+                    EnterpriseEntityCategory.slug == new_slug,
+                    EnterpriseEntityCategory.id != cat_uuid,
+                )
+            )
+            if self.session.execute(dup_stmt).scalar_one_or_none() is not None:
+                raise ValueError(
+                    f"Slug {new_slug!r} is already used by another category in this tenant."
+                )
+
+        for field_name in ("name", "slug", "entity_type", "description", "color", "platform", "sort_order"):
+            if field_name in updates:
+                setattr(row, field_name, updates[field_name])
+
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseEntityCategory",
+            entity_id=cat_uuid,
+            metadata=updates or None,
+        )
+        return CategoryDTO(
+            id=str(row.id),
+            name=row.name,
+            slug=row.slug or "",
+            entity_type=row.entity_type,
+            description=row.description,
+            color=row.color,
+            platform=row.platform,
+            sort_order=row.sort_order or 0,
+        )
+
+    # ------------------------------------------------------------------
+    # ISettingsRepository: delete_category
+    # ------------------------------------------------------------------
+
+    def delete_category(
+        self,
+        category_id: int,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Delete a category by primary key.
+
+        Parameters
+        ----------
+        category_id:
+            UUID or integer primary key of the category to delete.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If no category with *category_id* exists in this tenant.
+        ValueError
+            If the category has artifact associations.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseEntityCategory
+
+        try:
+            cat_uuid = uuid.UUID(str(category_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(category_id) from exc
+
+        stmt = self._apply_tenant_filter(
+            select(EnterpriseEntityCategory).where(
+                EnterpriseEntityCategory.id == cat_uuid
+            )
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(category_id)
+
+        if row.entity_category_associations:
+            raise ValueError(
+                f"Category {category_id!r} has existing associations and cannot be deleted."
+            )
+
+        self.session.delete(row)
+        self.session.flush()
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseEntityCategory",
+            entity_id=cat_uuid,
+        )
+
+
+# =============================================================================
+# EnterpriseContextEntityRepository  (ENT2-3.4)
+# =============================================================================
+
+
+class EnterpriseContextEntityRepository(
+    EnterpriseRepositoryBase["EnterpriseContextEntity"],
+):
+    """Repository for tenant-scoped CRUD on EnterpriseContextEntity.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.IContextEntityRepository`
+    for the enterprise PostgreSQL backend.
+
+    Context entities are special artifacts (CLAUDE.md, spec files, rule files,
+    context files, progress templates) stored in ``enterprise_context_entities``.
+    All queries are automatically scoped to the tenant stored in ``TenantContext``
+    via ``_apply_tenant_filter()``.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    The ``artifact_id`` FK is nullable — context entities may exist
+    independently of any artifact row.  The ``target_platforms`` and
+    ``category_associations`` fields are JSONB/relational respectively; JSONB
+    filters use standard equality (not ``@>``), so they are safe in SQLite-
+    backed unit tests.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseContextEntity as _ECE
+
+        super().__init__(session, _ECE)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _compute_content_hash(content: "Optional[str]") -> "Optional[str]":
+        """Return the SHA-256 hex digest of *content*, or ``None`` when empty.
+
+        Parameters
+        ----------
+        content:
+            Raw string content to hash.
+
+        Returns
+        -------
+        str or None
+        """
+        if not content:
+            return None
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    def _to_dto(self, row: "EnterpriseContextEntity") -> "ContextEntityDTO":
+        """Map an ``EnterpriseContextEntity`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.ContextEntityDTO`.
+
+        Parameters
+        ----------
+        row:
+            ORM instance to convert.
+
+        Returns
+        -------
+        ContextEntityDTO
+        """
+        from skillmeat.core.interfaces.dtos import ContextEntityDTO
+
+        category_ids: List[int] = []
+        if row.category_associations:
+            for assoc in row.category_associations:
+                try:
+                    category_ids.append(int(str(assoc.category_id)))
+                except (TypeError, ValueError):
+                    pass
+
+        return ContextEntityDTO(
+            id=str(row.id),
+            name=row.name,
+            entity_type=row.entity_type,
+            content=row.content or "",
+            path_pattern=row.path_pattern or "",
+            description=row.description,
+            category=row.category,
+            auto_load=bool(row.auto_load),
+            version=row.version,
+            target_platforms=list(row.target_platforms or []),
+            content_hash=self._compute_content_hash(row.content),
+            category_ids=category_ids,
+            created_at=row.created_at.isoformat() if row.created_at else None,
+            updated_at=row.updated_at.isoformat() if row.updated_at else None,
+        )
+
+    def _fetch_entity(
+        self,
+        entity_uuid: uuid.UUID,
+    ) -> "Optional[EnterpriseContextEntity]":
+        """Fetch a tenant-filtered context entity by UUID.
+
+        Parameters
+        ----------
+        entity_uuid:
+            UUID of the entity to retrieve.
+
+        Returns
+        -------
+        EnterpriseContextEntity or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseContextEntity
+
+        stmt = self._tenant_select().where(EnterpriseContextEntity.id == entity_uuid)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: list
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        filters: "Optional[dict]" = None,
+        limit: int = 20,
+        after: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[ContextEntityDTO]":
+        """Return a page of context entities matching optional filter criteria.
+
+        Supported filter keys: ``entity_type``, ``category``, ``auto_load``,
+        ``search`` (case-insensitive prefix on ``name``).
+
+        Parameters
+        ----------
+        filters:
+            Optional key/value filter map.
+        limit:
+            Maximum number of records to return (1-100).
+        after:
+            Opaque cursor (base64-encoded UUID string) for keyset pagination.
+            Pass the ``id`` of the last seen item.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[ContextEntityDTO]
+        """
+        import base64
+
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseContextEntity
+
+        stmt = self._tenant_select().order_by(EnterpriseContextEntity.created_at)
+
+        if filters:
+            entity_type = filters.get("entity_type")
+            if entity_type is not None:
+                stmt = stmt.where(EnterpriseContextEntity.entity_type == entity_type)
+
+            category = filters.get("category")
+            if category is not None:
+                stmt = stmt.where(EnterpriseContextEntity.category == category)
+
+            auto_load = filters.get("auto_load")
+            if auto_load is not None:
+                stmt = stmt.where(EnterpriseContextEntity.auto_load.is_(bool(auto_load)))
+
+            search = filters.get("search")
+            if search:
+                stmt = stmt.where(
+                    func.lower(EnterpriseContextEntity.name).like(
+                        f"{search.lower()}%"
+                    )
+                )
+
+        # Keyset pagination: skip rows whose id <= after cursor.
+        if after:
+            try:
+                cursor_id = uuid.UUID(base64.b64decode(after.encode()).decode())
+                stmt = stmt.where(EnterpriseContextEntity.id > cursor_id)
+            except Exception:
+                pass  # Ignore invalid cursor; return from beginning.
+
+        limit = max(1, min(limit, 100))
+        stmt = stmt.limit(limit)
+
+        rows = list(self.session.execute(stmt).scalars())
+        return [self._to_dto(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: get
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        entity_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[ContextEntityDTO]":
+        """Return a context entity by its identifier.
+
+        Parameters
+        ----------
+        entity_id:
+            Entity UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ContextEntityDTO or None
+        """
+        try:
+            entity_uuid = uuid.UUID(str(entity_id))
+        except (ValueError, AttributeError):
+            return None
+
+        row = self._fetch_entity(entity_uuid)
+        if row is None:
+            return None
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: create
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        name: str,
+        entity_type: str,
+        content: str,
+        path_pattern: str,
+        description: "Optional[str]" = None,
+        category: "Optional[str]" = None,
+        auto_load: bool = False,
+        version: "Optional[str]" = None,
+        target_platforms: "Optional[list[str]]" = None,
+        category_ids: "Optional[list[int]]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "ContextEntityDTO":
+        """Persist a new context entity and return the stored representation.
+
+        Parameters
+        ----------
+        name:
+            Human-readable entity name.
+        entity_type:
+            Entity type key, e.g. ``"context_file"``, ``"rule_file"``.
+        content:
+            Assembled markdown content.
+        path_pattern:
+            Target deployment path (must start with ``".claude/"`` or a
+            supported prefix).
+        description:
+            Optional description.
+        category:
+            Optional category label string.
+        auto_load:
+            Whether to auto-load on platform startup.
+        version:
+            Optional version string.
+        target_platforms:
+            Optional list of platform identifiers.
+        category_ids:
+            Ordered list of category IDs to associate.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ContextEntityDTO
+            The persisted entity.
+
+        Raises
+        ------
+        ValueError
+            If *path_pattern* is blank.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseContextEntity,
+            EnterpriseEntityCategoryAssociation,
+        )
+
+        if not path_pattern:
+            raise ValueError("path_pattern must not be empty.")
+
+        tenant_id = self._get_tenant_id()
+
+        row = EnterpriseContextEntity(
+            tenant_id=tenant_id,
+            name=name,
+            entity_type=entity_type,
+            content=content,
+            path_pattern=path_pattern,
+            description=description,
+            category=category,
+            auto_load=auto_load,
+            version=version,
+            target_platforms=target_platforms or [],
+        )
+        self.session.add(row)
+        self.session.flush()  # Populate row.id before associations.
+
+        if category_ids:
+            for position, cat_id in enumerate(category_ids):
+                try:
+                    cat_uuid = uuid.UUID(str(cat_id))
+                except (ValueError, AttributeError):
+                    continue
+                assoc = EnterpriseEntityCategoryAssociation(
+                    tenant_id=tenant_id,
+                    entity_id=row.id,
+                    category_id=cat_uuid,
+                    position=position,
+                )
+                self.session.add(assoc)
+            self.session.flush()
+
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseContextEntity",
+            entity_id=row.id,
+            metadata={"name": name, "entity_type": entity_type},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: update
+    # ------------------------------------------------------------------
+
+    def update(
+        self,
+        entity_id: str,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "ContextEntityDTO":
+        """Apply a partial update to an existing context entity.
+
+        Parameters
+        ----------
+        entity_id:
+            Entity UUID as a string.
+        updates:
+            Map of field names to new values.  Supported keys:
+            ``name``, ``entity_type``, ``content``, ``path_pattern``,
+            ``description``, ``category``, ``auto_load``, ``version``,
+            ``target_platforms``, ``category_ids``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        ContextEntityDTO
+            The updated entity.
+
+        Raises
+        ------
+        KeyError
+            If no entity with *entity_id* exists in this tenant.
+        ValueError
+            If *updates* contains invalid field values.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseContextEntity,
+            EnterpriseEntityCategoryAssociation,
+        )
+
+        try:
+            entity_uuid = uuid.UUID(str(entity_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(entity_id) from exc
+
+        row = self._fetch_entity(entity_uuid)
+        if row is None:
+            raise KeyError(entity_id)
+
+        for field_name in (
+            "name",
+            "entity_type",
+            "content",
+            "path_pattern",
+            "description",
+            "category",
+            "auto_load",
+            "version",
+            "target_platforms",
+        ):
+            if field_name in updates:
+                setattr(row, field_name, updates[field_name])
+
+        if "category_ids" in updates:
+            tenant_id = self._get_tenant_id()
+            # Replace all existing associations.
+            for assoc in list(row.category_associations):
+                self.session.delete(assoc)
+            self.session.flush()
+
+            for position, cat_id in enumerate(updates["category_ids"] or []):
+                try:
+                    cat_uuid = uuid.UUID(str(cat_id))
+                except (ValueError, AttributeError):
+                    continue
+                assoc = EnterpriseEntityCategoryAssociation(
+                    tenant_id=tenant_id,
+                    entity_id=row.id,
+                    category_id=cat_uuid,
+                    position=position,
+                )
+                self.session.add(assoc)
+
+        row.updated_at = datetime.utcnow()
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseContextEntity",
+            entity_id=entity_uuid,
+            metadata={k: str(v)[:80] for k, v in updates.items() if k != "content"},
+        )
+        return self._to_dto(row)
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: delete
+    # ------------------------------------------------------------------
+
+    def delete(
+        self,
+        entity_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Delete a context entity permanently.
+
+        The ``ON DELETE CASCADE`` on ``enterprise_entity_category_associations``
+        removes association rows automatically at the database level.
+
+        Parameters
+        ----------
+        entity_id:
+            Entity UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If no entity with *entity_id* exists in this tenant.
+        """
+        try:
+            entity_uuid = uuid.UUID(str(entity_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(entity_id) from exc
+
+        row = self._fetch_entity(entity_uuid)
+        if row is None:
+            raise KeyError(entity_id)
+
+        self.session.delete(row)
+        self.session.flush()
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseContextEntity",
+            entity_id=entity_uuid,
+        )
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: deploy
+    # ------------------------------------------------------------------
+
+    def deploy(
+        self,
+        entity_id: str,
+        project_path: str,
+        options: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Deploy a context entity's content to a filesystem project path.
+
+        Writes the assembled content to the location specified by
+        ``path_pattern``, resolved against *project_path*.
+
+        Parameters
+        ----------
+        entity_id:
+            Entity UUID as a string.
+        project_path:
+            Absolute filesystem path to the target project directory.
+        options:
+            Optional deployment options: ``overwrite`` (bool, default False).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *entity_id* does not exist.
+        FileExistsError
+            If the target file already exists and ``options["overwrite"]`` is
+            ``False``.
+        ValueError
+            If *project_path* does not exist or ``path_pattern`` is missing.
+        """
+        from pathlib import Path
+
+        try:
+            entity_uuid = uuid.UUID(str(entity_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(entity_id) from exc
+
+        row = self._fetch_entity(entity_uuid)
+        if row is None:
+            raise KeyError(entity_id)
+
+        if not row.path_pattern:
+            raise ValueError(f"Entity {entity_id!r} has no path_pattern set.")
+
+        project = Path(project_path)
+        if not project.exists():
+            raise ValueError(f"project_path {project_path!r} does not exist.")
+
+        target = project / row.path_pattern.lstrip("/")
+        overwrite = (options or {}).get("overwrite", False)
+
+        if target.exists() and not overwrite:
+            raise FileExistsError(
+                f"Target file {target} already exists. Pass overwrite=True to replace it."
+            )
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(row.content or "", encoding="utf-8")
+
+        self._log_operation(
+            operation="deploy",
+            entity_type="EnterpriseContextEntity",
+            entity_id=entity_uuid,
+            metadata={"project_path": project_path, "target": str(target)},
+        )
+
+    # ------------------------------------------------------------------
+    # IContextEntityRepository: get_content
+    # ------------------------------------------------------------------
+
+    def get_content(
+        self,
+        entity_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[str]":
+        """Return the raw markdown content of a context entity.
+
+        Parameters
+        ----------
+        entity_id:
+            Entity UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        str or None
+            Raw content string when the entity exists, ``None`` otherwise.
+        """
+        try:
+            entity_uuid = uuid.UUID(str(entity_id))
+        except (ValueError, AttributeError):
+            return None
+
+        row = self._fetch_entity(entity_uuid)
+        if row is None:
+            return None
+        return row.content
