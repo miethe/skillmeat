@@ -2247,4 +2247,124 @@ class EnterpriseUserCollectionAdapter(IDbUserCollectionRepository):
             collection.created_by = created_by
             self._repo.session.flush()
         return self._to_dto(collection)
-        return True
+
+    def update(
+        self,
+        collection_id: str,
+        ctx: Optional[object] = None,
+        **kwargs: object,
+    ) -> "UserCollectionDTO":
+        """Apply a partial update to an existing enterprise collection."""
+        try:
+            uid = uuid.UUID(collection_id)
+        except (ValueError, AttributeError):
+            raise KeyError(f"Collection {collection_id!r} not found.")
+
+        collection = self._repo.update(
+            uid,
+            name=kwargs.get("name"),
+            description=kwargs.get("description"),
+        )
+        return self._to_dto(collection)
+
+    def delete(
+        self,
+        collection_id: str,
+        ctx: Optional[object] = None,
+    ) -> bool:
+        """Delete an enterprise collection and all its membership records."""
+        try:
+            uid = uuid.UUID(collection_id)
+        except (ValueError, AttributeError):
+            return False
+
+        return self._repo.delete(uid)
+
+    def ensure_default(
+        self,
+        *,
+        created_by: Optional[str] = None,
+        ctx: Optional[object] = None,
+    ) -> "UserCollectionDTO":
+        """Return the default collection, creating it if it does not exist."""
+        default_name = "Default Collection"
+        existing = self._repo.get_by_name(default_name)
+        if existing is not None:
+            return self._to_dto(existing)
+
+        collection = self._repo.create(name=default_name, description="Default collection")
+        if created_by is not None and hasattr(collection, "created_by"):
+            collection.created_by = created_by
+            self._repo.session.flush()
+        return self._to_dto(collection)
+
+    def ensure_sentinel_project(self) -> None:
+        """No-op for enterprise mode — enterprise uses different FK relationships."""
+        pass
+
+    def get_artifact_count(
+        self,
+        collection_id: str,
+        ctx: Optional[object] = None,
+    ) -> int:
+        """Return the number of artifacts in the given enterprise collection."""
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
+
+        try:
+            uid = uuid.UUID(collection_id)
+        except (ValueError, AttributeError):
+            return 0
+
+        result = self._repo.session.execute(
+            select(func.count()).select_from(EnterpriseCollectionArtifact).where(
+                EnterpriseCollectionArtifact.collection_id == uid
+            )
+        )
+        return result.scalar_one() or 0
+
+    def get_groups(
+        self,
+        collection_id: str,
+        ctx: Optional[object] = None,
+    ) -> "list[str]":
+        """Enterprise does not have the same group association model; returns empty list."""
+        return []
+
+    def list_with_artifact_stats(
+        self,
+        *,
+        created_by: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: Optional[object] = None,
+    ) -> "list[UserCollectionDTO]":
+        """Return collections with artifact_count populated.
+
+        Delegates to :meth:`list`; the DTO already carries ``artifact_count``
+        from :meth:`_to_dto`.
+        """
+        return self.list(
+            created_by=created_by,
+            limit=limit,
+            offset=offset,
+            ctx=ctx,
+        )
+
+    def add_group(
+        self,
+        collection_id: str,
+        group_id: str,
+        ctx: Optional[object] = None,
+    ) -> bool:
+        """Enterprise does not support the same group model; returns False."""
+        return False
+
+    def remove_group(
+        self,
+        collection_id: str,
+        group_id: str,
+        ctx: Optional[object] = None,
+    ) -> bool:
+        """Enterprise does not support the same group model; returns False."""
+        return False
