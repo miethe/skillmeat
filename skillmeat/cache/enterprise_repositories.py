@@ -2368,3 +2368,1499 @@ class EnterpriseUserCollectionAdapter(IDbUserCollectionRepository):
     ) -> bool:
         """Enterprise does not support the same group model; returns False."""
         return False
+
+
+# ---------------------------------------------------------------------------
+# EnterpriseTagRepository  (ENT2-3.1)
+# ---------------------------------------------------------------------------
+
+
+class EnterpriseTagRepository(
+    EnterpriseRepositoryBase["EnterpriseTag"],
+):
+    """Repository for tenant-scoped CRUD on EnterpriseTag.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.ITagRepository`
+    for the enterprise PostgreSQL backend.
+
+    All queries are automatically scoped to the tenant stored in
+    ``TenantContext`` via ``_apply_tenant_filter()``.  Slug generation
+    normalises the tag name using a simple regex: lowercase, replace
+    non-alphanumeric runs with hyphens, strip leading/trailing hyphens.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    The interface defines ``id`` as ``str``; enterprise tag PKs are
+    ``uuid.UUID``.  All public methods accept and return ``str`` IDs and
+    convert internally.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseTag as _ET
+
+        super().__init__(session, _ET)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _slugify(name: str) -> str:
+        """Derive a URL-safe slug from *name*.
+
+        Lowercases the string, replaces every run of non-alphanumeric
+        characters (including spaces) with a single hyphen, and strips
+        leading/trailing hyphens.
+
+        Parameters
+        ----------
+        name:
+            Human-readable tag name, e.g. ``"AI & ML"``.
+
+        Returns
+        -------
+        str
+            Normalised slug, e.g. ``"ai-ml"``.
+        """
+        import re
+
+        slug = name.lower()
+        slug = re.sub(r"[^a-z0-9]+", "-", slug)
+        return slug.strip("-")
+
+    def _to_dto(self, tag: "EnterpriseTag", artifact_count: int = 0) -> "TagDTO":
+        """Map an ``EnterpriseTag`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.TagDTO`.
+
+        Parameters
+        ----------
+        tag:
+            ORM instance to convert.
+        artifact_count:
+            Number of artifacts currently carrying this tag.  Defaults to
+            ``0`` when the caller does not supply a pre-computed count.
+
+        Returns
+        -------
+        TagDTO
+            Immutable DTO ready for serialisation.
+        """
+        from skillmeat.core.interfaces.dtos import TagDTO
+
+        return TagDTO(
+            id=str(tag.id),
+            name=tag.name,
+            slug=tag.slug,
+            color=tag.color,
+            artifact_count=artifact_count,
+            deployment_set_count=0,
+            created_at=tag.created_at.isoformat() if tag.created_at else None,
+            updated_at=tag.updated_at.isoformat() if tag.updated_at else None,
+        )
+
+    # ------------------------------------------------------------------
+    # ITagRepository: get
+    # ------------------------------------------------------------------
+
+    def get(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[TagDTO]":
+        """Return a :class:`~skillmeat.core.interfaces.dtos.TagDTO` by string UUID.
+
+        Parameters
+        ----------
+        id:
+            Tag UUID as a string (e.g. from an API path parameter).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        TagDTO or None
+            The matching DTO when found within the current tenant, ``None``
+            otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        try:
+            tag_uuid = uuid.UUID(id)
+        except (ValueError, AttributeError):
+            return None
+        stmt = self._tenant_select().where(EnterpriseTag.id == tag_uuid)
+        tag = self.session.execute(stmt).scalar_one_or_none()
+        if tag is None:
+            return None
+        return self._to_dto(tag, artifact_count=len(tag.artifact_tags))
+
+    # ------------------------------------------------------------------
+    # ITagRepository: get_by_slug
+    # ------------------------------------------------------------------
+
+    def get_by_slug(
+        self,
+        slug: str,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[TagDTO]":
+        """Return a :class:`~skillmeat.core.interfaces.dtos.TagDTO` by slug.
+
+        Parameters
+        ----------
+        slug:
+            URL-safe normalised tag slug (e.g. ``"ai-ml"``).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        TagDTO or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        stmt = self._tenant_select().where(EnterpriseTag.slug == slug)
+        tag = self.session.execute(stmt).scalar_one_or_none()
+        if tag is None:
+            return None
+        return self._to_dto(tag, artifact_count=len(tag.artifact_tags))
+
+    # ------------------------------------------------------------------
+    # ITagRepository: list
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        filters: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[TagDTO]":
+        """Return all tags for the current tenant.
+
+        Parameters
+        ----------
+        filters:
+            Optional filter map.  Recognised key: ``"name"`` — performs a
+            case-insensitive prefix filter.  Unknown keys are ignored.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[TagDTO]
+            Tags ordered alphabetically by name.
+        """
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        stmt = self._tenant_select().order_by(EnterpriseTag.name)
+        if filters:
+            name_filter = filters.get("name")
+            if name_filter:
+                stmt = stmt.where(
+                    func.lower(EnterpriseTag.name).like(
+                        f"{name_filter.lower()}%"
+                    )
+                )
+        tags = list(self.session.execute(stmt).scalars())
+        return [self._to_dto(t, artifact_count=len(t.artifact_tags)) for t in tags]
+
+    # ------------------------------------------------------------------
+    # ITagRepository: create
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        name: str,
+        color: "Optional[str]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "TagDTO":
+        """Create a new tenant-scoped tag.
+
+        The slug is automatically derived from *name* via :meth:`_slugify`.
+
+        Parameters
+        ----------
+        name:
+            Human-readable tag name.  Must be unique within the tenant.
+        color:
+            Optional hex or CSS colour string (e.g. ``"#3B82F6"``).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        TagDTO
+            The newly created tag.
+
+        Raises
+        ------
+        ValueError
+            If a tag with the same derived slug already exists for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        tenant_id = self._get_tenant_id()
+        slug = self._slugify(name)
+
+        # Guard: uniqueness check on (tenant_id, slug) before insert.
+        existing = self.get_by_slug(slug)
+        if existing is not None:
+            raise ValueError(
+                f"A tag with slug {slug!r} already exists in this tenant."
+            )
+
+        tag = EnterpriseTag(
+            tenant_id=tenant_id,
+            name=name,
+            slug=slug,
+            color=color,
+        )
+        self.session.add(tag)
+        self.session.flush()
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseTag",
+            entity_id=tag.id,
+            metadata={"name": name, "slug": slug},
+        )
+        return self._to_dto(tag)
+
+    # ------------------------------------------------------------------
+    # ITagRepository: update
+    # ------------------------------------------------------------------
+
+    def update(
+        self,
+        id: str,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "TagDTO":
+        """Apply a partial update to an existing tag.
+
+        Parameters
+        ----------
+        id:
+            Tag UUID as a string.
+        updates:
+            Map of field names to new values.  Recognised keys:
+            ``"name"``, ``"color"``.  An updated ``"name"`` automatically
+            regenerates the slug unless ``"slug"`` is also provided
+            explicitly.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        TagDTO
+            The updated tag DTO.
+
+        Raises
+        ------
+        KeyError
+            If no tag with *id* exists in the current tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        try:
+            tag_uuid = uuid.UUID(id)
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(id) from exc
+
+        stmt = self._tenant_select().where(EnterpriseTag.id == tag_uuid)
+        tag = self.session.execute(stmt).scalar_one_or_none()
+        if tag is None:
+            raise KeyError(id)
+
+        changed: Dict[str, object] = {}
+        if "name" in updates:
+            tag.name = updates["name"]
+            changed["name"] = updates["name"]
+            # Auto-regenerate slug when name changes unless slug is explicit.
+            if "slug" not in updates:
+                tag.slug = self._slugify(updates["name"])
+                changed["slug"] = tag.slug
+        if "slug" in updates:
+            tag.slug = updates["slug"]
+            changed["slug"] = updates["slug"]
+        if "color" in updates:
+            tag.color = updates["color"]
+            changed["color"] = updates["color"]
+
+        tag.updated_at = datetime.utcnow()
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseTag",
+            entity_id=tag_uuid,
+            metadata=changed or None,
+        )
+        return self._to_dto(tag, artifact_count=len(tag.artifact_tags))
+
+    # ------------------------------------------------------------------
+    # ITagRepository: delete
+    # ------------------------------------------------------------------
+
+    def delete(
+        self,
+        id: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Delete a tag and remove all its artifact associations.
+
+        The ``ON DELETE CASCADE`` on ``enterprise_artifact_tags.tag_id``
+        removes association rows automatically at the database level.
+
+        Parameters
+        ----------
+        id:
+            Tag UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` when the tag was found and deleted, ``False`` otherwise.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseTag
+
+        try:
+            tag_uuid = uuid.UUID(id)
+        except (ValueError, AttributeError):
+            return False
+
+        stmt = self._tenant_select().where(EnterpriseTag.id == tag_uuid)
+        tag = self.session.execute(stmt).scalar_one_or_none()
+        if tag is None:
+            return False
+
+        self.session.delete(tag)
+        self.session.flush()
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseTag",
+            entity_id=tag_uuid,
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # ITagRepository: assign
+    # ------------------------------------------------------------------
+
+    def assign(
+        self,
+        tag_id: str,
+        artifact_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Associate a tag with an artifact (idempotent).
+
+        Parameters
+        ----------
+        tag_id:
+            Tag UUID as a string.
+        artifact_id:
+            Artifact UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` on success (including when the association already existed).
+
+        Raises
+        ------
+        KeyError
+            If *tag_id* or *artifact_id* does not exist within the current
+            tenant.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseArtifact,
+            EnterpriseArtifactTag,
+            EnterpriseTag,
+        )
+
+        try:
+            tag_uuid = uuid.UUID(tag_id)
+            artifact_uuid = uuid.UUID(artifact_id)
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(tag_id) from exc
+
+        tenant_id = self._get_tenant_id()
+
+        # Validate both entities exist within the tenant.
+        tag_stmt = self._tenant_select().where(EnterpriseTag.id == tag_uuid)
+        tag = self.session.execute(tag_stmt).scalar_one_or_none()
+        if tag is None:
+            raise KeyError(tag_id)
+
+        art_stmt = self._apply_tenant_filter(
+            select(EnterpriseArtifact).where(EnterpriseArtifact.id == artifact_uuid)
+        )
+        artifact = self.session.execute(art_stmt).scalar_one_or_none()
+        if artifact is None:
+            raise KeyError(artifact_id)
+
+        # Idempotent: check if the association already exists.
+        existing_stmt = select(EnterpriseArtifactTag).where(
+            EnterpriseArtifactTag.tenant_id == tenant_id,
+            EnterpriseArtifactTag.tag_id == tag_uuid,
+            EnterpriseArtifactTag.artifact_uuid == artifact_uuid,
+        )
+        existing = self.session.execute(existing_stmt).scalar_one_or_none()
+        if existing is not None:
+            return True
+
+        assoc = EnterpriseArtifactTag(
+            tenant_id=tenant_id,
+            tag_id=tag_uuid,
+            artifact_uuid=artifact_uuid,
+        )
+        self.session.add(assoc)
+        self.session.flush()
+        self._log_operation(
+            operation="assign",
+            entity_type="EnterpriseArtifactTag",
+            entity_id=assoc.id,
+            metadata={"tag_id": str(tag_uuid), "artifact_uuid": str(artifact_uuid)},
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # ITagRepository: unassign
+    # ------------------------------------------------------------------
+
+    def unassign(
+        self,
+        tag_id: str,
+        artifact_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> bool:
+        """Remove the association between a tag and an artifact.
+
+        Parameters
+        ----------
+        tag_id:
+            Tag UUID as a string.
+        artifact_id:
+            Artifact UUID as a string.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        bool
+            ``True`` when the association existed and was removed, ``False``
+            if there was no such association.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseArtifactTag
+
+        try:
+            tag_uuid = uuid.UUID(tag_id)
+            artifact_uuid = uuid.UUID(artifact_id)
+        except (ValueError, AttributeError):
+            return False
+
+        tenant_id = self._get_tenant_id()
+        result = self.session.execute(
+            delete(EnterpriseArtifactTag).where(
+                EnterpriseArtifactTag.tenant_id == tenant_id,
+                EnterpriseArtifactTag.tag_id == tag_uuid,
+                EnterpriseArtifactTag.artifact_uuid == artifact_uuid,
+            )
+        )
+        removed = result.rowcount > 0
+        if removed:
+            self.session.flush()
+            self._log_operation(
+                operation="unassign",
+                entity_type="EnterpriseArtifactTag",
+                entity_id=None,
+                metadata={
+                    "tag_id": str(tag_uuid),
+                    "artifact_uuid": str(artifact_uuid),
+                },
+            )
+        return removed
+
+
+# ---------------------------------------------------------------------------
+# EnterpriseGroupRepository  (ENT2-3.2)
+# ---------------------------------------------------------------------------
+
+
+class EnterpriseGroupRepository(
+    EnterpriseRepositoryBase["EnterpriseGroup"],
+):
+    """Repository for tenant-scoped CRUD on EnterpriseGroup.
+
+    Implements :class:`~skillmeat.core.interfaces.repositories.IGroupRepository`
+    for the enterprise PostgreSQL backend.
+
+    Groups are named, position-ordered buckets within a collection.  All
+    queries are automatically scoped to the tenant stored in ``TenantContext``
+    via ``_apply_tenant_filter()``.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        Lifecycle (commit/rollback/close) is managed by the caller.
+
+    Notes
+    -----
+    The IGroupRepository interface uses ``int`` group IDs for historical
+    reasons (local SQLite model uses autoincrement integers).  The enterprise
+    model uses ``uuid.UUID`` PKs.  All public methods accept ``int | str``
+    IDs, attempt UUID parse first, and raise ``KeyError`` for invalid values.
+    """
+
+    def __init__(self, session: Session) -> None:
+        from skillmeat.cache.models_enterprise import EnterpriseGroup as _EG
+
+        super().__init__(session, _EG)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _to_dto(
+        self,
+        group: "EnterpriseGroup",
+        artifact_count: int = 0,
+    ) -> "GroupDTO":
+        """Map an ``EnterpriseGroup`` ORM instance to a :class:`~skillmeat.core.interfaces.dtos.GroupDTO`.
+
+        Parameters
+        ----------
+        group:
+            ORM instance to convert.
+        artifact_count:
+            Number of artifacts currently in this group.
+
+        Returns
+        -------
+        GroupDTO
+        """
+        from skillmeat.core.interfaces.dtos import GroupDTO
+
+        return GroupDTO(
+            id=str(group.id),
+            name=group.name or "",
+            collection_id=str(group.collection_id) if group.collection_id else "",
+            description=group.description,
+            position=group.position or 0,
+            artifact_count=artifact_count,
+            tags=[],
+            color="slate",
+            icon="layers",
+            created_at=group.created_at.isoformat() if group.created_at else None,
+            updated_at=group.updated_at.isoformat() if group.updated_at else None,
+        )
+
+    def _ga_to_dto(
+        self,
+        ga: "EnterpriseGroupArtifact",
+    ) -> "GroupArtifactDTO":
+        """Map an ``EnterpriseGroupArtifact`` join row to a :class:`~skillmeat.core.interfaces.dtos.GroupArtifactDTO`.
+
+        Parameters
+        ----------
+        ga:
+            ORM join-table instance to convert.
+
+        Returns
+        -------
+        GroupArtifactDTO
+        """
+        from skillmeat.core.interfaces.dtos import GroupArtifactDTO
+
+        return GroupArtifactDTO(
+            group_id=str(ga.group_id),
+            artifact_uuid=str(ga.artifact_uuid),
+            position=ga.position or 0,
+            added_at=None,
+        )
+
+    def _resolve_group_uuid(self, group_id: "int | str") -> "Optional[uuid.UUID]":
+        """Coerce *group_id* to a ``uuid.UUID``, returning ``None`` on failure.
+
+        Accepts integer IDs (silently converted via ``str()`` before UUID
+        parse) or string UUIDs.
+
+        Parameters
+        ----------
+        group_id:
+            Raw group identifier from an API path or interface call.
+
+        Returns
+        -------
+        uuid.UUID or None
+        """
+        try:
+            return uuid.UUID(str(group_id))
+        except (ValueError, AttributeError):
+            return None
+
+    def _fetch_group(
+        self,
+        group_uuid: uuid.UUID,
+    ) -> "Optional[EnterpriseGroup]":
+        """Fetch a tenant-filtered group by UUID.
+
+        Parameters
+        ----------
+        group_uuid:
+            UUID of the group to retrieve.
+
+        Returns
+        -------
+        EnterpriseGroup or None
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroup
+
+        stmt = self._tenant_select().where(EnterpriseGroup.id == group_uuid)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: get_with_artifacts
+    # ------------------------------------------------------------------
+
+    def get_with_artifacts(
+        self,
+        group_id: int,
+        ctx: "Optional[object]" = None,
+    ) -> "Optional[GroupDTO]":
+        """Return a group by ID, including its artifact membership count.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key (integer or UUID string accepted).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        GroupDTO or None
+        """
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            return None
+        group = self._fetch_group(gid)
+        if group is None:
+            return None
+        artifact_count = len(group.group_artifacts)
+        return self._to_dto(group, artifact_count=artifact_count)
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: list
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        collection_id: str,
+        filters: "Optional[dict]" = None,
+        ctx: "Optional[object]" = None,
+    ) -> "list[GroupDTO]":
+        """Return all groups belonging to a collection, ordered by position.
+
+        Parameters
+        ----------
+        collection_id:
+            Collection UUID as a string.
+        filters:
+            Optional additional filter map.  Recognised key: ``"name"`` —
+            case-insensitive exact match.  Unknown keys are ignored.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[GroupDTO]
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroup
+
+        try:
+            col_uuid = uuid.UUID(str(collection_id))
+        except (ValueError, AttributeError):
+            return []
+
+        stmt = (
+            self._tenant_select()
+            .where(EnterpriseGroup.collection_id == col_uuid)
+            .order_by(EnterpriseGroup.position)
+        )
+        if filters:
+            name_filter = filters.get("name")
+            if name_filter:
+                stmt = stmt.where(EnterpriseGroup.name == name_filter)
+
+        groups = list(self.session.execute(stmt).scalars())
+        return [
+            self._to_dto(g, artifact_count=len(g.group_artifacts))
+            for g in groups
+        ]
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: create
+    # ------------------------------------------------------------------
+
+    def create(
+        self,
+        name: str,
+        collection_id: str,
+        description: "Optional[str]" = None,
+        position: "Optional[int]" = None,
+        ctx: "Optional[object]" = None,
+        owner_target: "Optional[object]" = None,
+    ) -> "GroupDTO":
+        """Create a new group in the given collection.
+
+        If *position* is ``None``, the group is appended after all existing
+        groups in the collection (``max(position) + 1``).
+
+        Parameters
+        ----------
+        name:
+            Human-readable group name.
+        collection_id:
+            Owning collection UUID as a string.
+        description:
+            Optional free-text description.
+        position:
+            Explicit display position.  ``None`` = append at the end.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+        owner_target:
+            Optional ownership target (reserved for future use; unused in
+            the enterprise backend today).
+
+        Returns
+        -------
+        GroupDTO
+            The newly created group.
+
+        Raises
+        ------
+        ValueError
+            If a group with the same *name* already exists in the collection.
+        """
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseGroup
+
+        try:
+            col_uuid = uuid.UUID(str(collection_id))
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(
+                f"Invalid collection_id {collection_id!r}: not a valid UUID."
+            ) from exc
+
+        tenant_id = self._get_tenant_id()
+
+        # Guard: name uniqueness within (tenant, collection).
+        dup_stmt = (
+            self._tenant_select()
+            .where(
+                EnterpriseGroup.collection_id == col_uuid,
+                EnterpriseGroup.name == name,
+            )
+        )
+        if self.session.execute(dup_stmt).scalar_one_or_none() is not None:
+            raise ValueError(
+                f"A group named {name!r} already exists in collection "
+                f"{collection_id!r}."
+            )
+
+        if position is None:
+            max_pos_result = self.session.execute(
+                select(func.max(EnterpriseGroup.position)).where(
+                    EnterpriseGroup.tenant_id == tenant_id,
+                    EnterpriseGroup.collection_id == col_uuid,
+                )
+            ).scalar()
+            position = 0 if max_pos_result is None else max_pos_result + 1
+
+        group = EnterpriseGroup(
+            tenant_id=tenant_id,
+            name=name,
+            collection_id=col_uuid,
+            description=description,
+            position=position,
+        )
+        self.session.add(group)
+        self.session.flush()
+        self._log_operation(
+            operation="create",
+            entity_type="EnterpriseGroup",
+            entity_id=group.id,
+            metadata={"name": name, "collection_id": str(col_uuid)},
+        )
+        return self._to_dto(group)
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: update
+    # ------------------------------------------------------------------
+
+    def update(
+        self,
+        group_id: int,
+        updates: "dict",
+        ctx: "Optional[object]" = None,
+    ) -> "GroupDTO":
+        """Apply a partial update to an existing group's metadata.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        updates:
+            Map of field names to new values.  Recognised keys:
+            ``"name"``, ``"description"``, ``"position"``.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        GroupDTO
+            The updated group DTO.
+
+        Raises
+        ------
+        KeyError
+            If no group with *group_id* exists in the current tenant.
+        """
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        changed: Dict[str, object] = {}
+        if "name" in updates:
+            group.name = updates["name"]
+            changed["name"] = updates["name"]
+        if "description" in updates:
+            group.description = updates["description"]
+            changed["description"] = updates["description"]
+        if "position" in updates:
+            group.position = updates["position"]
+            changed["position"] = updates["position"]
+
+        group.updated_at = datetime.utcnow()
+        self.session.flush()
+        self._log_operation(
+            operation="update",
+            entity_type="EnterpriseGroup",
+            entity_id=gid,
+            metadata=changed or None,
+        )
+        return self._to_dto(group, artifact_count=len(group.group_artifacts))
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: delete
+    # ------------------------------------------------------------------
+
+    def delete(
+        self,
+        group_id: int,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Delete a group and all its artifact membership records.
+
+        The ``ON DELETE CASCADE`` on ``enterprise_group_artifacts.group_id``
+        removes membership rows automatically at the database level.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If no group with *group_id* exists in the current tenant.
+        """
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        self.session.delete(group)
+        self.session.flush()
+        self._log_operation(
+            operation="delete",
+            entity_type="EnterpriseGroup",
+            entity_id=gid,
+        )
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: copy_to_collection
+    # ------------------------------------------------------------------
+
+    def copy_to_collection(
+        self,
+        group_id: int,
+        target_collection_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "GroupDTO":
+        """Duplicate a group and its artifact memberships into another collection.
+
+        The new group gets the same name, description, and position as the
+        source.  Artifact UUIDs are preserved.
+
+        Parameters
+        ----------
+        group_id:
+            Integer primary key of the source group.
+        target_collection_id:
+            UUID string of the destination collection.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        GroupDTO
+            The newly created group DTO in the target collection.
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist in the current tenant.
+        ValueError
+            If *target_collection_id* is not a valid UUID.
+        """
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseGroup,
+            EnterpriseGroupArtifact,
+        )
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        source = self._fetch_group(gid)
+        if source is None:
+            raise KeyError(group_id)
+
+        try:
+            target_col_uuid = uuid.UUID(str(target_collection_id))
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(
+                f"Invalid target_collection_id {target_collection_id!r}."
+            ) from exc
+
+        tenant_id = self._get_tenant_id()
+
+        # Compute append position in the target collection.
+        max_pos_result = self.session.execute(
+            select(func.max(EnterpriseGroup.position)).where(
+                EnterpriseGroup.tenant_id == tenant_id,
+                EnterpriseGroup.collection_id == target_col_uuid,
+            )
+        ).scalar()
+        new_position = 0 if max_pos_result is None else max_pos_result + 1
+
+        new_group = EnterpriseGroup(
+            tenant_id=tenant_id,
+            name=source.name,
+            collection_id=target_col_uuid,
+            description=source.description,
+            position=new_position,
+        )
+        self.session.add(new_group)
+        self.session.flush()
+
+        # Copy artifact memberships preserving positions.
+        source_memberships = list(
+            self.session.execute(
+                select(EnterpriseGroupArtifact).where(
+                    EnterpriseGroupArtifact.group_id == gid,
+                    EnterpriseGroupArtifact.tenant_id == tenant_id,
+                )
+            ).scalars()
+        )
+        for mem in source_memberships:
+            new_mem = EnterpriseGroupArtifact(
+                tenant_id=tenant_id,
+                group_id=new_group.id,
+                artifact_uuid=mem.artifact_uuid,
+                position=mem.position,
+            )
+            self.session.add(new_mem)
+
+        self.session.flush()
+        self._log_operation(
+            operation="copy_to_collection",
+            entity_type="EnterpriseGroup",
+            entity_id=new_group.id,
+            metadata={
+                "source_group_id": str(gid),
+                "target_collection_id": str(target_col_uuid),
+            },
+        )
+        return self._to_dto(
+            new_group,
+            artifact_count=len(source_memberships),
+        )
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: reorder_groups
+    # ------------------------------------------------------------------
+
+    def reorder_groups(
+        self,
+        collection_id: str,
+        ordered_ids: "list[int]",
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Bulk-update the display positions of all groups in a collection.
+
+        Parameters
+        ----------
+        collection_id:
+            Collection UUID as a string.
+        ordered_ids:
+            Complete list of group primary keys in the desired display order.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *collection_id* does not map to a valid UUID or any group in
+            *ordered_ids* is not found in the current tenant.
+        ValueError
+            If *ordered_ids* does not include all groups in the collection.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroup
+
+        try:
+            col_uuid = uuid.UUID(str(collection_id))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(collection_id) from exc
+
+        # Fetch all groups in the collection for this tenant.
+        stmt = (
+            self._tenant_select()
+            .where(EnterpriseGroup.collection_id == col_uuid)
+        )
+        groups = {g.id: g for g in self.session.execute(stmt).scalars()}
+
+        # Validate completeness.
+        ordered_uuids: list[uuid.UUID] = []
+        for raw_id in ordered_ids:
+            uid = self._resolve_group_uuid(raw_id)
+            if uid is None or uid not in groups:
+                raise KeyError(raw_id)
+            ordered_uuids.append(uid)
+
+        if len(ordered_uuids) != len(groups):
+            raise ValueError(
+                f"ordered_ids must include all {len(groups)} groups in the "
+                f"collection; got {len(ordered_uuids)}."
+            )
+
+        for position, gid in enumerate(ordered_uuids):
+            groups[gid].position = position
+            groups[gid].updated_at = datetime.utcnow()
+
+        self.session.flush()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: add_artifacts
+    # ------------------------------------------------------------------
+
+    def add_artifacts(
+        self,
+        group_id: int,
+        artifact_uuids: "list[str]",
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Add one or more artifacts to a group (idempotent).
+
+        Artifacts already in the group are silently skipped.  Newly added
+        artifacts are appended after existing members.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        artifact_uuids:
+            List of artifact UUID strings to add.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist in the current tenant.
+        """
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        tenant_id = self._get_tenant_id()
+
+        # Fetch current max position.
+        max_pos_result = self.session.execute(
+            select(func.max(EnterpriseGroupArtifact.position)).where(
+                EnterpriseGroupArtifact.group_id == gid,
+                EnterpriseGroupArtifact.tenant_id == tenant_id,
+            )
+        ).scalar()
+        next_position = 0 if max_pos_result is None else max_pos_result + 1
+
+        # Collect existing artifact UUIDs to deduplicate.
+        existing_stmt = select(EnterpriseGroupArtifact.artifact_uuid).where(
+            EnterpriseGroupArtifact.group_id == gid,
+            EnterpriseGroupArtifact.tenant_id == tenant_id,
+        )
+        existing_uuids: set[uuid.UUID] = {
+            row for row in self.session.execute(existing_stmt).scalars()
+        }
+
+        for raw_uuid in artifact_uuids:
+            try:
+                art_uuid = uuid.UUID(str(raw_uuid))
+            except (ValueError, AttributeError):
+                continue
+            if art_uuid in existing_uuids:
+                continue
+            mem = EnterpriseGroupArtifact(
+                tenant_id=tenant_id,
+                group_id=gid,
+                artifact_uuid=art_uuid,
+                position=next_position,
+            )
+            self.session.add(mem)
+            existing_uuids.add(art_uuid)
+            next_position += 1
+
+        self.session.flush()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: remove_artifact
+    # ------------------------------------------------------------------
+
+    def remove_artifact(
+        self,
+        group_id: int,
+        artifact_uuid: str,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Remove a single artifact from a group.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        artifact_uuid:
+            Artifact UUID string to remove.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist or *artifact_uuid* is not a member.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        try:
+            art_uuid = uuid.UUID(str(artifact_uuid))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(artifact_uuid) from exc
+
+        tenant_id = self._get_tenant_id()
+        result = self.session.execute(
+            delete(EnterpriseGroupArtifact).where(
+                EnterpriseGroupArtifact.group_id == gid,
+                EnterpriseGroupArtifact.artifact_uuid == art_uuid,
+                EnterpriseGroupArtifact.tenant_id == tenant_id,
+            )
+        )
+        if result.rowcount == 0:
+            raise KeyError(artifact_uuid)
+        self.session.flush()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: update_artifact_position
+    # ------------------------------------------------------------------
+
+    def update_artifact_position(
+        self,
+        group_id: int,
+        artifact_uuid: str,
+        position: int,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Update the display position of a single artifact within a group.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        artifact_uuid:
+            Artifact UUID string whose position to update.
+        position:
+            New zero-based display position.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist or *artifact_uuid* is not a member.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        try:
+            art_uuid = uuid.UUID(str(artifact_uuid))
+        except (ValueError, AttributeError) as exc:
+            raise KeyError(artifact_uuid) from exc
+
+        tenant_id = self._get_tenant_id()
+        stmt = select(EnterpriseGroupArtifact).where(
+            EnterpriseGroupArtifact.group_id == gid,
+            EnterpriseGroupArtifact.artifact_uuid == art_uuid,
+            EnterpriseGroupArtifact.tenant_id == tenant_id,
+        )
+        mem = self.session.execute(stmt).scalar_one_or_none()
+        if mem is None:
+            raise KeyError(artifact_uuid)
+
+        mem.position = position
+        self.session.flush()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: reorder_artifacts
+    # ------------------------------------------------------------------
+
+    def reorder_artifacts(
+        self,
+        group_id: int,
+        ordered_uuids: "list[str]",
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Bulk-update the display positions of all artifacts in a group.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key.
+        ordered_uuids:
+            Complete list of artifact UUID strings in the desired display
+            order.  Must include all current members.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist in the current tenant.
+        ValueError
+            If *ordered_uuids* does not cover all current members.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        tenant_id = self._get_tenant_id()
+        memberships_stmt = select(EnterpriseGroupArtifact).where(
+            EnterpriseGroupArtifact.group_id == gid,
+            EnterpriseGroupArtifact.tenant_id == tenant_id,
+        )
+        memberships = {
+            m.artifact_uuid: m
+            for m in self.session.execute(memberships_stmt).scalars()
+        }
+
+        parsed_uuids: list[uuid.UUID] = []
+        for raw in ordered_uuids:
+            try:
+                parsed_uuids.append(uuid.UUID(str(raw)))
+            except (ValueError, AttributeError):
+                continue
+
+        if len(parsed_uuids) != len(memberships):
+            raise ValueError(
+                f"ordered_uuids must include all {len(memberships)} current "
+                f"members; got {len(parsed_uuids)}."
+            )
+
+        for position, art_uuid in enumerate(parsed_uuids):
+            if art_uuid not in memberships:
+                raise ValueError(
+                    f"Artifact {art_uuid!s} is not a member of group {group_id!r}."
+                )
+            memberships[art_uuid].position = position
+
+        self.session.flush()
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: list_group_artifacts
+    # ------------------------------------------------------------------
+
+    def list_group_artifacts(
+        self,
+        group_id: str,
+        ctx: "Optional[object]" = None,
+    ) -> "list[GroupArtifactDTO]":
+        """Return the ordered artifact membership records for a group.
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key (string or integer).
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Returns
+        -------
+        list[GroupArtifactDTO]
+            Membership records ordered by ``position`` ascending.  Returns an
+            empty list when the group does not exist or has no members.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            return []
+
+        tenant_id = self._get_tenant_id()
+        stmt = (
+            select(EnterpriseGroupArtifact)
+            .where(
+                EnterpriseGroupArtifact.group_id == gid,
+                EnterpriseGroupArtifact.tenant_id == tenant_id,
+            )
+            .order_by(EnterpriseGroupArtifact.position)
+        )
+        members = list(self.session.execute(stmt).scalars())
+        return [self._ga_to_dto(m) for m in members]
+
+    # ------------------------------------------------------------------
+    # IGroupRepository: add_artifacts_at_position
+    # ------------------------------------------------------------------
+
+    def add_artifacts_at_position(
+        self,
+        group_id: str,
+        artifact_uuids: "list[str]",
+        position: int,
+        ctx: "Optional[object]" = None,
+    ) -> None:
+        """Insert artifacts at a specific position within a group.
+
+        Existing artifacts at or after *position* are shifted down by the
+        count of new insertions.  Artifacts already in the group are silently
+        skipped (deduplicated).
+
+        Parameters
+        ----------
+        group_id:
+            Group primary key string.
+        artifact_uuids:
+            Ordered list of artifact UUID strings to insert.
+        position:
+            Zero-based target position for the first inserted artifact.
+        ctx:
+            Optional per-request metadata (unused by the enterprise backend).
+
+        Raises
+        ------
+        KeyError
+            If *group_id* does not exist in the current tenant.
+        RuntimeError
+            On unexpected database errors.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseGroupArtifact
+
+        gid = self._resolve_group_uuid(group_id)
+        if gid is None:
+            raise KeyError(group_id)
+        group = self._fetch_group(gid)
+        if group is None:
+            raise KeyError(group_id)
+
+        tenant_id = self._get_tenant_id()
+
+        # Deduplicate: skip UUIDs already in the group.
+        existing_stmt = select(EnterpriseGroupArtifact.artifact_uuid).where(
+            EnterpriseGroupArtifact.group_id == gid,
+            EnterpriseGroupArtifact.tenant_id == tenant_id,
+        )
+        existing_uuids: set[uuid.UUID] = {
+            row for row in self.session.execute(existing_stmt).scalars()
+        }
+
+        new_uuids: list[uuid.UUID] = []
+        for raw in artifact_uuids:
+            try:
+                art_uuid = uuid.UUID(str(raw))
+            except (ValueError, AttributeError):
+                continue
+            if art_uuid not in existing_uuids:
+                new_uuids.append(art_uuid)
+
+        if not new_uuids:
+            return
+
+        # Shift existing members at or after *position* down by len(new_uuids).
+        shift = len(new_uuids)
+        shift_stmt = select(EnterpriseGroupArtifact).where(
+            EnterpriseGroupArtifact.group_id == gid,
+            EnterpriseGroupArtifact.tenant_id == tenant_id,
+            EnterpriseGroupArtifact.position >= position,
+        )
+        for mem in self.session.execute(shift_stmt).scalars():
+            if mem.position is not None:
+                mem.position = mem.position + shift
+
+        # Insert new membership rows starting at *position*.
+        for offset, art_uuid in enumerate(new_uuids):
+            new_mem = EnterpriseGroupArtifact(
+                tenant_id=tenant_id,
+                group_id=gid,
+                artifact_uuid=art_uuid,
+                position=position + offset,
+            )
+            self.session.add(new_mem)
+
+        self.session.flush()

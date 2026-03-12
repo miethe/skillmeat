@@ -5,82 +5,117 @@ doc_type: progress
 prd: enterprise-repo-parity
 feature_slug: enterprise-repo-parity
 phase: 3-4
-phase_title: "Repository Implementation (Core & Deployment)"
-status: pending
+phase_title: Repository Implementation (Core & Deployment)
+status: in_progress
 created: 2026-03-12
-updated: 2026-03-12
+updated: '2026-03-12'
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-repo-parity-v2.md
 plan_ref: docs/project_plans/implementation_plans/refactors/enterprise-repo-parity-v2.md
 commit_refs: []
 pr_refs: []
-
-owners: ["python-backend-engineer"]
-contributors: ["backend-architect"]
-
+owners:
+- python-backend-engineer
+contributors:
+- backend-architect
 tasks:
-  - id: "ENT2-3.1"
-    title: "EnterpriseTagRepository implementation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-3.2"
-    title: "EnterpriseGroupRepository implementation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-3.3"
-    title: "EnterpriseSettingsRepository implementation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-3.4"
-    title: "EnterpriseContextEntityRepository implementation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-3.5"
-    title: "Update DI providers for Phase 3 repositories"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT2-3.1", "ENT2-3.2", "ENT2-3.3", "ENT2-3.4"]
-  - id: "ENT2-3.6"
-    title: "Unit tests for Phase 3 repositories"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT2-3.5"]
-  - id: "ENT2-4.1"
-    title: "EnterpriseProjectRepository implementation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-4.2"
-    title: "EnterpriseDeploymentRepository implementation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-4.3"
-    title: "EnterpriseDeploymentSetRepository & EnterpriseDeploymentProfileRepository"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-  - id: "ENT2-4.4"
-    title: "Update DI providers for Phase 4 repositories"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT2-4.1", "ENT2-4.2", "ENT2-4.3"]
-  - id: "ENT2-4.5"
-    title: "Unit tests for Phase 4 repositories"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["ENT2-4.4"]
-
+- id: ENT2-3.1
+  title: EnterpriseTagRepository implementation
+  status: in_progress
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-3.2
+  title: EnterpriseGroupRepository implementation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-3.3
+  title: EnterpriseSettingsRepository implementation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-3.4
+  title: EnterpriseContextEntityRepository implementation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-3.5
+  title: Update DI providers for Phase 3 repositories
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT2-3.1
+  - ENT2-3.2
+  - ENT2-3.3
+  - ENT2-3.4
+- id: ENT2-3.6
+  title: Unit tests for Phase 3 repositories
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT2-3.5
+- id: ENT2-4.1
+  title: EnterpriseProjectRepository implementation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-4.2
+  title: EnterpriseDeploymentRepository implementation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-4.3
+  title: EnterpriseDeploymentSetRepository & EnterpriseDeploymentProfileRepository
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+- id: ENT2-4.4
+  title: Update DI providers for Phase 4 repositories
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT2-4.1
+  - ENT2-4.2
+  - ENT2-4.3
+- id: ENT2-4.5
+  title: Unit tests for Phase 4 repositories
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - ENT2-4.4
 parallelization:
-  batch_1: ["ENT2-3.1", "ENT2-3.2"]
-  batch_2: ["ENT2-3.3", "ENT2-3.4"]
-  batch_3: ["ENT2-3.5", "ENT2-3.6"]
-  batch_4: ["ENT2-4.1", "ENT2-4.2"]
-  batch_5: ["ENT2-4.3"]
-  batch_6: ["ENT2-4.4", "ENT2-4.5"]
+  batch_1:
+  - ENT2-3.1
+  - ENT2-3.2
+  batch_2:
+  - ENT2-3.3
+  - ENT2-3.4
+  batch_3:
+  - ENT2-3.5
+  - ENT2-3.6
+  batch_4:
+  - ENT2-4.1
+  - ENT2-4.2
+  batch_5:
+  - ENT2-4.3
+  batch_6:
+  - ENT2-4.4
+  - ENT2-4.5
+total_tasks: 11
+completed_tasks: 0
+in_progress_tasks: 1
+blocked_tasks: 0
+progress: 0
 ---
 
 # Phase 3-4: Repository Implementation (Core & Deployment)
