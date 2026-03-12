@@ -5,44 +5,74 @@ doc_type: progress
 prd: enterprise-repo-parity
 feature_slug: enterprise-repo-parity
 phase: 1
-phase_title: "Triage & Classify"
+phase_title: Triage & Classify
 status: pending
 created: 2026-03-12
-updated: 2026-03-12
+updated: '2026-03-12'
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-repo-parity-v2.md
 plan_ref: docs/project_plans/implementation_plans/refactors/enterprise-repo-parity-v2.md
 commit_refs: []
 pr_refs: []
-
-owners: ["data-layer-expert"]
-contributors: ["backend-architect"]
-
+owners:
+- data-layer-expert
+contributors:
+- backend-architect
 tasks:
-  - id: "ENT2-1.1"
-    title: "Read all 8 repository interface signatures"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-  - id: "ENT2-1.2"
-    title: "Read local implementations for filesystem coupling"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-  - id: "ENT2-1.3"
-    title: "Produce triage classification document"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["ENT2-1.1", "ENT2-1.2"]
-  - id: "ENT2-1.4"
-    title: "Review and approve triage document"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["ENT2-1.3"]
-
+- id: ENT2-1.1
+  title: Read all 8 Group A repository interface signatures
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+- id: ENT2-1.2
+  title: Read local implementations for filesystem coupling
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+- id: ENT2-1.3
+  title: Read Group B non-DI repository classes
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+- id: ENT2-1.4
+  title: Read DI providers for both groups
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+- id: ENT2-1.5
+  title: Produce triage classification document
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - ENT2-1.1
+  - ENT2-1.2
+  - ENT2-1.3
+  - ENT2-1.4
+- id: ENT2-1.6
+  title: Architecture review of triage document
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - ENT2-1.5
 parallelization:
-  batch_1: ["ENT2-1.1", "ENT2-1.2"]
-  batch_2: ["ENT2-1.3"]
-  batch_3: ["ENT2-1.4"]
+  batch_1:
+  - ENT2-1.1
+  - ENT2-1.2
+  - ENT2-1.3
+  - ENT2-1.4
+  - ENT2-1.5
+  batch_2:
+  - ENT2-1.6
+total_tasks: 6
+completed_tasks: 5
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 83
 ---
 
 # Phase 1: Triage & Classify
