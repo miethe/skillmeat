@@ -6463,7 +6463,7 @@ class DbUserCollectionRepository(
             sentinel = _Project(
                 id=_SENTINEL_ID,
                 name="Collection Artifacts",
-                path="~/.skillmeat/collections",
+                path=str(Path.home() / ".skillmeat" / "collections"),
                 description="Sentinel project for filesystem collection artifacts",
                 status="active",
             )

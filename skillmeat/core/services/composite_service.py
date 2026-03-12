@@ -630,7 +630,7 @@ class CompositeService:
             sentinel = Project(
                 id=_SENTINEL_PROJECT_ID,
                 name="Collection Artifacts",
-                path="~/.skillmeat/collections",
+                path=str(Path.home() / ".skillmeat" / "collections"),
                 description="Sentinel project for collection artifacts",
                 status="active",
             )

@@ -140,7 +140,7 @@ class WorkflowArtifactSyncRepository:
             sentinel = Project(
                 id=project_id,
                 name="Workflow Artifacts",
-                path="~/.skillmeat/workflows",
+                path=str(Path.home() / ".skillmeat" / "workflows"),
                 description="Virtual project for workflow artifact rows",
                 status="active",
             )
