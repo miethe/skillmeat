@@ -57,7 +57,7 @@ def _seed_default_collection(session) -> DBCollection:
     sentinel = Project(
         id=_SENTINEL_PROJECT_ID,
         name="Collection Artifacts",
-        path="~/.skillmeat/collections",
+        path=str(Path.home() / ".skillmeat" / "collections"),
         status="active",
     )
     session.add_all([coll, sentinel])

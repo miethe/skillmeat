@@ -73,13 +73,15 @@ import uuid
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict, Generator, Generic, List, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Dict, Generator, Generic, List, Optional, Tuple, Type, TypeVar
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import Select
 
 from skillmeat.cache.constants import DEFAULT_TENANT_ID
+
+from skillmeat.core.interfaces.repositories import IDbUserCollectionRepository
 
 if TYPE_CHECKING:
     from skillmeat.api.schemas.auth import AuthContext
@@ -977,6 +979,59 @@ class EnterpriseArtifactRepository(EnterpriseRepositoryBase):  # type: ignore[ty
             stmt = apply_visibility_filter_stmt(stmt, EnterpriseArtifact, auth_context)
 
         return list(self.session.execute(stmt).scalars().all())
+
+    def batch_resolve_uuids(
+        self,
+        artifacts: List[Tuple[str, str]],
+        ctx: Optional["RequestContext"] = None,
+        auth_context: Optional["AuthContext"] = None,
+    ) -> Dict[Tuple[str, str], str]:
+        """Batch-resolve UUIDs for multiple (artifact_type, name) pairs.
+
+        Executes a single query with OR conditions for all pairs, applying
+        tenant scoping per EnterpriseRepositoryBase conventions.
+
+        Parameters
+        ----------
+        artifacts:
+            List of (artifact_type, name) tuples to resolve.
+        ctx:
+            Optional per-request metadata (unused in enterprise repo).
+        auth_context:
+            Optional authentication context for tenant scoping.
+
+        Returns
+        -------
+        dict
+            Mapping from (artifact_type, name) tuple to 32-char hex UUID string.
+            Pairs that cannot be resolved are omitted.
+        """
+        from sqlalchemy import and_, or_
+
+        from skillmeat.cache.models_enterprise import EnterpriseArtifact
+
+        if not artifacts:
+            return {}
+
+        self._apply_auth_context(auth_context)
+
+        # Build OR conditions for each (type, name) pair
+        conditions = [
+            and_(
+                EnterpriseArtifact.artifact_type == atype,
+                EnterpriseArtifact.name == name,
+            )
+            for atype, name in artifacts
+        ]
+
+        stmt = self._tenant_select().where(or_(*conditions))
+        rows = self.session.execute(stmt).scalars().all()
+
+        # Map results back to (type, name) tuple keys
+        return {
+            (row.artifact_type, row.name): row.id.hex
+            for row in rows
+        }
 
     # ------------------------------------------------------------------
     # ENT-2.6: Version history retrieval
@@ -2047,4 +2102,269 @@ class EnterpriseCollectionRepository(
             entity_id=collection_id,
             metadata={"count": len(artifact_ids)},
         )
-        return True
+
+
+# =============================================================================
+# EnterpriseUserCollectionAdapter
+# =============================================================================
+
+
+class EnterpriseUserCollectionAdapter(IDbUserCollectionRepository):
+    """Adapts :class:`EnterpriseCollectionRepository` to
+    :class:`~skillmeat.core.interfaces.repositories.IDbUserCollectionRepository`.
+
+    In enterprise mode the ``user_collections`` router must query PostgreSQL
+    instead of SQLite.  This adapter wraps the existing
+    :class:`EnterpriseCollectionRepository` and translates its ORM results to
+    :class:`~skillmeat.core.interfaces.dtos.UserCollectionDTO` frozen
+    dataclasses, satisfying the interface contract without modifying the
+    underlying repository or the router.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the PostgreSQL enterprise
+        database.  Lifecycle is managed by the FastAPI DI layer via
+        ``get_db_session``.
+    """
+
+    def __init__(self, session: Session) -> None:
+        self._repo = EnterpriseCollectionRepository(session=session)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _to_dto(collection: "EnterpriseCollection") -> "UserCollectionDTO":  # type: ignore[name-defined]
+        """Convert an :class:`EnterpriseCollection` ORM instance to a DTO."""
+        from skillmeat.core.interfaces.dtos import UserCollectionDTO
+
+        created_at_iso: Optional[str] = None
+        updated_at_iso: Optional[str] = None
+        if collection.created_at is not None:
+            created_at_iso = collection.created_at.isoformat()
+        if collection.updated_at is not None:
+            updated_at_iso = collection.updated_at.isoformat()
+
+        # created_by on EnterpriseCollection is a string (user ID or "system")
+        created_by = collection.created_by
+
+        # Membership count — available only when the relationship is loaded;
+        # fall back to 0 rather than triggering a lazy load.
+        try:
+            artifact_count = len(collection.memberships)
+        except Exception:
+            artifact_count = 0
+
+        return UserCollectionDTO(
+            id=str(collection.id),
+            name=collection.name,
+            description=collection.description,
+            created_by=created_by,
+            collection_type=None,
+            context_category=None,
+            created_at=created_at_iso,
+            updated_at=updated_at_iso,
+            artifact_count=artifact_count,
+        )
+
+    # ------------------------------------------------------------------
+    # IDbUserCollectionRepository implementation
+    # ------------------------------------------------------------------
+
+    def list(
+        self,
+        *,
+        created_by: Optional[str] = None,
+        collection_type: Optional[str] = None,
+        context_category: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: Optional[object] = None,
+    ) -> "list[UserCollectionDTO]":  # type: ignore[override]
+        """Return a paginated list of enterprise collections as DTOs.
+
+        The *created_by*, *collection_type*, and *context_category* filters
+        map as follows against the enterprise schema:
+
+        * ``created_by`` — filters by ``EnterpriseCollection.created_by``
+          (string user-ID column).
+        * ``collection_type`` and ``context_category`` — the enterprise schema
+          has no direct equivalents; these filters are silently ignored so the
+          adapter remains forward-compatible.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseCollection
+
+        collections = self._repo.list(offset=offset, limit=limit)
+
+        if created_by is not None:
+            collections = [c for c in collections if c.created_by == created_by]
+
+        return [self._to_dto(c) for c in collections]
+
+    def get_by_id(
+        self,
+        collection_id: str,
+        ctx: Optional[object] = None,
+    ) -> "UserCollectionDTO | None":
+        """Return a collection by its UUID string primary key."""
+        try:
+            uid = uuid.UUID(collection_id)
+        except (ValueError, AttributeError):
+            return None
+
+        collection = self._repo.get(uid)
+        if collection is None:
+            return None
+        return self._to_dto(collection)
+
+    def get_by_name(
+        self,
+        name: str,
+        ctx: Optional[object] = None,
+    ) -> "UserCollectionDTO | None":
+        """Return a collection by its human-readable name."""
+        collection = self._repo.get_by_name(name)
+        if collection is None:
+            return None
+        return self._to_dto(collection)
+
+    def create(
+        self,
+        *,
+        name: str,
+        description: Optional[str] = None,
+        created_by: Optional[str] = None,
+        collection_type: Optional[str] = None,
+        context_category: Optional[str] = None,
+        ctx: Optional[object] = None,
+    ) -> "UserCollectionDTO":
+        """Persist a new enterprise collection and return its DTO."""
+        collection = self._repo.create(name=name, description=description)
+        # Populate created_by when provided and the ORM model supports it.
+        if created_by is not None and hasattr(collection, "created_by"):
+            collection.created_by = created_by
+            self._repo.session.flush()
+        return self._to_dto(collection)
+
+    def update(
+        self,
+        collection_id: str,
+        ctx: Optional[object] = None,
+        **kwargs: object,
+    ) -> "UserCollectionDTO":
+        """Apply a partial update to an existing enterprise collection."""
+        try:
+            uid = uuid.UUID(collection_id)
+        except (ValueError, AttributeError):
+            raise KeyError(f"Collection {collection_id!r} not found.")
+
+        collection = self._repo.update(
+            uid,
+            name=kwargs.get("name"),
+            description=kwargs.get("description"),
+        )
+        return self._to_dto(collection)
+
+    def delete(
+        self,
+        collection_id: str,
+        ctx: Optional[object] = None,
+    ) -> bool:
+        """Delete an enterprise collection and all its membership records."""
+        try:
+            uid = uuid.UUID(collection_id)
+        except (ValueError, AttributeError):
+            return False
+
+        return self._repo.delete(uid)
+
+    def ensure_default(
+        self,
+        *,
+        created_by: Optional[str] = None,
+        ctx: Optional[object] = None,
+    ) -> "UserCollectionDTO":
+        """Return the default collection, creating it if it does not exist."""
+        default_name = "Default Collection"
+        existing = self._repo.get_by_name(default_name)
+        if existing is not None:
+            return self._to_dto(existing)
+
+        collection = self._repo.create(name=default_name, description="Default collection")
+        if created_by is not None and hasattr(collection, "created_by"):
+            collection.created_by = created_by
+            self._repo.session.flush()
+        return self._to_dto(collection)
+
+    def ensure_sentinel_project(self) -> None:
+        """No-op for enterprise mode — enterprise uses different FK relationships."""
+        pass
+
+    def get_artifact_count(
+        self,
+        collection_id: str,
+        ctx: Optional[object] = None,
+    ) -> int:
+        """Return the number of artifacts in the given enterprise collection."""
+        from sqlalchemy import func
+        from skillmeat.cache.models_enterprise import EnterpriseCollectionArtifact
+
+        try:
+            uid = uuid.UUID(collection_id)
+        except (ValueError, AttributeError):
+            return 0
+
+        result = self._repo.session.execute(
+            select(func.count()).select_from(EnterpriseCollectionArtifact).where(
+                EnterpriseCollectionArtifact.collection_id == uid
+            )
+        )
+        return result.scalar_one() or 0
+
+    def get_groups(
+        self,
+        collection_id: str,
+        ctx: Optional[object] = None,
+    ) -> "list[str]":
+        """Enterprise does not have the same group association model; returns empty list."""
+        return []
+
+    def list_with_artifact_stats(
+        self,
+        *,
+        created_by: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        ctx: Optional[object] = None,
+    ) -> "list[UserCollectionDTO]":
+        """Return collections with artifact_count populated.
+
+        Delegates to :meth:`list`; the DTO already carries ``artifact_count``
+        from :meth:`_to_dto`.
+        """
+        return self.list(
+            created_by=created_by,
+            limit=limit,
+            offset=offset,
+            ctx=ctx,
+        )
+
+    def add_group(
+        self,
+        collection_id: str,
+        group_id: str,
+        ctx: Optional[object] = None,
+    ) -> bool:
+        """Enterprise does not support the same group model; returns False."""
+        return False
+
+    def remove_group(
+        self,
+        collection_id: str,
+        group_id: str,
+        ctx: Optional[object] = None,
+    ) -> bool:
+        """Enterprise does not support the same group model; returns False."""
+        return False

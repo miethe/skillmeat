@@ -738,7 +738,7 @@ def populate_collection_artifact_metadata(
         project_paths = []
         if project_repo is not None:
             for proj_dto in project_repo.list():
-                proj_path = Path(proj_dto.path)
+                proj_path = Path(proj_dto.path).expanduser()
                 if proj_path.exists():
                     project_paths.append((proj_dto.name, proj_path))
                 else:
@@ -755,7 +755,7 @@ def populate_collection_artifact_metadata(
             finally:
                 _db_sess.close()
             for _row in _proj_rows:
-                _proj_path = Path(_row.path)
+                _proj_path = Path(_row.path).expanduser()
                 if _proj_path.exists():
                     project_paths.append((_row.name, _proj_path))
                 else:
