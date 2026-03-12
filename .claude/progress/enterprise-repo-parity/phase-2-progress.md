@@ -6,7 +6,7 @@ prd: enterprise-repo-parity
 feature_slug: enterprise-repo-parity
 phase: 2
 phase_title: Enterprise Models & Migration
-status: in_progress
+status: pending
 created: 2026-03-12
 updated: '2026-03-12'
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-repo-parity-v2.md
@@ -20,31 +20,31 @@ contributors:
 tasks:
 - id: ENT2-2.1
   title: Enterprise models for tags, groups, settings
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies: []
 - id: ENT2-2.2
   title: Enterprise models for context entities
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies: []
 - id: ENT2-2.3
   title: Enterprise models for projects and deployments
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies: []
 - id: ENT2-2.4
   title: Enterprise models for marketplace sources
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies: []
 - id: ENT2-2.5
   title: Generate Alembic migration for all enterprise models
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -69,6 +69,11 @@ parallelization:
   - ENT2-2.5
   batch_3:
   - ENT2-2.6
+total_tasks: 6
+completed_tasks: 5
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 83
 ---
 
 # Phase 2: Enterprise Models & Migration
