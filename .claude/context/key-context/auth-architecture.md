@@ -27,6 +27,12 @@ Provider is registered once via `set_auth_provider()` in lifespan, then retrieve
 | `skillmeat/api/middleware/tenant_context.py` | `set_tenant_context_dep` / `TenantContextDep` |
 | `skillmeat/cache/auth_types.py` | DB-layer enums: `OwnerType`, `Visibility`, `UserRole` |
 | `skillmeat/api/config.py` | `auth_provider`, `clerk_jwks_url`, `clerk_issuer`, `auth_enabled` |
+| `skillmeat/core/ownership.py` | `OwnerTarget`, `ResolvedOwnership` domain DTOs |
+| `skillmeat/core/services/ownership_resolver.py` | Request-time `OwnershipResolver` service |
+| `skillmeat/core/interfaces/repositories.py` | `IMembershipRepository` interface |
+| `skillmeat/core/repositories/local_membership.py` | Local membership lookups (team_members table) |
+| `skillmeat/core/repositories/enterprise_membership.py` | Enterprise membership lookups (enterprise_team_members) |
+| `skillmeat/core/repositories/filters.py` | Visibility, ownership, membership-aware filter helpers |
 
 ## AuthContext Fields
 
@@ -69,7 +75,7 @@ Helpers: `has_role(role)`, `is_admin()`, `has_scope(scope)`, `has_any_scope(*sco
 
 | Enum | Values | Used for |
 |------|--------|---------|
-| `OwnerType` | `user`, `team` | `owner_type` column on resources |
+| `OwnerType` | `user`, `team`, `enterprise` | `owner_type` column on resources |
 | `Visibility` | `private`, `team`, `public` | Who can see a resource |
 | `UserRole` | mirrors `Role` above | DB storage on users/team_members rows |
 
@@ -122,6 +128,10 @@ Never compare `uuid.UUID` directly to a string column — use `str_owner_id()`.
 - Do not use the legacy `TokenDep` / `verify_token` (pre-AAA) for new endpoints — use `AuthContextDep`.
 - Do not skip `str_owner_id()` when filtering by owner — direct UUID-to-String comparison silently returns nothing.
 - Do not attach `TenantContextDep` before `require_auth` resolves — it depends on `AuthContext` being present.
+- Do not infer `owner_id` directly from `auth_context.user_id` for writes — use `ResolvedOwnership.default_owner` or explicit `OwnerTargetInput`.
+- Do not assume tenant-wide visibility for `visibility=team` rows — use `apply_membership_visibility_filter` which checks actual team membership.
+- Do not add enterprise scopes without checking `tenant_id is not None` — enterprise resolution only activates when enterprise context exists.
+- Do not modify `OwnershipResolver` to persist state — it must remain request-scoped and stateless.
 
 ## Edition Configuration
 
@@ -145,6 +155,90 @@ Enterprise repositories enforce row-level visibility on all read paths via `appl
 **Admin bypass**: `system_admin` role can read all artifacts/collections in tenant regardless of visibility.
 
 **Ownership error semantics**: Non-owners receive 404 (not disclosed as 403) when attempting to access private resources they don't own.
+
+## Ownership Resolution
+
+Request-time ownership resolution determines what a user can read and write based on their identity, team memberships, and enterprise context. The resolver produces a `ResolvedOwnership` object that downstream filters and validation helpers consume.
+
+### Core Types (`skillmeat/core/ownership.py`)
+
+```python
+@dataclass(frozen=True)
+class OwnerTarget:
+    owner_type: OwnerType  # user | team | enterprise
+    owner_id: str          # string for DB compat
+
+@dataclass(frozen=True)
+class ResolvedOwnership:
+    default_owner: OwnerTarget         # new resources default to this
+    readable_scopes: list[OwnerTarget] # all owners user can read from
+    writable_scopes: list[OwnerTarget] # all owners user can write to
+    has_enterprise_scope: bool         # True for system_admin in enterprise
+    tenant_id: uuid.UUID | None        # enterprise tenant, if any
+```
+
+Helpers: `can_read_from(owner_type, owner_id)`, `can_write_to(owner_type, owner_id)`.
+
+### Resolution Rules
+
+| Condition | Readable Scopes | Writable Scopes | Default Owner |
+|-----------|----------------|-----------------|---------------|
+| Local mode (no tenant) | user only + teams | user only + writable teams | user |
+| Enterprise, non-admin | user + teams + enterprise | user + writable teams | user |
+| Enterprise, system_admin | user + teams + enterprise | user + writable teams + enterprise | user |
+
+**Team role → write access**: `owner`, `team_admin`, `team_member` roles grant write; `viewer` is read-only.
+
+**Default owner is always user-owned**. Team and enterprise ownership require explicit selection.
+
+### FastAPI Dependencies (`skillmeat/api/dependencies.py`)
+
+```python
+# Inject resolved ownership into any route:
+@router.get("/items")
+async def list_items(
+    auth: AuthContextDep,
+    resolved: ResolvedOwnershipDep,
+) -> ...:
+    # Use resolved.readable_scopes for filtering
+    ...
+
+@router.post("/items")
+async def create_item(
+    auth: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
+    resolved: ResolvedOwnershipDep = ...,
+) -> ...:
+    # Validate write target against resolved.writable_scopes
+    ...
+```
+
+DI chain: `get_membership_repository` (edition-aware) → `get_ownership_resolver` → `get_resolved_ownership`.
+
+### API Contract Schemas (`skillmeat/api/schemas/auth.py`)
+
+| Schema | Purpose | Default |
+|--------|---------|---------|
+| `OwnerScopeFilter` | Query param for list filtering (`user\|team\|enterprise\|all`) | `all` (return all readable) |
+| `OwnerTargetInput` | Request body for mutation owner selection | `owner_type=user` (user-owned) |
+
+### Mutation Semantics
+
+- **Omitted owner target** → user-owned (the requesting user)
+- **Explicit team selection** → requires `owner_type=team` + `owner_id=<team_uuid>` + user must have write role in that team
+- **Explicit enterprise selection** → requires `owner_type=enterprise` + `owner_id=<tenant_uuid>` + `system_admin` role
+
+Validate with `validate_write_target(target, resolved)` from `skillmeat/core/repositories/filters.py`.
+
+### Filter Helpers (`skillmeat/core/repositories/filters.py`)
+
+| Helper | Style | Purpose |
+|--------|-------|---------|
+| `apply_visibility_filter` / `_stmt` | 1.x / 2.x | Legacy visibility (public/private/team, admin bypass) |
+| `apply_ownership_filter` / `_stmt` | 1.x / 2.x | Filter by `(owner_type, owner_id)` in readable_scopes |
+| `apply_membership_visibility_filter` / `_stmt` | 1.x / 2.x | Membership-aware: team rows visible only if user is member |
+| `validate_write_target` | — | Guard: checks target against writable_scopes |
+
+**Prefer `apply_membership_visibility_filter`** over `apply_visibility_filter` when `ResolvedOwnership` is available — it gates team visibility by actual membership instead of tenant-wide access.
 
 ## Excluded Paths (no auth required)
 

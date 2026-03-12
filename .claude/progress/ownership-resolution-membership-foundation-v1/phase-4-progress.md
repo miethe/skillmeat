@@ -5,7 +5,7 @@ doc_type: progress
 prd: ownership-resolution-membership-foundation
 feature_slug: ownership-resolution-membership-foundation
 phase: 4
-status: in_progress
+status: pending
 created: 2026-03-12
 updated: '2026-03-12'
 prd_ref: /docs/project_plans/PRDs/refactors/enterprise-governance-3-tier.md
@@ -19,14 +19,15 @@ contributors:
 - documentation-writer
 tasks:
 - id: TASK-4.1
-  title: Wire OwnershipResolver as FastAPI dependency and define owner_scope/owner_target API schemas
-  status: pending
+  title: Wire OwnershipResolver as FastAPI dependency and define owner_scope/owner_target
+    API schemas
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
 - id: TASK-4.2
   title: Add integration tests for ownership resolution API semantics
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -47,10 +48,10 @@ parallelization:
   batch_3:
   - TASK-4.3
 total_tasks: 3
-completed_tasks: 0
+completed_tasks: 2
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 0
+progress: 66
 ---
 
 # Phase 4: API Contract, Tests, Docs

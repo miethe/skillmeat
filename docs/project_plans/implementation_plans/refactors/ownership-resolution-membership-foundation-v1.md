@@ -37,7 +37,6 @@ related_documents:
 - /docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md
 - /.claude/context/key-context/auth-architecture.md
 ---
-
 # Ownership Resolution & Membership Foundation - Implementation Plan
 
 **Complexity**: Medium-Large | **Track**: Prerequisite Refactor | **Estimated Effort**: 16-22 story points | **Timeline**: 3-4 weeks
