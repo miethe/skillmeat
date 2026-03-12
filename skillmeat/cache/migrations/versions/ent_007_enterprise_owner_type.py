@@ -63,7 +63,7 @@ from typing import Sequence, Union
 # ---------------------------------------------------------------------------
 
 revision: str = "ent_007_enterprise_owner_type"
-down_revision: Union[str, None] = "ent_006_auth_indexes"
+down_revision: Union[str, None] = "waw_001_add_workflow_id"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
