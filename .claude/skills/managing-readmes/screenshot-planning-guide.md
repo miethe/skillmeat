@@ -1,6 +1,6 @@
 # Screenshot Planning Guide (Route 2)
 
-AI-consumable workflow for planning and capturing visual assets for README documentation.
+Surface enumeration, capture tool selection, and asset spec format for planning README visual assets.
 
 ## Capturable Surface Enumeration
 

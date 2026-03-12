@@ -244,9 +244,9 @@ For a new project, wire up in this order:
 
 ## References
 
-- **Route 1**: Bootstrap the README build system
-- **Route 2**: Manage features.json and build data
-- **Route 3**: Add screenshots and visual assets
-- **Route 4**: Define templates and partials
-- **Route 5**: Validate and troubleshoot builds
+- **Route 1**: Bootstrap the README build system (`./bootstrapping-readme-system.md`)
+- **Route 2**: Plan and capture screenshot and GIF visual assets (`./screenshot-planning-guide.md`)
+- **Route 3**: Content strategy, audience analysis, section structure (`./content-strategy-guide.md`)
+- **Route 4**: Build and rebuild README from templates and data (`./build-and-rebuild-workflow.md`)
+- **Route 5**: Validate links, screenshots, and feature references (`./validation-workflow.md`)
 - **Route 6**: This guide (CI and hook integration)

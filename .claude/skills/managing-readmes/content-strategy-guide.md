@@ -1,6 +1,6 @@
 # Content Strategy Guide (Route 3)
 
-AI-consumable workflow for crafting README content strategy based on project type and audience.
+Audience analysis, section structure, and prose style for README content planning by project type.
 
 ## Audience Analysis Framework
 

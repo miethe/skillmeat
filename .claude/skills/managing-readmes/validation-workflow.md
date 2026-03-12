@@ -1,6 +1,6 @@
 # Validation Workflow (Route 5)
 
-AI-consumable reference for README validation, link checking, screenshot verification, and CI integration.
+Commands, triage patterns, and CI integration for README link validation and screenshot verification.
 
 ## Validation Commands
 

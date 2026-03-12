@@ -222,7 +222,7 @@ Update placeholder screenshot entries with your actual captures:
       "id": "dashboard-overview",
       "type": "screenshot",
       "status": "captured",
-      "path": "docs/screenshots/dashboard.png",
+      "file": "docs/screenshots/dashboard.png",
       "alt": "Main dashboard showing widgets and metrics",
       "caption": "Dashboard Overview",
       "notes": "Captured at 1440px with demo data"
@@ -231,7 +231,7 @@ Update placeholder screenshot entries with your actual captures:
       "id": "quickstart-walkthrough",
       "type": "gif",
       "status": "pending",
-      "path": "docs/gifs/quickstart.gif",
+      "file": "docs/gifs/quickstart.gif",
       "alt": "Animated walkthrough of first-time user experience",
       "caption": "Get Started in 60 Seconds",
       "notes": "Record: signup through dashboard, keep under 30s at 2x playback"
@@ -608,26 +608,5 @@ After bootstrapping and customization:
    - Add screenshots when ready
    - Version bumps trigger rebuilds
 
-## Key Principles
+For key design principles, see `SKILL.md` § Key Principles.
 
-1. **Bootstrap is a starting point** — Customize everything to match your project
-2. **Data drives content** — Edit `data/*.json` without touching templates
-3. **Source is committed** — Commit partials, data, and templates alongside generated `README.md`
-4. **Idempotent builds** — Running `build-readme.js` twice produces identical output
-5. **Dry-run before committing** — Always preview with `--dry-run` first
-6. **One section per partial** — Keeps updates focused and easy to review
-
-## Summary
-
-Bootstrap creates a complete, type-specific README build system in 5 minutes:
-
-```bash
-node bootstrap.js --project-type web
-cd .github/readme && npm install
-cp /path/to/skill/scripts/*.js scripts/
-# Edit data/ and partials/
-node scripts/build-readme.js
-git add . && git commit -m "docs: initialize README build system"
-```
-
-From there, you maintain README through structured data and content files, not by hand-editing markdown.

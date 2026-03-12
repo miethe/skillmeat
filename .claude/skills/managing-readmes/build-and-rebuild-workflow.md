@@ -1,34 +1,6 @@
 # Build & Rebuild Workflow (Route 4)
 
-AI-consumable reference for README generation, partial management, and templating.
-
-## Build Commands
-
-All commands execute from project root.
-
-### Full Rebuild
-```bash
-node scripts/build-readme.js --root /path/to/project
-```
-Generates `README.md` from `templates/README.hbs` + data files + partials. Idempotent.
-
-### Preview (Dry-Run)
-```bash
-node scripts/build-readme.js --root /path/to/project --dry-run
-```
-Renders template to stdout. No file writes. Use before committing changes to template/data.
-
-### Override Version
-```bash
-node scripts/build-readme.js --root /path/to/project --version 1.2.0
-```
-Force a specific version in output (overrides `data/version.json`). Useful for backports.
-
-### Custom README Directory
-```bash
-node scripts/build-readme.js --root /path/to/project --readme-dir docs/readme-build
-```
-Write `README.md` to non-default location. Default is project root.
+Detailed reference for README generation, partial management, and templating.
 
 ## Section-Only Update Patterns
 
@@ -148,7 +120,7 @@ All 12 helpers:
 - **`screenshotsByCategory`** — Filter screenshots by category
   ```handlebars
   {{#each (screenshotsByCategory screenshots "setup")}}
-    ![{{alt}}]({{path}})
+    ![{{alt}}]({{file}})
   {{/each}}
   ```
 
@@ -271,7 +243,7 @@ Structure:
   "screenshots": [
     {
       "id": "screenshot-1",
-      "path": "docs/screenshots/feature-1.png",
+      "file": "docs/screenshots/feature-1.png",
       "alt": "Feature 1 in action",
       "category": "core",
       "width": 1280,

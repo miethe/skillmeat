@@ -1,15 +1,14 @@
 ---
 name: managing-readmes
 description: >
-  Use this skill when creating, rebuilding, or maintaining a project README using
-  a modular Handlebars build system. Covers bootstrapping the .github/readme/
-  scaffold for any project, planning screenshot and GIF visual assets, crafting
-  content strategy (audience analysis, section structure, success metrics),
-  assembling or rebuilding README.md from partials and data files, validating
-  links and screenshots, and wiring CI workflows or pre-commit hooks for
-  README freshness. Also use when a version bump, feature addition, or
-  screenshot update requires regenerating README content. Supports CLI tools,
-  web apps, libraries, and SaaS products.
+  Create, rebuild, or maintain a project README using a modular Handlebars build system.
+  Covers bootstrapping the .github/readme/ scaffold for any project, planning screenshot
+  and GIF visual assets, crafting content strategy (audience analysis, section structure,
+  success metrics), assembling or rebuilding README.md from partials and data files,
+  validating links and screenshots, and wiring CI workflows or pre-commit hooks for
+  README freshness. Also use when a version bump, feature addition, or screenshot update
+  requires regenerating README content. Supports CLI tools, web apps, libraries, and
+  SaaS products.
 ---
 
 # Managing READMEs
@@ -41,82 +40,24 @@ Audience analysis, section priority by project type, prose style guide, success 
 
 ## Route 4: Build & Rebuild (Inline)
 
-Full inline quick reference for README generation and partial management.
-
-### Build Commands
-
-All commands execute from project root. Output: `README.md` in project root (or custom location).
-
 ```bash
-# Full rebuild
-node scripts/build-readme.js --root /path/to/project
-
-# Preview without writing
-node scripts/build-readme.js --root /path/to/project --dry-run
-
-# Override version
-node scripts/build-readme.js --root /path/to/project --version 1.2.0
-
-# Custom readme dir
-node scripts/build-readme.js --root /path/to/project --readme-dir docs/readme-build
+node scripts/build-readme.js --root .                        # full rebuild
+node scripts/build-readme.js --root . --dry-run              # preview
+node scripts/update-version.js --root . --version X.Y.Z      # version bump
 ```
 
-### When to Rebuild
-
-| Change | Action |
-|---|---|
-| New feature | Edit `data/features.json` → rebuild |
-| Screenshot added | Edit `data/screenshots.json` status → rebuild |
-| Version bump | `node scripts/update-version.js --root . --version X.Y.Z` → rebuild |
-| Section content | Edit `partials/*.md` → rebuild |
-| Structure change | Edit `templates/README.hbs` → rebuild |
-
-### Partial Update Pattern
-
-1. Edit relevant file (`data/*.json`, `partials/*.md`, or `templates/`)
-2. Run `--dry-run` to preview: `node scripts/build-readme.js --root . --dry-run`
-3. If preview looks correct: `node scripts/build-readme.js --root .`
-4. Commit both the source file AND generated `README.md`
-
-See `./build-and-rebuild-workflow.md` for detailed template authoring, partial patterns, and data structure reference.
+For partial update patterns and template authoring, see `./build-and-rebuild-workflow.md`.
 
 ## Route 5: Validate (Inline)
 
-Full inline quick reference for README validation and CI integration.
-
-### Validation Commands
-
-All commands execute from project root. Exit codes: 0 = pass, 1 = fail (CI-compatible).
-
 ```bash
-# Internal links (fast)
-node scripts/validate-links.js --root .
-
-# External URLs (slower, requires network)
-node scripts/validate-links.js --root . --check-external
-
-# Screenshot existence
-node scripts/check-screenshots.js --root .
-
-# Only required screenshots (CI mode)
-node scripts/check-screenshots.js --root . --required-only
-
-# Feature references
-node scripts/sync-features.js --root . --check-refs --verbose
-
-# Full CI suite
-node scripts/validate-links.js --root . && \
-node scripts/check-screenshots.js --root . --required-only
+node scripts/validate-links.js --root .                                          # internal links
+node scripts/validate-links.js --root . --check-external                         # + external URLs
+node scripts/check-screenshots.js --root . --required-only                       # screenshot check
+node scripts/validate-links.js --root . && node scripts/check-screenshots.js --root . --required-only  # CI suite
 ```
 
-### Validation Details
-
-- **Link validation**: Checks internal anchors (`#section-name`), relative file refs (`docs/foo.md`), and image paths
-- **Screenshot validation**: Verifies files exist, dimensions match spec, format is PNG/JPG
-- **Feature sync**: Verifies all features in `data/features.json` referenced in templates; detects orphaned features
-- **Exit codes**: 0 = all pass, 1 = any failure (suitable for CI gates)
-
-See `./validation-workflow.md` for detailed validation logic, error recovery, and CI integration patterns.
+Exit codes: 0 = pass, 1 = fail. For failure triage, see `./validation-workflow.md`.
 
 ## Route 6: Workflow Integration (Summary)
 
@@ -373,31 +314,7 @@ project/
 └── docs/screenshots/             ← Captured screenshots (referenced by JSON)
 ```
 
-## Support & Troubleshooting
-
-### Scripts Fail or Return Errors
-
-1. **Node version**: Requires Node 16+. Check: `node --version`
-2. **Dependencies**: Run `npm ci` to install exactly pinned versions
-3. **Dry-run first**: Always use `--dry-run` before rebuilding
-4. **Check schema**: Validate JSON against `.schema.json` files in IDE or online validator
-
-### Link Validation False Positives
-
-- External URLs: Some require special headers (authentication, referrer). Skip with `--skip-external` in CI.
-- Anchors: Check case sensitivity. Markdown anchors are lowercase, with hyphens.
-
-### Screenshot Not Found
-
-1. Verify file path in `screenshots.json` matches actual file location
-2. Run `node scripts/check-screenshots.js --root . --verbose` for detailed error
-3. Ensure dimensions in JSON match actual image (check with image viewer or `identify` CLI)
-
-### Partial Not Rendering
-
-1. Check file name matches partial reference (e.g., `{{> intro}}` expects `partials/intro.md`)
-2. Verify Handlebars syntax — use `--dry-run` to see parse errors
-3. Check data context — ensure helpers (like `filter`, `eq`) have required data fields
+For troubleshooting build failures and validation errors, see `./validation-workflow.md` § Common Failure Triage.
 
 ## Key Principles
 
