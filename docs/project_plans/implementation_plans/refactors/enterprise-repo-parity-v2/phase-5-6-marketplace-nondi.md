@@ -2,7 +2,7 @@
 title: 'Phases 5-6: Marketplace/Template Repositories + Non-DI Migration'
 schema_version: 2
 doc_type: phase_plan
-status: in-progress
+status: completed
 created: 2026-03-12
 updated: '2026-03-12'
 feature_slug: enterprise-repo-parity
