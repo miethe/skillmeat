@@ -43,7 +43,8 @@ ENT2-7.3  — Tenant isolation tests (placeholder section, fill in next)
 from __future__ import annotations
 
 import os
-from typing import Any
+import uuid
+from typing import Any, Generator
 from unittest.mock import MagicMock
 
 import pytest
@@ -169,7 +170,7 @@ def _make_mock_session() -> Session:
     """
     session = MagicMock(spec=Session)
 
-    def _empty_execute(*args: Any, **kwargs: Any) -> MagicMock:
+    def _empty_execute(*_args: Any, **_kwargs: Any) -> MagicMock:
         result = MagicMock()
         result.scalars.return_value = iter([])
         result.scalar_one_or_none.return_value = None
@@ -205,7 +206,7 @@ def _build_enterprise_app() -> FastAPI:
     # 1. Tags
     # ------------------------------------------------------------------
     @app.get("/api/v1/tags")
-    async def list_tags(repo=Depends(get_tag_repository)) -> dict:
+    async def _list_tags(repo=Depends(get_tag_repository)) -> dict:
         tags = list(repo.list())
         return {"items": tags, "repo_class": type(repo).__name__}
 
@@ -213,7 +214,7 @@ def _build_enterprise_app() -> FastAPI:
     # 2. Groups
     # ------------------------------------------------------------------
     @app.get("/api/v1/groups")
-    async def list_groups(repo=Depends(get_group_repository)) -> dict:
+    async def _list_groups(repo=Depends(get_group_repository)) -> dict:
         # IGroupRepository.list() requires collection_id; pass empty string to
         # verify DI resolution without exercising query logic.
         groups = list(repo.list(collection_id=""))
@@ -223,7 +224,7 @@ def _build_enterprise_app() -> FastAPI:
     # 3. Settings (user settings / entity-type configs)
     # ------------------------------------------------------------------
     @app.get("/api/v1/settings")
-    async def get_settings_check(repo=Depends(get_settings_repository)) -> dict:
+    async def _get_settings_check(repo=Depends(get_settings_repository)) -> dict:
         # ISettingsRepository.get() returns the user's settings DTO or None
         settings_dto = repo.get()
         return {
@@ -235,7 +236,7 @@ def _build_enterprise_app() -> FastAPI:
     # 4. Context entities
     # ------------------------------------------------------------------
     @app.get("/api/v1/context-entities")
-    async def list_context_entities(
+    async def _list_context_entities(
         repo=Depends(get_context_entity_repository),
     ) -> dict:
         entities = list(repo.list())
@@ -245,7 +246,7 @@ def _build_enterprise_app() -> FastAPI:
     # 5. Projects
     # ------------------------------------------------------------------
     @app.get("/api/v1/projects")
-    async def list_projects(repo=Depends(get_project_repository)) -> dict:
+    async def _list_projects(repo=Depends(get_project_repository)) -> dict:
         projects = list(repo.list())
         return {"items": projects, "repo_class": type(repo).__name__}
 
@@ -253,7 +254,7 @@ def _build_enterprise_app() -> FastAPI:
     # 6. Deployments
     # ------------------------------------------------------------------
     @app.get("/api/v1/deployments")
-    async def list_deployments(repo=Depends(get_deployment_repository)) -> dict:
+    async def _list_deployments(repo=Depends(get_deployment_repository)) -> dict:
         deployments = list(repo.list())
         return {"items": deployments, "repo_class": type(repo).__name__}
 
@@ -261,7 +262,7 @@ def _build_enterprise_app() -> FastAPI:
     # 7. Marketplace sources
     # ------------------------------------------------------------------
     @app.get("/api/v1/marketplace/sources")
-    async def list_marketplace_sources(
+    async def _list_marketplace_sources(
         repo=Depends(get_marketplace_source_repository),
     ) -> dict:
         # IMarketplaceSourceRepository uses list_sources(), not list()
@@ -272,7 +273,7 @@ def _build_enterprise_app() -> FastAPI:
     # 8. Project templates
     # ------------------------------------------------------------------
     @app.get("/api/v1/project-templates")
-    async def list_project_templates(
+    async def _list_project_templates(
         repo=Depends(get_project_template_repository),
     ) -> dict:
         templates = list(repo.list())
@@ -496,37 +497,37 @@ class TestLocalEditionNotBroken:
         app.dependency_overrides[get_db_session] = lambda: mock_session
 
         @app.get("/api/v1/tags")
-        async def list_tags(repo=Depends(get_tag_repository)) -> dict:
+        async def _list_tags(repo=Depends(get_tag_repository)) -> dict:
             return {"repo_class": type(repo).__name__}
 
         @app.get("/api/v1/groups")
-        async def list_groups(repo=Depends(get_group_repository)) -> dict:
+        async def _list_groups(repo=Depends(get_group_repository)) -> dict:
             # IGroupRepository.list() requires collection_id; only resolve repo class here
             return {"repo_class": type(repo).__name__}
 
         @app.get("/api/v1/context-entities")
-        async def list_context_entities(
+        async def _list_context_entities(
             repo=Depends(get_context_entity_repository),
         ) -> dict:
             return {"repo_class": type(repo).__name__}
 
         @app.get("/api/v1/projects")
-        async def list_projects(repo=Depends(get_project_repository)) -> dict:
+        async def _list_projects(repo=Depends(get_project_repository)) -> dict:
             return {"repo_class": type(repo).__name__}
 
         @app.get("/api/v1/deployments")
-        async def list_deployments(repo=Depends(get_deployment_repository)) -> dict:
+        async def _list_deployments(repo=Depends(get_deployment_repository)) -> dict:
             return {"repo_class": type(repo).__name__}
 
         @app.get("/api/v1/marketplace/sources")
-        async def list_marketplace_sources(
+        async def _list_marketplace_sources(
             repo=Depends(get_marketplace_source_repository),
         ) -> dict:
             # IMarketplaceSourceRepository uses list_sources(), not list()
             return {"repo_class": type(repo).__name__}
 
         @app.get("/api/v1/project-templates")
-        async def list_project_templates(
+        async def _list_project_templates(
             repo=Depends(get_project_template_repository),
         ) -> dict:
             return {"repo_class": type(repo).__name__}
@@ -578,7 +579,7 @@ class TestLocalEditionNotBroken:
 
 
 # ---------------------------------------------------------------------------
-# ENT2-7.3: Tenant isolation tests (placeholder — fill in next)
+# ENT2-7.3: Tenant isolation integration tests
 # ---------------------------------------------------------------------------
 
 
@@ -589,54 +590,278 @@ class TestEnterpriseTenantIsolation:
     fixture guards on both SKILLMEAT_EDITION=enterprise and a valid
     DATABASE_URL).
 
-    Implementation notes (fill in when implementing):
-    - Create two tenant UUIDs (TENANT_A, TENANT_B).
-    - Insert rows for both tenants directly via SQLAlchemy (bypass the API).
-    - Issue GET requests with X-Tenant-Id headers for each tenant.
-    - Assert TENANT_A sees only its own rows, TENANT_B sees only its own.
-    - Cleanup: delete inserted rows in a finally block or pytest teardown.
+    Strategy
+    --------
+    Each test:
+    1. Creates two tenant UUIDs (TENANT_A, TENANT_B).
+    2. Writes rows using TENANT_A's context via ``tenant_scope()``.
+    3. Queries using TENANT_B's context.
+    4. Asserts TENANT_B sees zero rows.
 
-    Endpoint coverage planned for ENT2-7.3:
-    - /api/v1/tags — EnterpriseTagRepository tenant scoping
-    - /api/v1/groups — EnterpriseGroupRepository tenant scoping
-    - /api/v1/projects — EnterpriseProjectRepository tenant scoping
-    - /api/v1/deployments — EnterpriseDeploymentRepository tenant scoping
-    - /api/v1/marketplace/sources — EnterpriseMarketplaceSourceRepository tenant scoping
+    All writes use ``session.flush()`` (not ``commit()``) so each test is
+    rolled back automatically by the ``pg_session`` fixture — no manual
+    teardown required.
+
+    Repos excluded from isolation testing
+    --------------------------------------
+    - ``EnterpriseSettingsRepository``: UNIQUE (tenant_id) constraint means
+      there is at most one settings row per tenant; the isolation guarantee is
+      structural (single-row per tenant) rather than a filterable list.
+    - ``EnterpriseContextEntityRepository``: Passthrough / stub — no tenant
+      data stored in the enterprise tier.
+    - ``EnterpriseProjectTemplateRepository``: Stub — no tenant-specific data.
     """
 
     @pytest.fixture(scope="class")
-    def pg_client(self, enterprise_pg_env):
-        """Placeholder: build a TestClient backed by real PostgreSQL.
+    def pg_engine(self, enterprise_pg_env: None) -> "Generator":
+        """Create a SQLAlchemy engine bound to the test PostgreSQL instance.
 
-        Replace this stub with real database bootstrap logic when implementing
-        ENT2-7.3.  The ``enterprise_pg_env`` fixture already guards the skip
-        logic so this fixture only runs when PostgreSQL is available.
+        The ``enterprise_pg_env`` fixture already guards the skip logic so
+        this fixture only runs when both SKILLMEAT_EDITION=enterprise and a
+        valid DATABASE_URL are set.
         """
-        pytest.skip(
-            "ENT2-7.3 tenant isolation tests are not yet implemented. "
-            "Implement alongside ticket ENT2-7.3."
+        from sqlalchemy import create_engine, text
+
+        db_url = os.getenv("DATABASE_URL") or os.getenv("SKILLMEAT_DATABASE_URL", "")
+        engine = create_engine(db_url, future=True)
+
+        # Ensure enterprise tables exist.
+        from skillmeat.cache.models_enterprise import EnterpriseBase
+
+        EnterpriseBase.metadata.create_all(engine)
+
+        yield engine
+
+        engine.dispose()
+
+    @pytest.fixture()
+    def pg_session(self, pg_engine: Any) -> "Generator":
+        """Provide a rolled-back session for each test.
+
+        Using a nested transaction (SAVEPOINT) means every test starts from a
+        clean slate without needing to drop/recreate tables or delete rows
+        explicitly.
+        """
+        from sqlalchemy.orm import sessionmaker
+
+        SessionFactory = sessionmaker(bind=pg_engine)
+        connection = pg_engine.connect()
+        transaction = connection.begin()
+        session = SessionFactory(bind=connection)
+        try:
+            yield session
+        finally:
+            session.close()
+            transaction.rollback()
+            connection.close()
+
+    # ------------------------------------------------------------------
+    # Tags
+    # ------------------------------------------------------------------
+
+    def test_tenant_isolation_tags(self, pg_session: Session) -> None:
+        """Tags created by TENANT_A are invisible to TENANT_B."""
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseTagRepository,
+            tenant_scope,
         )
 
-    def test_tenant_a_cannot_see_tenant_b_tags(self, pg_client):
-        """Placeholder: TENANT_A tag query must not include TENANT_B rows."""
-        pass  # Replace with real test when ENT2-7.3 is implemented
+        tenant_a = uuid.uuid4()
+        tenant_b = uuid.uuid4()
 
-    def test_tenant_b_cannot_see_tenant_a_tags(self, pg_client):
-        """Placeholder: TENANT_B tag query must not include TENANT_A rows."""
-        pass  # Replace with real test when ENT2-7.3 is implemented
+        # Create a tag under TENANT_A.
+        with tenant_scope(tenant_a):
+            repo_a = EnterpriseTagRepository(session=pg_session)
+            repo_a.create(name="tag-for-tenant-a")
 
-    def test_tenant_a_cannot_see_tenant_b_groups(self, pg_client):
-        """Placeholder: TENANT_A group query must not include TENANT_B rows."""
-        pass  # Replace with real test when ENT2-7.3 is implemented
+        # TENANT_B should see an empty list.
+        with tenant_scope(tenant_b):
+            repo_b = EnterpriseTagRepository(session=pg_session)
+            results = repo_b.list()
 
-    def test_tenant_a_cannot_see_tenant_b_projects(self, pg_client):
-        """Placeholder: TENANT_A project query must not include TENANT_B rows."""
-        pass  # Replace with real test when ENT2-7.3 is implemented
+        assert len(results) == 0, (
+            f"TENANT_B unexpectedly sees {len(results)} tag(s) "
+            "that belong to TENANT_A."
+        )
 
-    def test_tenant_a_cannot_see_tenant_b_deployments(self, pg_client):
-        """Placeholder: TENANT_A deployment query must not include TENANT_B rows."""
-        pass  # Replace with real test when ENT2-7.3 is implemented
+    def test_tenant_a_cannot_see_tenant_b_tags(self, pg_session: Session) -> None:
+        """Tags created by TENANT_B are invisible to TENANT_A."""
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseTagRepository,
+            tenant_scope,
+        )
 
-    def test_tenant_a_cannot_see_tenant_b_marketplace_sources(self, pg_client):
-        """Placeholder: TENANT_A marketplace source query must not include TENANT_B rows."""
-        pass  # Replace with real test when ENT2-7.3 is implemented
+        tenant_a = uuid.uuid4()
+        tenant_b = uuid.uuid4()
+
+        # Create a tag under TENANT_B.
+        with tenant_scope(tenant_b):
+            repo_b = EnterpriseTagRepository(session=pg_session)
+            repo_b.create(name="tag-for-tenant-b")
+
+        # TENANT_A should see an empty list.
+        with tenant_scope(tenant_a):
+            repo_a = EnterpriseTagRepository(session=pg_session)
+            results = repo_a.list()
+
+        assert len(results) == 0, (
+            f"TENANT_A unexpectedly sees {len(results)} tag(s) "
+            "that belong to TENANT_B."
+        )
+
+    # ------------------------------------------------------------------
+    # Groups
+    # ------------------------------------------------------------------
+
+    def test_tenant_a_cannot_see_tenant_b_groups(self, pg_session: Session) -> None:
+        """Groups created by TENANT_B are invisible to TENANT_A.
+
+        ``EnterpriseGroupRepository.list()`` requires a ``collection_id``.
+        We create a synthetic collection UUID that TENANT_B owns; TENANT_A
+        queries using the same UUID to confirm cross-tenant leakage is
+        blocked by the tenant filter applied before the collection_id filter.
+        """
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseGroupRepository,
+            tenant_scope,
+        )
+
+        tenant_a = uuid.uuid4()
+        tenant_b = uuid.uuid4()
+        # Use a shared collection UUID so both tenants query "the same" ID.
+        shared_collection_id = str(uuid.uuid4())
+
+        # Create a group under TENANT_B.
+        with tenant_scope(tenant_b):
+            repo_b = EnterpriseGroupRepository(session=pg_session)
+            repo_b.create(
+                name="group-for-tenant-b",
+                collection_id=shared_collection_id,
+            )
+
+        # TENANT_A queries for the same collection_id — should see nothing.
+        with tenant_scope(tenant_a):
+            repo_a = EnterpriseGroupRepository(session=pg_session)
+            results = repo_a.list(collection_id=shared_collection_id)
+
+        assert len(results) == 0, (
+            f"TENANT_A unexpectedly sees {len(results)} group(s) "
+            "that belong to TENANT_B."
+        )
+
+    # ------------------------------------------------------------------
+    # Projects
+    # ------------------------------------------------------------------
+
+    def test_tenant_a_cannot_see_tenant_b_projects(self, pg_session: Session) -> None:
+        """Projects created by TENANT_B are invisible to TENANT_A."""
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseProjectRepository,
+            tenant_scope,
+        )
+        from skillmeat.core.interfaces.dtos import ProjectDTO
+
+        tenant_a = uuid.uuid4()
+        tenant_b = uuid.uuid4()
+
+        # Create a project under TENANT_B.
+        with tenant_scope(tenant_b):
+            repo_b = EnterpriseProjectRepository(session=pg_session)
+            repo_b.create(
+                ProjectDTO(
+                    id="",
+                    name="project-for-tenant-b",
+                    path="/tmp/tenant-b-project",
+                )
+            )
+
+        # TENANT_A should see an empty list.
+        with tenant_scope(tenant_a):
+            repo_a = EnterpriseProjectRepository(session=pg_session)
+            results = repo_a.list()
+
+        assert len(results) == 0, (
+            f"TENANT_A unexpectedly sees {len(results)} project(s) "
+            "that belong to TENANT_B."
+        )
+
+    # ------------------------------------------------------------------
+    # Deployments
+    # ------------------------------------------------------------------
+
+    def test_tenant_a_cannot_see_tenant_b_deployments(self, pg_session: Session) -> None:
+        """Deployments recorded by TENANT_B are invisible to TENANT_A.
+
+        ``EnterpriseDeploymentRepository.deploy()`` requires a valid
+        project_id UUID for the foreign-key constraint.  We first create a
+        project for TENANT_B, then record a deployment against it.
+        """
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseDeploymentRepository,
+            EnterpriseProjectRepository,
+            tenant_scope,
+        )
+        from skillmeat.core.interfaces.dtos import ProjectDTO
+
+        tenant_a = uuid.uuid4()
+        tenant_b = uuid.uuid4()
+
+        # Set up: create a project for TENANT_B so the FK is satisfied.
+        with tenant_scope(tenant_b):
+            proj_repo = EnterpriseProjectRepository(session=pg_session)
+            project_dto = proj_repo.create(
+                ProjectDTO(
+                    id="",
+                    name="tenant-b-proj",
+                    path="/tmp/tenant-b-proj",
+                )
+            )
+            deploy_repo = EnterpriseDeploymentRepository(session=pg_session)
+            deploy_repo.deploy(
+                artifact_id="skill:test-skill",
+                project_id=project_dto.id,
+            )
+
+        # TENANT_A should see an empty deployment list.
+        with tenant_scope(tenant_a):
+            repo_a = EnterpriseDeploymentRepository(session=pg_session)
+            results = repo_a.list()
+
+        assert len(results) == 0, (
+            f"TENANT_A unexpectedly sees {len(results)} deployment(s) "
+            "that belong to TENANT_B."
+        )
+
+    # ------------------------------------------------------------------
+    # Marketplace sources
+    # ------------------------------------------------------------------
+
+    def test_tenant_a_cannot_see_tenant_b_marketplace_sources(
+        self, pg_session: Session
+    ) -> None:
+        """Marketplace sources created by TENANT_B are invisible to TENANT_A."""
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseMarketplaceSourceRepository,
+            tenant_scope,
+        )
+
+        tenant_a = uuid.uuid4()
+        tenant_b = uuid.uuid4()
+
+        # Create a marketplace source under TENANT_B.
+        with tenant_scope(tenant_b):
+            repo_b = EnterpriseMarketplaceSourceRepository(session=pg_session)
+            repo_b.create_source(
+                name="tenant-b/test-repo",
+                endpoint=f"https://github.com/tenant-b/test-repo-{tenant_b.hex[:8]}",
+            )
+
+        # TENANT_A should see an empty source list.
+        with tenant_scope(tenant_a):
+            repo_a = EnterpriseMarketplaceSourceRepository(session=pg_session)
+            results = repo_a.list_sources()
+
+        assert len(results) == 0, (
+            f"TENANT_A unexpectedly sees {len(results)} marketplace source(s) "
+            "that belong to TENANT_B."
+        )

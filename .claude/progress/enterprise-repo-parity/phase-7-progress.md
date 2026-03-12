@@ -6,7 +6,7 @@ prd: enterprise-repo-parity
 feature_slug: enterprise-repo-parity
 phase: 7
 phase_title: Validation & Testing
-status: in_progress
+status: pending
 created: 2026-03-12
 updated: '2026-03-12'
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-repo-parity-v2.md
@@ -34,7 +34,7 @@ tasks:
   - ENT2-7.1
 - id: ENT2-7.3
   title: Tenant isolation integration tests
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -66,10 +66,10 @@ parallelization:
   batch_3:
   - ENT2-7.5
 total_tasks: 5
-completed_tasks: 3
-in_progress_tasks: 1
+completed_tasks: 4
+in_progress_tasks: 0
 blocked_tasks: 0
-progress: 60
+progress: 80
 ---
 
 # Phase 7: Validation & Testing
