@@ -961,7 +961,13 @@ def get_marketplace_catalog_repository() -> MarketplaceCatalogRepository:
     Returns a new ``MarketplaceCatalogRepository`` instance.  The repository
     manages its own session lifecycle internally.
 
-    # enterprise: passthrough — shared read-only catalog cache
+    # enterprise: passthrough — shared read-only catalog cache.
+    # No edition guard is intentional: the marketplace catalog is a shared,
+    # read-only SQLite cache populated by the marketplace import pipeline and
+    # consumed identically in both local and enterprise modes.  It is NOT
+    # tenant-scoped and does NOT hold user-mutable data, so routing to a
+    # separate PostgreSQL-backed implementation would provide no benefit and
+    # would break the shared-catalog contract.
 
     Returns:
         MarketplaceCatalogRepository instance.

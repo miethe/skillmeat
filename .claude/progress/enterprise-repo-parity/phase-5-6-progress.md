@@ -6,7 +6,7 @@ prd: enterprise-repo-parity
 feature_slug: enterprise-repo-parity
 phase: 5-6
 phase_title: Repository Implementation (Marketplace) & Edition-Aware Wiring
-status: pending
+status: completed
 created: 2026-03-12
 updated: '2026-03-12'
 prd_ref: docs/project_plans/PRDs/refactors/enterprise-repo-parity-v2.md
@@ -77,7 +77,7 @@ tasks:
   dependencies: []
 - id: ENT2-6.5
   title: Full grep audit for remaining SQLite instantiations
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -101,10 +101,10 @@ parallelization:
   batch_4:
   - ENT2-6.5
 total_tasks: 10
-completed_tasks: 9
+completed_tasks: 10
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 90
+progress: 100
 ---
 
 # Phase 5-6: Repository Implementation (Marketplace) & Edition-Aware Wiring
