@@ -35,6 +35,7 @@ from skillmeat.api.dependencies import (
     ArtifactManagerDep,
     ArtifactRepoDep,
     CollectionManagerDep,
+    CollectionRepoDep,
     ConfigManagerDep,
     DbCollectionArtifactRepoDep,
     DbSessionDep,
@@ -1888,6 +1889,7 @@ async def create_artifact(
     request: ArtifactCreateRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    collection_repo: CollectionRepoDep,
     token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> ArtifactCreateResponse:
@@ -1948,22 +1950,36 @@ async def create_artifact(
         # Determine collection - use default if not specified
         collection_name = request.collection
         if not collection_name:
-            # Use the default collection
+            # Use the default collection, resolving via repository (works in both
+            # local and enterprise editions — enterprise has no filesystem collections)
             collection_name = "default"
-            # Verify default collection exists (should always exist after server startup)
-            collections = collection_mgr.list_collections()
-            if "default" not in collections:
-                # Fall back to first available if default doesn't exist (shouldn't happen)
-                if collections:
-                    collection_name = collections[0]
+            repo_collections = collection_repo.list(auth_context=auth_context)
+            repo_names = [c.name for c in repo_collections]
+            if "default" not in repo_names:
+                # Fall back to first available if default doesn't exist
+                if repo_names:
+                    collection_name = repo_names[0]
                 else:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="No collections found. Create a collection first.",
-                    )
+                    # Last resort: try filesystem (local edition)
+                    fs_collections = collection_mgr.list_collections()
+                    if "default" not in fs_collections:
+                        if fs_collections:
+                            collection_name = fs_collections[0]
+                        else:
+                            raise HTTPException(
+                                status_code=status.HTTP_404_NOT_FOUND,
+                                detail="No collections found. Create a collection first.",
+                            )
         else:
             # Verify collection exists (resolve UUID if needed)
             resolved = resolve_collection_name(collection_name, collection_mgr)
+            if not resolved:
+                # Not found on filesystem — try repository (handles enterprise mode)
+                repo_collection = collection_repo.get_by_id(
+                    collection_name, auth_context=auth_context
+                )
+                if repo_collection is not None:
+                    resolved = repo_collection.name
             if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
