@@ -90,6 +90,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     logger.info("Starting SkillMeat API service...")
 
+    # Load settings early for validation
+    settings = get_settings()
+
+    # Validate edition/database configuration compatibility BEFORE
+    # initializing the session factory, which would fail cryptically
+    # if enterprise mode is set without a PostgreSQL database URL.
+    import os
+
+    database_url = os.environ.get("DATABASE_URL") or os.environ.get(
+        "SKILLMEAT_DATABASE_URL"
+    )
+    if settings.edition == "enterprise":
+        if not database_url or not (
+            database_url.startswith("postgresql://")
+            or database_url.startswith("postgresql+psycopg2://")
+        ):
+            raise RuntimeError(
+                "Edition mismatch: SKILLMEAT_EDITION='enterprise' requires a PostgreSQL database. "
+                "Set DATABASE_URL or SKILLMEAT_DATABASE_URL to a postgresql:// URL, "
+                "or set SKILLMEAT_EDITION='local' for SQLite mode."
+            )
+        logger.info("Edition: enterprise (PostgreSQL)")
+    else:
+        logger.info("Edition: local (SQLite)")
+
     # Initialize session factory singleton before AppState to prevent
     # concurrent imports from each creating their own sessionmaker instance
     from skillmeat.cache.models import init_session_factory
@@ -97,8 +122,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     init_session_factory()
     logger.info("Database session factory initialized")
 
-    # Load settings
-    settings = get_settings()
     logger.info(f"Environment: {settings.env.value}")
     logger.info(f"API Version: {settings.api_version}")
     logger.info(f"Host: {settings.host}:{settings.port}")
