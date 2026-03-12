@@ -506,9 +506,11 @@ def require_memory_context_enabled(
 # ---------------------------------------------------------------------------
 # Repository factory providers (hexagonal architecture)
 #
-# Enterprise Edition Provider Support (ENT2-002/003/ENT2-3.5)
-# Supported:   artifact, collection, tag, settings, group, context_entity
-# Unsupported: project, deployment, marketplace_source, project_template
+# Enterprise Edition Provider Support (ENT2-002/003/ENT2-3.5/ENT2-5.3/ENT2-5.4)
+# Supported:   artifact, collection, tag, settings, group, context_entity,
+#              project, deployment, deployment_set, deployment_profile,
+#              marketplace_source, project_template (stub), marketplace_transaction_handler
+# Passthrough: marketplace_catalog (shared read-only cache)
 # ---------------------------------------------------------------------------
 
 
@@ -806,14 +808,18 @@ def get_context_entity_repository(
 
 def get_marketplace_source_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IMarketplaceSourceRepository:
     """Get IMarketplaceSourceRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IMarketplaceSourceRepository implementation for the configured edition
+        IMarketplaceSourceRepository implementation for the configured edition.
+        Local edition returns ``LocalMarketplaceSourceRepository``; enterprise
+        edition returns ``EnterpriseMarketplaceSourceRepository``.
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -823,25 +829,33 @@ def get_marketplace_source_repository(
         from skillmeat.core.repositories import LocalMarketplaceSourceRepository
 
         return LocalMarketplaceSourceRepository()
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseMarketplaceSourceRepository,
+        )
+
+        return EnterpriseMarketplaceSourceRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support marketplace_source. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
 def get_project_template_repository(
     state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> IProjectTemplateRepository:
     """Get IProjectTemplateRepository dependency.
 
     Args:
         state: Application state
+        session: Per-request SQLAlchemy session (used by enterprise edition)
 
     Returns:
-        IProjectTemplateRepository implementation for the configured edition
+        IProjectTemplateRepository implementation for the configured edition.
+        Local edition returns ``LocalProjectTemplateRepository``; enterprise
+        edition returns ``EnterpriseProjectTemplateRepository`` (stub —
+        full implementation deferred to v3).
 
     Raises:
         HTTPException: If the configured edition is not supported
@@ -851,12 +865,15 @@ def get_project_template_repository(
         from skillmeat.core.repositories import LocalProjectTemplateRepository
 
         return LocalProjectTemplateRepository()
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseProjectTemplateRepository,
+        )
+
+        return EnterpriseProjectTemplateRepository(session=session)  # type: ignore[return-value]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            f"Enterprise edition does not yet support project_template. "
-            f"Supported providers: artifact, collection."
-        ),
+        detail=f"Unsupported edition: {edition}",
     )
 
 
@@ -928,21 +945,57 @@ def get_marketplace_catalog_repository() -> MarketplaceCatalogRepository:
     Returns a new ``MarketplaceCatalogRepository`` instance.  The repository
     manages its own session lifecycle internally.
 
+    # enterprise: passthrough — shared read-only catalog cache
+
     Returns:
         MarketplaceCatalogRepository instance.
     """
     return MarketplaceCatalogRepository()
 
 
-def get_marketplace_transaction_handler() -> MarketplaceTransactionHandler:
+def get_marketplace_transaction_handler(
+    state: Annotated[AppState, Depends(get_app_state)],
+    session: Annotated[Session, Depends(get_db_session)],
+    request: Request,
+) -> MarketplaceTransactionHandler:
     """Get MarketplaceTransactionHandler dependency.
 
-    Returns a new ``MarketplaceTransactionHandler`` instance for coordinating
-    atomic cross-table marketplace operations.
+    Returns a handler for coordinating atomic cross-table marketplace
+    operations.  In enterprise mode returns
+    ``EnterpriseMarketplaceTransactionHandler`` wired with the per-request
+    session and tenant; local mode returns the standard
+    ``MarketplaceTransactionHandler``.
+
+    Args:
+        state: Application state (used to read the configured edition).
+        session: Per-request SQLAlchemy session (enterprise path).
+        request: Current FastAPI request (enterprise path reads tenant_id
+            from auth context stored on request.state).
 
     Returns:
-        MarketplaceTransactionHandler instance.
+        MarketplaceTransactionHandler or EnterpriseMarketplaceTransactionHandler.
     """
+    edition = state.settings.edition if state.settings else "local"
+    if edition == "enterprise":
+        from skillmeat.cache.enterprise_repositories import (
+            EnterpriseMarketplaceTransactionHandler,
+        )
+
+        auth_ctx: AuthContext | None = getattr(request.state, "auth_context", None)
+        tenant_id = (
+            auth_ctx.tenant_id
+            if auth_ctx is not None and auth_ctx.tenant_id is not None
+            else None
+        )
+        if tenant_id is None:
+            from skillmeat.cache.constants import DEFAULT_TENANT_ID
+            import uuid as _uuid
+
+            tenant_id = _uuid.UUID(DEFAULT_TENANT_ID)
+
+        return EnterpriseMarketplaceTransactionHandler(  # type: ignore[return-value]
+            session=session, tenant_id=tenant_id
+        )
     return MarketplaceTransactionHandler()
 
 

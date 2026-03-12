@@ -8626,3 +8626,461 @@ class EnterpriseProjectTemplateRepository(
                 "full implementation deferred to v3."
             ),
         }
+
+
+# =============================================================================
+# EnterpriseMarketplaceTransactionHandler  (ENT2-5.3)
+# =============================================================================
+
+
+class EnterpriseMarketplaceTransactionHandler:
+    """Coordinates transactional marketplace operations for the enterprise backend.
+
+    Mirrors the interface of the local
+    :class:`~skillmeat.cache.repositories.MarketplaceTransactionHandler` but
+    operates on the enterprise PostgreSQL session rather than opening its own
+    SQLite connection.
+
+    Unlike most enterprise repositories this class does NOT extend
+    ``EnterpriseRepositoryBase`` because it manages multi-table operations
+    across both ``EnterpriseMarketplaceSource`` and
+    ``EnterpriseMarketplaceCatalogEntry`` and therefore cannot be bound to a
+    single model class.
+
+    Tenant filtering is applied explicitly inside each context method using the
+    current ``TenantContext``.
+
+    Parameters
+    ----------
+    session:
+        An open SQLAlchemy ``Session`` bound to the enterprise database.
+        The caller (FastAPI DI layer) is responsible for commit/rollback/close.
+    tenant_id:
+        Explicit tenant UUID for this handler instance.  Stored and used
+        to scope all queries without relying on ``TenantContext`` alone.
+
+    Example::
+
+        handler = EnterpriseMarketplaceTransactionHandler(
+            session=db_session, tenant_id=tenant_id
+        )
+        with handler.scan_update_transaction(source_id) as ctx:
+            ctx.update_source_status("success", artifact_count=5)
+            ctx.replace_catalog_entries(new_entries)
+    """
+
+    def __init__(self, session: Session, tenant_id: uuid.UUID) -> None:
+        """Initialise the enterprise marketplace transaction handler.
+
+        Parameters
+        ----------
+        session:
+            Injected SQLAlchemy session bound to the PostgreSQL enterprise
+            database.
+        tenant_id:
+            Tenant UUID that scopes all queries issued by this handler.
+        """
+        self.session = session
+        self.tenant_id = tenant_id
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _get_enterprise_source(self, source_id: str) -> "EnterpriseMarketplaceSource":
+        """Fetch an ``EnterpriseMarketplaceSource`` row scoped to the current tenant.
+
+        Parameters
+        ----------
+        source_id:
+            String representation of the source UUID.
+
+        Returns
+        -------
+        EnterpriseMarketplaceSource
+
+        Raises
+        ------
+        KeyError
+            If no matching row is found for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        try:
+            source_uuid = uuid.UUID(source_id)
+        except (ValueError, AttributeError):
+            raise KeyError(f"Invalid source UUID: {source_id!r}")
+
+        stmt = select(EnterpriseMarketplaceSource).where(
+            EnterpriseMarketplaceSource.id == source_uuid,
+            EnterpriseMarketplaceSource.tenant_id == self.tenant_id,
+        )
+        row = self.session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            raise KeyError(f"Source not found: {source_id!r}")
+        return row  # type: ignore[return-value]
+
+    # ------------------------------------------------------------------
+    # Context managers
+    # ------------------------------------------------------------------
+
+    @contextmanager
+    def scan_update_transaction(
+        self, source_id: str
+    ) -> Generator["EnterpriseScanUpdateContext", None, None]:
+        """Context manager for updating source and catalog after a scan.
+
+        Wraps the operation in a savepoint so that on error only this
+        logical unit is rolled back rather than the entire session.
+
+        Parameters
+        ----------
+        source_id:
+            The enterprise marketplace source UUID being updated.
+
+        Yields
+        ------
+        EnterpriseScanUpdateContext
+            Context object with helper methods for the scan update.
+
+        Raises
+        ------
+        RuntimeError
+            If the database operation fails.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceTransactionHandler: starting scan_update_transaction "
+            "source=%s tenant=%s",
+            source_id,
+            self.tenant_id,
+        )
+        try:
+            context = EnterpriseScanUpdateContext(
+                session=self.session,
+                source_id=source_id,
+                tenant_id=self.tenant_id,
+            )
+            yield context
+            self.session.flush()
+            logger.info(
+                "EnterpriseMarketplaceTransactionHandler: scan_update_transaction "
+                "flushed source=%s",
+                source_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "EnterpriseMarketplaceTransactionHandler: scan_update_transaction "
+                "failed source=%s error=%s",
+                source_id,
+                exc,
+            )
+            raise RuntimeError(
+                f"Enterprise scan update transaction failed: {exc}"
+            ) from exc
+
+    @contextmanager
+    def import_transaction(
+        self, source_id: str
+    ) -> Generator["EnterpriseImportContext", None, None]:
+        """Context manager for importing catalog entries to the collection.
+
+        Parameters
+        ----------
+        source_id:
+            The enterprise marketplace source UUID being imported from.
+
+        Yields
+        ------
+        EnterpriseImportContext
+            Context object with helper methods for marking import results.
+
+        Raises
+        ------
+        RuntimeError
+            If the database operation fails.
+        """
+        logger.debug(
+            "EnterpriseMarketplaceTransactionHandler: starting import_transaction "
+            "source=%s tenant=%s",
+            source_id,
+            self.tenant_id,
+        )
+        try:
+            context = EnterpriseImportContext(
+                session=self.session,
+                source_id=source_id,
+                tenant_id=self.tenant_id,
+            )
+            yield context
+            self.session.flush()
+            logger.info(
+                "EnterpriseMarketplaceTransactionHandler: import_transaction "
+                "flushed source=%s",
+                source_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "EnterpriseMarketplaceTransactionHandler: import_transaction "
+                "failed source=%s error=%s",
+                source_id,
+                exc,
+            )
+            raise RuntimeError(
+                f"Enterprise import transaction failed: {exc}"
+            ) from exc
+
+
+class EnterpriseScanUpdateContext:
+    """Context for scan update operations within an enterprise transaction.
+
+    Mirrors :class:`~skillmeat.cache.repositories.ScanUpdateContext` for the
+    enterprise PostgreSQL backend using SQLAlchemy 2.x ``select()`` style.
+
+    Parameters
+    ----------
+    session:
+        Active SQLAlchemy session (managed by
+        :class:`EnterpriseMarketplaceTransactionHandler`).
+    source_id:
+        UUID string of the marketplace source being updated.
+    tenant_id:
+        Tenant UUID for row-level isolation.
+    """
+
+    def __init__(self, session: Session, source_id: str, tenant_id: uuid.UUID) -> None:
+        self.session = session
+        self.source_id = source_id
+        self.tenant_id = tenant_id
+
+    def update_source_status(
+        self,
+        status: str,
+        artifact_count: Optional[int] = None,
+        error_message: Optional[str] = None,
+        ref: Optional[str] = None,
+    ) -> None:
+        """Update source scan status and metadata.
+
+        Parameters
+        ----------
+        status:
+            New scan status (e.g. ``"success"``, ``"error"``).
+        artifact_count:
+            Number of artifacts discovered (``None`` leaves unchanged).
+        error_message:
+            Error message when *status* is ``"error"`` (``None`` clears).
+        ref:
+            Resolved git ref used during scan (``None`` leaves unchanged).
+
+        Raises
+        ------
+        KeyError
+            If no matching source row is found for this tenant.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+
+        try:
+            source_uuid = uuid.UUID(self.source_id)
+        except (ValueError, AttributeError):
+            raise KeyError(f"Invalid source UUID: {self.source_id!r}")
+
+        stmt = select(EnterpriseMarketplaceSource).where(
+            EnterpriseMarketplaceSource.id == source_uuid,
+            EnterpriseMarketplaceSource.tenant_id == self.tenant_id,
+        )
+        source = self.session.execute(stmt).scalar_one_or_none()
+        if source is None:
+            raise KeyError(f"Source not found: {self.source_id!r}")
+
+        source.scan_status = status
+        source.last_sync_at = datetime.utcnow()
+
+        if artifact_count is not None:
+            source.artifact_count = artifact_count
+
+        source.last_error = error_message
+
+        if ref is not None:
+            source.ref = ref
+            logger.info(
+                "EnterpriseScanUpdateContext: updated source %s ref to %r",
+                self.source_id,
+                ref,
+            )
+
+        logger.info(
+            "EnterpriseScanUpdateContext: updated source=%s status=%s count=%s",
+            self.source_id,
+            status,
+            artifact_count,
+        )
+
+    def replace_catalog_entries(
+        self, entries: "List[EnterpriseMarketplaceCatalogEntry]"
+    ) -> int:
+        """Delete existing catalog entries for the source and insert new ones.
+
+        Parameters
+        ----------
+        entries:
+            List of new ``EnterpriseMarketplaceCatalogEntry`` instances to insert.
+
+        Returns
+        -------
+        int
+            Number of entries inserted.
+        """
+        from skillmeat.cache.models_enterprise import (
+            EnterpriseMarketplaceCatalogEntry,
+            EnterpriseMarketplaceSource,
+        )
+
+        try:
+            source_uuid = uuid.UUID(self.source_id)
+        except (ValueError, AttributeError):
+            raise KeyError(f"Invalid source UUID: {self.source_id!r}")
+
+        # Delete existing entries scoped to this tenant's source
+        del_stmt = delete(EnterpriseMarketplaceCatalogEntry).where(
+            EnterpriseMarketplaceCatalogEntry.source_id == source_uuid,
+            EnterpriseMarketplaceCatalogEntry.tenant_id == self.tenant_id,
+        )
+        result = self.session.execute(del_stmt)
+        deleted_count = result.rowcount
+        logger.debug(
+            "EnterpriseScanUpdateContext: deleted %d existing entries for source=%s",
+            deleted_count,
+            self.source_id,
+        )
+
+        # Insert new entries
+        for entry in entries:
+            self.session.add(entry)
+
+        logger.info(
+            "EnterpriseScanUpdateContext: inserted %d entries for source=%s",
+            len(entries),
+            self.source_id,
+        )
+        return len(entries)
+
+
+class EnterpriseImportContext:
+    """Context for import operations within an enterprise transaction.
+
+    Mirrors :class:`~skillmeat.cache.repositories.ImportContext` for the
+    enterprise PostgreSQL backend using SQLAlchemy 2.x ``select()`` style.
+
+    Parameters
+    ----------
+    session:
+        Active SQLAlchemy session (managed by
+        :class:`EnterpriseMarketplaceTransactionHandler`).
+    source_id:
+        UUID string of the marketplace source being imported from.
+    tenant_id:
+        Tenant UUID for row-level isolation.
+    """
+
+    def __init__(self, session: Session, source_id: str, tenant_id: uuid.UUID) -> None:
+        self.session = session
+        self.source_id = source_id
+        self.tenant_id = tenant_id
+
+    def mark_imported(self, entry_ids: List[str], import_id: str) -> int:
+        """Mark catalog entries as imported.
+
+        Parameters
+        ----------
+        entry_ids:
+            List of catalog entry UUID strings to update.
+        import_id:
+            Unique identifier for this import operation.
+
+        Returns
+        -------
+        int
+            Number of entries updated.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceCatalogEntry
+
+        updated_count = 0
+        now = datetime.utcnow()
+
+        for entry_id_str in entry_ids:
+            try:
+                entry_uuid = uuid.UUID(entry_id_str)
+            except (ValueError, AttributeError):
+                logger.warning(
+                    "EnterpriseImportContext.mark_imported: skipping invalid UUID %r",
+                    entry_id_str,
+                )
+                continue
+
+            stmt = select(EnterpriseMarketplaceCatalogEntry).where(
+                EnterpriseMarketplaceCatalogEntry.id == entry_uuid,
+                EnterpriseMarketplaceCatalogEntry.tenant_id == self.tenant_id,
+            )
+            entry = self.session.execute(stmt).scalar_one_or_none()
+            if entry is None:
+                continue
+
+            entry.status = "imported"
+            entry.updated_at = now
+            updated_count += 1
+
+        logger.info(
+            "EnterpriseImportContext: marked %d entries imported (import_id=%s)",
+            updated_count,
+            import_id,
+        )
+        return updated_count
+
+    def mark_failed(self, entry_ids: List[str], error: str) -> int:
+        """Mark catalog entries as failed import.
+
+        Parameters
+        ----------
+        entry_ids:
+            List of catalog entry UUID strings to mark as failed.
+        error:
+            Error message describing the failure reason.
+
+        Returns
+        -------
+        int
+            Number of entries updated.
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceCatalogEntry
+
+        updated_count = 0
+        now = datetime.utcnow()
+
+        for entry_id_str in entry_ids:
+            try:
+                entry_uuid = uuid.UUID(entry_id_str)
+            except (ValueError, AttributeError):
+                logger.warning(
+                    "EnterpriseImportContext.mark_failed: skipping invalid UUID %r",
+                    entry_id_str,
+                )
+                continue
+
+            stmt = select(EnterpriseMarketplaceCatalogEntry).where(
+                EnterpriseMarketplaceCatalogEntry.id == entry_uuid,
+                EnterpriseMarketplaceCatalogEntry.tenant_id == self.tenant_id,
+            )
+            entry = self.session.execute(stmt).scalar_one_or_none()
+            if entry is None:
+                continue
+
+            entry.status = "error"
+            entry.updated_at = now
+            updated_count += 1
+
+        logger.info(
+            "EnterpriseImportContext: marked %d entries failed error=%r",
+            updated_count,
+            error,
+        )
+        return updated_count

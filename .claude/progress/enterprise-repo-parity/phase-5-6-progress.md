@@ -32,13 +32,13 @@ tasks:
   dependencies: []
 - id: ENT2-5.3
   title: Audit marketplace catalog service & transaction handler
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
 - id: ENT2-5.4
   title: Update DI providers for Phase 5 repositories
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -101,10 +101,10 @@ parallelization:
   batch_4:
   - ENT2-6.5
 total_tasks: 10
-completed_tasks: 2
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 20
+progress: 40
 ---
 
 # Phase 5-6: Repository Implementation (Marketplace) & Edition-Aware Wiring
