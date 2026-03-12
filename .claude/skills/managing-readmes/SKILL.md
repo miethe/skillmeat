@@ -29,7 +29,7 @@ Route selection table:
 
 ## Route 1: Bootstrap (Summary)
 
-Bootstrap the `.github/readme/` scaffold structure for a new project. Creates directories, templates, data files, and validation scripts. Supports `--project-type [cli|web|library|saas]` to customize initial templates. See `./bootstrapping-readme-system.md` for full step-by-step guide and template customization for different project types.
+Run `node scripts/bootstrap.js --project-type [cli|web|library|saas]` to scaffold `.github/readme/` with templates, data files, and partials. Supports `--output`, `--name`, and `--force` flags. After scaffolding, run `node scripts/analyze-project.js` to auto-populate `features.json` from your codebase. See `./bootstrapping-readme-system.md` for full post-bootstrap workflow and template customization for different project types.
 
 ## Route 2: Screenshot Planning (Summary)
 
@@ -120,7 +120,7 @@ See `./validation-workflow.md` for detailed validation logic, error recovery, an
 
 ## Route 6: Workflow Integration (Summary)
 
-Wire README validation into CI (GitHub Actions, pre-commit hooks, version bump scripts) for automated freshness checks. Supports GitHub Actions workflow templates, pre-commit hook scaffolding, and version-bump integration. See `./ci-and-hook-integration.md` for ready-to-use workflow examples, hook configuration, and triggering validation on version changes.
+Wire README validation into CI (GitHub Actions), pre-commit hooks (Claude Code or git), and version bump scripts for automated freshness checks. Includes complete GitHub Actions workflows for PR validation and auto-rebuild on version changes. See `./ci-and-hook-integration.md` for ready-to-use YAML workflows and hook scripts.
 
 ## Data File Reference
 
@@ -228,20 +228,37 @@ Schema: `./data-schemas/version.schema.json`
 
 See `./build-and-rebuild-workflow.md` § "Handlebars Helper Reference" for complete helper details and conditional rendering patterns.
 
+## Scripts Reference
+
+The README build system includes 8 scripts for different stages of the README lifecycle:
+
+| Script | Purpose | Input | Output |
+|--------|---------|-------|--------|
+| `bootstrap.js` | Scaffold `.github/readme/` for any project type | Project type (cli/web/library/saas) | Full directory structure + templates + data files |
+| `analyze-project.js` | Auto-populate `features.json` from project analysis | `package.json`, routes, OpenAPI, Python CLIs | Updated `features.json` |
+| `generate-screenshot-spec.js` | Generate `screenshots.json` spec from surfaces | Project structure + UI/CLI surfaces | Initial `screenshots.json` |
+| `build-readme.js` | Main build engine — compiles README from partials + data | Templates, partials, data files | Generated `README.md` |
+| `validate-links.js` | Check internal links, relative refs, image paths | README.md + referenced files | Exit 0 (pass) or 1 (fail) |
+| `check-screenshots.js` | Verify screenshots exist, dimensions match spec | `screenshots.json` + image files | Exit 0 or 1; detailed error report |
+| `sync-features.js` | Detect orphaned features, missing references | `features.json` + templates | Feature sync report |
+| `update-version.js` | Bump version in `version.json` and package.json | Version string (e.g., 2.0.0) | Updated files + rebuild trigger |
+
+All scripts accept `--dry-run` (preview without writing) and `--verbose` (detailed output) flags. Run from project root.
+
 ## Agent Delegation Patterns
 
 When to delegate vs. execute directly:
 
 | Task | Delegate To | Notes |
 |---|---|---|
-| Analyze project for features | `codebase-explorer` | Symbol-first discovery for feature enumeration |
-| Scaffold bootstrap | Direct (Sonnet) | Single agent can create files directly |
+| Run project analysis | `codebase-explorer` or direct (`analyze-project.js`) | Symbol-first discovery, or script auto-populates `features.json` |
+| Scaffold bootstrap | Direct (`bootstrap.js`) | Script scaffolds entire `.github/readme/` structure |
+| Generate screenshot spec | Direct (`generate-screenshot-spec.js`) | Script generates initial `screenshots.json` from project surfaces |
 | Content strategy | Direct (Sonnet) | Inline reasoning; no multi-system synthesis |
-| Screenshot planning spec | Direct (Sonnet) + `generate-screenshot-spec.js` | Generate JSON spec, then execute script |
 | Web screenshot capture | Chrome MCP tools | Use directly; integrated with Claude Code |
 | GIF recording | Chrome MCP `gif_creator` | Record sequences; tool-native workflow |
 | Build & validate scripts | Direct (Bash/Node.js) | No delegation — scripts are standalone |
-| CI workflow authoring | `python-backend-engineer` | Sonnet-level task; requires YAML expertise |
+| CI workflow authoring | Direct (Sonnet) or `python-backend-engineer` | YAML expertise; can be manual or delegated |
 
 ## Cross-Tool Compatibility
 
@@ -341,6 +358,9 @@ project/
 │   │   ├── api.md
 │   │   └── contributing.md
 │   ├── scripts/
+│   │   ├── bootstrap.js          ← Scaffold .github/readme/ structure
+│   │   ├── analyze-project.js    ← Auto-populate features.json
+│   │   ├── generate-screenshot-spec.js ← Generate screenshots.json
 │   │   ├── build-readme.js       ← Main builder
 │   │   ├── validate-links.js     ← Link validator
 │   │   ├── check-screenshots.js  ← Screenshot checker
