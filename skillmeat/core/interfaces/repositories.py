@@ -39,6 +39,7 @@ from skillmeat.core.interfaces.context import RequestContext
 
 if TYPE_CHECKING:
     from skillmeat.api.schemas.auth import AuthContext
+    from skillmeat.core.ownership import OwnerTarget
 from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
     ArtifactVersionDTO,
@@ -234,6 +235,7 @@ class IArtifactRepository(abc.ABC):
         dto: ArtifactDTO,
         ctx: RequestContext | None = None,
         auth_context: AuthContext | None = None,
+        owner_target: OwnerTarget | None = None,
     ) -> ArtifactDTO:
         """Persist a new artifact record and return the stored representation.
 
@@ -244,6 +246,11 @@ class IArtifactRepository(abc.ABC):
             auth_context: Optional authentication and authorisation context.
                 When ``None`` the operation is performed without tenant
                 scoping (local zero-auth mode).
+            owner_target: Explicit ownership target for the new artifact.
+                When provided, the implementation MUST use this instead of
+                deriving ownership from ``auth_context`` (e.g. team-owned or
+                enterprise-owned artifacts).  When ``None``, defaults to
+                user-owned (backward-compatible behaviour).
 
         Returns:
             The persisted :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
@@ -1022,6 +1029,7 @@ class ICollectionRepository(abc.ABC):
         description: str | None = None,
         ctx: RequestContext | None = None,
         auth_context: AuthContext | None = None,
+        owner_target: OwnerTarget | None = None,
     ) -> CollectionDTO:
         """Create a new collection.
 
@@ -1033,6 +1041,11 @@ class ICollectionRepository(abc.ABC):
             auth_context: Optional authentication and authorisation context.
                 When ``None`` the operation is performed without tenant
                 scoping (local zero-auth mode).
+            owner_target: Explicit ownership target for the new collection.
+                When provided, the implementation MUST use this instead of
+                deriving ownership from ``auth_context`` (e.g. team-owned
+                collections).  When ``None``, defaults to user-owned
+                (backward-compatible behaviour).
 
         Returns:
             The created :class:`~skillmeat.core.interfaces.dtos.CollectionDTO`.
@@ -2007,6 +2020,7 @@ class IGroupRepository(abc.ABC):
         description: str | None = None,
         position: int | None = None,
         ctx: RequestContext | None = None,
+        owner_target: OwnerTarget | None = None,
     ) -> GroupDTO:
         """Create a new group in the given collection.
 
@@ -2018,6 +2032,11 @@ class IGroupRepository(abc.ABC):
             position: Explicit display position.  When ``None`` the
                 implementation appends the group at the end.
             ctx: Optional per-request metadata.
+            owner_target: Explicit ownership target for the new group.
+                When provided, the implementation MUST use this instead of
+                deriving ownership from request context (e.g. team-owned
+                groups).  When ``None``, defaults to user-owned
+                (backward-compatible behaviour).
 
         Returns:
             The created :class:`~skillmeat.core.interfaces.dtos.GroupDTO`.
