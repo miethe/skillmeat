@@ -18,11 +18,36 @@ When to use the `EntityPickerDialog` component system and how to extend it.
 
 ## Current Integration Points
 
-| Location | Mode | Filter | File:Lines |
-|----------|------|--------|------------|
-| Stage Editor — Primary Agent | single | `['agent']` | `workflow/stage-editor.tsx:488-511` |
-| Stage Editor — Supporting Tools | multi | `['skill','command','mcp']` | `workflow/stage-editor.tsx:514-539` |
-| Builder Sidebar — Global Modules | multi | context entities | `workflow/builder-sidebar.tsx:536-553` |
+| Location | Mode | allowedTypes | typeFilters | File:Lines |
+|----------|------|-------------|-------------|------------|
+| Stage Editor — Primary Agent | single | `['agent']` | none | `workflow/stage-editor.tsx:488-511` |
+| Stage Editor — Supporting Tools | multi | `['skill','command','mcp']` | Skills, Commands, MCP Servers | `workflow/stage-editor.tsx:514-539` |
+| Builder Sidebar — Global Modules | multi | none | none | `workflow/builder-sidebar.tsx:536-553` |
+
+## allowedTypes vs typeFilters
+
+`EntityPickerTab` separates two distinct filtering concerns:
+
+| Field | Who controls it | Purpose |
+|-------|----------------|---------|
+| `allowedTypes` | Tab definition (developer) | Base type constraint. Limits which entity types can ever appear. |
+| `typeFilters` | End user (pill clicks) | Narrows within allowedTypes. Optional per-tab. |
+
+**How the effective filter is computed** (in `TabContent`):
+- User has active pills → pass pill selection to `useData.typeFilter`
+- No active pills, `allowedTypes` set → pass `allowedTypes` to `useData.typeFilter`
+- No active pills, no `allowedTypes` → pass `undefined` (all types visible)
+
+**Convention**: `typeFilters` values must be a subset of `allowedTypes`. The dialog does not enforce this at runtime — misconfigured tabs (e.g. a "Hooks" pill on a tab with `allowedTypes: ['skill']`) would show 0 results for that pill since the API filters to the pill value, but other pills would still work.
+
+**`useData` is now a passthrough** — with `allowedTypes` handling base restriction, `useData` implementations should just forward `params` without overriding `typeFilter`:
+```typescript
+// ✓ Correct — let allowedTypes + dialog handle filtering
+useData: (params) => useEntityPickerArtifacts(params),
+
+// ✗ Wrong — overrides the computed effective filter
+useData: (params) => useEntityPickerArtifacts({ ...params, typeFilter: ['skill'] }),
+```
 
 ## Key Gotcha: useData is a Hook
 
@@ -43,6 +68,7 @@ To integrate a new entity type:
 2. For paginated sources: flatten `data.pages` into `items` array
 3. For non-paginated sources: set `hasNextPage: false`, `fetchNextPage: () => {}` — see `useEntityPickerContextModules` as reference
 4. Wire into a tab config — see `stage-editor.tsx:352-373` for live examples
+5. Add `allowedTypes` to restrict which entity types this tab shows — the dialog applies it automatically. Add `typeFilters` if users should be able to narrow further.
 
 ## Accessibility (Built-in)
 

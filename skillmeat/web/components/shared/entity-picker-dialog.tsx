@@ -77,6 +77,19 @@ export interface EntityPickerTab<T> {
     label: string;
     icon?: React.ComponentType<{ className?: string }>;
   }[];
+  /**
+   * Optional base type constraint always applied before user pill selections.
+   *
+   * When set, the effective filter passed to `useData` is:
+   * - The active pill selection when the user toggles pills (caller must ensure
+   *   `typeFilters` values are a subset of `allowedTypes`).
+   * - `allowedTypes` itself when no pills are active (i.e. show all allowed types).
+   * - `undefined` when both `allowedTypes` is absent and no pills are active.
+   *
+   * This removes the need for each `useData` implementation to manually merge a
+   * base type constraint with the user's pill selection.
+   */
+  allowedTypes?: string[];
 }
 
 /**
@@ -299,11 +312,14 @@ function TabContent<T>({ tab, selectedIds, onSelect, liveAnnouncement, onAnnounc
     });
   }, []);
 
-  const typeFilterArray = activeTypeFilters.size > 0 ? Array.from(activeTypeFilters) : undefined;
+  const effectiveTypeFilter: string[] | undefined =
+    activeTypeFilters.size > 0
+      ? Array.from(activeTypeFilters)
+      : (tab.allowedTypes?.length ? tab.allowedTypes : undefined);
 
   const { items, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = tab.useData({
     search: debouncedSearch,
-    typeFilter: typeFilterArray,
+    typeFilter: effectiveTypeFilter,
   });
 
   // Infinite scroll sentinel

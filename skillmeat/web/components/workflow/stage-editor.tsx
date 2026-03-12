@@ -353,7 +353,8 @@ export function StageEditor({ stage, open, onClose, onSave }: StageEditorProps) 
     id: 'artifacts',
     label: 'Agents',
     icon: Package,
-    useData: (params) => useEntityPickerArtifacts({ ...params, typeFilter: ['agent'] }),
+    allowedTypes: ['agent'],
+    useData: (params) => useEntityPickerArtifacts(params),
     renderCard: renderAgentCard,
     getId: (item) => item.uuid,
   }], [renderAgentCard]);
@@ -362,10 +363,8 @@ export function StageEditor({ stage, open, onClose, onSave }: StageEditorProps) 
     id: 'artifacts',
     label: 'Tools',
     icon: Package,
-    useData: (params) => useEntityPickerArtifacts({
-      ...params,
-      typeFilter: params.typeFilter?.length ? params.typeFilter : ['skill', 'command', 'mcp'],
-    }),
+    allowedTypes: ['skill', 'command', 'mcp'],
+    useData: (params) => useEntityPickerArtifacts(params),
     renderCard: renderToolCard,
     getId: (item) => item.uuid,
     typeFilters: [
