@@ -20,6 +20,7 @@ related_documents:
   - docs/project_plans/PRDs/features/aaa-rbac-foundation-v1.md
   - docs/project_plans/PRDs/refactors/enterprise-db-storage-v1.md
   - docs/project_plans/PRDs/enhancements/versioning-merge-system-v1.md
+  - docs/project_plans/design-specs/ownership-resolution-and-membership-semantics.md
 ---
 
 # PRD: Enterprise Governance & 3-Tier Scope Architecture
