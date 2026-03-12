@@ -97,6 +97,16 @@
     display: none; /* Chrome, Safari, Opera */
   }
 
+  /* EntityPickerDialog: card selection flash animation */
+  @keyframes picker-flash {
+    0%   { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.5); }
+    50%  { box-shadow: 0 0 0 6px hsl(var(--primary) / 0.15); }
+    100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+  }
+  .animate-picker-flash {
+    animation: picker-flash 200ms ease-out;
+  }
+
   /* DnD particle burst effect */
   .dnd-particle {
     position: absolute;

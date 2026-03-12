@@ -41,6 +41,7 @@ import {
   ChevronDown,
   Code2,
   Cpu,
+  FileText,
   Layers,
   Settings2,
   Tag,
@@ -51,9 +52,15 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { TagEditor } from '@/components/shared/tag-editor';
-import { ContextModulePicker } from '@/components/shared/context-module-picker';
+import {
+  EntityPickerDialog,
+  EntityPickerTrigger,
+  type EntityPickerTab,
+} from '@/components/shared/entity-picker-dialog';
+import { useEntityPickerContextModules } from '@/components/shared/entity-picker-adapter-hooks';
 import { cn } from '@/lib/utils';
 import type { ContextPolicy, WorkflowParameter } from '@/types/workflow';
+import type { ContextModuleResponse } from '@/sdk/models/ContextModuleResponse';
 
 // ============================================================================
 // Types
@@ -287,6 +294,70 @@ function ParameterList({ parameters }: ParameterListProps) {
 }
 
 // ============================================================================
+// ContextModuleCard — minimal card for ContextModuleResponse in picker grid
+// ============================================================================
+
+interface ContextModuleCardProps {
+  module: ContextModuleResponse;
+  selected: boolean;
+}
+
+function ContextModuleCard({ module, selected }: ContextModuleCardProps) {
+  const memoryCount = Array.isArray(module.memory_items)
+    ? (module.memory_items as unknown[]).length
+    : 0;
+
+  return (
+    <div
+      className={cn(
+        'relative flex w-full min-h-[100px] flex-col rounded-lg border border-l-[3px] bg-card p-3',
+        'shadow-sm transition-all duration-150',
+        'border-l-violet-500',
+        selected && 'ring-2 ring-primary ring-offset-1'
+      )}
+    >
+      {selected && (
+        <span
+          className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground"
+          aria-hidden="true"
+        >
+          <svg className="h-2.5 w-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="1.5,5 4,7.5 8.5,2.5" />
+          </svg>
+        </span>
+      )}
+      <div className="flex items-center gap-1.5 pr-5">
+        <FileText className="h-4 w-4 flex-shrink-0 text-violet-600 dark:text-violet-400" aria-hidden="true" />
+        <span className="truncate text-sm font-medium leading-tight" title={module.name}>
+          {module.name}
+        </span>
+      </div>
+      {module.priority !== undefined && module.priority > 0 && (
+        <div className="mt-1">
+          <span className="rounded bg-violet-500/10 px-1.5 py-0 text-[10px] font-medium text-violet-600 dark:text-violet-400">
+            P{module.priority}
+          </span>
+        </div>
+      )}
+      <div className="mt-1.5">
+        {module.description ? (
+          <p className="line-clamp-2 text-xs leading-[14px] text-muted-foreground" title={module.description}>
+            {module.description}
+          </p>
+        ) : (
+          <p className="text-xs italic text-muted-foreground/60">No description</p>
+        )}
+      </div>
+      {memoryCount > 0 && (
+        <p className="mt-1 text-[10px] text-muted-foreground/70">
+          {memoryCount} memory {memoryCount === 1 ? 'item' : 'items'}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // BuilderSidebar — Main component
 // ============================================================================
 
@@ -303,6 +374,28 @@ export function BuilderSidebar({
   onParametersChange: _onParametersChange,
   className,
 }: BuilderSidebarProps) {
+  // ── Dialog state for context modules picker ────────────────────────────────
+  const [modulesDialogOpen, setModulesDialogOpen] = React.useState(false);
+
+  // ── Context module tab config ──────────────────────────────────────────────
+  // projectId is not available on BuilderSidebar; adapter hook handles undefined
+  // gracefully (query is disabled when projectId is empty string).
+  const contextModulesTabs: EntityPickerTab<ContextModuleResponse>[] = React.useMemo(
+    () => [
+      {
+        id: 'context-modules',
+        label: 'Context Modules',
+        icon: FileText,
+        useData: (params) => useEntityPickerContextModules({ ...params }),
+        renderCard: (item, isSelected) => (
+          <ContextModuleCard module={item} selected={isSelected} />
+        ),
+        getId: (item) => item.id,
+      },
+    ],
+    []
+  );
+
   // ── Context policy helpers ─────────────────────────────────────────────────
   const handleModulesChange = React.useCallback(
     (modules: string[]) => {
@@ -314,6 +407,17 @@ export function BuilderSidebar({
   const handleInheritGlobalChange = React.useCallback(
     (inheritGlobal: boolean) => {
       onContextPolicyChange({ ...contextPolicy, inheritGlobal });
+    },
+    [contextPolicy, onContextPolicyChange]
+  );
+
+  // ── Remove a single module from the selection ─────────────────────────────
+  const handleModuleRemove = React.useCallback(
+    (id: string) => {
+      onContextPolicyChange({
+        ...contextPolicy,
+        modules: contextPolicy.modules.filter((m) => m !== id),
+      });
     },
     [contextPolicy, onContextPolicyChange]
   );
@@ -425,12 +529,29 @@ export function BuilderSidebar({
           {/* ================================================================ */}
           <Section id="global-context" title="Global Context" icon={Layers} defaultOpen={true}>
             <div className="space-y-3">
-              <ContextModulePicker
-                label="Global modules"
-                value={contextPolicy.modules}
-                onChange={handleModulesChange}
-                placeholder="Select context modules..."
-              />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium leading-none text-foreground/80">
+                  Global modules
+                </Label>
+                <EntityPickerTrigger
+                  label=""
+                  value={contextPolicy.modules}
+                  mode="multi"
+                  onClick={() => setModulesDialogOpen(true)}
+                  onRemove={handleModuleRemove}
+                  placeholder="Select context modules..."
+                />
+                <EntityPickerDialog
+                  open={modulesDialogOpen}
+                  onOpenChange={setModulesDialogOpen}
+                  tabs={contextModulesTabs}
+                  mode="multi"
+                  value={contextPolicy.modules}
+                  onChange={(value) => handleModulesChange(value as string[])}
+                  title="Select Context Modules"
+                  description="Choose global context modules for this workflow."
+                />
+              </div>
 
               <ToggleRow
                 id="inherit-parent-context"

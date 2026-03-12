@@ -14,3 +14,4 @@ Scope: React components in `skillmeat/web/components/`.
 - Testing updates: `.claude/context/key-context/testing-patterns.md`
 - Data behavior tied to hooks: `.claude/context/key-context/hook-selection-and-deprecations.md`
 - Marketplace source display and import flows: `.claude/context/key-context/marketplace-import-flows.md`
+- Entity picker dialog (browse/select entities): `.claude/context/key-context/entity-picker-patterns.md`

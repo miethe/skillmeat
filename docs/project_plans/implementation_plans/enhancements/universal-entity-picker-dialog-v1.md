@@ -1,35 +1,45 @@
 ---
-title: "Implementation Plan: Universal Entity Picker Dialog"
-schema_version: "1.0"
+title: 'Implementation Plan: Universal Entity Picker Dialog'
+schema_version: '1.0'
 doc_type: implementation_plan
-status: draft
-created: "2026-03-06"
-updated: "2026-03-06"
+status: completed
+created: '2026-03-06'
+updated: '2026-03-11'
 feature_slug: universal-entity-picker-dialog
-feature_version: "v1"
+feature_version: v1
 prd_ref: docs/project_plans/PRDs/enhancements/universal-entity-picker-dialog-v1.md
 plan_ref: null
-scope: "Frontend-only enhancement extracting rich dialog picker patterns for workflow UI"
-effort_estimate: "14 points"
-architecture_summary: "Extract generic EntityPickerDialog from AddMemberDialog patterns; integrate into Stage Editor and Builder Sidebar replacing compact pickers with rich browsable dialogs"
+scope: Frontend-only enhancement extracting rich dialog picker patterns for workflow
+  UI
+effort_estimate: 14 points
+architecture_summary: Extract generic EntityPickerDialog from AddMemberDialog patterns;
+  integrate into Stage Editor and Builder Sidebar replacing compact pickers with rich
+  browsable dialogs
 related_documents:
-  - docs/project_plans/PRDs/enhancements/universal-entity-picker-dialog-v1.md
-  - .claude/context/key-context/component-patterns.md
-  - .claude/context/key-context/testing-patterns.md
+- docs/project_plans/PRDs/enhancements/universal-entity-picker-dialog-v1.md
+- docs/project_plans/implementation_plans/features/workflow-artifact-wiring-v1.md
+- .claude/context/key-context/component-patterns.md
+- .claude/context/key-context/testing-patterns.md
 owner: null
 contributors: []
 priority: medium
 risk_level: low
 category: product-planning
-tags: [implementation, planning, frontend, components, picker, dialog]
+tags:
+- implementation
+- planning
+- frontend
+- components
+- picker
+- dialog
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/web/components/shared/entity-picker-dialog.tsx
-  - skillmeat/web/components/context/mini-context-entity-card.tsx
-  - skillmeat/web/components/workflow/stage-editor.tsx
-  - skillmeat/web/components/workflow/builder-sidebar.tsx
+- skillmeat/web/components/shared/entity-picker-dialog.tsx
+- skillmeat/web/components/context/mini-context-entity-card.tsx
+- skillmeat/web/components/workflow/stage-editor.tsx
+- skillmeat/web/components/workflow/builder-sidebar.tsx
 ---
 
 # Implementation Plan: Universal Entity Picker Dialog
@@ -41,6 +51,7 @@ files_affected:
 - **PRD**: `docs/project_plans/PRDs/enhancements/universal-entity-picker-dialog-v1.md`
 - **Source Component**: `skillmeat/web/components/deployment-sets/add-member-dialog.tsx`
 - **Replacement Components**: `skillmeat/web/components/shared/artifact-picker.tsx`, `skillmeat/web/components/shared/context-module-picker.tsx`
+- **Prerequisite Feature**: `docs/project_plans/implementation_plans/features/workflow-artifact-wiring-v1.md` (completed; adds `workflow` artifact type)
 
 **Complexity**: Small
 **Total Estimated Effort**: 14 story points
@@ -98,7 +109,7 @@ This is a **frontend-only** component refactoring following these principles:
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
 | UEPD-1.1 | EntityPickerDialog component | Create generic dialog with tabs, search, infinite scroll, type filters, selection state | Component renders multiple tabs; search filters results; infinite scroll loads next page; single/multi-select modes work | 3 pts | ui-engineer-enhanced | None |
 | UEPD-1.2 | EntityPickerTrigger component | Create trigger element showing selection summary and opening dialog | Trigger shows single-select name or multi-select count; opens dialog on click; shows removable badges in multi mode | 1.5 pts | ui-engineer-enhanced | UEPD-1.1 |
-| UEPD-1.3 | useEntityPickerArtifacts adapter hook | Wrap useInfiniteArtifacts to match EntityPickerTab.useData interface | Hook returns { items, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } matching tab contract | 0.5 pts | ui-engineer-enhanced | None |
+| UEPD-1.3 | useEntityPickerArtifacts adapter hook | Wrap useInfiniteArtifacts to match EntityPickerTab.useData interface. Note: `useInfiniteArtifacts` now returns workflow-type artifacts (added by workflow-artifact-wiring); typeFilter must correctly handle `'workflow'` type | Hook returns { items, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } matching tab contract; workflow-type artifacts included when no typeFilter or when typeFilter includes 'workflow' | 0.5 pts | ui-engineer-enhanced | None |
 
 **Phase 1 Quality Gates:**
 - [ ] `pnpm type-check` passes with zero errors
@@ -137,7 +148,7 @@ This is a **frontend-only** component refactoring following these principles:
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
 | UEPD-2.1 | MiniContextEntityCard component | Create compact context entity card showing name, type badge, description | Renders name + description (2-line truncate) + type chip; type color from context-entity-config; matches mini-artifact-card visual scale | 1.5 pts | ui-engineer-enhanced | None |
-| UEPD-2.2 | useEntityPickerContextModules adapter hook | Wrap useContextModules to match EntityPickerTab.useData interface | Hook returns { items, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage }; works with search + limit params | 0.5 pts | ui-engineer-enhanced | None |
+| UEPD-2.2 | useEntityPickerContextModules adapter hook | Wrap useContextModules to match EntityPickerTab.useData interface. Note: `useContextModules` may return full list without pagination — adapter should wrap in single-page infinite query shape (hasNextPage=false, fetchNextPage=no-op) | Hook returns { items, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage }; works with search + limit params; handles non-paginated source gracefully | 0.5 pts | ui-engineer-enhanced | None |
 
 **Phase 2 Quality Gates:**
 - [ ] `pnpm type-check` passes
@@ -168,7 +179,7 @@ This is a **frontend-only** component refactoring following these principles:
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
 | UEPD-3.1 | Replace Primary Agent picker | Replace ArtifactPicker (lines ~413-421) with EntityPickerDialog single-select Artifacts tab filtered to agent type | Dialog opens on trigger click; selecting agent closes dialog and updates primaryAgentUuid; form state preserved | 1.5 pts | ui-engineer-enhanced | UEPD-1.1, UEPD-1.2, UEPD-1.3 |
-| UEPD-3.2 | Replace Supporting Tools picker | Replace ArtifactPicker (lines ~424-432) with EntityPickerDialog multi-select Artifacts tab filtered to skill/command/mcp types | Dialog opens on trigger click; selecting/deselecting tools updates toolUuids array; form state preserved | 1.5 pts | ui-engineer-enhanced | UEPD-1.1, UEPD-1.2, UEPD-1.3 |
+| UEPD-3.2 | Replace Supporting Tools picker | Replace ArtifactPicker (lines ~424-432) with EntityPickerDialog multi-select Artifacts tab filtered to skill/command/mcp types. **Decision**: `'workflow'` is intentionally excluded from Supporting Tools — workflows are top-level orchestration units, not composable tools within a stage. Revisit if sub-workflow invocation is added later | Dialog opens on trigger click; selecting/deselecting tools updates toolUuids array; form state preserved; typeFilter=['skill','command','mcp'] (no 'workflow') | 1.5 pts | ui-engineer-enhanced | UEPD-1.1, UEPD-1.2, UEPD-1.3 |
 
 **Phase 3 Quality Gates:**
 - [ ] `pnpm type-check` passes on stage-editor.tsx
@@ -269,6 +280,8 @@ This is a **frontend-only** component refactoring following these principles:
 | Existing stage-editor/builder-sidebar unit tests break due to ArtifactPicker/ContextModulePicker import mocks | Low | Medium | Task UEPD-3.2 and UEPD-4.1 explicitly include test mock updates |
 | EntityPickerDialog trigger button different size than current pickers; visual regression | Low | Low | Match trigger button height and label style to existing `Field` + label pattern in stage-editor.tsx |
 | Inherited context modules UX unclear from ContextModulePicker source | Low | Low | Inspect `useContextModules` hook return shape before Phase 4 implementation; defer inherited display to v2 if needed |
+| MiniArtifactCard missing `workflow` color in `typeBarColors` map (line ~50) — workflow artifacts render without color bar | Low | High | Prerequisite fix: add `workflow: 'border-l-cyan-500'` to `typeBarColors` in `mini-artifact-card.tsx` before Phase 3 integration |
+| `useContextModules` may not support pagination — adapter hook wrapping may need single-page fallback | Low | Medium | UEPD-2.2 adapter hook handles non-paginated source by wrapping in single-page infinite query shape |
 
 ---
 
@@ -416,6 +429,7 @@ Each phase must pass before proceeding to next:
 **Types** (referenced; no modifications):
 - `skillmeat/web/types/workflow.ts` (RoleAssignment, StageRoles, ContextBinding)
 - `skillmeat/web/types/index.ts` (Artifact, ContextModuleResponse)
+- `skillmeat/web/types/artifact.ts` (ArtifactType now includes `'workflow'`; Artifact DTO has optional `workflow_id` field — added by workflow-artifact-wiring)
 - `skillmeat/web/lib/context-entity-config.ts` (type color mapping)
 
 **New Files Created**:
@@ -426,6 +440,27 @@ Each phase must pass before proceeding to next:
 ---
 
 ## Implementation Notes
+
+### Prerequisite Fix (from workflow-artifact-wiring)
+
+Before Phase 3 integration, apply this fix to `MiniArtifactCard`:
+
+```typescript
+// skillmeat/web/components/collection/mini-artifact-card.tsx, line ~50
+// Add missing workflow color to typeBarColors map:
+const typeBarColors: Record<ArtifactType, string> = {
+  // ... existing entries ...
+  workflow: 'border-l-cyan-500',
+};
+```
+
+Without this, workflow-type artifacts rendered via `EntityPickerDialog` will have no color bar.
+
+### Workflow Type Decision
+
+The `'workflow'` artifact type (added by workflow-artifact-wiring) is **intentionally excluded** from the Supporting Tools picker (`typeFilter=['skill','command','mcp']`). Workflows are top-level orchestration units, not composable tools within a stage. If sub-workflow invocation support is added later, revisit this decision.
+
+The Primary Agent picker remains `typeFilter=['agent']` — no change needed for workflows.
 
 ### Component API Design
 
@@ -515,5 +550,5 @@ See `.claude/progress/universal-entity-picker-dialog/all-phases-progress.md` (to
 
 ---
 
-**Implementation Plan Version**: 1.0
-**Last Updated**: 2026-03-06
+**Implementation Plan Version**: 1.1
+**Last Updated**: 2026-03-11

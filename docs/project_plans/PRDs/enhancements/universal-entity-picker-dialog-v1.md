@@ -1,38 +1,43 @@
 ---
-title: "PRD: Universal Entity Picker Dialog"
-schema_version: "1.0"
+title: 'PRD: Universal Entity Picker Dialog'
+schema_version: '1.0'
 doc_type: prd
-status: draft
-created: "2026-03-06"
-updated: "2026-03-06"
+status: inferred_complete
+created: '2026-03-06'
+updated: '2026-03-06'
 feature_slug: universal-entity-picker-dialog
-feature_version: "v1"
+feature_version: v1
 prd_ref: null
 plan_ref: null
 related_documents:
-  - skillmeat/web/components/deployment-sets/add-member-dialog.tsx
-  - skillmeat/web/components/shared/artifact-picker.tsx
-  - skillmeat/web/components/shared/context-module-picker.tsx
-  - skillmeat/web/components/workflow/stage-editor.tsx
-  - skillmeat/web/components/workflow/builder-sidebar.tsx
+- skillmeat/web/components/deployment-sets/add-member-dialog.tsx
+- skillmeat/web/components/shared/artifact-picker.tsx
+- skillmeat/web/components/shared/context-module-picker.tsx
+- skillmeat/web/components/workflow/stage-editor.tsx
+- skillmeat/web/components/workflow/builder-sidebar.tsx
 owner: null
 contributors: []
 priority: medium
 risk_level: low
 category: enhancements
-tags: [prd, enhancement, frontend, workflow, components, picker]
+tags:
+- prd
+- enhancement
+- frontend
+- workflow
+- components
+- picker
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/web/components/shared/entity-picker-dialog.tsx
-  - skillmeat/web/components/shared/artifact-picker.tsx
-  - skillmeat/web/components/shared/context-module-picker.tsx
-  - skillmeat/web/components/context/mini-context-entity-card.tsx
-  - skillmeat/web/components/workflow/stage-editor.tsx
-  - skillmeat/web/components/workflow/builder-sidebar.tsx
+- skillmeat/web/components/shared/entity-picker-dialog.tsx
+- skillmeat/web/components/shared/artifact-picker.tsx
+- skillmeat/web/components/shared/context-module-picker.tsx
+- skillmeat/web/components/context/mini-context-entity-card.tsx
+- skillmeat/web/components/workflow/stage-editor.tsx
+- skillmeat/web/components/workflow/builder-sidebar.tsx
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**

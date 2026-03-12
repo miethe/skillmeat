@@ -47,6 +47,7 @@ const typeBarColors: Record<ArtifactType, string> = {
   mcp: 'border-l-orange-500',
   hook: 'border-l-pink-500',
   composite: 'border-l-indigo-500',
+  workflow: 'border-l-cyan-500',
 };
 
 // ============================================================================
