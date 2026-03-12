@@ -28,7 +28,7 @@ class CollectionCreateRequest(BaseModel):
     )
     owner_type: Optional[str] = Field(
         default=None,
-        description="Owner type: 'user' or 'team'. Defaults to 'user' when not provided.",
+        description="Owner type: 'user', 'team', or 'enterprise'. Defaults to 'user' when not provided.",
     )
     visibility: Optional[str] = Field(
         default=None,
@@ -72,7 +72,7 @@ class CollectionUpdateRequest(BaseModel):
     )
     owner_type: Optional[str] = Field(
         default=None,
-        description="Owner type: 'user' or 'team'.",
+        description="Owner type: 'user', 'team', or 'enterprise'.",
     )
     visibility: Optional[str] = Field(
         default=None,
@@ -168,7 +168,7 @@ class CollectionResponse(BaseModel):
     )
     owner_type: Optional[str] = Field(
         default=None,
-        description="Owner type: 'user' or 'team'",
+        description="Owner type: 'user', 'team', or 'enterprise'",
     )
     visibility: Optional[str] = Field(
         default=None,

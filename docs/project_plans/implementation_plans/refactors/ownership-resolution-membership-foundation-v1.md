@@ -1,39 +1,41 @@
 ---
 schema_version: 2
 doc_type: implementation_plan
-title: "Ownership Resolution & Membership Foundation - Implementation Plan"
-description: >
-  Prerequisite refactor plan for request-time ownership resolution, membership-aware
-  visibility filtering, and enterprise owner-scope support across local and enterprise editions.
+title: Ownership Resolution & Membership Foundation - Implementation Plan
+description: 'Prerequisite refactor plan for request-time ownership resolution, membership-aware
+  visibility filtering, and enterprise owner-scope support across local and enterprise
+  editions.
+
+  '
 audience:
-  - ai-agents
-  - backend-engineers
-  - platform-engineers
-  - security-engineers
+- ai-agents
+- backend-engineers
+- platform-engineers
+- security-engineers
 tags:
-  - implementation-plan
-  - planning
-  - refactor
-  - rbac
-  - ownership
-  - enterprise
+- implementation-plan
+- planning
+- refactor
+- rbac
+- ownership
+- enterprise
 created: 2026-03-12
-updated: 2026-03-12
+updated: '2026-03-12'
 category: product-planning
-status: draft
+status: in-progress
 priority: HIGH
 risk_level: high
 feature_slug: ownership-resolution-membership-foundation
 prd_ref: /docs/project_plans/PRDs/refactors/enterprise-governance-3-tier.md
 plan_ref: null
 scope: backend
-effort_estimate: "16-22 story points"
-timeline: "3-4 weeks"
+effort_estimate: 16-22 story points
+timeline: 3-4 weeks
 related_documents:
-  - /docs/project_plans/PRDs/refactors/enterprise-governance-3-tier.md
-  - /docs/project_plans/design-specs/ownership-resolution-and-membership-semantics.md
-  - /docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md
-  - /.claude/context/key-context/auth-architecture.md
+- /docs/project_plans/PRDs/refactors/enterprise-governance-3-tier.md
+- /docs/project_plans/design-specs/ownership-resolution-and-membership-semantics.md
+- /docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md
+- /.claude/context/key-context/auth-architecture.md
 ---
 
 # Ownership Resolution & Membership Foundation - Implementation Plan
