@@ -17,6 +17,9 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
 
 # Re-export storage-layer enums so callers only need one import path.
 from skillmeat.cache.auth_types import OwnerType, UserRole as _UserRole, Visibility
@@ -80,6 +83,8 @@ class Scope(str, Enum):
 __all__ = [
     "AuthContext",
     "LOCAL_ADMIN_CONTEXT",
+    "OwnerScopeFilter",
+    "OwnerTargetInput",
     "OwnerType",
     "Role",
     "Scope",
@@ -214,3 +219,66 @@ LOCAL_ADMIN_CONTEXT: AuthContext = AuthContext(
     roles=[Role.system_admin.value],
     scopes=[s.value for s in Scope],
 )
+
+
+# =============================================================================
+# Owner scope / target schemas (Phase 4 — ownership-resolution)
+# =============================================================================
+
+
+class OwnerScopeFilter(str, Enum):
+    """Filter list results by owner scope.
+
+    Used as a query parameter on collection / artifact list endpoints to
+    restrict results to resources owned by a specific principal kind.
+
+    Values:
+        user:       Return only resources owned by the requesting user.
+        team:       Return only resources owned by one of the user's teams.
+        enterprise: Return only resources owned at the enterprise/tenant level.
+        all:        Default — return all resources readable by this context.
+
+    Note:
+        The ``all`` value does *not* bypass visibility filtering; it returns
+        the union of all scopes the authenticated context may read, as
+        determined by :class:`~skillmeat.core.ownership.ResolvedOwnership`.
+    """
+
+    user = "user"
+    team = "team"
+    enterprise = "enterprise"
+    all = "all"
+
+
+class OwnerTargetInput(BaseModel):
+    """Explicit owner selection for write mutations.
+
+    When omitted from request bodies the service layer defaults to
+    user-owned resources.  Team ownership requires an explicit ``team_id``
+    to be present in ``owner_id``.  Enterprise ownership requires explicit
+    selection and the caller must hold the ``system_admin`` role.
+
+    Attributes:
+        owner_type: Discriminator for the target principal kind.
+                    Defaults to ``OwnerType.user``.
+        owner_id:   String identifier of the owning principal.  For
+                    ``owner_type=user`` this is auto-populated from the
+                    auth context when omitted.  For ``team`` and
+                    ``enterprise`` it must be supplied explicitly.
+
+    Example::
+
+        # User-owned (default — owner_id omitted, resolved from auth context)
+        body = OwnerTargetInput()
+
+        # Team-owned
+        body = OwnerTargetInput(owner_type=OwnerType.team, owner_id="<team-uuid>")
+
+        # Enterprise-owned (system_admin only)
+        body = OwnerTargetInput(owner_type=OwnerType.enterprise, owner_id="<tenant-uuid>")
+    """
+
+    owner_type: OwnerType = OwnerType.user
+    owner_id: Optional[str] = None  # Auto-filled for user; required for team/enterprise
+
+    model_config = ConfigDict(use_enum_values=True)

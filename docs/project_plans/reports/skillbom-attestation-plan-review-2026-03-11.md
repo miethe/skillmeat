@@ -76,6 +76,7 @@ Recommended implementation consequence:
   - user-owned records
   - team-owned records
   - enterprise-owned records
+- Standardize enterprise-owned records on a canonical owner identifier. Recommended direction: use the string form of `tenant_id` for `owner_type=enterprise` in enterprise mode.
 
 ### Decision 3: Split Backstage backend from frontend
 
@@ -109,6 +110,7 @@ Resolution:
 
 - Update the plan to explicitly add `enterprise` ownership.
 - Introduce ownership resolution as a first-class design concern rather than assuming raw `team_id` on `AuthContext`.
+- Ensure the resolver compiles readable/writable owner scopes once per request and passes SQL-friendly scope data to repositories, rather than relying on Python-side filtering.
 
 ### 2. The history phase needed a sharper architectural boundary
 
@@ -177,11 +179,14 @@ Resolution:
 - Reword BOM as a provenance package/view over activity history plus snapshots.
 - Update Phase 5 to use the proper Git hook lifecycle.
 - Narrow Phase 10 to backend/scaffolder scope.
+- Treat ownership resolution as a prerequisite implementation track before SkillBOM Phase 4 / 7 owner-scoped behavior closes.
+- Track the prerequisite work explicitly in `/docs/project_plans/implementation_plans/refactors/ownership-resolution-membership-foundation-v1.md`.
 
 ### Phase 3-4
 
 - Replace ORM-listener-first capture with explicit activity-event emission.
 - Introduce ownership resolution for `user|team|enterprise`.
+- Avoid tenant-wide shortcuts for team visibility; use membership-aware repository filtering.
 
 ### Phase 5-6
 
@@ -203,5 +208,5 @@ Resolution:
 
 1. Final API naming for the new activity history surface versus the existing artifact history surface.
 2. Exact ownership-resolution source for team and enterprise scope.
-3. Whether `enterprise` enum/schema updates should be treated as a Phase 1 amendment or an explicit early-Phase-4 prerequisite.
+3. Whether a distinct `enterprise` or `tenant` visibility mode is needed later if `public` semantics expand beyond tenant scope.
 4. Whether the future Backstage frontend card deserves a separate PRD/implementation plan now or later.

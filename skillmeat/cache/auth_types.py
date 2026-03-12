@@ -7,7 +7,7 @@ imported by models.py, models_enterprise.py, repositories, API schemas, and
 anywhere else without creating circular dependencies.
 
 Enums:
-    OwnerType   — discriminates between user-owned and team-owned resources
+    OwnerType   — discriminates between user-owned, team-owned, and enterprise-owned resources
     Visibility  — controls who can see a resource
     UserRole    — system-wide and team-level role assignments
 
@@ -39,12 +39,14 @@ class OwnerType(str, enum.Enum):
     both user-level and team-level ownership.
 
     Values:
-        user: Resource is owned by a single user.
-        team: Resource is owned by a team (shared among team members).
+        user:       Resource is owned by a single user.
+        team:       Resource is owned by a team (shared among team members).
+        enterprise: Resource is owned at the enterprise/tenant level.
     """
 
     user = "user"
     team = "team"
+    enterprise = "enterprise"
 
 
 # =============================================================================

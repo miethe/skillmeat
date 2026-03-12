@@ -34,6 +34,8 @@ parallelization_strategy: "Parallel tracks after Phase 2 (DB models established)
 related_documents:
   - /docs/project_plans/PRDs/features/skillbom-attestation-v1.md
   - /docs/project_plans/design-specs/skillbom-point-in-time-environment-recovery.md
+  - /docs/project_plans/design-specs/ownership-resolution-and-membership-semantics.md
+  - /docs/project_plans/implementation_plans/refactors/ownership-resolution-membership-foundation-v1.md
   - /.claude/context/key-context/repository-architecture.md
   - /.claude/context/key-context/data-flow-patterns.md
   - /.claude/context/key-context/auth-architecture.md
@@ -62,6 +64,7 @@ The plan follows MeatyPrompts' layered hexagonal architecture, with clear separa
 **Critical Dependencies:**
 - Completion of Phase 1 (models) gates all subsequent phases
 - Phase 2 (BOM generator) must complete before Phase 3 (activity capture)
+- Ownership-resolution prerequisite track must complete before Phase 4 / Phase 7 owner-scoped behavior closes
 - Phase 7 (API) is gateway to Phases 9-10 (web and backend integration surfaces)
 
 ---

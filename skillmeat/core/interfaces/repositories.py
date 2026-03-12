@@ -32,12 +32,14 @@ Usage::
 from __future__ import annotations
 
 import abc
+import uuid
 from typing import TYPE_CHECKING, Any
 
 from skillmeat.core.interfaces.context import RequestContext
 
 if TYPE_CHECKING:
     from skillmeat.api.schemas.auth import AuthContext
+    from skillmeat.core.ownership import OwnerTarget
 from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
     ArtifactVersionDTO,
@@ -74,6 +76,7 @@ __all__ = [
     "IProjectTemplateRepository",
     "IDbCollectionArtifactRepository",
     "IDbArtifactHistoryRepository",
+    "IMembershipRepository",
 ]
 
 
@@ -232,6 +235,7 @@ class IArtifactRepository(abc.ABC):
         dto: ArtifactDTO,
         ctx: RequestContext | None = None,
         auth_context: AuthContext | None = None,
+        owner_target: OwnerTarget | None = None,
     ) -> ArtifactDTO:
         """Persist a new artifact record and return the stored representation.
 
@@ -242,6 +246,11 @@ class IArtifactRepository(abc.ABC):
             auth_context: Optional authentication and authorisation context.
                 When ``None`` the operation is performed without tenant
                 scoping (local zero-auth mode).
+            owner_target: Explicit ownership target for the new artifact.
+                When provided, the implementation MUST use this instead of
+                deriving ownership from ``auth_context`` (e.g. team-owned or
+                enterprise-owned artifacts).  When ``None``, defaults to
+                user-owned (backward-compatible behaviour).
 
         Returns:
             The persisted :class:`~skillmeat.core.interfaces.dtos.ArtifactDTO`
@@ -1020,6 +1029,7 @@ class ICollectionRepository(abc.ABC):
         description: str | None = None,
         ctx: RequestContext | None = None,
         auth_context: AuthContext | None = None,
+        owner_target: OwnerTarget | None = None,
     ) -> CollectionDTO:
         """Create a new collection.
 
@@ -1031,6 +1041,11 @@ class ICollectionRepository(abc.ABC):
             auth_context: Optional authentication and authorisation context.
                 When ``None`` the operation is performed without tenant
                 scoping (local zero-auth mode).
+            owner_target: Explicit ownership target for the new collection.
+                When provided, the implementation MUST use this instead of
+                deriving ownership from ``auth_context`` (e.g. team-owned
+                collections).  When ``None``, defaults to user-owned
+                (backward-compatible behaviour).
 
         Returns:
             The created :class:`~skillmeat.core.interfaces.dtos.CollectionDTO`.
@@ -2005,6 +2020,7 @@ class IGroupRepository(abc.ABC):
         description: str | None = None,
         position: int | None = None,
         ctx: RequestContext | None = None,
+        owner_target: OwnerTarget | None = None,
     ) -> GroupDTO:
         """Create a new group in the given collection.
 
@@ -2016,6 +2032,11 @@ class IGroupRepository(abc.ABC):
             position: Explicit display position.  When ``None`` the
                 implementation appends the group at the end.
             ctx: Optional per-request metadata.
+            owner_target: Explicit ownership target for the new group.
+                When provided, the implementation MUST use this instead of
+                deriving ownership from request context (e.g. team-owned
+                groups).  When ``None``, defaults to user-owned
+                (backward-compatible behaviour).
 
         Returns:
             The created :class:`~skillmeat.core.interfaces.dtos.GroupDTO`.
@@ -4012,5 +4033,65 @@ class IDbArtifactHistoryRepository(abc.ABC):
             A (possibly empty) list of
             :class:`~skillmeat.core.interfaces.dtos.ArtifactVersionDTO`
             ordered by ``created_at`` descending.
+        """
+        raise NotImplementedError
+
+
+# =============================================================================
+# IMembershipRepository
+# =============================================================================
+
+
+class IMembershipRepository(abc.ABC):
+    """Lookup interface for team/org membership, used by OwnershipResolver.
+
+    Implementations are responsible for tenant scoping internally (e.g. via a
+    ContextVar).  Callers do not pass ``tenant_id`` directly — this keeps the
+    interface simple and aligns with how enterprise repositories already manage
+    per-request tenant context.
+    """
+
+    # ------------------------------------------------------------------
+    # Membership queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def get_team_ids_for_user(self, user_id: uuid.UUID) -> list[uuid.UUID]:
+        """Return the IDs of every team the user is a member of.
+
+        Args:
+            user_id: The UUID of the user whose team memberships are queried.
+
+        Returns:
+            A (possibly empty) list of team UUIDs.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_team_role(
+        self, user_id: uuid.UUID, team_id: uuid.UUID
+    ) -> str | None:
+        """Return the user's role in a specific team, or ``None`` if not a member.
+
+        Args:
+            user_id: The UUID of the user.
+            team_id: The UUID of the team.
+
+        Returns:
+            A role string (e.g. ``"owner"``, ``"member"``) when the user
+            belongs to the team, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def is_member_of(self, user_id: uuid.UUID, team_id: uuid.UUID) -> bool:
+        """Check whether a user is a member of the given team.
+
+        Args:
+            user_id: The UUID of the user.
+            team_id: The UUID of the team.
+
+        Returns:
+            ``True`` when the user is a member, ``False`` otherwise.
         """
         raise NotImplementedError
