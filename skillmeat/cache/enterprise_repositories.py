@@ -7059,6 +7059,7 @@ class EnterpriseDeploymentSetRepository(
         stmt = select(EnterpriseDeploymentSetMember).where(
             EnterpriseDeploymentSetMember.set_id == set_uuid,
             EnterpriseDeploymentSetMember.artifact_id == artifact_id,
+            EnterpriseDeploymentSetMember.tenant_id == self._get_tenant_id(),
         )
         member = self.session.execute(stmt).scalar_one_or_none()
         if member is None:
@@ -9171,6 +9172,44 @@ class EnterpriseDbCollectionArtifactRepository(
             return None
 
     # ------------------------------------------------------------------
+    # Tenant-safety helpers
+    # ------------------------------------------------------------------
+
+    def _validate_collection_tenant(self, collection_uuid: uuid.UUID) -> None:
+        """Verify *collection_uuid* belongs to the current tenant.
+
+        ``EnterpriseCollectionArtifact`` is a pure join table with no
+        ``tenant_id`` column of its own.  Tenant isolation for all
+        collection-scoped membership queries is enforced by confirming that the
+        parent ``EnterpriseCollection`` row is visible under the current tenant
+        before any membership query is executed.
+
+        We cannot use ``_apply_tenant_filter()`` here because that helper
+        filters against ``self.model_class.tenant_id``
+        (``EnterpriseCollectionArtifact.tenant_id``), which does not exist.
+        Instead we apply the filter manually against ``EnterpriseCollection``.
+
+        Raises
+        ------
+        ValueError
+            If no ``EnterpriseCollection`` row with that UUID exists for the
+            current tenant (either the collection does not exist, or it belongs
+            to a different tenant).
+        """
+        from skillmeat.cache.models_enterprise import EnterpriseCollection
+
+        tenant_id = self._get_tenant_id()
+        stmt = select(EnterpriseCollection).where(
+            EnterpriseCollection.id == collection_uuid,
+            EnterpriseCollection.tenant_id == tenant_id,
+        )
+        result = self.session.execute(stmt).scalar_one_or_none()
+        if result is None:
+            raise ValueError(
+                f"Collection {collection_uuid} not found for current tenant"
+            )
+
+    # ------------------------------------------------------------------
     # Queries
     # ------------------------------------------------------------------
 
@@ -9193,11 +9232,16 @@ class EnterpriseDbCollectionArtifactRepository(
         coll_uuid = self._parse_collection_uuid(collection_id)
         if coll_uuid is None:
             return []
+        self._validate_collection_tenant(coll_uuid)
 
+        tenant_id = self._get_tenant_id()
         stmt = (
             select(EnterpriseCollectionArtifact)
             .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
-            .where(EnterpriseCollectionArtifact.collection_id == coll_uuid)
+            .where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
         )
         if artifact_type is not None:
             stmt = stmt.where(EnterpriseArtifact.artifact_type == artifact_type)
@@ -9224,10 +9268,19 @@ class EnterpriseDbCollectionArtifactRepository(
             art_uuid = uuid.UUID(artifact_uuid)
         except (ValueError, AttributeError):
             return None
+        self._validate_collection_tenant(coll_uuid)
 
-        stmt = select(EnterpriseCollectionArtifact).where(
-            EnterpriseCollectionArtifact.collection_id == coll_uuid,
-            EnterpriseCollectionArtifact.artifact_id == art_uuid,
+        from skillmeat.cache.models_enterprise import EnterpriseArtifact
+
+        tenant_id = self._get_tenant_id()
+        stmt = (
+            select(EnterpriseCollectionArtifact)
+            .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
+            .where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseCollectionArtifact.artifact_id == art_uuid,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
         )
         row = self.session.execute(stmt).scalar_one_or_none()
         return self._row_to_dto(row) if row is not None else None
@@ -9243,6 +9296,8 @@ class EnterpriseDbCollectionArtifactRepository(
         coll_uuid = self._parse_collection_uuid(collection_id)
         if coll_uuid is None:
             return 0
+        self._validate_collection_tenant(coll_uuid)
+
         stmt = select(func.count()).select_from(EnterpriseCollectionArtifact).where(
             EnterpriseCollectionArtifact.collection_id == coll_uuid
         )
@@ -9265,11 +9320,16 @@ class EnterpriseDbCollectionArtifactRepository(
         coll_uuid = self._parse_collection_uuid(collection_id)
         if coll_uuid is None:
             return []
+        self._validate_collection_tenant(coll_uuid)
 
+        tenant_id = self._get_tenant_id()
         stmt = (
             select(EnterpriseCollectionArtifact)
             .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
-            .where(EnterpriseCollectionArtifact.collection_id == coll_uuid)
+            .where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
         )
         if tag is not None:
             # PostgreSQL JSONB array contains operator
@@ -9316,6 +9376,7 @@ class EnterpriseDbCollectionArtifactRepository(
         coll_uuid = self._parse_collection_uuid(collection_id)
         if coll_uuid is None:
             raise KeyError(f"Invalid collection_id: {collection_id!r}")
+        self._validate_collection_tenant(coll_uuid)
 
         results = []
         for art_uuid_str in artifact_uuids:
@@ -9346,7 +9407,7 @@ class EnterpriseDbCollectionArtifactRepository(
             self.session.flush()
             results.append(self._row_to_dto(row))
 
-        self.session.commit()
+        self.session.flush()
         return results
 
     def remove_artifact(
@@ -9365,6 +9426,7 @@ class EnterpriseDbCollectionArtifactRepository(
             art_uuid = uuid.UUID(artifact_uuid)
         except (ValueError, AttributeError):
             return False
+        self._validate_collection_tenant(coll_uuid)
 
         result = self.session.execute(
             sa_delete(EnterpriseCollectionArtifact).where(
@@ -9372,7 +9434,7 @@ class EnterpriseDbCollectionArtifactRepository(
                 EnterpriseCollectionArtifact.artifact_id == art_uuid,
             )
         )
-        self.session.commit()
+        self.session.flush()
         return (result.rowcount or 0) > 0
 
     def upsert_metadata(
@@ -9443,11 +9505,16 @@ class EnterpriseDbCollectionArtifactRepository(
         coll_uuid = self._parse_collection_uuid(collection_id)
         if coll_uuid is None:
             return set()
+        self._validate_collection_tenant(coll_uuid)
 
+        tenant_id = self._get_tenant_id()
         stmt = (
             select(EnterpriseArtifact.name, EnterpriseArtifact.artifact_type)
             .join(EnterpriseCollectionArtifact, EnterpriseCollectionArtifact.artifact_id == EnterpriseArtifact.id)
-            .where(EnterpriseCollectionArtifact.collection_id == coll_uuid)
+            .where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
         )
         rows = self.session.execute(stmt).all()
         return {f"{r.artifact_type}:{r.name}" for r in rows}
@@ -9459,9 +9526,11 @@ class EnterpriseDbCollectionArtifactRepository(
         if ":" not in artifact_id:
             return None
         artifact_type, _, name = artifact_id.partition(":")
+        tenant_id = self._get_tenant_id()
         stmt = select(EnterpriseArtifact.id).where(
             EnterpriseArtifact.name == name,
             EnterpriseArtifact.artifact_type == artifact_type,
+            EnterpriseArtifact.tenant_id == tenant_id,
         )
         row = self.session.execute(stmt).scalar_one_or_none()
         return str(row).replace("-", "") if row is not None else None
@@ -9473,10 +9542,14 @@ class EnterpriseDbCollectionArtifactRepository(
             EnterpriseCollectionArtifact,
         )
 
+        tenant_id = self._get_tenant_id()
         stmt = (
             select(EnterpriseCollectionArtifact)
             .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
-            .where(EnterpriseArtifact.tags != None)  # noqa: E711
+            .where(
+                EnterpriseArtifact.tags != None,  # noqa: E711
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
         )
         rows = self.session.execute(stmt).scalars().all()
         return [self._row_to_dto(r) for r in rows if getattr(r.artifact, "tags", None)]
@@ -9505,8 +9578,10 @@ class EnterpriseDbCollectionArtifactRepository(
         if not parsed:
             return {}
 
+        tenant_id = self._get_tenant_id()
         stmt = select(EnterpriseArtifact.id, EnterpriseArtifact.name, EnterpriseArtifact.artifact_type).where(
-            EnterpriseArtifact.id.in_(parsed)
+            EnterpriseArtifact.id.in_(parsed),
+            EnterpriseArtifact.tenant_id == tenant_id,
         )
         rows = self.session.execute(stmt).all()
         return {
@@ -9527,11 +9602,16 @@ class EnterpriseDbCollectionArtifactRepository(
         coll_uuid = self._parse_collection_uuid(collection_id)
         if coll_uuid is None:
             return []
+        self._validate_collection_tenant(coll_uuid)
 
+        tenant_id = self._get_tenant_id()
         stmt = (
             select(EnterpriseCollectionArtifact)
             .join(EnterpriseArtifact, EnterpriseArtifact.id == EnterpriseCollectionArtifact.artifact_id)
-            .where(EnterpriseCollectionArtifact.collection_id == coll_uuid)
+            .where(
+                EnterpriseCollectionArtifact.collection_id == coll_uuid,
+                EnterpriseArtifact.tenant_id == tenant_id,
+            )
             .order_by(EnterpriseArtifact.artifact_type, EnterpriseArtifact.name)
         )
         rows = self.session.execute(stmt).scalars().all()
