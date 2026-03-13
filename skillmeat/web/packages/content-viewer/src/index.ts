@@ -48,6 +48,26 @@ export { ContentPane } from './components/ContentPane';
 export type { ContentPaneProps, TruncationInfo } from './components/ContentPane';
 
 // ============================================================
+// Adapter Types (Phase 3)
+// ============================================================
+export type {
+  AdapterHookOptions,
+  AdapterQueryResult,
+  FileTreeAdapter,
+  FileContentAdapter,
+  ContentViewerAdapter,
+} from './types/adapters';
+
+// ============================================================
+// Provider + Consumer Hook (Phase 3)
+// ============================================================
+export {
+  ContentViewerProvider,
+  useContentViewerAdapter,
+} from './providers/ContentViewerProvider';
+export type { ContentViewerProviderProps } from './providers/ContentViewerProvider';
+
+// ============================================================
 // Hooks (Phase 3 — requires adapter abstraction)
 // ============================================================
 // export { useCatalogFileTree, useCatalogFileContent } from './hooks/useFileContent';
