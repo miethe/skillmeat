@@ -14975,6 +14975,16 @@ main.add_command(bom_group, name="bom")
 
 
 # ====================
+# History Command Group
+# ====================
+
+
+from skillmeat.cli.commands.history import history_group  # noqa: E402
+
+main.add_command(history_group, name="history")
+
+
+# ====================
 # Entry Point
 # ====================
 
