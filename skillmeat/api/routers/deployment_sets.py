@@ -20,6 +20,7 @@ API Endpoints:
 """
 
 import logging
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -823,8 +824,6 @@ def batch_deploy(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Deployment set '{set_id}' not found.",
         )
-
-    from pathlib import Path
 
     project_path = Path(request.project_path)
     if not project_path.exists():

@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from skillmeat.api.dependencies import (
     CollectionManagerDep,
     DeploymentRepoDep,
+    SettingsDep,
     get_auth_context,
     require_auth,
     verify_api_key,
@@ -85,7 +86,7 @@ def get_deployment_manager(
     """Get DeploymentManager dependency.
 
     Args:
-        collection_mgr: Collection manager dependency
+        collection_mgr: Collection manager dependency (raises 501 in enterprise edition)
 
     Returns:
         DeploymentManager instance
@@ -450,8 +451,8 @@ async def undeploy_artifact(
     },
 )
 async def list_deployments(
+    settings: SettingsDep,
     deployment_repo: DeploymentRepoDep,
-    deployment_mgr: DeploymentManager = Depends(get_deployment_manager),
     token: TokenDep = None,
     project_path: Optional[str] = Query(
         default=None,
@@ -465,19 +466,27 @@ async def list_deployments(
 ) -> DeploymentListResponse:
     """List all deployed artifacts in a project.
 
-    Retrieves deployment metadata for all artifacts in the project's
-    profile roots, including sync status.
+    In local edition, retrieves deployment metadata from the filesystem via
+    DeploymentManager, including sync status computed against collection state.
+
+    In enterprise edition, retrieves deployment records from the DB cache via
+    DeploymentRepoDep.  Sync-status and profile_root_dir fields are not
+    available in enterprise (no filesystem access) and default to ``"unknown"``
+    and ``None`` respectively.
 
     Args:
-        deployment_mgr: Deployment manager dependency
-        token: Authentication token
-        project_path: Optional project path
+        settings: API settings (edition routing).
+        deployment_repo: DeploymentRepository dependency (DB-backed).
+        token: Authentication token.
+        project_path: Optional project path.
+        profile_id: Optional deployment profile ID filter.
+        auth_context: Resolved authentication context.
 
     Returns:
-        DeploymentListResponse with list of deployments
+        DeploymentListResponse with list of deployments.
 
     Raises:
-        HTTPException: On retrieval failure
+        HTTPException: On retrieval failure.
     """
     try:
         # Resolve project path
@@ -485,6 +494,69 @@ async def list_deployments(
         resolved_path = resolved_path.resolve()
 
         logger.info(f"Listing deployments for project: {resolved_path}")
+
+        if settings.edition == "enterprise":
+            # Enterprise path: serve entirely from DB cache — no filesystem access
+            filters: dict = {"project_path": str(resolved_path)}
+            if profile_id:
+                filters["profile_id"] = profile_id
+
+            with PerfTimer(
+                "router.list_deployments.fetch",
+                project_path=str(resolved_path),
+                profile_id=profile_id,
+            ):
+                dto_deployments = deployment_repo.list(filters=filters)
+
+            deployment_infos = []
+            deployments_by_profile: dict = {}
+            for dto in dto_deployments:
+                info = DeploymentInfo(
+                    artifact_name=dto.artifact_name,
+                    artifact_type=dto.artifact_type,
+                    from_collection=dto.from_collection,
+                    deployed_at=dto.deployed_at,
+                    artifact_path=dto.target_path or "",
+                    project_path=str(resolved_path),
+                    collection_sha=dto.collection_sha,
+                    local_modifications=dto.local_modifications,
+                    sync_status="unknown",
+                    deployment_profile_id=dto.deployment_profile_id,
+                    platform=dto.platform,
+                    profile_root_dir=None,
+                )
+                deployment_infos.append(info)
+                grouped_profile = dto.deployment_profile_id or "claude_code"
+                deployments_by_profile.setdefault(grouped_profile, []).append(info)
+
+            response = DeploymentListResponse(
+                project_path=str(resolved_path),
+                deployments=deployment_infos,
+                deployments_by_profile=deployments_by_profile,
+                total=len(deployment_infos),
+            )
+            logger.info(
+                "Retrieved %d deployments (enterprise/DB path)", len(deployment_infos)
+            )
+            return response
+
+        # Local edition path: use filesystem-backed DeploymentManager
+        from skillmeat.api.dependencies import get_app_state
+        from skillmeat.core.deployment import DeploymentManager as _DeploymentManager
+
+        # Obtain the collection manager from app state directly — avoids
+        # injecting CollectionManagerDep (which raises 501 in enterprise) into
+        # the list endpoint signature where it is only needed in local mode.
+        from skillmeat.api.dependencies import app_state as _app_state
+
+        if _app_state.collection_manager is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Collection manager not available",
+            )
+        deployment_mgr = _DeploymentManager(
+            collection_mgr=_app_state.collection_manager
+        )
 
         # Get deployments — timed separately from status check to isolate costs
         with PerfTimer(
@@ -545,6 +617,9 @@ async def list_deployments(
 
         logger.info(f"Retrieved {len(deployment_infos)} deployments")
         return response
+
+    except HTTPException:
+        raise
 
     except Exception as e:
         logger.error(f"Failed to list deployments: {e}", exc_info=True)
