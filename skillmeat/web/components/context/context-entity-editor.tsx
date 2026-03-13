@@ -33,7 +33,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { MarkdownEditor } from '@/components/editor/markdown-editor';
+import { MarkdownEditor } from '@skillmeat/content-viewer';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Tooltip,

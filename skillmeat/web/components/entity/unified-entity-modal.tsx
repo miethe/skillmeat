@@ -54,8 +54,8 @@ import { useEntityLifecycle } from '@/hooks';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { RollbackDialog } from '@/components/entity/rollback-dialog';
 import { MergeWorkflow } from '@/components/entity/merge-workflow';
-import { FileTree } from '@/components/entity/file-tree';
-import { ContentPane } from '@/components/entity/content-pane';
+import { FileTree, ContentPane } from '@skillmeat/content-viewer';
+
 import { FileCreationDialog } from '@/components/entity/file-creation-dialog';
 import { FileDeletionDialog } from '@/components/entity/file-deletion-dialog';
 import { UnsavedChangesDialog } from '@/components/entity/unsaved-changes-dialog';

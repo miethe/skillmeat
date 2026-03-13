@@ -96,8 +96,8 @@ import {
   type LinkedArtifactReference,
 } from '@/components/entity/linked-artifacts-section';
 import { ArtifactLinkingDialog } from '@/components/entity';
-import { FileTree } from '@/components/entity/file-tree';
-import { ContentPane } from '@/components/entity/content-pane';
+import { FileTree, ContentPane } from '@skillmeat/content-viewer';
+
 import { SyncStatusTab } from '@/components/sync-status';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import { DeployButton } from '@/components/shared/deploy-button';

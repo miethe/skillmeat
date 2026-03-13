@@ -64,8 +64,8 @@ import { CrossNavigationButtons } from '@/components/shared/cross-navigation-but
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
 import { LinkedArtifactsSection, type LinkedArtifactReference } from '@/components/entity';
 import { ArtifactLinkingDialog } from '@/components/entity';
-import { FileTree } from '@/components/entity/file-tree';
-import { ContentPane } from '@/components/entity/content-pane';
+import { FileTree, ContentPane } from '@skillmeat/content-viewer';
+
 import { DeployButton } from '@/components/shared/deploy-button';
 import { ARTIFACT_TYPES, type Artifact, type ArtifactType } from '@/types/artifact';
 import { getCollectionColor } from '@/lib/utils/collection-colors';
