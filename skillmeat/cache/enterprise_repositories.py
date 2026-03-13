@@ -9639,6 +9639,52 @@ class EnterpriseDbCollectionArtifactRepository(
         )
         return {}
 
+    # No-op stubs for local-only features
+
+    def get_group_memberships_batch(
+        self,
+        artifact_uuids: "list[str]",
+        collection_id: str,
+        ctx: "Any | None" = None,
+    ) -> "list[dict]":
+        """Return empty list for enterprise — group lookups are local-only."""
+        return []
+
+    def get_staleness_stats(
+        self,
+        collection_id: str,
+        ttl_seconds: int,
+        ctx: "Any | None" = None,
+    ) -> dict:
+        """Return empty staleness stats — staleness tracking is local-only."""
+        return {
+            "total_artifacts": 0,
+            "stale_count": 0,
+            "fresh_count": 0,
+            "oldest_sync_age_seconds": 0,
+            "percentage_stale": 0.0,
+            "ttl_seconds": ttl_seconds,
+            "collection_id": collection_id,
+        }
+
+    def update_deployments_by_name(
+        self,
+        collection_id: str,
+        artifact_name: str,
+        deployments_json: str,
+        ctx: "Any | None" = None,
+    ) -> int:
+        """No-op for enterprise — deployment tracking is local-only."""
+        return 0
+
+    def bulk_update_metadata(
+        self,
+        updates: "list[dict]",
+        ctx: "Any | None" = None,
+    ) -> int:
+        """No-op for enterprise — bulk metadata updates are local-only."""
+        return 0
+
 
 # =============================================================================
 # EnterpriseArtifactHistoryStub  (ENT2-6.2)
