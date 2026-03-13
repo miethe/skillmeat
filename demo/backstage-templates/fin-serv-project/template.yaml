@@ -117,8 +117,6 @@ spec:
       name: Publish to GitHub
       action: publish:github
       input:
-        allowedHosts:
-          - github.com
         description: ${{ parameters.description | default("Financial services project scaffolded with SkillMeat AI context") }}
         repoUrl: ${{ parameters.repoUrl }}
         defaultBranch: main
