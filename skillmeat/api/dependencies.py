@@ -382,6 +382,11 @@ def get_collection_manager(
         HTTPException: If CollectionManager not available
     """
     if state.collection_manager is None:
+        if state.settings and state.settings.edition == "enterprise":
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Collection manager is not available in enterprise edition",
+            )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Collection manager not available",
@@ -404,6 +409,11 @@ def get_artifact_manager(
         HTTPException: If ArtifactManager not available
     """
     if state.artifact_manager is None:
+        if state.settings and state.settings.edition == "enterprise":
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Artifact manager is not available in enterprise edition",
+            )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Artifact manager not available",
@@ -448,6 +458,11 @@ def get_sync_manager(
         HTTPException: If SyncManager not available
     """
     if state.sync_manager is None:
+        if state.settings and state.settings.edition == "enterprise":
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Sync manager is not available in enterprise edition",
+            )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Sync manager not available",
@@ -470,6 +485,11 @@ def get_context_sync_service(
         HTTPException: If ContextSyncService not available
     """
     if state.context_sync_service is None:
+        if state.settings and state.settings.edition == "enterprise":
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Context sync service is not available in enterprise edition",
+            )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Context sync service not available",
