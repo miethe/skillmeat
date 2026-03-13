@@ -2095,3 +2095,17 @@ deployment_profile_id = "claude_code"
 platform = "claude_code"
 profile_root_dir = ".claude"
 collection_sha = "a8d9918602c9bbd67d8acb348ad2e95627f699b1537cd1f3f6f1277760476402"
+
+[[deployed]]
+artifact_name = "managing-readmes"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-03-12T23:19:28.077602"
+artifact_path = "skills/managing-readmes"
+content_hash = "f3dc7ebaa051abc6f833c01661f2837d16499e5b74ab202e0e5501b1f1b4d852"
+local_modifications = false
+merge_base_snapshot = "f3dc7ebaa051abc6f833c01661f2837d16499e5b74ab202e0e5501b1f1b4d852"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "f3dc7ebaa051abc6f833c01661f2837d16499e5b74ab202e0e5501b1f1b4d852"

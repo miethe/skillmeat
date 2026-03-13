@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Gemini Layout Analysis: SkillBOM Provenance UI
 
 This document provides a technical layout analysis and integration validation for the SkillBOM provenance and attestation UI components, ensuring consistency with the existing SkillMeat design system.

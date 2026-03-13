@@ -1,7 +1,7 @@
 """Add SkillBOM attestation tables (skillbom-attestation)
 
 Revision ID: 20260311_0003_add_skillbom_attestation_tables
-Revises: 20260310_0002_add_workflow_id_to_deployment_set_members
+Revises: ent_008_enterprise_parity_tables
 Create Date: 2026-03-11 00:03:00.000000+00:00
 
 Background
@@ -74,9 +74,7 @@ from skillmeat.cache.migrations.dialect_helpers import (
 # ---------------------------------------------------------------------------
 
 revision: str = "20260311_0003_add_skillbom_attestation_tables"
-down_revision: Union[str, None] = (
-    "20260310_0002_add_workflow_id_to_deployment_set_members"
-)
+down_revision: Union[str, None] = "ent_008_enterprise_parity_tables"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

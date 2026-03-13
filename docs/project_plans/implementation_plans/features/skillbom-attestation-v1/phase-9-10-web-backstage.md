@@ -1,46 +1,47 @@
 ---
 schema_version: 2
 doc_type: phase_plan
-title: "SkillBOM & Attestation - Phases 9-10: Web & Backstage Backend"
-description: >
-  Web app provenance UI (Phase 9) + Backstage backend integration (Phase 10).
-  Frontend provenance surfaces plus backend/scaffolder integration.
+title: 'SkillBOM & Attestation - Phases 9-10: Web & Backstage Backend'
+description: 'Web app provenance UI (Phase 9) + Backstage backend integration (Phase
+  10). Frontend provenance surfaces plus backend/scaffolder integration.
+
+  '
 audience:
-  - ai-agents
-  - developers
-  - frontend-engineers
-  - ui-engineers
-  - platform-engineers
+- ai-agents
+- developers
+- frontend-engineers
+- ui-engineers
+- platform-engineers
 tags:
-  - implementation-plan
-  - phases
-  - skillbom
-  - web
-  - backstage
-  - ui
+- implementation-plan
+- phases
+- skillbom
+- web
+- backstage
+- ui
 created: 2026-03-10
 updated: 2026-03-11
 phase: 9-10
-phase_title: "Web & Backstage Backend: Provenance Surfaces"
+phase_title: 'Web & Backstage Backend: Provenance Surfaces'
 prd_ref: /docs/project_plans/PRDs/features/skillbom-attestation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md
 entry_criteria:
-  - Phase 7 API endpoints stable and tested
-  - Phase 8 CLI commands functional
-  - OpenAPI spec and typed client artifacts finalized
+- Phase 7 API endpoints stable and tested
+- Phase 8 CLI commands functional
+- OpenAPI spec and typed client artifacts finalized
 exit_criteria:
-  - ProvenanceTab component renders on artifact detail pages
-  - BomViewer displays `context.lock` contents
-  - ActivityTimeline distinguishes provenance activity from existing version history
-  - Backstage backend payload contract finalized
-  - All new API hooks tested
-  - Web component and backend integration tests pass
+- ProvenanceTab component renders on artifact detail pages
+- BomViewer displays `context.lock` contents
+- ActivityTimeline distinguishes provenance activity from existing version history
+- Backstage backend payload contract finalized
+- All new API hooks tested
+- Web component and backend integration tests pass
 feature_slug: skillbom-attestation
-effort_estimate: "19-23 story points"
-timeline: "2 weeks"
-parallelization: "Phase 9 and Phase 10 can run in parallel after Phase 7 API stable"
+effort_estimate: 19-23 story points
+timeline: 2 weeks
+parallelization: Phase 9 and Phase 10 can run in parallel after Phase 7 API stable
+status: inferred_complete
 ---
-
 # SkillBOM & Attestation System - Phases 9-10: Web & Backstage Backend
 
 ## Overview
