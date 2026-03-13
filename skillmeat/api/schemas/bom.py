@@ -166,6 +166,63 @@ class AttestationSchema(BaseModel):
 # =============================================================================
 
 
+# =============================================================================
+# IDP BOM Card Schema
+# =============================================================================
+
+
+class BomCardArtifactEntry(BaseModel):
+    """Lightweight artifact summary for Backstage BOM card consumption.
+
+    Omits heavy metadata fields to keep the IDP payload compact and fast
+    to parse in Backstage backend/scaffolder actions.
+    """
+
+    name: str = Field(description="Artifact name (unique within type)")
+    type: str = Field(description="Artifact type string (e.g. 'skill', 'command')")
+    version: Optional[str] = Field(
+        default=None,
+        description="Deployed or upstream version string",
+    )
+    content_hash: str = Field(
+        description="SHA-256 hex digest of artifact content, or '' if unavailable",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BomCardResponse(BaseModel):
+    """Backstage-renderable BOM payload for IDP catalog/backend consumers.
+
+    A lightweight summary of the latest BOM snapshot for a project.
+    Intended for use by Backstage software-catalog plugins and scaffolder
+    actions that need artifact inventory metadata without the full BOM JSON.
+    """
+
+    project_id: str = Field(description="Project identifier")
+    snapshot_id: int = Field(description="Primary key of the BOM snapshot row")
+    generated_at: str = Field(
+        description="ISO-8601 UTC timestamp when the snapshot was captured",
+    )
+    artifact_count: int = Field(
+        ge=0,
+        description="Total number of artifacts in this snapshot",
+    )
+    artifacts: List[BomCardArtifactEntry] = Field(
+        default_factory=list,
+        description="Lightweight artifact summaries from the snapshot",
+    )
+    signature_status: str = Field(
+        description="'signed' if the snapshot carries a cryptographic signature, 'unsigned' otherwise",
+    )
+    attestation_count: int = Field(
+        ge=0,
+        description="Number of AttestationRecord rows linked to artifacts in this snapshot",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class HistoryEventSchema(BaseModel):
     """Artifact history/activity event record.
 

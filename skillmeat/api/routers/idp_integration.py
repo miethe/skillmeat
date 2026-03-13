@@ -6,13 +6,15 @@ registration operations.
 API Endpoints:
     POST /integrations/idp/scaffold             - Render template files in-memory
     POST /integrations/idp/register-deployment  - Register/update an IDP deployment set
+    GET  /integrations/idp/bom-card/{project_id} - Latest BOM snapshot summary for Backstage
 """
 
 import json
 import logging
 from base64 import b64encode
+from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 
 from skillmeat.api.dependencies import (
     APIKeyDep,
@@ -22,6 +24,7 @@ from skillmeat.api.dependencies import (
     require_auth,
 )
 from skillmeat.api.schemas.auth import AuthContext
+from skillmeat.api.schemas.bom import BomCardArtifactEntry, BomCardResponse
 from skillmeat.api.schemas.idp_integration import (
     IDPRegisterDeploymentRequest,
     IDPRegisterDeploymentResponse,
@@ -230,4 +233,163 @@ async def register_deployment(
     return IDPRegisterDeploymentResponse(
         deployment_set_id=deployment_set_id,
         created=created,
+    )
+
+
+@router.get(
+    "/bom-card/{project_id}",
+    response_model=BomCardResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get latest BOM snapshot summary for Backstage/IDP consumption",
+    description=(
+        "Returns a lightweight Bill-of-Materials summary for the given project, "
+        "sourced from the most recent BomSnapshot row.  The payload is intentionally "
+        "compact (no full BOM JSON) for efficient Backstage backend/scaffolder "
+        "consumption.  Artifact entries include name, type, version, and content_hash "
+        "only.  Attestation count reflects all AttestationRecord rows linked to "
+        "artifacts present in the snapshot."
+    ),
+    responses={
+        200: {"description": "BOM card payload returned successfully"},
+        404: {"description": "No BOM snapshot found for the given project_id"},
+        500: {"description": "Internal error querying the BOM snapshot"},
+    },
+)
+async def get_bom_card(
+    project_id: str = Path(
+        ...,
+        description="Project identifier to fetch the latest BOM snapshot for",
+    ),
+    session: DbSessionDep = None,
+    _auth: APIKeyDep = None,
+    auth_context: AuthContext = Depends(require_auth(scopes=["artifact:read"])),
+) -> BomCardResponse:
+    """Return a Backstage-renderable BOM summary for the latest snapshot.
+
+    Queries ``bom_snapshots`` for the most recent row matching ``project_id``
+    (ordered by ``created_at DESC``).  Parses the stored ``bom_json`` and
+    extracts a compact artifact list plus a count of linked attestation records.
+
+    The ``attestation_count`` is computed by summing ``AttestationRecord`` rows
+    whose ``artifact_id`` appears in the snapshot's artifact list.
+
+    Args:
+        project_id: Path parameter identifying the project.
+        session: Database session injected via DI.
+        _auth: API key authentication (enforced when auth is enabled).
+        auth_context: Caller auth context (requires ``artifact:read`` scope).
+
+    Returns:
+        BomCardResponse containing the lightweight BOM summary.
+
+    Raises:
+        HTTPException: 404 if no snapshot exists for the project,
+                       500 for unexpected database or parsing errors.
+    """
+    from skillmeat.cache.models import AttestationRecord, BomSnapshot
+
+    logger.info("IDP bom-card requested: project_id=%s", project_id)
+
+    try:
+        snapshot = (
+            session.query(BomSnapshot)
+            .filter(BomSnapshot.project_id == project_id)
+            .order_by(BomSnapshot.created_at.desc())
+            .first()
+        )
+    except Exception as exc:
+        logger.exception(
+            "IDP bom-card DB query failed for project_id=%s: %s",
+            project_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to query BOM snapshot",
+        )
+
+    if snapshot is None:
+        logger.info("IDP bom-card: no snapshot found for project_id=%s", project_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No BOM snapshot found for project '{project_id}'",
+        )
+
+    # Parse the stored BOM JSON
+    try:
+        bom_data: dict = json.loads(snapshot.bom_json)
+    except (json.JSONDecodeError, TypeError) as exc:
+        logger.exception(
+            "IDP bom-card: invalid bom_json for snapshot id=%s project_id=%s: %s",
+            snapshot.id,
+            project_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="BOM snapshot contains invalid JSON",
+        )
+
+    # Build lightweight artifact list from the parsed BOM
+    raw_artifacts: List[dict] = bom_data.get("artifacts", [])
+    card_artifacts: List[BomCardArtifactEntry] = [
+        BomCardArtifactEntry(
+            name=a.get("name", ""),
+            type=a.get("type", ""),
+            version=a.get("version"),
+            content_hash=a.get("content_hash", ""),
+        )
+        for a in raw_artifacts
+        if isinstance(a, dict)
+    ]
+
+    # Collect artifact IDs present in the snapshot for attestation count query
+    artifact_ids: List[str] = [
+        f"{a.get('type', '')}:{a.get('name', '')}"
+        for a in raw_artifacts
+        if isinstance(a, dict) and a.get("name") and a.get("type")
+    ]
+
+    # Count attestation records linked to these artifacts
+    try:
+        attestation_count: int = (
+            session.query(AttestationRecord)
+            .filter(AttestationRecord.artifact_id.in_(artifact_ids))
+            .count()
+            if artifact_ids
+            else 0
+        )
+    except Exception as exc:
+        logger.exception(
+            "IDP bom-card: attestation count query failed for project_id=%s: %s",
+            project_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to count attestation records",
+        )
+
+    signature_status = "signed" if snapshot.signature else "unsigned"
+    generated_at = (
+        snapshot.created_at.isoformat() if snapshot.created_at else ""
+    )
+
+    logger.info(
+        "IDP bom-card: project_id=%s snapshot_id=%s artifacts=%d attestations=%d signature=%s",
+        project_id,
+        snapshot.id,
+        len(card_artifacts),
+        attestation_count,
+        signature_status,
+    )
+
+    return BomCardResponse(
+        project_id=project_id,
+        snapshot_id=snapshot.id,
+        generated_at=generated_at,
+        artifact_count=len(card_artifacts),
+        artifacts=card_artifacts,
+        signature_status=signature_status,
+        attestation_count=attestation_count,
     )

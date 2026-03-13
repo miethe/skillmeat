@@ -5,9 +5,12 @@ and attestation records.  All endpoints are owner-scoped: users see only their
 own context's data, filtered by ``AuthContext.user_id`` and ``AuthContext.tenant_id``.
 
 Endpoints:
-    GET  /bom/snapshot      -- Current point-in-time BOM snapshot
-    POST /bom/generate      -- On-demand BOM generation (with optional auto-sign)
-    GET  /attestations      -- Cursor-paginated list of attestation records
+    GET  /bom/snapshot              -- Current point-in-time BOM snapshot
+    POST /bom/generate              -- On-demand BOM generation (with optional auto-sign)
+    POST /bom/verify                -- Verify BOM signature on a snapshot
+    GET  /attestations              -- Cursor-paginated list of attestation records
+    POST /attestations              -- Create a manual attestation record
+    GET  /attestations/{id}         -- Retrieve a single attestation record
 """
 
 from __future__ import annotations
@@ -573,3 +576,367 @@ async def list_attestations(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve attestation records.",
         )
+
+
+# =============================================================================
+# Request/response schemas for new endpoints
+# =============================================================================
+
+
+_VALID_VISIBILITY = frozenset({"private", "team", "public"})
+
+
+class AttestationCreateRequest(BaseModel):
+    """Request body for manual attestation creation (TASK-7.5)."""
+
+    artifact_id: str = Field(
+        description="Artifact identifier in 'type:name' format.",
+    )
+    owner_scope: Optional[str] = Field(
+        default=None,
+        description=(
+            "Owner scope override: 'user', 'team', or 'enterprise'. "
+            "When omitted the caller's principal type is used."
+        ),
+    )
+    roles: Optional[List[str]] = Field(
+        default=None,
+        description="RBAC roles to assert for this attestation.",
+    )
+    scopes: Optional[List[str]] = Field(
+        default=None,
+        description="Permission scopes covered by this attestation.",
+    )
+    visibility: str = Field(
+        default="private",
+        description="Visibility policy: 'private', 'team', or 'public'.",
+    )
+    notes: Optional[str] = Field(
+        default=None,
+        description="Free-text notes for offline / manual attestation workflows.",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BomVerifyRequest(BaseModel):
+    """Request body for BOM signature verification (TASK-7.7)."""
+
+    snapshot_id: Optional[int] = Field(
+        default=None,
+        description=(
+            "Primary key of the BomSnapshot to verify.  When omitted the "
+            "most recent snapshot for the caller's owner scope is used."
+        ),
+    )
+    signature: Optional[str] = Field(
+        default=None,
+        description=(
+            "Hex-encoded Ed25519 signature to verify against.  When omitted "
+            "the signature stored in the snapshot row is used."
+        ),
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BomVerifyResponse(BaseModel):
+    """Result of BOM signature verification."""
+
+    valid: bool = Field(description="True when the signature is cryptographically valid.")
+    details: str = Field(description="Human-readable verification outcome or error message.")
+    key_id: Optional[str] = Field(
+        default=None,
+        description="SHA-256 fingerprint of the public key used to verify (when available).",
+    )
+    snapshot_id: Optional[int] = Field(
+        default=None,
+        description="ID of the snapshot that was verified.",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# POST /attestations  (TASK-7.5)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/attestations",
+    response_model=AttestationSchema,
+    status_code=status.HTTP_201_CREATED,
+    tags=["attestations"],
+    summary="Create a manual attestation record",
+    description=(
+        "Create a manual attestation record for offline or audited workflows. "
+        "The artifact must already exist in the database.  The record is "
+        "owner-scoped to the authenticated caller's principal context."
+    ),
+    responses={
+        201: {"description": "Attestation created successfully"},
+        404: {"description": "Artifact not found in the database"},
+        400: {"description": "Invalid owner_scope or visibility value"},
+    },
+)
+async def create_attestation(
+    request: AttestationCreateRequest,
+    db: DbSessionDep,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> AttestationSchema:
+    """Create a manual attestation record.
+
+    Validates that the referenced artifact exists, resolves the caller's
+    owner identity from ``AuthContext``, and persists a new
+    ``AttestationRecord`` row.
+
+    Steps:
+    1. Validate ``owner_scope`` and ``visibility`` inputs.
+    2. Confirm the artifact exists in ``artifacts`` table.
+    3. Determine ``owner_type`` / ``owner_id`` from :class:`AuthContext`.
+    4. Insert and commit the new :class:`AttestationRecord`.
+    5. Return the persisted record serialised as :class:`AttestationSchema`.
+    """
+    # Validate owner_scope when provided.
+    if request.owner_scope is not None and request.owner_scope not in _VALID_OWNER_SCOPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Invalid owner_scope '{request.owner_scope}'. "
+                f"Must be one of: {sorted(_VALID_OWNER_SCOPES)!r}."
+            ),
+        )
+
+    # Validate visibility.
+    if request.visibility not in _VALID_VISIBILITY:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Invalid visibility '{request.visibility}'. "
+                f"Must be one of: {sorted(_VALID_VISIBILITY)!r}."
+            ),
+        )
+
+    # Confirm the artifact exists.
+    from skillmeat.cache.models import Artifact
+
+    artifact_row = (
+        db.query(Artifact).filter(Artifact.id == request.artifact_id).first()
+    )
+    if artifact_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact '{request.artifact_id}' not found.",
+        )
+
+    # Resolve owner identity from auth context.
+    if request.owner_scope is not None:
+        owner_type = request.owner_scope
+    elif auth_context.tenant_id:
+        owner_type = "enterprise"
+    else:
+        owner_type = "user"
+
+    owner_id: str = str(auth_context.user_id) if auth_context.user_id else "local_admin"
+    if auth_context.tenant_id:
+        owner_id = str(auth_context.tenant_id)
+
+    try:
+        record = AttestationRecord(
+            artifact_id=request.artifact_id,
+            owner_type=owner_type,
+            owner_id=owner_id,
+            roles=request.roles or [],
+            scopes=request.scopes or [],
+            visibility=request.visibility,
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Failed to persist attestation record: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create attestation record.",
+        )
+
+    return _attestation_to_schema(record)
+
+
+# ---------------------------------------------------------------------------
+# GET /attestations/{attestation_id}  (TASK-7.6)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/attestations/{attestation_id}",
+    response_model=AttestationSchema,
+    tags=["attestations"],
+    summary="Get a single attestation record",
+    description=(
+        "Retrieve full metadata for a single attestation record.  The record "
+        "is returned only when it belongs to the authenticated caller's owner "
+        "scope — cross-owner access is denied with a 404 to prevent information "
+        "leakage."
+    ),
+    responses={
+        200: {"description": "Attestation record retrieved successfully"},
+        404: {"description": "Attestation record not found or not owned by caller"},
+    },
+)
+async def get_attestation(
+    attestation_id: int,
+    db: DbSessionDep,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> AttestationSchema:
+    """Retrieve a single attestation record by primary key.
+
+    Owner-scope guard: the record is returned only when its ``owner_type``
+    and ``owner_id`` match the authenticated caller's resolved identity.
+    A missing or mismatched record surfaces as a 404 to prevent enumeration.
+    """
+    # Resolve caller's owner identity.
+    caller_owner_type = "user"
+    caller_owner_id = auth_context.user_id or "local_admin"
+    if auth_context.tenant_id:
+        caller_owner_type = "enterprise"
+        caller_owner_id = auth_context.tenant_id
+
+    try:
+        record: Optional[AttestationRecord] = (
+            db.query(AttestationRecord)
+            .filter(
+                AttestationRecord.id == attestation_id,
+                AttestationRecord.owner_type == caller_owner_type,
+                AttestationRecord.owner_id == caller_owner_id,
+            )
+            .first()
+        )
+    except Exception as exc:
+        logger.exception("Failed to query attestation record id=%s: %s", attestation_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve attestation record.",
+        )
+
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Attestation record '{attestation_id}' not found.",
+        )
+
+    return _attestation_to_schema(record)
+
+
+# ---------------------------------------------------------------------------
+# POST /bom/verify  (TASK-7.7)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/bom/verify",
+    response_model=BomVerifyResponse,
+    tags=["bom"],
+    summary="Verify BOM signature",
+    description=(
+        "Verify the Ed25519 signature stored on (or supplied for) a BOM snapshot. "
+        "When ``snapshot_id`` is omitted the most recent snapshot for the caller's "
+        "owner scope is used.  When ``signature`` is omitted the signature already "
+        "stored in the snapshot row is used.  Returns 422 when the snapshot has no "
+        "verifiable signature."
+    ),
+    responses={
+        200: {"description": "Verification result (check ``valid`` field for outcome)"},
+        404: {"description": "No BOM snapshot found for the caller's scope"},
+        422: {"description": "Snapshot has no signature to verify"},
+    },
+)
+async def verify_bom(
+    request: BomVerifyRequest,
+    db: DbSessionDep,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> BomVerifyResponse:
+    """Verify the Ed25519 signature of a BOM snapshot.
+
+    Steps:
+    1. Resolve the target snapshot (by ``snapshot_id`` or latest for caller).
+    2. Determine the signature to verify (from request or stored on snapshot).
+    3. Call ``verify_signature()`` with the snapshot's ``bom_json`` as content.
+    4. Return :class:`BomVerifyResponse` with the verification outcome.
+    """
+    from skillmeat.core.bom.signing import verify_signature
+
+    # Resolve owner_type for scope filtering when no explicit snapshot_id given.
+    owner_type = "user"
+    if auth_context.tenant_id:
+        owner_type = "enterprise"
+
+    # --- Fetch the target snapshot ---
+    if request.snapshot_id is not None:
+        snapshot: Optional[BomSnapshot] = (
+            db.query(BomSnapshot)
+            .filter(BomSnapshot.id == request.snapshot_id)
+            .first()
+        )
+        if snapshot is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"BOM snapshot '{request.snapshot_id}' not found.",
+            )
+    else:
+        snapshot = (
+            db.query(BomSnapshot)
+            .filter(BomSnapshot.owner_type == owner_type)
+            .order_by(BomSnapshot.created_at.desc())
+            .first()
+        )
+        if snapshot is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No BOM snapshot found for the caller's scope.",
+            )
+
+    # --- Resolve signature to verify ---
+    signature_hex: Optional[str] = request.signature or snapshot.signature
+    if not signature_hex:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "No signature available for verification.  "
+                "Supply a 'signature' in the request body or generate a signed snapshot first."
+            ),
+        )
+
+    try:
+        signature_bytes = bytes.fromhex(signature_hex)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Signature is not valid hex-encoded data.",
+        )
+
+    # --- Run verification ---
+    try:
+        result = verify_signature(
+            bom_content=snapshot.bom_json.encode(),
+            signature=signature_bytes,
+        )
+    except Exception as exc:
+        logger.exception("Unexpected error during BOM signature verification: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Verification failed with an unexpected error: {exc}",
+        )
+
+    if result.valid:
+        details = "Signature is valid."
+    else:
+        details = result.error or "Signature verification failed."
+
+    return BomVerifyResponse(
+        valid=result.valid,
+        details=details,
+        key_id=result.key_id,
+        snapshot_id=snapshot.id,
+    )
