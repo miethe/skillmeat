@@ -12,9 +12,11 @@
     "clean:cache": "rm -rf .next/cache 2>/dev/null || (chmod -R u+w .next/cache 2>/dev/null; rm -rf .next/cache) || true",
     "clean:all": "(rm -rf .next node_modules 2>/dev/null || (chmod -R u+w .next node_modules 2>/dev/null; rm -rf .next node_modules)) && pnpm install",
     "lint": "next lint",
+    "lint:all": "pnpm lint && pnpm --filter @skillmeat/content-viewer lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "type-check": "tsc --noEmit",
+    "type-check:all": "pnpm type-check && pnpm --filter @skillmeat/content-viewer type-check",
     "generate-sdk": "npx openapi-typescript-codegen --input ../api/openapi.json --output ./sdk --client fetch --name SkillMeatClient --useOptions --useUnionTypes",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -120,7 +122,7 @@
   },
   "engines": {
     "node": ">=18.18.0",
-    "pnpm": ">=8.0.0"
+    "pnpm": ">=8.15.0"
   },
   "packageManager": "pnpm@8.15.0"
 }
