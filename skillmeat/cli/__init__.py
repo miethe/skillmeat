@@ -14985,6 +14985,16 @@ main.add_command(history_group, name="history")
 
 
 # ====================
+# Attest Command Group
+# ====================
+
+
+from skillmeat.cli.commands.attest import attest_group  # noqa: E402
+
+main.add_command(attest_group, name="attest")
+
+
+# ====================
 # Entry Point
 # ====================
 
