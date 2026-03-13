@@ -38,6 +38,16 @@ export type { FileNode } from './types';
 export type { FileTreeEntry, FileTreeResponse, FileContentResponse } from './types';
 
 // ============================================================
+// Components (Phase 3)
+// ============================================================
+export { MarkdownEditor } from './components/MarkdownEditor';
+export type { MarkdownEditorProps } from './components/MarkdownEditor';
+export { SplitPreview } from './components/SplitPreview';
+export type { SplitPreviewProps } from './components/SplitPreview';
+export { ContentPane } from './components/ContentPane';
+export type { ContentPaneProps, TruncationInfo } from './components/ContentPane';
+
+// ============================================================
 // Hooks (Phase 3 — requires adapter abstraction)
 // ============================================================
 // export { useCatalogFileTree, useCatalogFileContent } from './hooks/useFileContent';
