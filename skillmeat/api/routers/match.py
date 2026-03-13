@@ -11,8 +11,7 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from skillmeat.api.dependencies import (
-    ArtifactManagerDep,
-    CollectionManagerDep,
+    ArtifactRepoDep,
     get_auth_context,
     require_auth,
 )
@@ -22,6 +21,7 @@ from skillmeat.api.schemas.match import (
     ScoreBreakdown,
 )
 from skillmeat.core.artifact import ArtifactMetadata
+from skillmeat.core.interfaces.dtos import ArtifactDTO
 from skillmeat.core.scoring.service import ScoringService
 from skillmeat.observability.tracing import trace_operation
 from skillmeat.api.schemas.auth import AuthContext
@@ -60,8 +60,7 @@ router = APIRouter(
     },
 )
 async def match_artifacts(
-    artifact_mgr: ArtifactManagerDep,
-    collection_mgr: CollectionManagerDep,
+    artifact_repo: ArtifactRepoDep,
     q: str = Query(
         ...,
         min_length=1,
@@ -93,8 +92,7 @@ async def match_artifacts(
         limit: Maximum number of results to return
         min_confidence: Minimum confidence threshold (0-100)
         include_breakdown: Whether to include score breakdown
-        artifact_mgr: Artifact manager dependency
-        collection_mgr: Collection manager dependency
+        artifact_repo: Artifact repository dependency
 
     Returns:
         MatchResponse with matched artifacts sorted by confidence
@@ -118,17 +116,26 @@ async def match_artifacts(
         include_breakdown=include_breakdown,
     ) as span:
         try:
-            # Get all artifacts from collection
-            # Optimized via in-memory caching in CollectionManager
-            artifacts = artifact_mgr.list_artifacts()
+            # Get all artifacts from repository (works in both local and
+            # enterprise editions via the repository abstraction layer)
+            artifacts: list[ArtifactDTO] = artifact_repo.list()
             span.set_attribute("total_artifacts", len(artifacts))
             span.add_event("artifacts_loaded")
 
-            # Convert to format expected by ScoringService
+            # Convert to format expected by ScoringService.
+            # ArtifactDTO carries metadata as a plain dict; build a minimal
+            # ArtifactMetadata object from it.  ScoringService only reads
+            # the ``title`` and ``description`` fields.
             artifact_tuples: List[Tuple[str, ArtifactMetadata]] = [
                 (
                     artifact.name,
-                    artifact.metadata if artifact.metadata else ArtifactMetadata(),
+                    ArtifactMetadata(
+                        title=artifact.metadata.get("title"),
+                        description=artifact.description
+                        or artifact.metadata.get("description"),
+                    )
+                    if artifact.metadata or artifact.description
+                    else ArtifactMetadata(),
                 )
                 for artifact in artifacts
             ]
@@ -173,24 +180,26 @@ async def match_artifacts(
                     None,
                 )
 
-                # Build matched artifact
+                # Build matched artifact.
+                # ArtifactDTO.artifact_type is a plain string; use it directly.
                 matched = MatchedArtifact(
                     artifact_id=(
-                        f"{artifact.type.value}:{score.artifact_id}"
+                        f"{artifact.artifact_type}:{score.artifact_id}"
                         if artifact
                         else score.artifact_id
                     ),
                     name=score.artifact_id,
-                    artifact_type=artifact.type.value if artifact else "unknown",
+                    artifact_type=artifact.artifact_type if artifact else "unknown",
                     confidence=score.confidence,
                     title=(
-                        artifact.metadata.title
+                        artifact.metadata.get("title")
                         if artifact and artifact.metadata
                         else None
                     ),
                     description=(
-                        artifact.metadata.description
-                        if artifact and artifact.metadata
+                        artifact.description
+                        or (artifact.metadata.get("description") if artifact and artifact.metadata else None)
+                        if artifact
                         else None
                     ),
                 )

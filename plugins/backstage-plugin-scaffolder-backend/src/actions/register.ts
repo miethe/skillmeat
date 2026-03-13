@@ -14,10 +14,11 @@
  */
 
 import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
+import { RootConfigService } from '@backstage/backend-plugin-api';
 import fetch from 'node-fetch';
 import { RegisterDeploymentRequest, RegisterDeploymentResponse } from '../types';
 
-export function createSkillMeatRegisterAction() {
+export function createSkillMeatRegisterAction({ config }: { config: RootConfigService }) {
   return createTemplateAction<{
     repoUrl: string;
     targetId: string;
@@ -96,7 +97,7 @@ export function createSkillMeatRegisterAction() {
       // global Backstage config.  Same pattern as skillmeat:context:inject.
       const baseUrl =
         inputBaseUrl ??
-        ctx.config?.getOptionalString('skillmeat.baseUrl') ??
+        config.getOptionalString('skillmeat.baseUrl') ??
         '';
 
       if (!baseUrl) {
@@ -108,7 +109,7 @@ export function createSkillMeatRegisterAction() {
 
       const token =
         inputToken ??
-        ctx.config?.getOptionalString('skillmeat.token') ??
+        config.getOptionalString('skillmeat.token') ??
         undefined;
 
       // Build request headers.  Authorization header is omitted entirely when

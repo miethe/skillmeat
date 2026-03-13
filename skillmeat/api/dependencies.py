@@ -92,16 +92,26 @@ class AppState:
         logger.info("Initializing application state...")
         self.settings = settings
 
-        # Initialize SkillMeat core managers
+        # Always-initialized managers (work in all editions)
         self.config_manager = ConfigManager()
-        self.collection_manager = CollectionManager(config=self.config_manager)
-        self.artifact_manager = ArtifactManager(collection_mgr=self.collection_manager)
         self.token_manager = TokenManager() if settings.auth_enabled else None
-        self.sync_manager = SyncManager(
-            collection_manager=self.collection_manager,
-            artifact_manager=self.artifact_manager,
-        )
         self.path_resolver = ProjectPathResolver()
+
+        # Filesystem managers — only available in local edition
+        if settings.edition != "enterprise":
+            self.collection_manager = CollectionManager(config=self.config_manager)
+            self.artifact_manager = ArtifactManager(collection_mgr=self.collection_manager)
+            self.sync_manager = SyncManager(
+                collection_manager=self.collection_manager,
+                artifact_manager=self.artifact_manager,
+            )
+        else:
+            logger.info(
+                "Enterprise edition: skipping filesystem manager initialization"
+            )
+            self.collection_manager = None
+            self.artifact_manager = None
+            self.sync_manager = None
 
         # Initialize cache manager if not already initialized (lazy init pattern)
         if self.cache_manager is None:
@@ -114,17 +124,22 @@ class AppState:
                 logger.warning(f"CacheManager initialization failed: {e}")
                 self.cache_manager = None
 
-        # Initialize context sync service
-        if self.cache_manager is not None:
+        # Initialize context sync service (requires both cache_manager and collection_manager)
+        if self.cache_manager is not None and self.collection_manager is not None:
             self.context_sync_service = ContextSyncService(
                 collection_mgr=self.collection_manager,
                 cache_mgr=self.cache_manager,
             )
             logger.info("ContextSyncService initialized")
         else:
-            logger.warning(
-                "ContextSyncService not initialized (CacheManager unavailable)"
-            )
+            if settings.edition == "enterprise":
+                logger.info(
+                    "Enterprise edition: skipping ContextSyncService (no collection_manager)"
+                )
+            else:
+                logger.warning(
+                    "ContextSyncService not initialized (CacheManager unavailable)"
+                )
             self.context_sync_service = None
 
         logger.info("Application state initialized successfully")
@@ -367,6 +382,11 @@ def get_collection_manager(
         HTTPException: If CollectionManager not available
     """
     if state.collection_manager is None:
+        if state.settings and state.settings.edition == "enterprise":
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Collection manager is not available in enterprise edition",
+            )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Collection manager not available",
@@ -389,6 +409,11 @@ def get_artifact_manager(
         HTTPException: If ArtifactManager not available
     """
     if state.artifact_manager is None:
+        if state.settings and state.settings.edition == "enterprise":
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Artifact manager is not available in enterprise edition",
+            )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Artifact manager not available",
@@ -433,6 +458,11 @@ def get_sync_manager(
         HTTPException: If SyncManager not available
     """
     if state.sync_manager is None:
+        if state.settings and state.settings.edition == "enterprise":
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Sync manager is not available in enterprise edition",
+            )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Sync manager not available",
@@ -455,6 +485,11 @@ def get_context_sync_service(
         HTTPException: If ContextSyncService not available
     """
     if state.context_sync_service is None:
+        if state.settings and state.settings.edition == "enterprise":
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Context sync service is not available in enterprise edition",
+            )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Context sync service not available",

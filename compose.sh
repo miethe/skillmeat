@@ -136,6 +136,15 @@ if [ "$ENGINE" = "podman" ]; then
                 -f skillmeat/web/Dockerfile skillmeat/web
         fi
 
+        # Build backstage (demo context)
+        if [ -f demo/backstage-app/package.json ] && [ -f demo/dockerfile ]; then
+            echo "[compose.sh]   Building ${PROJECT_NAME}_backstage..."
+            podman build --ulimit nofile=65536:65536 \
+                --format docker \
+                -t "${PROJECT_NAME}_backstage" \
+                -f demo/dockerfile demo/backstage-app
+        fi
+
         echo "[compose.sh] Pre-build complete. Starting services..."
 
         # Strip --build from args so compose doesn't re-build

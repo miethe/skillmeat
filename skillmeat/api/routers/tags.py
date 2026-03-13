@@ -21,13 +21,13 @@ import base64
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import (
-    CollectionManagerDep,
     CollectionRepoDep,
     DbSessionDep,
+    SettingsDep,
     get_auth_context,
     require_auth,
 )
@@ -140,6 +140,7 @@ async def create_tag(
     request: TagCreateRequest,
     collection_repo: CollectionRepoDep,
     db_session: DbSessionDep,
+    settings: SettingsDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> TagResponse:
     """Create a new tag.
@@ -166,11 +167,12 @@ async def create_tag(
 
         logger.info(f"Created tag: {tag.id} ('{tag.name}')")
 
-        collection_dto = collection_repo.get()
-        _sync_tag_definitions_to_manifest(
-            session=db_session,
-            collection_id=collection_dto.id if collection_dto is not None else None,
-        )
+        if settings.edition != "enterprise":
+            collection_dto = collection_repo.get()
+            _sync_tag_definitions_to_manifest(
+                session=db_session,
+                collection_id=collection_dto.id if collection_dto is not None else None,
+            )
 
         return tag
 
@@ -471,21 +473,24 @@ async def get_tag_by_slug(
 async def update_tag(
     tag_id: str,
     request: TagUpdateRequest,
-    collection_mgr: CollectionManagerDep,
+    http_request: Request,
     collection_repo: CollectionRepoDep,
     db_session: DbSessionDep,
+    settings: SettingsDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> TagResponse:
     """Update tag metadata.
 
-    If the tag name is changing, the rename is written back to filesystem
-    sources (collection.toml and artifact frontmatter) so the change
-    persists through cache refreshes.
+    If the tag name is changing and the server is running in local edition,
+    the rename is written back to filesystem sources (collection.toml and
+    artifact frontmatter) so the change persists through cache refreshes.
+    In enterprise edition the DB update is sufficient.
 
     Args:
         tag_id: Tag identifier
         request: Tag update request with optional name, slug, color
-        collection_mgr: Injected CollectionManager for filesystem write-back
+        http_request: FastAPI request (used to access app state for filesystem
+            manager in local edition)
 
     Returns:
         Updated tag details
@@ -507,21 +512,23 @@ async def update_tag(
 
         affected_artifacts = []
 
-        # If name is changing, write-back to filesystem
-        if request.name is not None:
+        # If name is changing, write-back to filesystem (local edition only)
+        if request.name is not None and settings.edition != "enterprise":
             existing_tag = service.get_tag(tag_id)
             if existing_tag and existing_tag.name != request.name:
-                result = write_service.rename_tag(
-                    old_name=existing_tag.name,
-                    new_name=request.name,
-                    collection_manager=collection_mgr,
-                )
-                affected_artifacts = result.get("affected_artifacts", [])
-                if affected_artifacts:
-                    logger.info(
-                        f"Renamed tag '{existing_tag.name}' -> '{request.name}' "
-                        f"in {len(affected_artifacts)} artifacts on filesystem"
+                collection_mgr = http_request.app.state.collection_manager
+                if collection_mgr is not None:
+                    result = write_service.rename_tag(
+                        old_name=existing_tag.name,
+                        new_name=request.name,
+                        collection_manager=collection_mgr,
                     )
+                    affected_artifacts = result.get("affected_artifacts", [])
+                    if affected_artifacts:
+                        logger.info(
+                            f"Renamed tag '{existing_tag.name}' -> '{request.name}' "
+                            f"in {len(affected_artifacts)} artifacts on filesystem"
+                        )
 
         # Update tag in DB via service
         tag = service.update_tag(tag_id, request)
@@ -532,17 +539,18 @@ async def update_tag(
                 detail=f"Tag '{tag_id}' not found",
             )
 
-        # Update tags_json cache for affected artifacts
+        # Update tags_json cache for affected artifacts (local edition only)
         if affected_artifacts:
             write_service.update_tags_json_cache(affected_artifacts)
 
         logger.info(f"Updated tag: {tag.id} ('{tag.name}')")
 
-        collection_dto = collection_repo.get()
-        _sync_tag_definitions_to_manifest(
-            session=db_session,
-            collection_id=collection_dto.id if collection_dto is not None else None,
-        )
+        if settings.edition != "enterprise":
+            collection_dto = collection_repo.get()
+            _sync_tag_definitions_to_manifest(
+                session=db_session,
+                collection_id=collection_dto.id if collection_dto is not None else None,
+            )
 
         return tag
 
@@ -592,20 +600,24 @@ async def update_tag(
 )
 async def delete_tag(
     tag_id: str,
-    collection_mgr: CollectionManagerDep,
+    http_request: Request,
     collection_repo: CollectionRepoDep,
     db_session: DbSessionDep,
+    settings: SettingsDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["artifact:write"])),
 ) -> None:
     """Delete tag by ID.
 
-    The tag is first removed from filesystem sources (collection.toml and
-    artifact frontmatter) so the deletion persists through cache refreshes,
-    then deleted from the database (CASCADE removes artifact_tags rows).
+    In local edition the tag is first removed from filesystem sources
+    (collection.toml and artifact frontmatter) so the deletion persists
+    through cache refreshes, then deleted from the database (CASCADE removes
+    artifact_tags rows).  In enterprise edition only the DB deletion is
+    performed.
 
     Args:
         tag_id: Tag identifier
-        collection_mgr: Injected CollectionManager for filesystem write-back
+        http_request: FastAPI request (used to access app state for filesystem
+            manager in local edition)
 
     Returns:
         None (204 No Content)
@@ -631,31 +643,37 @@ async def delete_tag(
                 detail=f"Tag '{tag_id}' not found",
             )
 
-        # Write-back: remove tag from filesystem sources
-        result = write_service.delete_tag(
-            tag_name=tag.name,
-            collection_manager=collection_mgr,
-        )
-        if result["affected_artifacts"]:
-            logger.info(
-                f"Removed tag '{tag.name}' from {len(result['affected_artifacts'])} "
-                f"artifacts on filesystem"
-            )
+        # Write-back: remove tag from filesystem sources (local edition only)
+        affected_artifacts: list = []
+        if settings.edition != "enterprise":
+            collection_mgr = http_request.app.state.collection_manager
+            if collection_mgr is not None:
+                result = write_service.delete_tag(
+                    tag_name=tag.name,
+                    collection_manager=collection_mgr,
+                )
+                affected_artifacts = result.get("affected_artifacts", [])
+                if affected_artifacts:
+                    logger.info(
+                        f"Removed tag '{tag.name}' from {len(affected_artifacts)} "
+                        f"artifacts on filesystem"
+                    )
 
         # Delete from DB (CASCADE removes artifact_tags rows)
         service.delete_tag(tag_id)
 
-        # Update tags_json cache for affected artifacts
-        if result["affected_artifacts"]:
-            write_service.update_tags_json_cache(result["affected_artifacts"])
+        # Update tags_json cache for affected artifacts (local edition only)
+        if affected_artifacts:
+            write_service.update_tags_json_cache(affected_artifacts)
 
         logger.info(f"Deleted tag: {tag_id}")
 
-        collection_dto = collection_repo.get()
-        _sync_tag_definitions_to_manifest(
-            session=db_session,
-            collection_id=collection_dto.id if collection_dto is not None else None,
-        )
+        if settings.edition != "enterprise":
+            collection_dto = collection_repo.get()
+            _sync_tag_definitions_to_manifest(
+                session=db_session,
+                collection_id=collection_dto.id if collection_dto is not None else None,
+            )
 
     except HTTPException:
         raise

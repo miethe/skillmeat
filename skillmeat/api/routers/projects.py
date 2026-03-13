@@ -14,6 +14,7 @@ from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from skillmeat.api.config import get_settings
 from skillmeat.api.dependencies import (
     DbSessionDep,
     DeploymentProfileRepoDep,
@@ -683,6 +684,9 @@ async def create_project(
     try:
         logger.info(f"Creating project: {request.name} at {request.path}")
 
+        settings = get_settings()
+        is_enterprise = settings.edition == "enterprise"
+
         # Resolve path
         # TODO: IProjectRepository.create() should handle path resolution internally.
         project_path = Path(request.path).resolve()
@@ -695,50 +699,65 @@ async def create_project(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Project already exists at path: {request.path}",
             )
-        # Also check filesystem metadata in case the project exists but is unregistered
-        if ProjectMetadataStorage.exists(project_path):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Project already exists at path: {request.path}",
+
+        if is_enterprise:
+            # Enterprise mode: DB is source of truth — skip all filesystem operations
+            logger.info(
+                f"Enterprise mode: creating DB-only project {request.name}, "
+                "skipping filesystem operations"
+            )
+            metadata_created_at = datetime.utcnow().isoformat()
+        else:
+            # Also check filesystem metadata in case the project exists but is unregistered
+            if ProjectMetadataStorage.exists(project_path):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Project already exists at path: {request.path}",
+                )
+
+            # Create project directory if it doesn't exist
+            # TODO: Directory creation should move into IProjectRepository.create() impl.
+            try:
+                project_path.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Created project directory: {project_path}")
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to create project directory: {str(e)}",
+                )
+
+            # Create .claude subdirectory
+            # TODO: .claude directory scaffolding should move into IProjectRepository.create() impl.
+            claude_dir = project_path / ".claude"
+            try:
+                claude_dir.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Created .claude directory: {claude_dir}")
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to create .claude directory: {str(e)}",
+                )
+
+            # Create project metadata on filesystem
+            # TODO: ProjectMetadataStorage write should move into IProjectRepository.create() impl.
+            metadata = ProjectMetadataStorage.create_metadata(
+                project_path=project_path,
+                name=request.name,
+                description=request.description,
             )
 
-        # Create project directory if it doesn't exist
-        # TODO: Directory creation should move into IProjectRepository.create() impl.
-        try:
-            project_path.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Created project directory: {project_path}")
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to create project directory: {str(e)}",
+            # Initialize empty deployment tracking file so project is discoverable
+            from skillmeat.storage.deployment import DeploymentTracker
+
+            DeploymentTracker.write_deployments(project_path, [])
+
+            metadata_created_at = (
+                metadata.created_at.isoformat()
+                if hasattr(metadata.created_at, "isoformat")
+                else str(metadata.created_at) if metadata.created_at else None
             )
 
-        # Create .claude subdirectory
-        # TODO: .claude directory scaffolding should move into IProjectRepository.create() impl.
-        claude_dir = project_path / ".claude"
-        try:
-            claude_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Created .claude directory: {claude_dir}")
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to create .claude directory: {str(e)}",
-            )
-
-        # Create project metadata on filesystem
-        # TODO: ProjectMetadataStorage write should move into IProjectRepository.create() impl.
-        metadata = ProjectMetadataStorage.create_metadata(
-            project_path=project_path,
-            name=request.name,
-            description=request.description,
-        )
-
-        # Initialize empty deployment tracking file so project is discoverable
-        from skillmeat.storage.deployment import DeploymentTracker
-
-        DeploymentTracker.write_deployments(project_path, [])
-
-        # Register project via repository
+        # Register project via repository (always runs — DB is always updated)
         new_dto = ProjectDTO(
             id=project_id,
             name=request.name,
@@ -746,24 +765,21 @@ async def create_project(
             description=request.description,
             status="active",
             artifact_count=0,
-            created_at=(
-                metadata.created_at.isoformat()
-                if hasattr(metadata.created_at, "isoformat")
-                else str(metadata.created_at) if metadata.created_at else None
-            ),
+            created_at=metadata_created_at,
         )
         try:
             project_repo.create(new_dto)
             logger.info(f"Project registered via repository: {request.name}")
         except Exception as e:
-            # Log but don't fail — filesystem state is the source of truth
+            # Log but don't fail — DB record creation failure is non-fatal
             logger.warning(f"Failed to register project in repository: {e}")
 
         logger.info(f"Project created successfully: {request.name}")
 
-        # Invalidate in-memory cache so new project appears in list
-        registry = await get_project_registry()
-        await registry.refresh_entry(project_path)
+        if not is_enterprise:
+            # Invalidate in-memory cache so new project appears in list
+            registry = await get_project_registry()
+            await registry.refresh_entry(project_path)
 
         # Add project to persistent SQLite cache (upsert preserves other projects)
         if cache_manager is not None:
@@ -784,12 +800,17 @@ async def create_project(
                     exc_info=True,
                 )
 
+        created_at_value = (
+            datetime.fromisoformat(metadata_created_at)
+            if isinstance(metadata_created_at, str)
+            else metadata_created_at
+        )
         return ProjectCreateResponse(
             id=project_id,
             path=str(project_path),
-            name=metadata.name,
-            description=metadata.description,
-            created_at=metadata.created_at,
+            name=request.name,
+            description=request.description,
+            created_at=created_at_value,
         )
 
     except HTTPException:

@@ -355,7 +355,7 @@ router = APIRouter(
 
 def resolve_collection_name(
     collection_param: str,
-    collection_mgr,
+    collection_mgr=None,
     db_user_coll_repo=None,
     db_session=None,
     collection_repo: Optional[ICollectionRepository] = None,
@@ -365,30 +365,30 @@ def resolve_collection_name(
     Accepts either a collection name or UUID. If a UUID is provided,
     looks up the name from the database via the repository.
 
+    In enterprise mode (collection_repo is the primary source), the
+    repository is checked first before any filesystem scan.  When
+    collection_mgr is None the filesystem path is skipped entirely.
+
     Args:
         collection_param: Collection name or UUID string
-        collection_mgr: CollectionManager instance
+        collection_mgr: CollectionManager instance (optional; when None the
+            filesystem path is skipped and collection_repo is used exclusively)
         db_user_coll_repo: Optional IDbUserCollectionRepository instance for
             UUID-to-name resolution (preferred). Falls back to db_session if
             not provided.
         db_session: Deprecated — kept for backward compatibility only.
             Use db_user_coll_repo instead.
-        collection_repo: Optional ICollectionRepository for enterprise-mode
-            resolution. When provided, also checks the DB-backed collection
-            list so that collections that exist only in the database (not on
-            the local filesystem) are resolved correctly.
+        collection_repo: ICollectionRepository for enterprise-mode resolution.
+            When provided, the DB-backed collection list is checked as the
+            primary source so that collections that exist only in the database
+            (not on the local filesystem) are resolved correctly.
 
     Returns:
         The collection name if found, None if not resolvable.
     """
-    # Fast path: check as a name first (filesystem)
-    collection_names = collection_mgr.list_collections()
-    if collection_param in collection_names:
-        return collection_param
-
-    # Enterprise-mode path: if a collection_repo is provided, check whether
-    # the param matches a known DB collection name directly (handles the case
-    # where no local filesystem collections exist).
+    # Primary path: when a collection_repo is available, use the DB-backed
+    # list as the authoritative source.  This covers enterprise mode where no
+    # local filesystem collections exist.
     if collection_repo is not None:
         try:
             db_collections = collection_repo.list()
@@ -403,6 +403,13 @@ def resolve_collection_name(
             logger.debug(
                 "collection_repo.list() failed during resolve_collection_name: %s", e
             )
+
+    # Filesystem fast path: only attempted when collection_mgr is available.
+    collection_names: List[str] = []
+    if collection_mgr is not None:
+        collection_names = collection_mgr.list_collections()
+        if collection_param in collection_names:
+            return collection_param
 
     # Try as a UUID - look up in DB via repository
     collection_record = None
@@ -450,16 +457,21 @@ def resolve_collection_name(
 def _find_artifact_in_collections(
     artifact_name: str,
     artifact_type: ArtifactType,
-    collection_mgr,
+    collection_mgr=None,
     preferred_collection: Optional[str] = None,
     db_session=None,
     artifact_repo: Optional[IArtifactRepository] = None,
+    collection_repo: Optional[ICollectionRepository] = None,
 ) -> tuple:
     """Find an artifact across collections, with optional preferred collection hint.
 
     When a preferred collection is specified (name or UUID), searches there first.
     If the artifact is not found in the preferred collection (e.g., stale DB
     association), falls back to searching all collections.
+
+    In enterprise mode (artifact_repo provided and collection_mgr is None or
+    the filesystem has no collections), the repository is queried directly
+    without a filesystem scan.
 
     This prevents 404 errors caused by the frontend sending a collection UUID
     from a stale DB association while the artifact actually lives in a different
@@ -468,21 +480,46 @@ def _find_artifact_in_collections(
     Args:
         artifact_name: Normalized artifact name (extension already stripped)
         artifact_type: Artifact type enum
-        collection_mgr: CollectionManager instance
+        collection_mgr: CollectionManager instance (optional; when None the
+            filesystem path is skipped entirely)
         preferred_collection: Optional collection name or UUID to search first
         db_session: Optional SQLAlchemy session for UUID resolution
-        artifact_repo: Optional IArtifactRepository for enterprise-mode lookup.
+        artifact_repo: IArtifactRepository for enterprise-mode lookup.
             When provided and the filesystem search yields no result, the
-            function falls back to querying the DB-backed repository.
+            function falls back (or goes directly in enterprise mode) to
+            querying the DB-backed repository.
+        collection_repo: Optional ICollectionRepository used when resolving
+            preferred_collection names in enterprise mode.
 
     Returns:
         Tuple of (artifact_or_dto, collection_name) where collection_name is the
         collection name. Returns (None, None) if not found anywhere.
     """
+    # Primary path: when artifact_repo is available and no collection_mgr exists
+    # (enterprise mode), query the repository directly without filesystem access.
+    if artifact_repo is not None and collection_mgr is None:
+        try:
+            artifact_id = f"{artifact_type.value}:{artifact_name}"
+            dto = artifact_repo.get(artifact_id)
+            if dto is not None:
+                collection_name = getattr(dto, "collection_name", None) or "default"
+                return dto, collection_name
+        except Exception as e:
+            logger.debug(
+                "artifact_repo.get('%s:%s') failed in _find_artifact_in_collections (enterprise primary): %s",
+                artifact_type.value,
+                artifact_name,
+                e,
+            )
+        return None, None
+
     # If a preferred collection is specified, try it first
-    if preferred_collection:
+    if preferred_collection and collection_mgr is not None:
         resolved = resolve_collection_name(
-            preferred_collection, collection_mgr, db_session=db_session
+            preferred_collection,
+            collection_mgr,
+            db_session=db_session,
+            collection_repo=collection_repo,
         )
         if resolved:
             try:
@@ -502,18 +539,19 @@ def _find_artifact_in_collections(
                 preferred_collection,
             )
 
-    # Search across all filesystem collections
-    for coll_name in collection_mgr.list_collections():
-        try:
-            coll = collection_mgr.load_collection(coll_name)
-            artifact = coll.find_artifact(artifact_name, artifact_type)
-            if artifact:
-                return artifact, coll_name
-        except ValueError:
-            continue
+    # Search across all filesystem collections (local mode)
+    if collection_mgr is not None:
+        for coll_name in collection_mgr.list_collections():
+            try:
+                coll = collection_mgr.load_collection(coll_name)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+                if artifact:
+                    return artifact, coll_name
+            except ValueError:
+                continue
 
-    # Enterprise-mode fallback: if no artifact was found on the filesystem and
-    # an artifact_repo is available, query the DB-backed repository.
+    # Fallback: if no artifact was found on the filesystem and an artifact_repo
+    # is available, query the DB-backed repository.
     if artifact_repo is not None:
         try:
             artifact_id = f"{artifact_type.value}:{artifact_name}"
@@ -4492,6 +4530,7 @@ async def get_version_graph(
     artifact_id: str,
     _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    settings: SettingsDep,
     _token: TokenDep,
     auth_context: AuthContext = Depends(get_auth_context),
     collection: Optional[str] = Query(
@@ -4554,6 +4593,14 @@ async def get_version_graph(
             "last_updated": "2025-11-20T16:00:00Z"
         }
     """
+    # Version graph traversal reads local filesystem deployments and collection
+    # directories — not yet available in enterprise mode.
+    if settings.edition == "enterprise":
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Version graph is not yet available in enterprise edition",
+        )
+
     try:
         logger.info(
             f"Building version graph for artifact: {artifact_id} (collection={collection})"

@@ -45,8 +45,8 @@ backend:
 integrations:
   github:
     - host: github.com
-      # TODO: replace with your personal or org GitHub token
-      token: ${GITHUB_TOKEN}
+      # Set GITHUB_TOKEN env var for live catalog integrations
+      # token: ${GITHUB_TOKEN}
 
 # =============================================================================
 # SKILLMEAT API INTEGRATION
@@ -54,8 +54,8 @@ integrations:
 # These values are consumed by the @skillmeat/backstage-plugin-scaffolder-backend
 # scaffolder actions (skillmeat:inject-claude-artifact, skillmeat:register-deployment).
 skillmeat:
-  apiUrl: ${SKILLMEAT_API_URL:-http://skillmeat-api:8080}
-  # apiKey: ${SKILLMEAT_API_KEY:-}   # uncomment if auth is enabled
+  baseUrl: ${SKILLMEAT_API_URL:-http://skillmeat-api:8080}
+  # token: ${SKILLMEAT_API_KEY:-}   # uncomment if auth is enabled
 
 # =============================================================================
 # CATALOG
@@ -67,15 +67,10 @@ catalog:
   rules:
     - allow: [Component, System, API, Resource, Location, Template]
 
-  locations:
-    # SkillMeat demo catalog entities
-    # TODO: replace with your actual catalog URL or local paths
-    - type: url
-      target: https://github.com/your-org/your-backstage-catalog/blob/main/all.yaml
-
-    # Example: local catalog file (useful during development)
-    # - type: file
-    #   target: ../../catalog-entities/all.yaml
+  # Add external catalog locations here (these merge with app-config.production.yaml):
+  # locations:
+  #   - type: url
+  #     target: https://github.com/your-org/your-backstage-catalog/blob/main/all.yaml
 
 # =============================================================================
 # SCAFFOLDER
@@ -83,7 +78,7 @@ catalog:
 scaffolder:
   # The SkillMeat scaffolder actions are registered automatically when
   # @skillmeat/backstage-plugin-scaffolder-backend is loaded.
-  # No additional config is required beyond the `skillmeat.apiUrl` above.
+  # No additional config is required beyond the `skillmeat.baseUrl` above.
 
   # TODO: add any additional scaffolder action config here
 
@@ -93,9 +88,10 @@ scaffolder:
 auth:
   # Using guest auth provider for demo simplicity.
   # TODO: replace with GitHub OAuth or your IdP for real use.
-  providers:
-    guest: {}
   environment: development
+  providers:
+    guest:
+      dangerouslyAllowOutsideDevelopment: true
 
 # =============================================================================
 # PROXY ROUTES

@@ -68,6 +68,7 @@ from .routers import (
     workflows,
 )
 from .middleware import ObservabilityMiddleware, RateLimitMiddleware
+from .middleware.filesystem_error_handler import FilesystemErrorMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -363,6 +364,9 @@ def create_app(settings: APISettings = None) -> FastAPI:
         block_duration=10,
     )
     logger.info("RateLimit middleware enabled")
+
+    app.add_middleware(FilesystemErrorMiddleware)
+    logger.info("FilesystemError middleware enabled")
 
     # Configure CORS middleware
     if settings.cors_enabled:
