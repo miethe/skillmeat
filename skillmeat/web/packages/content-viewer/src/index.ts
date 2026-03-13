@@ -12,10 +12,10 @@
 // ============================================================
 // Components (Phase 2)
 // ============================================================
-// export { FileTree } from './components/FileTree';
-// export type { FileTreeProps } from './components/FileTree';
-// export { FrontmatterDisplay } from './components/FrontmatterDisplay';
-// export type { FrontmatterDisplayProps } from './components/FrontmatterDisplay';
+export { FileTree } from './components/FileTree';
+export type { FileTreeProps } from './components/FileTree';
+export { FrontmatterDisplay } from './components/FrontmatterDisplay';
+export type { FrontmatterDisplayProps } from './components/FrontmatterDisplay';
 
 // ============================================================
 // Utilities (Phase 2)
@@ -34,8 +34,8 @@ export type { ReadmeSearchEntry } from './lib/readme-utils';
 // ============================================================
 // Types (Phase 2)
 // ============================================================
-// export type { FileNode } from './types';
-// export type { FileTreeResponse, FileContentResponse } from './types';
+export type { FileNode } from './types';
+export type { FileTreeEntry, FileTreeResponse, FileContentResponse } from './types';
 
 // ============================================================
 // Hooks (Phase 3 — requires adapter abstraction)
@@ -46,4 +46,3 @@ export type { ReadmeSearchEntry } from './lib/readme-utils';
 // API Client (Phase 3 — requires adapter abstraction)
 // ============================================================
 // export { fetchCatalogFileTree, fetchCatalogFileContent } from './lib/api';
-
