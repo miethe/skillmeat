@@ -5,6 +5,9 @@ const nextConfig = {
   // Output standalone build for production
   output: 'standalone',
 
+  // Transpile workspace packages
+  transpilePackages: ['@skillmeat/content-viewer'],
+
   // Ignore ESLint errors during build
   eslint: {
     ignoreDuringBuilds: true,
