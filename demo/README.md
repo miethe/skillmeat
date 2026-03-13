@@ -43,9 +43,9 @@ SKILLMEAT_API_URL=http://host.containers.internal:8080 \
 | Variable | Default | Purpose |
 |---|---|---|
 | `SKILLMEAT_GITHUB_TOKEN` | _(empty)_ | GitHub token for live artifact fetching |
-| `GITHUB_TOKEN` | _(empty)_ | GitHub token for Backstage catalog integrations |
+| `GITHUB_TOKEN` | _(empty)_ | GitHub PAT for Backstage catalog integrations and scaffolder repo publishing |
 | `SKILLMEAT_COLLECTION_PATH` | `~/.skillmeat` | Path to local SkillMeat collection |
-| `SKILLMEAT_API_URL` | `http://host.containers.internal:8080` | API URL used by Backstage (backstage-only profile) |
+| `SKILLMEAT_API_URL` | `http://host.containers.internal:8080` | SAM API URL — maps to `skillmeat.baseUrl` in app-config; used by scaffolder actions and proxy |
 
 Example:
 
@@ -110,7 +110,12 @@ backend.add(
 cp ../backstage-app-config.yaml app-config.local.yaml
 ```
 
-Edit `app-config.local.yaml` and set your `GITHUB_TOKEN` if you want live catalog integrations.
+Edit `app-config.local.yaml` and set your `GITHUB_TOKEN` for catalog integrations and scaffolder repo publishing.
+
+The `GITHUB_TOKEN` PAT requires these scopes:
+- `repo` — full access to create/push repositories via the `publish:github` scaffolder action
+- `workflow` — if templates create GitHub Actions workflows
+- `read:org` — if reading organization data for the catalog
 
 ### 4. Build the Backstage backend
 
@@ -187,5 +192,14 @@ Then access `http://<host>:7007` explicitly.
 
 **Pod conflicts with enterprise profile**: Use a separate project name:
 `podman-compose -p skillmeat-demo --profile backstage-only up -d`
+
+**"SAM API baseUrl is required"**: The scaffolder actions expect `skillmeat.baseUrl` in
+`app-config.yaml` (or `app-config.local.yaml`). Ensure `SKILLMEAT_API_URL` is set as an
+environment variable or that `skillmeat.baseUrl` is explicitly configured. The demo template
+(`backstage-app-config.yaml`) provides sensible defaults.
+
+**Scaffolder fails to publish to GitHub**: Ensure `GITHUB_TOKEN` is set with `repo` scope.
+The Backstage `publish:github` action uses this token via the `integrations.github[].token`
+config entry.
 
 See `plugins/backstage-plugin-scaffolder-backend/README.md` for full plugin documentation.
