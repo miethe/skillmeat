@@ -7753,6 +7753,82 @@ class EnterpriseMarketplaceSourceRepository(
     # Source CRUD — IMarketplaceSourceRepository
     # ------------------------------------------------------------------
 
+    def list_paginated(
+        self, limit: int = 50, cursor: "Optional[str]" = None
+    ) -> "PaginatedResult":
+        """List marketplace sources with cursor-based pagination.
+
+        Uses UUID-keyed cursor pagination for stable, efficient paging through
+        large result sets without the performance penalty of OFFSET.
+
+        Parameters
+        ----------
+        limit:
+            Maximum number of items to return per page (default: 50).
+        cursor:
+            Opaque cursor string from the previous page's ``next_cursor``
+            field.  Pass ``None`` (or omit) to start from the first page.
+
+        Returns
+        -------
+        PaginatedResult
+            Container with ``items`` (list of ``EnterpriseMarketplaceSource``
+            ORM rows), ``next_cursor`` (str UUID or ``None``), and
+            ``has_more`` (bool).
+
+        Notes
+        -----
+        * Pagination is ordered by primary-key UUID, which is monotonically
+          increasing (UUID v4 ordering is lexicographic on the hex string
+          representation as stored in PostgreSQL's ``uuid`` column type).
+        * SQLAlchemy 2.x ``select()`` style — no ``session.query()`` here.
+        * ``_apply_tenant_filter`` is always applied so cross-tenant leakage
+          is impossible.
+        """
+        import uuid as _uuid
+
+        from skillmeat.cache.models_enterprise import EnterpriseMarketplaceSource
+        from skillmeat.cache.repositories import PaginatedResult
+
+        stmt = select(EnterpriseMarketplaceSource)
+        stmt = self._apply_tenant_filter(stmt)
+
+        if cursor:
+            try:
+                cursor_uuid = _uuid.UUID(cursor)
+                stmt = stmt.where(EnterpriseMarketplaceSource.id > cursor_uuid)
+            except ValueError:
+                logger.debug(
+                    "EnterpriseMarketplaceSourceRepository.list_paginated: "
+                    "invalid cursor UUID %r — ignoring",
+                    cursor,
+                )
+
+        stmt = stmt.order_by(EnterpriseMarketplaceSource.id)
+
+        # Fetch limit + 1 to detect whether another page follows.
+        rows = list(self.session.execute(stmt.limit(limit + 1)).scalars())
+
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[:limit]
+
+        next_cursor = str(rows[-1].id) if rows and has_more else None
+
+        logger.debug(
+            "EnterpriseMarketplaceSourceRepository.list_paginated: "
+            "returned %d items (cursor=%r, has_more=%s)",
+            len(rows),
+            cursor,
+            has_more,
+        )
+
+        return PaginatedResult(
+            items=rows,
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )
+
     def list_sources(
         self,
         filters: "Optional[Dict[str, object]]" = None,
