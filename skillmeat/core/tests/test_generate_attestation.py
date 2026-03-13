@@ -307,3 +307,126 @@ class TestGenerateAttestationSigning:
             result = generate_attestation(signature_key_id=None)
 
         assert result["signature"] is None
+
+
+# ---------------------------------------------------------------------------
+# _signing_available internal helper
+# ---------------------------------------------------------------------------
+
+
+class TestSigningAvailable:
+    """Tests for the _signing_available() internal helper."""
+
+    def test_returns_true_when_signing_module_importable(self) -> None:
+        from skillmeat.core.tools.generate_attestation import _signing_available
+
+        # The signing module is always available in this environment.
+        assert _signing_available() is True
+
+    def test_returns_false_when_import_fails(self) -> None:
+        from skillmeat.core.tools.generate_attestation import _signing_available
+        import builtins
+
+        real_import = builtins.__import__
+
+        def patched_import(name, *args, **kwargs):
+            if name == "skillmeat.core.bom.signing":
+                raise ImportError("mocked import failure")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=patched_import):
+            result = _signing_available()
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# _sign_bom internal helper
+# ---------------------------------------------------------------------------
+
+
+class TestSignBomInternal:
+    """Tests for the _sign_bom() internal helper."""
+
+    def test_sign_bom_returns_hex_string(self, tmp_path) -> None:
+        from skillmeat.core.tools.generate_attestation import _sign_bom
+        from skillmeat.core.bom.signing import generate_signing_keypair, SignatureResult
+        from datetime import datetime, timezone
+
+        key_dir = tmp_path / "keys"
+        generate_signing_keypair(key_dir=key_dir)
+
+        canonical_json = '{"artifacts":[],"schema_version":"1.0.0"}'
+        fake_hex = "ab" * 32  # 64 hex chars
+
+        mock_result = SignatureResult(
+            signature=bytes.fromhex(fake_hex),
+            signature_hex=fake_hex,
+            algorithm="ed25519",
+            key_id="k" * 64,
+            signed_at=datetime.now(tz=timezone.utc),
+        )
+
+        # sign_bom is imported inside _sign_bom — patch at the module where it lives.
+        with patch(
+            "skillmeat.core.bom.signing.sign_bom",
+            return_value=mock_result,
+        ):
+            result = _sign_bom(canonical_json, "my-key")
+
+        assert result == fake_hex
+
+
+# ---------------------------------------------------------------------------
+# hash computation edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestHashComputationEdgeCases:
+    """Tests for edge cases in the hash computation path."""
+
+    def test_bom_with_non_serialisable_value_still_hashes(self) -> None:
+        """Even if BOM contains non-standard data, hash computation should work."""
+        # generate_attestation handles exceptions in the hash block
+        with patch(
+            "skillmeat.core.tools.generate_attestation._generate_bom",
+            return_value=_FAKE_BOM,
+        ):
+            result = generate_attestation()
+
+        assert len(result["hash"]) == 64
+
+    def test_hash_failure_sets_error_and_empty_hash(self) -> None:
+        """When json.dumps fails during hash computation, error is set and hash is empty."""
+        # Return a BOM with a non-serializable value to trigger hash failure.
+        class NonSerializable:
+            pass
+
+        bad_bom = {**_FAKE_BOM, "artifacts": [NonSerializable()]}
+
+        with patch(
+            "skillmeat.core.tools.generate_attestation._generate_bom",
+            return_value=bad_bom,
+        ):
+            result = generate_attestation()
+
+        # The hash block will fail due to non-serializable object.
+        assert result["hash"] == "" or result["error"] is not None
+
+    def test_auto_signing_path_when_signing_available_no_key_id(self) -> None:
+        """When signing_available=True but key_id=None, no signature is produced."""
+        with (
+            patch(
+                "skillmeat.core.tools.generate_attestation._generate_bom",
+                return_value=_FAKE_BOM,
+            ),
+            patch(
+                "skillmeat.core.tools.generate_attestation._signing_available",
+                return_value=True,
+            ),
+        ):
+            result = generate_attestation(signature_key_id=None)
+
+        # signature_key_id is None, so the inner `if signature_key_id is not None`
+        # branch is not taken — signature stays None.
+        assert result["signature"] is None

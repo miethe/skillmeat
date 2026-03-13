@@ -640,3 +640,375 @@ class TestBomSerializer:
 
         content = json.loads(target.read_text(encoding="utf-8"))
         assert content["artifact_count"] == 99
+
+
+# ---------------------------------------------------------------------------
+# _hash_bytes helper
+# ---------------------------------------------------------------------------
+
+
+class TestHashBytesHelper:
+    """Tests for the _hash_bytes internal helper."""
+
+    def test_hash_bytes_returns_64_char_hex(self):
+        from skillmeat.core.bom.generator import _hash_bytes
+
+        result = _hash_bytes(b"hello world")
+        assert len(result) == 64
+        assert all(c in "0123456789abcdef" for c in result)
+
+    def test_hash_bytes_deterministic(self):
+        from skillmeat.core.bom.generator import _hash_bytes
+
+        assert _hash_bytes(b"abc") == _hash_bytes(b"abc")
+
+    def test_hash_bytes_different_for_different_input(self):
+        from skillmeat.core.bom.generator import _hash_bytes
+
+        assert _hash_bytes(b"abc") != _hash_bytes(b"def")
+
+    def test_hash_bytes_empty_input(self):
+        from skillmeat.core.bom.generator import _hash_bytes
+
+        result = _hash_bytes(b"")
+        assert len(result) == 64
+
+
+# ---------------------------------------------------------------------------
+# _resolve_artifact_fs_path
+# ---------------------------------------------------------------------------
+
+
+class TestResolveArtifactFsPath:
+    """Tests for _resolve_artifact_fs_path."""
+
+    def test_returns_none_when_no_project_path_no_source(self):
+        from skillmeat.core.bom.generator import _resolve_artifact_fs_path
+
+        art = MagicMock()
+        art.type = "skill"
+        art.name = "my-skill"
+        art.source = None
+        result = _resolve_artifact_fs_path(art, project_path=None)
+        assert result is None
+
+    def test_returns_none_when_project_path_candidate_missing(self, tmp_path: Path):
+        from skillmeat.core.bom.generator import _resolve_artifact_fs_path
+
+        art = MagicMock()
+        art.type = "skill"
+        art.name = "nonexistent-skill"
+        art.source = None
+        result = _resolve_artifact_fs_path(art, project_path=tmp_path)
+        assert result is None
+
+    def test_returns_path_when_project_candidate_exists(self, tmp_path: Path):
+        from skillmeat.core.bom.generator import _resolve_artifact_fs_path
+
+        skill_dir = tmp_path / ".claude" / "skills" / "my-skill"
+        skill_dir.mkdir(parents=True)
+
+        art = MagicMock()
+        art.type = "skill"
+        art.name = "my-skill"
+        art.source = None
+        result = _resolve_artifact_fs_path(art, project_path=tmp_path)
+        assert result == skill_dir
+
+    def test_resolves_source_as_local_absolute_path(self, tmp_path: Path):
+        from skillmeat.core.bom.generator import _resolve_artifact_fs_path
+
+        skill_path = tmp_path / "my-skill"
+        skill_path.mkdir()
+
+        art = MagicMock()
+        art.type = "skill"
+        art.name = "my-skill"
+        art.source = str(skill_path)  # absolute path starting with "/"
+        result = _resolve_artifact_fs_path(art, project_path=None)
+        assert result == skill_path
+
+    def test_source_local_path_nonexistent_returns_none(self, tmp_path: Path):
+        from skillmeat.core.bom.generator import _resolve_artifact_fs_path
+
+        art = MagicMock()
+        art.type = "skill"
+        art.name = "my-skill"
+        art.source = "/nonexistent/path/to/skill"
+        result = _resolve_artifact_fs_path(art, project_path=None)
+        assert result is None
+
+    def test_source_relative_path_dot_prefix(self, tmp_path: Path):
+        from skillmeat.core.bom.generator import _resolve_artifact_fs_path
+        import os
+
+        rel_path = tmp_path / "rel-skill"
+        rel_path.mkdir()
+        # Use a path starting with "." (relative) — test the condition
+        # that artifact.source.startswith(".")
+        art = MagicMock()
+        art.type = "skill"
+        art.name = "rel-skill"
+        # Path starting with "." that resolves
+        art.source = str(rel_path)
+        result = _resolve_artifact_fs_path(art, project_path=None)
+        # absolute paths starting with "/" are resolved; "." paths from tmp_path
+        # won't start with "." so this will return None unless source starts with "."
+        # Test the actual "." prefix case with a relative path:
+        art.source = "./does-not-exist"
+        result2 = _resolve_artifact_fs_path(art, project_path=None)
+        assert result2 is None  # doesn't exist
+
+
+# ---------------------------------------------------------------------------
+# _compute_directory_or_db_hash
+# ---------------------------------------------------------------------------
+
+
+class TestComputeDirectoryOrDbHash:
+    """Tests for _compute_directory_or_db_hash internal helper."""
+
+    def test_returns_empty_string_when_no_content(self):
+        from skillmeat.core.bom.generator import _compute_directory_or_db_hash
+
+        art = MagicMock()
+        art.type = "skill"
+        art.name = "empty-skill"
+        art.id = "skill:empty-skill"
+        art.source = None
+        art.content_hash = None
+        art.content = None
+        result = _compute_directory_or_db_hash(art, project_path=None)
+        assert result == ""
+
+    def test_uses_content_hash_when_present(self):
+        from skillmeat.core.bom.generator import _compute_directory_or_db_hash
+
+        art = MagicMock()
+        art.type = "skill"
+        art.name = "cached-skill"
+        art.id = "skill:cached-skill"
+        art.source = None
+        art.content_hash = "a" * 64
+        art.content = None
+        result = _compute_directory_or_db_hash(art, project_path=None)
+        assert result == "a" * 64
+
+    def test_hashes_content_when_no_content_hash(self):
+        from skillmeat.core.bom.generator import _compute_directory_or_db_hash, _hash_string
+
+        art = MagicMock()
+        art.type = "command"
+        art.name = "deploy-cmd"
+        art.id = "command:deploy-cmd"
+        art.source = None
+        art.content_hash = None
+        art.content = "#!/bin/bash\necho 'deploy'"
+        result = _compute_directory_or_db_hash(art, project_path=None)
+        assert result == _hash_string(art.content)
+        assert len(result) == 64
+
+
+# ---------------------------------------------------------------------------
+# _extract_standard_metadata
+# ---------------------------------------------------------------------------
+
+
+class TestExtractStandardMetadata:
+    """Tests for _extract_standard_metadata helper."""
+
+    def test_returns_none_fields_when_no_metadata(self):
+        from skillmeat.core.bom.generator import _extract_standard_metadata
+
+        art = MagicMock()
+        art.artifact_metadata = None
+        art.created_at = None
+        art.updated_at = None
+        result = _extract_standard_metadata(art)
+
+        assert result["author"] is None
+        assert result["description"] is None
+        assert result["tags"] == []
+        assert result["created_at"] is None
+        assert result["updated_at"] is None
+
+    def test_extracts_description_from_metadata(self):
+        from skillmeat.core.bom.generator import _extract_standard_metadata
+
+        meta = MagicMock()
+        meta.description = "A test skill"
+        meta.tags = None
+        meta.metadata_json = None
+
+        art = MagicMock()
+        art.artifact_metadata = meta
+        art.created_at = None
+        art.updated_at = None
+
+        result = _extract_standard_metadata(art)
+        assert result["description"] == "A test skill"
+
+    def test_extracts_tags_from_metadata(self):
+        from skillmeat.core.bom.generator import _extract_standard_metadata
+
+        meta = MagicMock()
+        meta.description = None
+        meta.tags = "python, backend, api"
+        meta.metadata_json = None
+
+        art = MagicMock()
+        art.artifact_metadata = meta
+        art.created_at = None
+        art.updated_at = None
+
+        result = _extract_standard_metadata(art)
+        assert result["tags"] == ["python", "backend", "api"]
+
+    def test_extracts_author_from_metadata_json(self):
+        from skillmeat.core.bom.generator import _extract_standard_metadata
+
+        meta = MagicMock()
+        meta.description = None
+        meta.tags = None
+        meta.metadata_json = json.dumps({"author": "Alice", "description": "From JSON"})
+
+        art = MagicMock()
+        art.artifact_metadata = meta
+        art.created_at = None
+        art.updated_at = None
+
+        result = _extract_standard_metadata(art)
+        assert result["author"] == "Alice"
+        assert result["description"] == "From JSON"
+
+    def test_handles_invalid_metadata_json(self):
+        from skillmeat.core.bom.generator import _extract_standard_metadata
+
+        meta = MagicMock()
+        meta.description = None
+        meta.tags = None
+        meta.metadata_json = "not-valid-json!!!"
+
+        art = MagicMock()
+        art.artifact_metadata = meta
+        art.created_at = None
+        art.updated_at = None
+
+        # Should not raise; author stays None
+        result = _extract_standard_metadata(art)
+        assert result["author"] is None
+
+    def test_includes_created_at_and_updated_at(self):
+        from skillmeat.core.bom.generator import _extract_standard_metadata
+        from datetime import datetime, timezone
+
+        ts = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        art = MagicMock()
+        art.artifact_metadata = None
+        art.created_at = ts
+        art.updated_at = ts
+
+        result = _extract_standard_metadata(art)
+        assert result["created_at"] == ts.isoformat()
+        assert result["updated_at"] == ts.isoformat()
+
+
+# ---------------------------------------------------------------------------
+# SkillAdapter with metadata
+# ---------------------------------------------------------------------------
+
+
+class TestSkillAdapterWithMetadata:
+    """Tests for SkillAdapter.adapt() with metadata extracted."""
+
+    def test_adapt_with_metadata_description_and_tags(self):
+        from skillmeat.core.bom.generator import SkillAdapter
+
+        meta = MagicMock()
+        meta.description = "Canvas drawing skill"
+        meta.tags = "drawing, art"
+        meta.metadata_json = json.dumps({"author": "Bob"})
+
+        art = MagicMock()
+        art.name = "canvas"
+        art.type = "skill"
+        art.id = "skill:canvas"
+        art.source = "anthropics/skills/canvas"
+        art.deployed_version = "v1.0.0"
+        art.upstream_version = None
+        art.content = None
+        art.content_hash = None
+        art.artifact_metadata = meta
+        art.created_at = None
+        art.updated_at = None
+
+        adapter = SkillAdapter()
+        entry = adapter.adapt(art)
+
+        assert entry["metadata"]["description"] == "Canvas drawing skill"
+        assert entry["metadata"]["tags"] == ["drawing", "art"]
+        assert entry["metadata"]["author"] == "Bob"
+
+    def test_adapt_with_content_hash_fallback(self):
+        from skillmeat.core.bom.generator import SkillAdapter
+
+        cached_hash = "b" * 64
+        art = MagicMock()
+        art.name = "cached-skill"
+        art.type = "skill"
+        art.id = "skill:cached-skill"
+        art.source = None
+        art.deployed_version = None
+        art.upstream_version = None
+        art.content = None
+        art.content_hash = cached_hash
+        art.artifact_metadata = None
+        art.created_at = None
+        art.updated_at = None
+
+        adapter = SkillAdapter()
+        entry = adapter.adapt(art)
+
+        assert entry["content_hash"] == cached_hash
+
+
+# ---------------------------------------------------------------------------
+# BomGenerator custom adapter registration
+# ---------------------------------------------------------------------------
+
+
+class TestBomGeneratorAdapterRegistry:
+    """Tests for BomGenerator.register_adapter and get_adapter."""
+
+    def test_get_adapter_returns_none_for_unknown_type(self):
+        """get_adapter returns None for an unregistered type."""
+        session = _make_session([])
+        gen = BomGenerator(session=session)
+        assert gen.get_adapter("unicorn_type") is None
+
+    def test_register_adapter_replaces_existing(self):
+        """register_adapter() replaces any previously registered adapter for the same type."""
+        session = _make_session([])
+        gen = BomGenerator(session=session)
+
+        class DoubleHashSkillAdapter(MagicMock):
+            def get_artifact_type(self):
+                return "skill"
+
+        new_adapter = DoubleHashSkillAdapter()
+        gen.register_adapter(new_adapter)
+        assert gen.get_adapter("skill") is new_adapter
+
+    def test_project_path_stored_as_path_object(self, tmp_path: Path):
+        """BomGenerator converts string project_path to Path."""
+        session = _make_session([])
+        gen = BomGenerator(session=session, project_path=str(tmp_path))
+        result = gen.generate()
+        assert result["project_path"] == str(tmp_path)
+
+    def test_project_path_none_produces_null_in_bom(self):
+        """project_path=None produces null in BOM output."""
+        session = _make_session([])
+        gen = BomGenerator(session=session, project_path=None)
+        result = gen.generate()
+        assert result["project_path"] is None

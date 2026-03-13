@@ -523,3 +523,115 @@ class TestBuildQueryFilters:
             "enterprise", "e-corp", roles=["viewer"]
         )
         assert filters == {"owner_type": "enterprise", "owner_id": "e-corp"}
+
+
+# =============================================================================
+# OwnershipResolver — resolve()
+# =============================================================================
+
+
+class TestOwnershipResolverResolve:
+    """OwnershipResolver.resolve() precedence rules."""
+
+    @pytest.fixture()
+    def resolver(self) -> OwnershipResolver:
+        return OwnershipResolver()
+
+    def test_tenant_id_wins_over_all(self, resolver: OwnershipResolver) -> None:
+        owner_type, owner_id = resolver.resolve(
+            user_id="u-1", team_id="t-1", tenant_id="e-1"
+        )
+        assert owner_type == OwnerType.enterprise.value
+        assert owner_id == "e-1"
+
+    def test_team_id_wins_over_user(self, resolver: OwnershipResolver) -> None:
+        owner_type, owner_id = resolver.resolve(user_id="u-1", team_id="t-1")
+        assert owner_type == OwnerType.team.value
+        assert owner_id == "t-1"
+
+    def test_user_id_only(self, resolver: OwnershipResolver) -> None:
+        owner_type, owner_id = resolver.resolve(user_id="u-42")
+        assert owner_type == OwnerType.user.value
+        assert owner_id == "u-42"
+
+    def test_no_ids_returns_anonymous(self, resolver: OwnershipResolver) -> None:
+        owner_type, owner_id = resolver.resolve()
+        assert owner_type == OwnerType.user.value
+        assert owner_id == "anonymous"
+
+    def test_none_ids_return_anonymous(self, resolver: OwnershipResolver) -> None:
+        owner_type, owner_id = resolver.resolve(
+            user_id=None, team_id=None, tenant_id=None
+        )
+        assert owner_type == OwnerType.user.value
+        assert owner_id == "anonymous"
+
+    def test_tenant_id_without_user_or_team(self, resolver: OwnershipResolver) -> None:
+        owner_type, owner_id = resolver.resolve(tenant_id="e-99")
+        assert owner_type == OwnerType.enterprise.value
+        assert owner_id == "e-99"
+
+    def test_team_id_without_user(self, resolver: OwnershipResolver) -> None:
+        owner_type, owner_id = resolver.resolve(team_id="t-77")
+        assert owner_type == OwnerType.team.value
+        assert owner_id == "t-77"
+
+
+# =============================================================================
+# OwnershipResolver — resolve_from_auth_context()
+# =============================================================================
+
+
+class TestOwnershipResolverFromAuthContext:
+    """OwnershipResolver.resolve_from_auth_context() uses getattr safely."""
+
+    @pytest.fixture()
+    def resolver(self) -> OwnershipResolver:
+        return OwnershipResolver()
+
+    def test_extracts_user_id_from_context(self, resolver: OwnershipResolver) -> None:
+        from types import SimpleNamespace
+
+        ctx = SimpleNamespace(user_id="u-ctx", team_id=None, tenant_id=None)
+        owner_type, owner_id = resolver.resolve_from_auth_context(ctx)
+        assert owner_type == OwnerType.user.value
+        assert owner_id == "u-ctx"
+
+    def test_extracts_team_id_from_context(self, resolver: OwnershipResolver) -> None:
+        from types import SimpleNamespace
+
+        ctx = SimpleNamespace(user_id="u-ctx", team_id="t-ctx", tenant_id=None)
+        owner_type, owner_id = resolver.resolve_from_auth_context(ctx)
+        assert owner_type == OwnerType.team.value
+        assert owner_id == "t-ctx"
+
+    def test_extracts_tenant_id_from_context(self, resolver: OwnershipResolver) -> None:
+        from types import SimpleNamespace
+
+        ctx = SimpleNamespace(user_id="u-ctx", team_id="t-ctx", tenant_id="e-ctx")
+        owner_type, owner_id = resolver.resolve_from_auth_context(ctx)
+        assert owner_type == OwnerType.enterprise.value
+        assert owner_id == "e-ctx"
+
+    def test_missing_attributes_fallback_to_anonymous(
+        self, resolver: OwnershipResolver
+    ) -> None:
+        """Objects with none of the expected attributes yield anonymous."""
+
+        class EmptyContext:
+            pass
+
+        owner_type, owner_id = resolver.resolve_from_auth_context(EmptyContext())
+        assert owner_type == OwnerType.user.value
+        assert owner_id == "anonymous"
+
+    def test_uuid_ids_are_converted_to_str(self, resolver: OwnershipResolver) -> None:
+        """UUID objects in auth context are stringified before calling resolve()."""
+        import uuid
+        from types import SimpleNamespace
+
+        uid = uuid.UUID("12345678-1234-5678-1234-567812345678")
+        ctx = SimpleNamespace(user_id=uid, team_id=None, tenant_id=None)
+        owner_type, owner_id = resolver.resolve_from_auth_context(ctx)
+        assert owner_type == OwnerType.user.value
+        assert owner_id == str(uid)
