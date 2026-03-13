@@ -67,10 +67,10 @@ catalog:
   rules:
     - allow: [Component, System, API, Resource, Location, Template]
 
-  locations: []
-    # Uncomment and replace with your catalog URL:
-    # - type: url
-    #   target: https://github.com/your-org/your-backstage-catalog/blob/main/all.yaml
+  # Add external catalog locations here (these merge with app-config.production.yaml):
+  # locations:
+  #   - type: url
+  #     target: https://github.com/your-org/your-backstage-catalog/blob/main/all.yaml
 
 # =============================================================================
 # SCAFFOLDER
@@ -88,9 +88,10 @@ scaffolder:
 auth:
   # Using guest auth provider for demo simplicity.
   # TODO: replace with GitHub OAuth or your IdP for real use.
-  providers:
-    guest: {}
   environment: development
+  providers:
+    guest:
+      dangerouslyAllowOutsideDevelopment: true
 
 # =============================================================================
 # PROXY ROUTES
