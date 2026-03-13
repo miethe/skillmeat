@@ -393,9 +393,12 @@ export function EntityLifecycleProvider({
       };
 
       // Build query parameters
+      // Filter out the 'discovered' sentinel — it marks undiscovered artifacts and
+      // is not a real collection name. Let the backend use its default collection.
+      const effectiveCollection = collection === 'discovered' ? undefined : collection;
       const params = new URLSearchParams();
-      if (collection) {
-        params.set('collection', collection);
+      if (effectiveCollection) {
+        params.set('collection', effectiveCollection);
       }
       const queryString = params.toString();
       const url = `/artifacts/${encodeURIComponent(id)}/deploy${queryString ? `?${queryString}` : ''}`;

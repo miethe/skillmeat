@@ -67,6 +67,14 @@ export function useDiscovery() {
       await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       // Also invalidate discovery results to get fresh count
       await queryClient.invalidateQueries({ queryKey: ['artifacts', 'discover'] });
+      // Collection page uses ['collections'] query key to display artifacts
+      await queryClient.invalidateQueries({ queryKey: ['collections'] });
+      // Manage page uses ['entities'] query key (EntityLifecycle)
+      await queryClient.invalidateQueries({ queryKey: ['entities'] });
+      // Deployments may have changed if project_id was provided
+      await queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      // Projects page needs refresh for deployment counts
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
   });
 
