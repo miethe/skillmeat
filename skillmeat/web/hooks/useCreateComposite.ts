@@ -53,6 +53,10 @@ export function useCreateComposite(): UseMutationResult<
       queryClient.invalidateQueries({
         queryKey: compositeKeys.all,
       });
+      // Invalidate artifacts so the merged collection view refreshes
+      queryClient.invalidateQueries({
+        queryKey: ['artifacts'],
+      });
     },
     onError: (error) => {
       showError(error, 'Failed to create composite');

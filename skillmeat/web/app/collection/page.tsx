@@ -32,6 +32,7 @@ import {
   useEditArtifactParameters,
   useToast,
   useReturnTo,
+  useComposites,
 } from '@/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -405,6 +406,33 @@ function CollectionPageContent() {
     enabled: true, // Always fetch to support enrichment
   });
 
+  // Fetch composites for the selected collection (or 'default' for "All Collections" view)
+  const compositesCollectionId = isSpecificCollection ? selectedCollectionId : 'default';
+  const { data: compositesData, isLoading: compositesLoading } = useComposites(compositesCollectionId);
+
+  // Map composites to Artifact shape for unified rendering
+  const compositeArtifacts = useMemo<Artifact[]>(() => {
+    if (!compositesData?.items) return [];
+    return compositesData.items.map((composite) => {
+      const name = composite.display_name ?? composite.id.replace(/^composite:/, '');
+      return {
+        id: composite.id.startsWith('composite:') ? composite.id : `composite:${composite.id}`,
+        uuid: composite.id.replace(/^composite:/, ''),
+        name,
+        type: 'composite' as const,
+        scope: 'user' as const,
+        syncStatus: 'synced' as const,
+        version: '1.0.0',
+        source: 'local',
+        origin: 'local' as const,
+        description: composite.description ?? undefined,
+        createdAt: composite.created_at,
+        updatedAt: composite.updated_at,
+        compositeType: (composite.composite_type as 'plugin' | 'stack' | 'suite' | 'skill') ?? 'plugin',
+      } satisfies Artifact;
+    });
+  }, [compositesData]);
+
   // Unified pagination state based on current view
   const fetchNextPage = isSpecificCollection ? fetchNextCollectionPage : fetchNextAllPage;
   const hasNextPage = isSpecificCollection ? hasNextCollectionPage : hasNextAllPage;
@@ -419,9 +447,10 @@ function CollectionPageContent() {
   });
 
   // Select the appropriate loading state and error based on selection
+  // Include compositesLoading so the UI waits for both before rendering
   const isLoadingArtifacts = isSpecificCollection
-    ? isLoadingCollectionArtifacts
-    : isLoadingAllArtifacts;
+    ? isLoadingCollectionArtifacts || compositesLoading
+    : isLoadingAllArtifacts || compositesLoading;
   const error = isSpecificCollection ? collectionError : allArtifactsError;
   const refetch = isSpecificCollection ? refetchCollectionArtifacts : refetchAllArtifacts;
 
@@ -645,6 +674,15 @@ function CollectionPageContent() {
       });
     }
 
+    // Merge composites into the artifact list. Composites are fetched separately
+    // from /composites (separate DB table) and are not included in the artifacts
+    // infinite scroll query. Deduplicate in case a composite appears in both.
+    if (compositeArtifacts.length > 0) {
+      const existingIds = new Set(artifacts.map((a) => a.id));
+      const newComposites = compositeArtifacts.filter((c) => !existingIds.has(c.id));
+      artifacts = [...newComposites, ...artifacts];
+    }
+
     // Type filter is always AND (it's a primary category selector, not a cross-category filter)
     if (filters.type && filters.type !== 'all') {
       artifacts = artifacts.filter((artifact) => artifact.type === filters.type);
@@ -709,6 +747,7 @@ function CollectionPageContent() {
     isSpecificCollection,
     infiniteCollectionData,
     infiniteAllArtifactsData,
+    compositeArtifacts,
     filters,
     searchQuery,
     selectedStatuses,
