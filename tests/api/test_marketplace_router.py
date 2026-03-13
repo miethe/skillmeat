@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from skillmeat.api.server import create_app
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.utils.cache import get_cache_manager
 from skillmeat.marketplace.broker import MarketplaceBroker, DownloadError, PublishError
 from skillmeat.marketplace.models import MarketplaceListing, PublishResult
 
@@ -69,6 +70,12 @@ def client(test_settings):
         lambda: mock_source_repo
     )
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_cache():
+    """Reset the global cache between tests."""
+    get_cache_manager().clear()
 
 
 @pytest.fixture
