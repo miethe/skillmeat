@@ -16,6 +16,7 @@ Performance improvement: ~10-30 seconds → <50ms for cached responses.
 
 import asyncio
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -174,14 +175,13 @@ class ProjectRegistry:
             None, self._discover_projects_sync
         )
 
-        # Build cache entries (also in thread pool for TOML reads)
-        new_cache: Dict[str, ProjectCacheEntry] = {}
-        for project_path in discovered_paths:
-            entry = await loop.run_in_executor(
-                None, self._build_cache_entry, project_path
-            )
-            if entry:
-                new_cache[str(project_path)] = entry
+        # Build cache entries in parallel (thread pool for blocking TOML reads)
+        async def build_entry(path: Path) -> tuple[Path, Optional[ProjectCacheEntry]]:
+            entry = await loop.run_in_executor(None, self._build_cache_entry, path)
+            return path, entry
+
+        results = await asyncio.gather(*[build_entry(p) for p in discovered_paths])
+        new_cache = {str(path): entry for path, entry in results if entry is not None}
 
         # Atomic swap
         self._cache = new_cache
@@ -199,9 +199,22 @@ class ProjectRegistry:
         Synchronously discover projects with deployment files.
 
         This is the blocking filesystem scan that runs in a thread pool.
+        Uses os.walk with pruning to avoid traversing heavy directories.
         """
         discovered = []
         search_paths = self._get_search_paths()
+        deployment_filename = DeploymentTracker.DEPLOYMENT_FILE
+        profile_root_set = set(DEFAULT_PROFILE_ROOTS)
+
+        # Directories to skip during traversal (common heavy directories)
+        skip_dirs = {
+            "node_modules", ".git", "venv", ".venv", "__pycache__",
+            ".npm", ".cargo", ".rustup", ".cache", ".local",
+            "vendor", "dist", "build", ".next", ".nuxt",
+            "target",   # Rust
+            "Pods",     # iOS
+            ".gradle",  # Java/Android
+        }
 
         for search_path in search_paths:
             if not search_path.exists() or not search_path.is_dir():
@@ -214,27 +227,32 @@ class ProjectRegistry:
                 continue
 
             try:
-                # Use rglob to find deployment files across profile roots
-                for profile_root in DEFAULT_PROFILE_ROOTS:
-                    for deployment_file in search_path.rglob(
-                        f"{profile_root}/{DeploymentTracker.DEPLOYMENT_FILE}"
-                    ):
-                        project_path = deployment_file.parent.parent
+                for root, dirs, _files in os.walk(search_path):
+                    root_path = Path(root)
+                    depth = len(root_path.relative_to(search_path).parts)
 
-                        # Validate path is within search_path
-                        try:
-                            project_path = project_path.resolve()
-                            project_path.relative_to(search_path)
-                        except (ValueError, RuntimeError, OSError):
-                            continue
+                    # Prune: skip heavy directories and respect depth limit.
+                    # Modifying dirs in-place prevents os.walk from descending.
+                    dirs[:] = [
+                        d for d in dirs
+                        if d not in skip_dirs and depth < self._max_depth + 2
+                    ]
 
-                        # Check depth limit
-                        depth = len(project_path.relative_to(search_path).parts)
-                        if depth > self._max_depth:
-                            continue
+                    # Check if this directory is a profile root with a deployment file
+                    if root_path.name in profile_root_set:
+                        deployment_file = root_path / deployment_filename
+                        if deployment_file.exists():
+                            project_path = root_path.parent
 
-                        if project_path not in discovered:
-                            discovered.append(project_path)
+                            # Validate depth (project_path depth, not profile root depth)
+                            project_depth = len(
+                                project_path.relative_to(search_path).parts
+                            )
+                            if project_depth > self._max_depth:
+                                continue
+
+                            if project_path not in discovered:
+                                discovered.append(project_path)
 
             except (PermissionError, OSError) as e:
                 logger.warning(f"Error scanning {search_path}: {e}")
