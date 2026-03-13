@@ -20,15 +20,16 @@
 // ============================================================
 // Utilities (Phase 2)
 // ============================================================
-// export {
-//   parseFrontmatter,
-//   stripFrontmatter,
-//   detectFrontmatter,
-// } from './lib/frontmatter';
-// export {
-//   extractFirstParagraph,
-//   extractFolderReadme,
-// } from './lib/readme-utils';
+export {
+  parseFrontmatter,
+  stripFrontmatter,
+  detectFrontmatter,
+} from './lib/frontmatter';
+export {
+  extractFirstParagraph,
+  extractFolderReadme,
+} from './lib/readme-utils';
+export type { ReadmeSearchEntry } from './lib/readme-utils';
 
 // ============================================================
 // Types (Phase 2)
@@ -46,5 +47,3 @@
 // ============================================================
 // export { fetchCatalogFileTree, fetchCatalogFileContent } from './lib/api';
 
-// Placeholder to make this a valid module
-export {};
