@@ -550,6 +550,13 @@ export { useAnalyticsStream } from './useAnalyticsStream';
 // Artifact provenance/history timeline
 export { useArtifactHistory, getArtifactHistoryId, artifactHistoryKeys } from './useArtifactHistory';
 
+// Artifact activity stream (audit/provenance, cursor-paginated)
+export {
+  artifactActivityHistoryKeys,
+  useArtifactActivityHistory,
+  type UseArtifactActivityHistoryOptions,
+} from './useArtifactActivityHistory';
+
 // ============================================================================
 // SIMILARITY (7 hooks)
 // ============================================================================
