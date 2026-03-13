@@ -39,6 +39,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import mimetypes
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
@@ -47,7 +48,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from skillmeat.cache.models import Artifact
+from skillmeat.cache.models import Artifact, CompositeMembership
 from skillmeat.core.hashing import compute_artifact_hash
 
 logger = logging.getLogger(__name__)
@@ -348,6 +349,895 @@ class SkillAdapter(BaseArtifactAdapter):
 
 
 # ---------------------------------------------------------------------------
+# Shared helper for metadata extraction (used by multiple adapters)
+# ---------------------------------------------------------------------------
+
+
+def _extract_standard_metadata(
+    artifact: Artifact,
+) -> Dict[str, Any]:
+    """Extract the standard metadata block from an ``Artifact`` row.
+
+    Pulls ``author``, ``description``, and ``tags`` from the
+    ``artifact_metadata`` relationship (including the ``metadata_json`` blob)
+    and adds ``created_at``/``updated_at`` ISO-8601 timestamps.
+
+    Args:
+        artifact: ORM artifact row with accessible ``artifact_metadata``.
+
+    Returns:
+        Metadata dict suitable for inclusion in a BOM entry.
+    """
+    meta = artifact.artifact_metadata
+    author: Optional[str] = None
+    description: Optional[str] = None
+    tags: List[str] = []
+
+    if meta is not None:
+        description = meta.description
+        if meta.tags:
+            tags = [t.strip() for t in meta.tags.split(",") if t.strip()]
+        if meta.metadata_json:
+            try:
+                raw_meta = json.loads(meta.metadata_json)
+                author = raw_meta.get("author")
+                if not description:
+                    description = raw_meta.get("description")
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+    return {
+        "author": author,
+        "description": description,
+        "tags": tags,
+        "created_at": (
+            artifact.created_at.isoformat() if artifact.created_at else None
+        ),
+        "updated_at": (
+            artifact.updated_at.isoformat() if artifact.updated_at else None
+        ),
+    }
+
+
+def _compute_directory_or_db_hash(
+    artifact: Artifact,
+    project_path: Optional[Path],
+) -> str:
+    """Compute content hash for a directory-based artifact.
+
+    Strategy (in order):
+    1. Filesystem Merkle-tree via ``compute_artifact_hash`` if path resolves.
+    2. Cached ``content_hash`` DB column.
+    3. Hash of ``content`` DB column text.
+    4. Empty string with warning.
+
+    Args:
+        artifact: ORM artifact row.
+        project_path: Optional project root directory.
+
+    Returns:
+        64-character lowercase hex string, or ``""`` on failure.
+    """
+    fs_path = _resolve_artifact_fs_path(artifact, project_path)
+    if fs_path is not None:
+        try:
+            return compute_artifact_hash(str(fs_path))
+        except (FileNotFoundError, ValueError, OSError) as exc:
+            logger.debug(
+                "Filesystem hash failed for %r %r (%s); falling back to DB content.",
+                artifact.type,
+                artifact.name,
+                exc,
+            )
+
+    if artifact.content_hash:
+        logger.debug(
+            "Using cached content_hash from DB for %r %r.",
+            artifact.type,
+            artifact.name,
+        )
+        return artifact.content_hash
+
+    if artifact.content:
+        return _hash_string(artifact.content)
+
+    logger.warning(
+        "Cannot compute content hash for %r %r (id=%r): "
+        "no filesystem path and no DB content available.",
+        artifact.type,
+        artifact.name,
+        artifact.id,
+    )
+    return ""
+
+
+# ---------------------------------------------------------------------------
+# TASK-2.2: CommandAdapter
+# ---------------------------------------------------------------------------
+
+
+class CommandAdapter(BaseArtifactAdapter):
+    """BOM adapter for command-type artifacts.
+
+    Commands are typically stored under ``.claude/commands/<name>/``.
+    Content hashing mirrors the ``SkillAdapter`` strategy: filesystem
+    Merkle-tree when a path resolves, DB content otherwise.
+
+    Metadata extracted per BOM entry:
+
+    * ``author``, ``description``, ``tags`` — from ``artifact_metadata``.
+    * ``created_at``, ``updated_at`` — ISO-8601 timestamps.
+    """
+
+    def get_artifact_type(self) -> str:
+        """Return ``"command"``."""
+        return "command"
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for a command artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        return _compute_directory_or_db_hash(artifact, project_path)
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for a command artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata.
+        """
+        return {
+            "name": artifact.name,
+            "type": artifact.type,
+            "source": artifact.source,
+            "version": artifact.deployed_version or artifact.upstream_version,
+            "content_hash": self.compute_content_hash(artifact, project_path),
+            "metadata": _extract_standard_metadata(artifact),
+        }
+
+
+# ---------------------------------------------------------------------------
+# TASK-2.3: AgentAdapter, McpAdapter
+# ---------------------------------------------------------------------------
+
+
+class AgentAdapter(BaseArtifactAdapter):
+    """BOM adapter for agent-type artifacts.
+
+    Agents reside under ``.claude/agents/<name>``.  Hashing and metadata
+    extraction follow the same strategy as ``SkillAdapter``.
+    """
+
+    def get_artifact_type(self) -> str:
+        """Return ``"agent"``."""
+        return "agent"
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for an agent artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        return _compute_directory_or_db_hash(artifact, project_path)
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for an agent artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata.
+        """
+        return {
+            "name": artifact.name,
+            "type": artifact.type,
+            "source": artifact.source,
+            "version": artifact.deployed_version or artifact.upstream_version,
+            "content_hash": self.compute_content_hash(artifact, project_path),
+            "metadata": _extract_standard_metadata(artifact),
+        }
+
+
+class McpAdapter(BaseArtifactAdapter):
+    """BOM adapter for MCP server artifacts.
+
+    MCP servers reside under ``.claude/mcp/<name>``.  Hashing and metadata
+    extraction follow the same strategy as ``SkillAdapter``.
+    """
+
+    def get_artifact_type(self) -> str:
+        """Return ``"mcp_server"``."""
+        return "mcp_server"
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for an MCP server artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        return _compute_directory_or_db_hash(artifact, project_path)
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for an MCP server artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata.
+        """
+        return {
+            "name": artifact.name,
+            "type": artifact.type,
+            "source": artifact.source,
+            "version": artifact.deployed_version or artifact.upstream_version,
+            "content_hash": self.compute_content_hash(artifact, project_path),
+            "metadata": _extract_standard_metadata(artifact),
+        }
+
+
+# ---------------------------------------------------------------------------
+# TASK-2.4: HookAdapter, WorkflowAdapter, CompositeAdapter
+# ---------------------------------------------------------------------------
+
+
+class HookAdapter(BaseArtifactAdapter):
+    """BOM adapter for hook-type artifacts.
+
+    Hooks reside under ``.claude/hooks/<name>``.  Hashing and metadata
+    extraction follow the same strategy as ``SkillAdapter``.
+    """
+
+    def get_artifact_type(self) -> str:
+        """Return ``"hook"``."""
+        return "hook"
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for a hook artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        return _compute_directory_or_db_hash(artifact, project_path)
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for a hook artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata.
+        """
+        return {
+            "name": artifact.name,
+            "type": artifact.type,
+            "source": artifact.source,
+            "version": artifact.deployed_version or artifact.upstream_version,
+            "content_hash": self.compute_content_hash(artifact, project_path),
+            "metadata": _extract_standard_metadata(artifact),
+        }
+
+
+class WorkflowAdapter(BaseArtifactAdapter):
+    """BOM adapter for workflow-type artifacts.
+
+    Workflows are directory-based artifacts stored under
+    ``.claude/workflows/<name>``.  Hashing and metadata extraction follow the
+    same strategy as ``SkillAdapter``.
+    """
+
+    def get_artifact_type(self) -> str:
+        """Return ``"workflow"``."""
+        return "workflow"
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for a workflow artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        return _compute_directory_or_db_hash(artifact, project_path)
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for a workflow artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata.
+        """
+        return {
+            "name": artifact.name,
+            "type": artifact.type,
+            "source": artifact.source,
+            "version": artifact.deployed_version or artifact.upstream_version,
+            "content_hash": self.compute_content_hash(artifact, project_path),
+            "metadata": _extract_standard_metadata(artifact),
+        }
+
+
+#: Maximum recursion depth for nested composite member resolution.
+_COMPOSITE_MAX_DEPTH = 4
+
+
+class CompositeAdapter(BaseArtifactAdapter):
+    """BOM adapter for composite-type artifacts.
+
+    Composites are multi-artifact bundles (e.g. plugins).  The BOM entry
+    includes a ``members`` list that enumerates child artifact references
+    resolved via ``CompositeMembership`` rows.
+
+    Member resolution
+    -----------------
+    The adapter queries ``CompositeMembership`` rows where
+    ``composite_id == artifact.id`` (both use the ``type:name`` string format).
+    Each membership row's ``child_artifact`` relationship provides the child
+    ``Artifact``.  Recursion is capped at ``_COMPOSITE_MAX_DEPTH`` to prevent
+    cycles.
+
+    Session access
+    --------------
+    A SQLAlchemy ``Session`` is required to query memberships.  Pass it via the
+    ``session`` constructor argument.  When ``session`` is ``None`` the adapter
+    logs a warning and returns an empty ``members`` list.
+
+    Args:
+        session: SQLAlchemy session for querying ``CompositeMembership`` rows.
+    """
+
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self._session = session
+
+    def get_artifact_type(self) -> str:
+        """Return ``"composite"``."""
+        return "composite"
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for a composite artifact.
+
+        Computes a hash over the sorted member UUIDs so that any change in
+        membership (add/remove/reorder) produces a different hash.  Falls back
+        to filesystem / DB content hashing when no session is available.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        if self._session is not None:
+            try:
+                memberships = (
+                    self._session.query(CompositeMembership)
+                    .filter(CompositeMembership.composite_id == artifact.id)
+                    .all()
+                )
+                if memberships:
+                    # Sort for determinism: hash over sorted child UUIDs.
+                    child_uuids = sorted(m.child_artifact_uuid for m in memberships)
+                    return _hash_string(
+                        f"{artifact.id}:{'|'.join(child_uuids)}"
+                    )
+            except Exception as exc:
+                logger.debug(
+                    "Failed to query memberships for composite %r (%s); "
+                    "falling back to directory hash.",
+                    artifact.name,
+                    exc,
+                )
+
+        return _compute_directory_or_db_hash(artifact, project_path)
+
+    def _resolve_members(
+        self, artifact: Artifact, depth: int
+    ) -> List[Dict[str, Any]]:
+        """Recursively resolve member artifacts up to ``_COMPOSITE_MAX_DEPTH``.
+
+        Args:
+            artifact: Parent composite ``Artifact`` row.
+            depth: Current recursion depth (0 = first level).
+
+        Returns:
+            List of member dicts with keys: uuid, name, type, source,
+            version, relationship_type, pinned_version_hash.
+        """
+        if depth >= _COMPOSITE_MAX_DEPTH:
+            logger.debug(
+                "Composite member recursion depth %d reached for %r; stopping.",
+                depth,
+                artifact.name,
+            )
+            return []
+
+        if self._session is None:
+            return []
+
+        try:
+            memberships = (
+                self._session.query(CompositeMembership)
+                .filter(CompositeMembership.composite_id == artifact.id)
+                .all()
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to query CompositeMembership for composite %r (id=%r): %s",
+                artifact.name,
+                artifact.id,
+                exc,
+            )
+            return []
+
+        members: List[Dict[str, Any]] = []
+        for membership in memberships:
+            child = membership.child_artifact
+            if child is None:
+                logger.debug(
+                    "CompositeMembership child_artifact is None for uuid=%r; skipping.",
+                    membership.child_artifact_uuid,
+                )
+                continue
+
+            member_entry: Dict[str, Any] = {
+                "uuid": child.uuid,
+                "name": child.name,
+                "type": child.type,
+                "source": child.source,
+                "version": child.deployed_version or child.upstream_version,
+                "relationship_type": membership.relationship_type,
+                "pinned_version_hash": membership.pinned_version_hash,
+            }
+
+            # Recurse if the child is itself a composite.
+            if child.type == "composite":
+                member_entry["members"] = self._resolve_members(
+                    child, depth + 1
+                )
+
+            members.append(member_entry)
+
+        return members
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for a composite artifact.
+
+        Includes a ``members`` list populated by querying
+        ``CompositeMembership`` rows for this composite.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata, members.
+        """
+        if self._session is None:
+            logger.warning(
+                "CompositeAdapter has no session; members list will be empty "
+                "for composite artifact %r (id=%r).",
+                artifact.name,
+                artifact.id,
+            )
+
+        meta = _extract_standard_metadata(artifact)
+
+        return {
+            "name": artifact.name,
+            "type": artifact.type,
+            "source": artifact.source,
+            "version": artifact.deployed_version or artifact.upstream_version,
+            "content_hash": self.compute_content_hash(artifact, project_path),
+            "metadata": meta,
+            "members": self._resolve_members(artifact, depth=0),
+        }
+
+
+# ---------------------------------------------------------------------------
+# TASK-2.5: ConfigAdapter, SpecAdapter, RuleAdapter, ContextFileAdapter
+# ---------------------------------------------------------------------------
+
+#: File extensions recognised as plain-text for MIME guessing.
+_TEXT_EXTENSIONS: Dict[str, str] = {
+    ".md": "text/markdown",
+    ".py": "text/x-python",
+    ".yaml": "application/yaml",
+    ".yml": "application/yaml",
+    ".json": "application/json",
+    ".toml": "application/toml",
+    ".txt": "text/plain",
+    ".sh": "application/x-sh",
+    ".ts": "text/typescript",
+    ".tsx": "text/typescript",
+    ".jsx": "text/javascript",
+    ".js": "text/javascript",
+    ".css": "text/css",
+}
+
+
+def _guess_mime_type(path: Optional[Path]) -> Optional[str]:
+    """Guess the MIME type of *path* based on its file extension.
+
+    Checks a curated ``_TEXT_EXTENSIONS`` dict first; falls back to
+    ``mimetypes.guess_type`` from the stdlib for anything else.
+
+    Args:
+        path: Filesystem path whose extension is inspected.  May be ``None``.
+
+    Returns:
+        MIME type string (e.g. ``"text/markdown"``) or ``None`` when
+        the type cannot be determined.
+    """
+    if path is None:
+        return None
+    suffix = path.suffix.lower()
+    if suffix in _TEXT_EXTENSIONS:
+        return _TEXT_EXTENSIONS[suffix]
+    mime, _ = mimetypes.guess_type(str(path))
+    return mime
+
+
+def _compute_file_hash(
+    artifact: Artifact,
+    project_path: Optional[Path],
+) -> str:
+    """Compute content hash for a file-based artifact.
+
+    For file-based types (config, spec, rule, context) hashing directly
+    reads the file bytes rather than using the Merkle-tree algorithm.
+    Falls back to the DB ``content_hash`` or ``content`` columns.
+
+    Args:
+        artifact: ORM artifact row.
+        project_path: Optional project root directory.
+
+    Returns:
+        64-character lowercase hex string, or ``""`` on failure.
+    """
+    fs_path = _resolve_artifact_fs_path(artifact, project_path)
+    if fs_path is not None and fs_path.is_file():
+        try:
+            return _hash_bytes(fs_path.read_bytes())
+        except OSError as exc:
+            logger.debug(
+                "File read failed for %r %r (%s); falling back to DB content.",
+                artifact.type,
+                artifact.name,
+                exc,
+            )
+    elif fs_path is not None and fs_path.is_dir():
+        # If path resolves to a directory fall back to Merkle tree.
+        try:
+            return compute_artifact_hash(str(fs_path))
+        except (FileNotFoundError, ValueError, OSError) as exc:
+            logger.debug(
+                "Directory hash failed for %r %r (%s); falling back to DB content.",
+                artifact.type,
+                artifact.name,
+                exc,
+            )
+
+    if artifact.content_hash:
+        logger.debug(
+            "Using cached content_hash from DB for %r %r.",
+            artifact.type,
+            artifact.name,
+        )
+        return artifact.content_hash
+
+    if artifact.content:
+        return _hash_string(artifact.content)
+
+    logger.warning(
+        "Cannot compute content hash for %r %r (id=%r): "
+        "no filesystem path and no DB content available.",
+        artifact.type,
+        artifact.name,
+        artifact.id,
+    )
+    return ""
+
+
+def _file_based_adapt(
+    artifact: Artifact,
+    project_path: Optional[Path],
+) -> Dict[str, Any]:
+    """Build a normalised BOM entry for a file-based artifact.
+
+    Shared implementation used by ``ConfigAdapter``, ``SpecAdapter``,
+    ``RuleAdapter``, and ``ContextFileAdapter``.  Adds ``mime_type`` to the
+    standard metadata block.
+
+    Args:
+        artifact: ORM artifact row.
+        project_path: Optional project root directory.
+
+    Returns:
+        BOM-entry dict with keys: name, type, source, version,
+        content_hash, metadata (including mime_type).
+    """
+    fs_path = _resolve_artifact_fs_path(artifact, project_path)
+    meta = _extract_standard_metadata(artifact)
+    meta["mime_type"] = _guess_mime_type(fs_path) or _guess_mime_type(
+        Path(artifact.name) if artifact.name else None
+    )
+
+    return {
+        "name": artifact.name,
+        "type": artifact.type,
+        "source": artifact.source,
+        "version": artifact.deployed_version or artifact.upstream_version,
+        "content_hash": _compute_file_hash(artifact, project_path),
+        "metadata": meta,
+    }
+
+
+class ConfigAdapter(BaseArtifactAdapter):
+    """BOM adapter for project configuration file artifacts.
+
+    Config files live under ``.claude/config/``.  Content hashing reads the
+    file bytes directly.  A ``mime_type`` field is included in the metadata.
+    """
+
+    def get_artifact_type(self) -> str:
+        """Return ``"project_config"``."""
+        return "project_config"
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for a config file artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        return _compute_file_hash(artifact, project_path)
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for a config file artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata (including mime_type).
+        """
+        return _file_based_adapt(artifact, project_path)
+
+
+class SpecAdapter(BaseArtifactAdapter):
+    """BOM adapter for spec file artifacts.
+
+    Spec files live under ``.claude/specs/``.  Content hashing reads the
+    file bytes directly.  A ``mime_type`` field is included in the metadata.
+    """
+
+    def get_artifact_type(self) -> str:
+        """Return ``"spec_file"``."""
+        return "spec_file"
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for a spec file artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        return _compute_file_hash(artifact, project_path)
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for a spec file artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata (including mime_type).
+        """
+        return _file_based_adapt(artifact, project_path)
+
+
+class RuleAdapter(BaseArtifactAdapter):
+    """BOM adapter for rule file artifacts.
+
+    Rule files live under ``.claude/rules/``.  Content hashing reads the
+    file bytes directly.  A ``mime_type`` field is included in the metadata.
+    """
+
+    def get_artifact_type(self) -> str:
+        """Return ``"rule_file"``."""
+        return "rule_file"
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for a rule file artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        return _compute_file_hash(artifact, project_path)
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for a rule file artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata (including mime_type).
+        """
+        return _file_based_adapt(artifact, project_path)
+
+
+class ContextFileAdapter(BaseArtifactAdapter):
+    """BOM adapter for context file artifacts.
+
+    Context files live under ``.claude/context/``.  Content hashing reads the
+    file bytes directly.  A ``mime_type`` field is included in the metadata.
+    """
+
+    def get_artifact_type(self) -> str:
+        """Return ``"context_file"``."""
+        return "context_file"
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for a context file artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        return _compute_file_hash(artifact, project_path)
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for a context file artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Optional project root directory.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata (including mime_type).
+        """
+        return _file_based_adapt(artifact, project_path)
+
+
+# ---------------------------------------------------------------------------
 # BomGenerator
 # ---------------------------------------------------------------------------
 
@@ -407,8 +1297,27 @@ class BomGenerator:
     # ------------------------------------------------------------------
 
     def _register_builtin_adapters(self) -> None:
-        """Register the built-in adapters shipped with this module."""
+        """Register the built-in adapters shipped with this module.
+
+        All standard artifact type adapters are registered here.  The
+        ``CompositeAdapter`` receives the session so it can query membership
+        rows at generation time.
+        """
         self.register_adapter(SkillAdapter())
+        # TASK-2.2
+        self.register_adapter(CommandAdapter())
+        # TASK-2.3
+        self.register_adapter(AgentAdapter())
+        self.register_adapter(McpAdapter())
+        # TASK-2.4
+        self.register_adapter(HookAdapter())
+        self.register_adapter(WorkflowAdapter())
+        self.register_adapter(CompositeAdapter(session=self._session))
+        # TASK-2.5
+        self.register_adapter(ConfigAdapter())
+        self.register_adapter(SpecAdapter())
+        self.register_adapter(RuleAdapter())
+        self.register_adapter(ContextFileAdapter())
 
     def register_adapter(self, adapter: BaseArtifactAdapter) -> None:
         """Register (or replace) an adapter for its declared artifact type.
