@@ -54,8 +54,8 @@ integrations:
 # These values are consumed by the @skillmeat/backstage-plugin-scaffolder-backend
 # scaffolder actions (skillmeat:inject-claude-artifact, skillmeat:register-deployment).
 skillmeat:
-  apiUrl: ${SKILLMEAT_API_URL:-http://skillmeat-api:8080}
-  # apiKey: ${SKILLMEAT_API_KEY:-}   # uncomment if auth is enabled
+  baseUrl: ${SKILLMEAT_API_URL:-http://skillmeat-api:8080}
+  # token: ${SKILLMEAT_API_KEY:-}   # uncomment if auth is enabled
 
 # =============================================================================
 # CATALOG
@@ -78,7 +78,7 @@ catalog:
 scaffolder:
   # The SkillMeat scaffolder actions are registered automatically when
   # @skillmeat/backstage-plugin-scaffolder-backend is loaded.
-  # No additional config is required beyond the `skillmeat.apiUrl` above.
+  # No additional config is required beyond the `skillmeat.baseUrl` above.
 
   # TODO: add any additional scaffolder action config here
 
