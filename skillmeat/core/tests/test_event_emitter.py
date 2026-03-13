@@ -385,3 +385,153 @@ class TestStandaloneSessionPath:
             diff_json=None,
             content_hash=None,
         )
+
+
+# ---------------------------------------------------------------------------
+# auth_context owner_type resolution
+# ---------------------------------------------------------------------------
+
+
+class TestAuthContextOwnerTypeResolution:
+    """owner_type is resolved from auth_context when provided."""
+
+    def _make_auth_context(self, **attrs: object) -> object:
+        """Return a simple namespace object carrying the given attributes."""
+        from types import SimpleNamespace
+
+        return SimpleNamespace(**attrs)
+
+    def test_tenant_id_resolves_to_enterprise(self, db_session: Session) -> None:
+        from skillmeat.cache.models import ArtifactHistoryEvent
+        from skillmeat.core.bom.event_emitter import emit_activity_event
+
+        _seed_artifact(db_session, "skill:ent-skill")
+        ctx = self._make_auth_context(user_id="u1", tenant_id="tenant-abc")
+
+        emit_activity_event(
+            session=db_session,
+            artifact_id="skill:ent-skill",
+            event_type="create",
+            actor_id="u1",
+            auth_context=ctx,
+        )
+
+        row = db_session.query(ArtifactHistoryEvent).filter_by(
+            artifact_id="skill:ent-skill"
+        ).first()
+        assert row is not None
+        assert row.owner_type == "enterprise"
+
+    def test_team_id_resolves_to_team(self, db_session: Session) -> None:
+        from skillmeat.cache.models import ArtifactHistoryEvent
+        from skillmeat.core.bom.event_emitter import emit_activity_event
+
+        _seed_artifact(db_session, "skill:team-skill")
+        ctx = self._make_auth_context(user_id="u2", team_id="team-xyz")
+
+        emit_activity_event(
+            session=db_session,
+            artifact_id="skill:team-skill",
+            event_type="update",
+            actor_id="u2",
+            auth_context=ctx,
+        )
+
+        row = db_session.query(ArtifactHistoryEvent).filter_by(
+            artifact_id="skill:team-skill"
+        ).first()
+        assert row is not None
+        assert row.owner_type == "team"
+
+    def test_user_only_resolves_to_user(self, db_session: Session) -> None:
+        from skillmeat.cache.models import ArtifactHistoryEvent
+        from skillmeat.core.bom.event_emitter import emit_activity_event
+
+        _seed_artifact(db_session, "skill:user-skill")
+        ctx = self._make_auth_context(user_id="u3")
+
+        emit_activity_event(
+            session=db_session,
+            artifact_id="skill:user-skill",
+            event_type="deploy",
+            actor_id="u3",
+            auth_context=ctx,
+        )
+
+        row = db_session.query(ArtifactHistoryEvent).filter_by(
+            artifact_id="skill:user-skill"
+        ).first()
+        assert row is not None
+        assert row.owner_type == "user"
+
+    def test_no_auth_context_uses_default_owner_type(
+        self, db_session: Session
+    ) -> None:
+        from skillmeat.cache.models import ArtifactHistoryEvent
+        from skillmeat.core.bom.event_emitter import emit_activity_event
+
+        _seed_artifact(db_session, "skill:default-skill")
+
+        emit_activity_event(
+            session=db_session,
+            artifact_id="skill:default-skill",
+            event_type="sync",
+            auth_context=None,
+        )
+
+        row = db_session.query(ArtifactHistoryEvent).filter_by(
+            artifact_id="skill:default-skill"
+        ).first()
+        assert row is not None
+        assert row.owner_type == "user"
+
+    def test_tenant_id_wins_over_team_id(self, db_session: Session) -> None:
+        """tenant_id takes precedence when both tenant_id and team_id are present."""
+        from skillmeat.cache.models import ArtifactHistoryEvent
+        from skillmeat.core.bom.event_emitter import emit_activity_event
+
+        _seed_artifact(db_session, "skill:mixed-skill")
+        ctx = self._make_auth_context(
+            user_id="u4",
+            tenant_id="tenant-abc",
+            team_id="team-xyz",
+        )
+
+        emit_activity_event(
+            session=db_session,
+            artifact_id="skill:mixed-skill",
+            event_type="create",
+            actor_id="u4",
+            auth_context=ctx,
+        )
+
+        row = db_session.query(ArtifactHistoryEvent).filter_by(
+            artifact_id="skill:mixed-skill"
+        ).first()
+        assert row is not None
+        assert row.owner_type == "enterprise"
+
+    def test_auth_context_overrides_explicit_owner_type_param(
+        self, db_session: Session
+    ) -> None:
+        """auth_context resolution overrides a caller-supplied owner_type param."""
+        from skillmeat.cache.models import ArtifactHistoryEvent
+        from skillmeat.core.bom.event_emitter import emit_activity_event
+
+        _seed_artifact(db_session, "skill:override-skill")
+        ctx = self._make_auth_context(user_id="u5", tenant_id="tenant-zzz")
+
+        emit_activity_event(
+            session=db_session,
+            artifact_id="skill:override-skill",
+            event_type="delete",
+            actor_id="u5",
+            owner_type="user",   # would normally store "user"
+            auth_context=ctx,    # but tenant_id → "enterprise" wins
+        )
+
+        row = db_session.query(ArtifactHistoryEvent).filter_by(
+            artifact_id="skill:override-skill"
+        ).first()
+        assert row is not None
+        assert row.owner_type == "enterprise"

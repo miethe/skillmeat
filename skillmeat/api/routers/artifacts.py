@@ -2208,6 +2208,7 @@ async def create_artifact(
             artifact_id=artifact_id,
             event_type="create",
             actor_id=getattr(auth_context, "user_id", None),
+            auth_context=auth_context,
         )
 
         return ArtifactCreateResponse(
@@ -3127,6 +3128,7 @@ async def update_artifact(
                 artifact_id=artifact_id,
                 event_type="update",
                 actor_id=getattr(auth_context, "user_id", None),
+                auth_context=auth_context,
                 content_hash=content_hash,
             )
 
@@ -3535,6 +3537,7 @@ async def delete_artifact(
                 artifact_id=artifact_id,
                 event_type="delete",
                 actor_id=getattr(auth_context, "user_id", None),
+                auth_context=auth_context,
             )
         except ValueError as e:
             # Artifact not found (race condition)
@@ -3779,6 +3782,7 @@ async def deploy_artifact(
                 artifact_id=artifact_id,
                 event_type="deploy",
                 actor_id=getattr(auth_context, "user_id", None),
+                auth_context=auth_context,
             )
 
             # Invalidate upstream fetch cache — project version has changed
@@ -4319,6 +4323,7 @@ async def sync_artifact(
                     artifact_id=artifact_id,
                     event_type="sync",
                     actor_id=getattr(auth_context, "user_id", None),
+                    auth_context=auth_context,
                 )
 
                 # Invalidate upstream fetch cache — collection version has changed
@@ -4432,6 +4437,7 @@ async def undeploy_artifact(
                 artifact_id=artifact_id,
                 event_type="undeploy",
                 actor_id=getattr(auth_context, "user_id", None),
+                auth_context=auth_context,
             )
 
             return ArtifactDeployResponse(

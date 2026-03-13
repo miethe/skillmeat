@@ -31,6 +31,15 @@ Usage at call sites::
         content_hash=artifact_hash, # optional
     )
 
+    # With auth_context — owner_type is resolved automatically:
+    emit_activity_event(
+        session=session,
+        artifact_id=artifact_id,
+        event_type="create",
+        actor_id=auth_context.user_id,
+        auth_context=auth_context,  # tenant_id → "enterprise", team_id → "team"
+    )
+
     # In a FastAPI route using BackgroundTasks (deferred, non-blocking):
     emit_activity_event(
         session=None,               # session is opened internally
@@ -57,6 +66,34 @@ logger = logging.getLogger(__name__)
 
 # Valid event types — must match the CHECK constraint in ArtifactHistoryEvent.
 _VALID_EVENT_TYPES = frozenset({"create", "update", "delete", "deploy", "undeploy", "sync"})
+
+
+def _resolve_owner_type(auth_context: object, default: str) -> str:
+    """Derive the owner_type string from an auth context object.
+
+    Checks attributes in priority order (most-specific scope wins):
+
+    1. ``tenant_id`` present and truthy → ``"enterprise"``
+    2. ``team_id`` present and truthy  → ``"team"``
+    3. Otherwise                        → *default* (typically ``"user"``)
+
+    Uses ``getattr`` with ``None`` defaults so the function works safely with
+    any object shape — including plain ``MagicMock`` instances in tests.
+
+    Args:
+        auth_context: Any object that may carry ``tenant_id`` or ``team_id``
+                      attributes.  ``None`` is not accepted here; callers must
+                      guard against ``None`` before calling this function.
+        default: Fallback owner_type string when no scope attribute is found.
+
+    Returns:
+        One of ``"enterprise"``, ``"team"``, or *default*.
+    """
+    if getattr(auth_context, "tenant_id", None):
+        return "enterprise"
+    if getattr(auth_context, "team_id", None):
+        return "team"
+    return default
 
 
 def _write_event(
@@ -139,6 +176,7 @@ def emit_activity_event(
     session: Optional["Session"] = None,
     actor_id: Optional[str] = None,
     owner_type: str = "user",
+    auth_context: Optional[object] = None,
     diff_json: Optional[str] = None,
     content_hash: Optional[str] = None,
     background_tasks: Optional["BackgroundTasks"] = None,
@@ -155,6 +193,16 @@ def emit_activity_event(
     lifecycle.  When neither is provided a new session is opened, used, and
     closed inside this call.
 
+    When *auth_context* is provided the ``owner_type`` is resolved from it
+    automatically, overriding the *owner_type* parameter:
+
+    * ``auth_context.tenant_id`` truthy → ``"enterprise"``
+    * ``auth_context.team_id`` truthy   → ``"team"``
+    * Otherwise                         → the *owner_type* parameter value
+
+    This avoids a hard dependency on ``OwnershipResolver`` and keeps this
+    module self-contained.
+
     Args:
         artifact_id: Artifact identifier string (e.g. ``"skill:my-skill"``).
         event_type: One of ``'create'``, ``'update'``, ``'delete'``,
@@ -163,6 +211,11 @@ def emit_activity_event(
                  written synchronously into this session and committed.
         actor_id: Opaque user/system identifier; ``None`` for automated events.
         owner_type: Owner context at event time.  Defaults to ``"user"``.
+                    Ignored when *auth_context* resolves a more-specific scope.
+        auth_context: Optional auth context object.  When provided the
+                      ``owner_type`` is resolved from its ``tenant_id`` and
+                      ``team_id`` attributes via ``getattr`` (safe for any
+                      object shape).
         diff_json: Optional JSON string describing what changed.
         content_hash: Optional SHA-256 hash of the artifact content at event
                       time.
@@ -178,6 +231,7 @@ def emit_activity_event(
                 artifact_id=artifact_id,
                 event_type="create",
                 actor_id=auth_context.user_id,
+                auth_context=auth_context,
             )
 
         After a deploy using BackgroundTasks (non-blocking)::
@@ -186,9 +240,13 @@ def emit_activity_event(
                 artifact_id=artifact_id,
                 event_type="deploy",
                 actor_id=auth_context.user_id,
+                auth_context=auth_context,
                 background_tasks=background_tasks,
             )
     """
+    # Resolve owner_type from auth_context when provided.
+    if auth_context is not None:
+        owner_type = _resolve_owner_type(auth_context, default=owner_type)
     if event_type not in _VALID_EVENT_TYPES:
         logger.warning(
             "emit_activity_event: ignoring unknown event_type=%r for artifact_id=%r",
