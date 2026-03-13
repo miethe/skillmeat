@@ -5,8 +5,10 @@ This package contains all API route handlers organized by domain.
 
 from . import (
     analytics,
+    artifact_activity,
     artifact_history,
     artifacts,
+    bom,
     enterprise_content,
     bundles,
     cache,
@@ -44,8 +46,10 @@ from . import (
 
 __all__ = [
     "analytics",
+    "artifact_activity",
     "artifact_history",
     "artifacts",
+    "bom",
     "enterprise_content",
     "bundles",
     "cache",
