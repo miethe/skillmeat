@@ -2,79 +2,120 @@
 schema_version: 2
 doc_type: progress
 type: progress
-prd: "skillbom-attestation"
-feature_slug: "skillbom-attestation"
+prd: skillbom-attestation
+feature_slug: skillbom-attestation
 phase: 5-6
-status: pending
+status: completed
 created: 2026-03-10
-updated: 2026-03-10
-prd_ref: "docs/project_plans/PRDs/features/skillbom-attestation-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/skillbom-attestation-v1/phase-5-6-git-crypto.md"
+updated: '2026-03-12'
+prd_ref: docs/project_plans/PRDs/features/skillbom-attestation-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/skillbom-attestation-v1/phase-5-6-git-crypto.md
 commit_refs: []
 pr_refs: []
 owners:
-  - "python-backend-engineer"
+- python-backend-engineer
 contributors: []
 tasks:
-  - id: "TASK-5.1"
-    name: "Implement pre-commit hook installer (skillmeat bom install-hook) creating executable .git/hooks/pre-commit"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "2 pts"
-  - id: "TASK-5.2"
-    name: "Implement pre-commit hook script: call BomGenerator, compute SHA256 of context.lock, append SkillBOM-Hash footer to COMMIT_EDITMSG"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-5.1"]
-    estimate: "2 pts"
-  - id: "TASK-5.3"
-    name: "Implement BOM snapshot capture on commit with commit_sha linkage and idempotency guarantee"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-5.2"]
-    estimate: "2 pts"
-  - id: "TASK-5.4"
-    name: "Implement skillmeat restore --commit <hash>: extract SkillBOM-Hash from commit message and rehydrate .claude/ to that state"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-5.3"]
-    estimate: "2 pts"
-  - id: "TASK-5.5"
-    name: "Implement upstream fallback for missing commit BOMs with user confirmation prompt before network fetch, plus generate_attestation Claude Code agent tool"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-5.4"]
-    estimate: "4 pts"
-  - id: "TASK-6.1"
-    name: "Integrate Ed25519 signing with existing skillmeat/security/crypto.py: sign_bom() and verify_signature() methods"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "2 pts"
-  - id: "TASK-6.2"
-    name: "Implement skillmeat bom sign CLI command producing context.lock.sig signature file"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-6.1"]
-    estimate: "2 pts"
-  - id: "TASK-6.3"
-    name: "Implement skillmeat bom verify CLI command returning VALID/INVALID/ERROR with signature details"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-6.1"]
-    estimate: "1 pt"
-  - id: "TASK-6.4"
-    name: "Implement signature chain validation, BomSnapshot signature storage, auto-sign feature flag, restore signature verification, and signing unit tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-6.1", "TASK-6.2", "TASK-6.3"]
-    estimate: "6 pts"
+- id: TASK-5.1
+  name: Implement pre-commit hook installer (skillmeat bom install-hook) creating
+    executable .git/hooks/pre-commit
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 2 pts
+- id: TASK-5.2
+  name: 'Implement pre-commit hook script: call BomGenerator, compute SHA256 of context.lock,
+    append SkillBOM-Hash footer to COMMIT_EDITMSG'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-5.1
+  estimate: 2 pts
+- id: TASK-5.3
+  name: Implement BOM snapshot capture on commit with commit_sha linkage and idempotency
+    guarantee
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-5.2
+  estimate: 2 pts
+- id: TASK-5.4
+  name: 'Implement skillmeat restore --commit <hash>: extract SkillBOM-Hash from commit
+    message and rehydrate .claude/ to that state'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-5.3
+  estimate: 2 pts
+- id: TASK-5.5
+  name: Implement upstream fallback for missing commit BOMs with user confirmation
+    prompt before network fetch, plus generate_attestation Claude Code agent tool
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-5.4
+  estimate: 4 pts
+- id: TASK-6.1
+  name: 'Integrate Ed25519 signing with existing skillmeat/security/crypto.py: sign_bom()
+    and verify_signature() methods'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 2 pts
+- id: TASK-6.2
+  name: Implement skillmeat bom sign CLI command producing context.lock.sig signature
+    file
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-6.1
+  estimate: 2 pts
+- id: TASK-6.3
+  name: Implement skillmeat bom verify CLI command returning VALID/INVALID/ERROR with
+    signature details
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-6.1
+  estimate: 1 pt
+- id: TASK-6.4
+  name: Implement signature chain validation, BomSnapshot signature storage, auto-sign
+    feature flag, restore signature verification, and signing unit tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-6.1
+  - TASK-6.2
+  - TASK-6.3
+  estimate: 6 pts
 parallelization:
-  batch_1: ["TASK-5.1", "TASK-5.2"]
-  batch_2: ["TASK-5.3", "TASK-5.4", "TASK-5.5"]
-  batch_3: ["TASK-6.1", "TASK-6.2", "TASK-6.3"]
-  batch_4: ["TASK-6.4"]
+  batch_1:
+  - TASK-5.1
+  - TASK-5.2
+  batch_2:
+  - TASK-5.3
+  - TASK-5.4
+  - TASK-5.5
+  batch_3:
+  - TASK-6.1
+  - TASK-6.2
+  - TASK-6.3
+  batch_4:
+  - TASK-6.4
+total_tasks: 9
+completed_tasks: 9
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 100
 ---
 
 # Phase 5-6 Progress: Git & Crypto — Commit Integration & Signing
