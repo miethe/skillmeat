@@ -29,8 +29,10 @@ from .openapi import generate_openapi_spec
 from .middleware.tenant_context import set_tenant_context_dep
 from .routers import (
     analytics,
+    artifact_activity,
     artifact_history,
     artifacts,
+    bom as bom_router,
     bundles,
     enterprise_content,
     cache,
@@ -518,6 +520,18 @@ def create_app(settings: APISettings = None) -> FastAPI:
         artifact_history.router,
         prefix=settings.api_prefix,
         tags=["artifacts"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        artifact_activity.router,
+        prefix=settings.api_prefix,
+        tags=["artifact-activity"],
+        dependencies=_auth_deps,
+    )
+    app.include_router(
+        bom_router.router,
+        prefix=settings.api_prefix,
+        tags=["bom"],
         dependencies=_auth_deps,
     )
     app.include_router(

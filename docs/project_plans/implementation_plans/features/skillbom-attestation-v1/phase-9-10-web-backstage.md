@@ -1,46 +1,47 @@
 ---
 schema_version: 2
 doc_type: phase_plan
-title: "SkillBOM & Attestation - Phases 9-10: Web & Backstage Backend"
-description: >
-  Web app provenance UI (Phase 9) + Backstage backend integration (Phase 10).
-  Frontend provenance surfaces plus backend/scaffolder integration.
+title: 'SkillBOM & Attestation - Phases 9-10: Web & Backstage Backend'
+description: 'Web app provenance UI (Phase 9) + Backstage backend integration (Phase
+  10). Frontend provenance surfaces plus backend/scaffolder integration.
+
+  '
 audience:
-  - ai-agents
-  - developers
-  - frontend-engineers
-  - ui-engineers
-  - platform-engineers
+- ai-agents
+- developers
+- frontend-engineers
+- ui-engineers
+- platform-engineers
 tags:
-  - implementation-plan
-  - phases
-  - skillbom
-  - web
-  - backstage
-  - ui
+- implementation-plan
+- phases
+- skillbom
+- web
+- backstage
+- ui
 created: 2026-03-10
 updated: 2026-03-11
 phase: 9-10
-phase_title: "Web & Backstage Backend: Provenance Surfaces"
+phase_title: 'Web & Backstage Backend: Provenance Surfaces'
 prd_ref: /docs/project_plans/PRDs/features/skillbom-attestation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md
 entry_criteria:
-  - Phase 7 API endpoints stable and tested
-  - Phase 8 CLI commands functional
-  - OpenAPI spec and typed client artifacts finalized
+- Phase 7 API endpoints stable and tested
+- Phase 8 CLI commands functional
+- OpenAPI spec and typed client artifacts finalized
 exit_criteria:
-  - ProvenanceTab component renders on artifact detail pages
-  - BomViewer displays `context.lock` contents
-  - ActivityTimeline distinguishes provenance activity from existing version history
-  - Backstage backend payload contract finalized
-  - All new API hooks tested
-  - Web component and backend integration tests pass
+- ProvenanceTab component renders on artifact detail pages
+- BomViewer displays `context.lock` contents
+- ActivityTimeline distinguishes provenance activity from existing version history
+- Backstage backend payload contract finalized
+- All new API hooks tested
+- Web component and backend integration tests pass
 feature_slug: skillbom-attestation
-effort_estimate: "19-23 story points"
-timeline: "2 weeks"
-parallelization: "Phase 9 and Phase 10 can run in parallel after Phase 7 API stable"
+effort_estimate: 19-23 story points
+timeline: 2 weeks
+parallelization: Phase 9 and Phase 10 can run in parallel after Phase 7 API stable
+status: inferred_complete
 ---
-
 # SkillBOM & Attestation System - Phases 9-10: Web & Backstage Backend
 
 ## Overview
@@ -82,6 +83,33 @@ Add frontend components for viewing BOM, activity history, and attestation data 
 | 9.13 | E2E tests for web components | Tests for rendering, filtering, pagination, data loading, and error states. | Tests cover component functionality; E2E tests pass | 2 | Pending |
 | 9.14 | Design system alignment | Ensure all new components follow the existing design system and current artifact-detail interaction patterns. | Components visually consistent with app; integrates cleanly with existing modal/page components | 1 | Pending |
 
+### Wireframes & Component Hierarchy
+
+Visual wireframes and component hierarchy specifications are available for all Phase 9 components:
+
+| Wireframe | File | Component |
+|-----------|------|-----------|
+| WF-1 | `wireframes/wf-1-provenance-tab.png` | ProvenanceTab in entity modal |
+| WF-2 | `wireframes/wf-2-bom-viewer.png` | BomViewer expanded view |
+| WF-3 | `wireframes/wf-3-attestation-badge.png` | AttestationBadge variants |
+| WF-4 | `wireframes/wf-4-activity-timeline.png` | ActivityTimeline full view |
+| WF-5 | `wireframes/wf-5-filter-panel.png` | Attestation filter panel |
+| WF-6 | `wireframes/wf-6-dashboard-provenance.png` | Dashboard provenance section |
+
+**Supporting docs** (in `wireframes/`):
+- `wireframe-brief.md` — Full specifications, layout ASCII art, and generation instructions
+- `gemini-layout-analysis.md` — Integration validation, refined component hierarchies, and shadcn/Radix primitive mapping
+
+**Wireframe usage policy**: These wireframes are AI-generated layout scaffolds, not pixel-perfect design specs. During implementation:
+
+1. **Layout and structure are authoritative** — section ordering, information hierarchy, and component composition should match the wireframes.
+2. **Visual styling is NOT authoritative** — fonts, colors, spacing, border radii, shadows, and visual details in the wireframes are approximations. Always defer to:
+   - Existing shadcn/ui primitives (`Badge`, `Card`, `Tabs`, `Tooltip`, `Popover`, `ScrollArea`, etc.) — use them as-is, do not hand-style to match wireframe visuals.
+   - Existing component patterns — match the look of `entity-card.tsx`, `unified-entity-modal.tsx`, `filters.tsx`, `version-tree.tsx`, and other established components.
+   - The `cn()` utility and Tailwind classes already used in the codebase (zinc palette, Inter font, tight spacing).
+3. **When wireframe and codebase conflict, codebase wins** — if a wireframe shows a custom filter panel but the codebase already has `TagFilterPopover` with established patterns, follow the codebase pattern.
+4. **Component hierarchy from `gemini-layout-analysis.md` is the primary implementation reference** — it maps each wireframe to specific shadcn primitives and React component trees.
+
 ### Key Design Notes
 
 - **Do Not Replace Existing History**: Preserve current version-history components and query hooks. Add provenance/activity as a separate tab or panel.
@@ -89,6 +117,8 @@ Add frontend components for viewing BOM, activity history, and attestation data 
 - **Query Clients**: Prefer the generated SDK/client artifacts or existing API helper patterns rather than raw one-off fetch helpers.
 - **Error UI**: Show user-friendly error messages with retry actions for transient failures.
 - **Loading States**: Skeleton loaders for initial load; light spinners for refresh.
+- **Tab Integration**: Add `provenance` to the tab bar in `unified-entity-modal.tsx` after History, using the same `rounded-none border-b-2` styling. Use `ShieldCheck` icon from Lucide.
+- **Badge Sizing**: AttestationBadge must match existing source/version badge dimensions in entity-card.tsx. Use `Badge` + `Tooltip` from shadcn.
 
 ### Deliverables
 

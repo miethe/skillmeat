@@ -311,6 +311,15 @@ class APISettings(BaseSettings):
         description="Enable automatic memory extraction from conversations (Phase 5 feature)",
     )
 
+    # SkillBOM feature flag (skillbom-attestation)
+    skillbom_enabled: bool = Field(
+        default=False,
+        description="Enable SkillBOM generation and attestation features. "
+        "When disabled, all /api/v1/bom endpoints return 404 and CLI bom commands "
+        "display a 'coming soon' message. "
+        "Configurable via SKILLMEAT_SKILLBOM_ENABLED env var.",
+    )
+
     # Diff operation configuration
     diff_exclude_dirs: List[str] = Field(
         default=[

@@ -119,6 +119,9 @@ from skillmeat.core.repositories.enterprise_membership import (
     EnterpriseMembershipRepository,
 )
 from skillmeat.core.repositories.local_artifact import LocalArtifactRepository
+from skillmeat.core.repositories.local_artifact_activity import (
+    LocalArtifactActivityRepository,
+)
 from skillmeat.core.repositories.local_collection import LocalCollectionRepository
 from skillmeat.core.repositories.local_context_entity import LocalContextEntityRepository
 from skillmeat.core.repositories.local_deployment import LocalDeploymentRepository
@@ -135,6 +138,7 @@ from skillmeat.core.repositories.local_tag import LocalTagRepository
 
 __all__ = [
     "EnterpriseMembershipRepository",
+    "LocalArtifactActivityRepository",
     "LocalArtifactRepository",
     "LocalCollectionRepository",
     "LocalContextEntityRepository",

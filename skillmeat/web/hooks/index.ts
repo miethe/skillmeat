@@ -550,6 +550,37 @@ export { useAnalyticsStream } from './useAnalyticsStream';
 // Artifact provenance/history timeline
 export { useArtifactHistory, getArtifactHistoryId, artifactHistoryKeys } from './useArtifactHistory';
 
+// Artifact activity stream (audit/provenance, cursor-paginated)
+export {
+  artifactActivityHistoryKeys,
+  useArtifactActivityHistory,
+  type UseArtifactActivityHistoryOptions,
+} from './useArtifactActivityHistory';
+
+// ============================================================================
+// BOM & ATTESTATIONS (3 hooks)
+// ============================================================================
+// BOM snapshot fetching and attestation record CRUD
+
+// BOM snapshot (current point-in-time bill of materials)
+export {
+  bomSnapshotKeys,
+  useBomSnapshot,
+  type UseBomSnapshotOptions,
+  type BomSnapshotResponse,
+} from './useBomSnapshot';
+
+// Attestation records (cursor-paginated list + create mutation)
+export {
+  attestationKeys,
+  useAttestations,
+  useCreateAttestation,
+  type UseAttestationsOptions,
+  type AttestationPage,
+  type AttestationPageInfo,
+  type CreateAttestationRequest,
+} from './useAttestations';
+
 // ============================================================================
 // SIMILARITY (7 hooks)
 // ============================================================================

@@ -1,43 +1,44 @@
 ---
 schema_version: 2
 doc_type: phase_plan
-title: "SkillBOM & Attestation - Phases 7-8: API & CLI"
-description: >
-  REST API layer (Phase 7) + CLI commands (Phase 8).
-  Exposes activity history, BOM, and attestation data via HTTP and command-line interfaces.
+title: 'SkillBOM & Attestation - Phases 7-8: API & CLI'
+description: 'REST API layer (Phase 7) + CLI commands (Phase 8). Exposes activity
+  history, BOM, and attestation data via HTTP and command-line interfaces.
+
+  '
 audience:
-  - ai-agents
-  - developers
-  - backend-engineers
-  - api-engineers
+- ai-agents
+- developers
+- backend-engineers
+- api-engineers
 tags:
-  - implementation-plan
-  - phases
-  - skillbom
-  - api
-  - cli
+- implementation-plan
+- phases
+- skillbom
+- api
+- cli
 created: 2026-03-10
 updated: 2026-03-11
 phase: 7-8
-phase_title: "API & CLI: HTTP & Command-Line Surfaces"
+phase_title: 'API & CLI: HTTP & Command-Line Surfaces'
 prd_ref: /docs/project_plans/PRDs/features/skillbom-attestation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md
 entry_criteria:
-  - Phase 1-6 complete with models, generators, activity history, RBAC, git, and crypto
-  - Repositories and services stable and tested
-  - Authentication/authorization middleware available
+- Phase 1-6 complete with models, generators, activity history, RBAC, git, and crypto
+- Repositories and services stable and tested
+- Authentication/authorization middleware available
 exit_criteria:
-  - All planned API endpoints implemented with proper auth
-  - OpenAPI spec updated and documentation correct
-  - All CLI commands (`bom`, `history`, `attest`) functional
-  - Response pagination implemented where required
-  - Integration tests pass for all endpoints
+- All planned API endpoints implemented with proper auth
+- OpenAPI spec updated and documentation correct
+- All CLI commands (`bom`, `history`, `attest`) functional
+- Response pagination implemented where required
+- Integration tests pass for all endpoints
 feature_slug: skillbom-attestation
-effort_estimate: "28-32 story points"
-timeline: "3 weeks"
-critical_path: "Phase 7 gates Phase 9-10 (web/backstage)"
+effort_estimate: 28-32 story points
+timeline: 3 weeks
+critical_path: Phase 7 gates Phase 9-10 (web/backstage)
+status: inferred_complete
 ---
-
 # SkillBOM & Attestation System - Phases 7-8: API & CLI
 
 ## Overview

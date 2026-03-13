@@ -14965,6 +14965,36 @@ main.add_command(auth_cli, name="auth")
 
 
 # ====================
+# BOM Command Group
+# ====================
+
+
+from skillmeat.cli.commands.bom import bom_group  # noqa: E402
+
+main.add_command(bom_group, name="bom")
+
+
+# ====================
+# History Command Group
+# ====================
+
+
+from skillmeat.cli.commands.history import history_group  # noqa: E402
+
+main.add_command(history_group, name="history")
+
+
+# ====================
+# Attest Command Group
+# ====================
+
+
+from skillmeat.cli.commands.attest import attest_group  # noqa: E402
+
+main.add_command(attest_group, name="attest")
+
+
+# ====================
 # Entry Point
 # ====================
 

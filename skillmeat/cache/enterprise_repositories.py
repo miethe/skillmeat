@@ -82,6 +82,7 @@ from sqlalchemy.sql import Select
 from skillmeat.cache.constants import DEFAULT_TENANT_ID
 
 from skillmeat.core.interfaces.repositories import (
+    IArtifactActivityRepository,
     IDbArtifactHistoryRepository,
     IDbCollectionArtifactRepository,
     IDbUserCollectionRepository,
@@ -9833,3 +9834,259 @@ class EnterpriseDuplicatePairStub:
     def list_pairs_for_artifact(self, artifact_uuid: str) -> "list":
         logger.debug("DuplicatePairRepository: enterprise stub — dedup is local-only in v2")
         return []
+
+
+# =============================================================================
+# EnterpriseArtifactActivityRepository  (TASK-3.3)
+# =============================================================================
+
+
+class EnterpriseArtifactActivityRepository(IArtifactActivityRepository):
+    """Enterprise (PostgreSQL) implementation of ``IArtifactActivityRepository``.
+
+    Manages :class:`~skillmeat.cache.models.ArtifactHistoryEvent` rows using
+    SQLAlchemy 2.x ``select()`` style, consistent with all other enterprise
+    repositories in this module.
+
+    Design notes
+    ------------
+    * ``ArtifactHistoryEvent`` is a shared model (not an enterprise-only model)
+      and does **not** carry a ``tenant_id`` column.  Multi-tenant scoping is
+      achieved via the ``owner_type`` column, which callers populate with the
+      active tenant / owner context string.  The ``list_events``,
+      ``count_events``, and ``list_provenance_slice`` methods accept an
+      optional ``owner_type`` filter to restrict results to a single tenant.
+    * Events are **immutable** once written.  No ``update`` or ``delete``
+      methods are provided.
+    * The session lifecycle is owned by the caller (FastAPI DI or test
+      harness).  This class only calls ``session.flush()`` after an insert to
+      obtain the generated primary key; commit/rollback is the caller's
+      responsibility.
+
+    Parameters
+    ----------
+    session:
+        An open :class:`sqlalchemy.orm.Session` bound to the enterprise
+        PostgreSQL database.
+    """
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    # ------------------------------------------------------------------
+    # Mutations (insert-only)
+    # ------------------------------------------------------------------
+
+    def create_event(
+        self,
+        artifact_id: str,
+        event_type: str,
+        actor_id: Optional[str],
+        owner_type: str,
+        diff_json: Optional[str],
+        content_hash: Optional[str],
+        ctx: "Any | None" = None,
+    ) -> "ArtifactHistoryEvent":
+        """Append a new lifecycle event to the activity log.
+
+        Args:
+            artifact_id: Primary key of the artifact (``"type:name"`` format).
+            event_type: One of ``'create'``, ``'update'``, ``'delete'``,
+                ``'deploy'``, ``'undeploy'``, or ``'sync'``.
+            actor_id: Opaque identifier for the user or system that triggered
+                the event; ``None`` for automated/system events.
+            owner_type: Owner context string at the time of the event.  Used
+                as the multi-tenant scope key in the absence of a dedicated
+                ``tenant_id`` column on this model.
+            diff_json: JSON-serialised diff payload, or ``None``.
+            content_hash: SHA-256 hex digest of artifact content, or ``None``.
+            ctx: Optional per-request metadata (unused in this backend).
+
+        Returns:
+            The newly flushed
+            :class:`~skillmeat.cache.models.ArtifactHistoryEvent` instance
+            with ``id`` populated.
+        """
+        from skillmeat.cache.auth_types import OwnerType
+        from skillmeat.cache.models import ArtifactHistoryEvent
+
+        resolved_owner_type = owner_type or OwnerType.user.value
+        event = ArtifactHistoryEvent(
+            artifact_id=artifact_id,
+            event_type=event_type,
+            actor_id=actor_id,
+            owner_type=resolved_owner_type,
+            diff_json=diff_json,
+            content_hash=content_hash,
+        )
+        self.session.add(event)
+        self.session.flush()
+        logger.debug(
+            "EnterpriseArtifactActivityRepository.create_event: "
+            "id=%s artifact_id=%s event_type=%s owner_type=%s",
+            event.id,
+            artifact_id,
+            event_type,
+            resolved_owner_type,
+        )
+        return event
+
+    # ------------------------------------------------------------------
+    # Queries
+    # ------------------------------------------------------------------
+
+    def list_events(
+        self,
+        artifact_id: Optional[str] = None,
+        event_type: Optional[str] = None,
+        actor_id: Optional[str] = None,
+        owner_type: Optional[str] = None,
+        time_range: Optional[Tuple[datetime, datetime]] = None,
+        limit: int = 100,
+        offset: int = 0,
+        ctx: "Any | None" = None,
+    ) -> "list[ArtifactHistoryEvent]":
+        """Return a filtered, paginated slice of activity events.
+
+        All filter arguments are optional and AND-ed together when provided.
+
+        Args:
+            artifact_id: Restrict to events for this artifact primary key.
+            event_type: Restrict to events of this type.
+            actor_id: Restrict to events triggered by this actor.
+            owner_type: Restrict to events with this owner context.  Use this
+                to scope results to a specific tenant in multi-tenant
+                deployments.
+            time_range: ``(start, end)`` inclusive window in UTC.
+            limit: Maximum number of rows to return (default 100).
+            offset: Number of rows to skip for pagination (default 0).
+            ctx: Optional per-request metadata (unused in this backend).
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.cache.models.ArtifactHistoryEvent` ordered
+            by ``timestamp`` ascending, then ``id`` ascending.
+        """
+        from skillmeat.cache.models import ArtifactHistoryEvent
+
+        stmt = select(ArtifactHistoryEvent)
+
+        if artifact_id is not None:
+            stmt = stmt.where(ArtifactHistoryEvent.artifact_id == artifact_id)
+        if event_type is not None:
+            stmt = stmt.where(ArtifactHistoryEvent.event_type == event_type)
+        if actor_id is not None:
+            stmt = stmt.where(ArtifactHistoryEvent.actor_id == actor_id)
+        if owner_type is not None:
+            stmt = stmt.where(ArtifactHistoryEvent.owner_type == owner_type)
+        if time_range is not None:
+            start, end = time_range
+            stmt = stmt.where(ArtifactHistoryEvent.timestamp >= start)
+            stmt = stmt.where(ArtifactHistoryEvent.timestamp <= end)
+
+        stmt = (
+            stmt.order_by(
+                ArtifactHistoryEvent.timestamp.asc(),
+                ArtifactHistoryEvent.id.asc(),
+            )
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def get_event(
+        self,
+        event_id: int,
+        ctx: "Any | None" = None,
+    ) -> "ArtifactHistoryEvent | None":
+        """Return a single event by its integer primary key.
+
+        Args:
+            event_id: Auto-increment primary key of the event row.
+            ctx: Optional per-request metadata (unused in this backend).
+
+        Returns:
+            The matching :class:`~skillmeat.cache.models.ArtifactHistoryEvent`
+            when found, ``None`` otherwise.
+        """
+        from skillmeat.cache.models import ArtifactHistoryEvent
+
+        stmt = select(ArtifactHistoryEvent).where(ArtifactHistoryEvent.id == event_id)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    def count_events(
+        self,
+        artifact_id: Optional[str] = None,
+        event_type: Optional[str] = None,
+        owner_type: Optional[str] = None,
+        ctx: "Any | None" = None,
+    ) -> int:
+        """Return the count of events matching the given filters.
+
+        Args:
+            artifact_id: Restrict count to events for this artifact.
+            event_type: Restrict count to events of this type.
+            owner_type: Restrict count to events with this owner context.
+            ctx: Optional per-request metadata (unused in this backend).
+
+        Returns:
+            Non-negative integer count of matching event rows.
+        """
+        from sqlalchemy import func
+
+        from skillmeat.cache.models import ArtifactHistoryEvent
+
+        stmt = select(func.count()).select_from(ArtifactHistoryEvent)
+
+        if artifact_id is not None:
+            stmt = stmt.where(ArtifactHistoryEvent.artifact_id == artifact_id)
+        if event_type is not None:
+            stmt = stmt.where(ArtifactHistoryEvent.event_type == event_type)
+        if owner_type is not None:
+            stmt = stmt.where(ArtifactHistoryEvent.owner_type == owner_type)
+
+        result = self.session.execute(stmt).scalar_one()
+        return int(result)
+
+    def list_provenance_slice(
+        self,
+        artifact_id: str,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
+        ctx: "Any | None" = None,
+    ) -> "list[ArtifactHistoryEvent]":
+        """Return the ordered provenance timeline for a single artifact.
+
+        Returns all events for *artifact_id* within the optional time window,
+        ordered chronologically ascending.
+
+        Args:
+            artifact_id: Primary key of the artifact whose provenance is
+                requested.
+            since: Lower bound (inclusive) of the time window in UTC.
+                When ``None``, no lower bound is applied.
+            until: Upper bound (inclusive) of the time window in UTC.
+                When ``None``, no upper bound is applied.
+            ctx: Optional per-request metadata (unused in this backend).
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.cache.models.ArtifactHistoryEvent` ordered
+            by ``timestamp`` ascending, then ``id`` ascending.
+        """
+        from skillmeat.cache.models import ArtifactHistoryEvent
+
+        stmt = select(ArtifactHistoryEvent).where(
+            ArtifactHistoryEvent.artifact_id == artifact_id
+        )
+
+        if since is not None:
+            stmt = stmt.where(ArtifactHistoryEvent.timestamp >= since)
+        if until is not None:
+            stmt = stmt.where(ArtifactHistoryEvent.timestamp <= until)
+
+        stmt = stmt.order_by(
+            ArtifactHistoryEvent.timestamp.asc(),
+            ArtifactHistoryEvent.id.asc(),
+        )
+        return list(self.session.execute(stmt).scalars().all())

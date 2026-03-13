@@ -1,46 +1,48 @@
 ---
 schema_version: 2
 doc_type: phase_plan
-title: "SkillBOM & Attestation - Phases 3-4: Activity & RBAC"
-description: >
-  Artifact activity history layer (Phase 3) + AAA/RBAC scoped metadata (Phase 4).
-  Establishes a provenance-grade audit stream separate from existing version-lineage history.
+title: 'SkillBOM & Attestation - Phases 3-4: Activity & RBAC'
+description: 'Artifact activity history layer (Phase 3) + AAA/RBAC scoped metadata
+  (Phase 4). Establishes a provenance-grade audit stream separate from existing version-lineage
+  history.
+
+  '
 audience:
-  - ai-agents
-  - developers
-  - backend-engineers
-  - security-engineers
+- ai-agents
+- developers
+- backend-engineers
+- security-engineers
 tags:
-  - implementation-plan
-  - phases
-  - skillbom
-  - history
-  - activity-log
-  - rbac
+- implementation-plan
+- phases
+- skillbom
+- history
+- activity-log
+- rbac
 created: 2026-03-10
 updated: 2026-03-11
 phase: 3-4
-phase_title: "Activity & RBAC: Event Capture & Owner Scoping"
+phase_title: 'Activity & RBAC: Event Capture & Owner Scoping'
 prd_ref: /docs/project_plans/PRDs/features/skillbom-attestation-v1.md
 plan_ref: /docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md
 entry_criteria:
-  - Phase 1-2 models and generators complete and tested
-  - BomSnapshot and ArtifactHistoryEvent models available
-  - AttestationRecord model with owner_type/owner_id fields ready
+- Phase 1-2 models and generators complete and tested
+- BomSnapshot and ArtifactHistoryEvent models available
+- AttestationRecord model with owner_type/owner_id fields ready
 exit_criteria:
-  - Artifact activity repository + query interface complete
-  - Activity events recorded from artifact/deploy/sync/BOM/attestation flows
-  - Fire-and-forget writes verified to not block mutations
-  - Ownership resolution supports user/team/enterprise
-  - AttestationScopeResolver enforces owner-scoped visibility
-  - Enterprise policy fields configurable per tenant
-  - RBAC unit tests verify correct access control per owner type
+- Artifact activity repository + query interface complete
+- Activity events recorded from artifact/deploy/sync/BOM/attestation flows
+- Fire-and-forget writes verified to not block mutations
+- Ownership resolution supports user/team/enterprise
+- AttestationScopeResolver enforces owner-scoped visibility
+- Enterprise policy fields configurable per tenant
+- RBAC unit tests verify correct access control per owner type
 feature_slug: skillbom-attestation
-effort_estimate: "20-24 story points"
-timeline: "2 weeks"
-parallelization: "Phase 3 and Phase 4 can run in parallel after models lock"
+effort_estimate: 20-24 story points
+timeline: 2 weeks
+parallelization: Phase 3 and Phase 4 can run in parallel after models lock
+status: inferred_complete
 ---
-
 # SkillBOM & Attestation System - Phases 3-4: Activity & RBAC
 
 ## Overview

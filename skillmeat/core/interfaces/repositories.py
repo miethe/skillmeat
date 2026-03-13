@@ -33,12 +33,14 @@ from __future__ import annotations
 
 import abc
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from skillmeat.core.interfaces.context import RequestContext
 
 if TYPE_CHECKING:
     from skillmeat.api.schemas.auth import AuthContext
+    from skillmeat.cache.models import ArtifactHistoryEvent
     from skillmeat.core.ownership import OwnerTarget
 from skillmeat.core.interfaces.dtos import (
     ArtifactDTO,
@@ -77,6 +79,7 @@ __all__ = [
     "IDbCollectionArtifactRepository",
     "IDbArtifactHistoryRepository",
     "IMembershipRepository",
+    "IArtifactActivityRepository",
 ]
 
 
@@ -4093,5 +4096,179 @@ class IMembershipRepository(abc.ABC):
 
         Returns:
             ``True`` when the user is a member, ``False`` otherwise.
+        """
+        raise NotImplementedError
+
+
+# =============================================================================
+# IArtifactActivityRepository
+# =============================================================================
+
+
+class IArtifactActivityRepository(abc.ABC):
+    """Repository ABC for artifact activity / audit-log events.
+
+    Manages :class:`~skillmeat.cache.models.ArtifactHistoryEvent` rows which
+    form the immutable append-only activity ledger for every artifact in the
+    collection.
+
+    Design invariants:
+
+    - **Insert-only**: Events are immutable once written.  There are no
+      ``update`` or ``delete`` methods on this interface.
+    - **Append-only queries**: All read methods filter and page over the
+      existing event log; they do not modify state.
+    - Valid ``event_type`` values: ``'create'``, ``'update'``, ``'delete'``,
+      ``'deploy'``, ``'undeploy'``, ``'sync'``.
+    - ``ctx: RequestContext | None = None`` is the last parameter of every
+      method so callers that do not need per-request metadata can omit it.
+    """
+
+    # ------------------------------------------------------------------
+    # Mutations (insert-only)
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def create_event(
+        self,
+        artifact_id: str,
+        event_type: str,
+        actor_id: str | None,
+        owner_type: str,
+        diff_json: str | None,
+        content_hash: str | None,
+        ctx: RequestContext | None = None,
+    ) -> ArtifactHistoryEvent:
+        """Append a new lifecycle event to the activity log.
+
+        Args:
+            artifact_id: Primary key of the artifact (``"type:name"`` format).
+            event_type: One of ``'create'``, ``'update'``, ``'delete'``,
+                ``'deploy'``, ``'undeploy'``, or ``'sync'``.
+            actor_id: Opaque identifier for the user or system that triggered
+                the event; ``None`` for automated/system events.
+            owner_type: Owner context at the time of the event (e.g. the
+                ``.value`` of :class:`~skillmeat.cache.auth_types.OwnerType`).
+            diff_json: JSON-serialised diff payload describing the change, or
+                ``None`` when no diff is available.
+            content_hash: SHA-256 hex digest of artifact content at event
+                time, or ``None`` when not applicable.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The newly created :class:`~skillmeat.cache.models.ArtifactHistoryEvent`
+            instance (id populated after flush/commit).
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Queries
+    # ------------------------------------------------------------------
+
+    @abc.abstractmethod
+    def list_events(
+        self,
+        artifact_id: str | None = None,
+        event_type: str | None = None,
+        actor_id: str | None = None,
+        owner_type: str | None = None,
+        time_range: tuple[datetime, datetime] | None = None,
+        limit: int = 100,
+        offset: int = 0,
+        ctx: RequestContext | None = None,
+    ) -> list[ArtifactHistoryEvent]:
+        """Return a filtered, paginated slice of activity events.
+
+        All filter arguments are optional and combinable.  When multiple
+        filters are provided they are AND-ed together.
+
+        Args:
+            artifact_id: Restrict to events for this artifact primary key.
+            event_type: Restrict to events of this type.
+            actor_id: Restrict to events triggered by this actor.
+            owner_type: Restrict to events with this owner context.
+            time_range: ``(start, end)`` inclusive window in UTC; restricts
+                to events where ``timestamp >= start`` and
+                ``timestamp <= end``.
+            limit: Maximum number of events to return (default 100).
+            offset: Number of events to skip for pagination (default 0).
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.cache.models.ArtifactHistoryEvent` ordered
+            by ``timestamp`` ascending, then ``id`` ascending.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_event(
+        self,
+        event_id: int,
+        ctx: RequestContext | None = None,
+    ) -> ArtifactHistoryEvent | None:
+        """Return a single event by its integer primary key.
+
+        Args:
+            event_id: Auto-increment primary key of the event row.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            The matching :class:`~skillmeat.cache.models.ArtifactHistoryEvent`
+            when found, ``None`` otherwise.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def count_events(
+        self,
+        artifact_id: str | None = None,
+        event_type: str | None = None,
+        owner_type: str | None = None,
+        ctx: RequestContext | None = None,
+    ) -> int:
+        """Return the count of events matching the given filters.
+
+        Useful for pagination metadata and analytics without transferring
+        full event rows.
+
+        Args:
+            artifact_id: Restrict count to events for this artifact.
+            event_type: Restrict count to events of this type.
+            owner_type: Restrict count to events with this owner context.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            Non-negative integer count of matching event rows.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def list_provenance_slice(
+        self,
+        artifact_id: str,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        ctx: RequestContext | None = None,
+    ) -> list[ArtifactHistoryEvent]:
+        """Return the ordered provenance timeline for a single artifact.
+
+        Returns all events for *artifact_id* within the optional time window,
+        ordered chronologically ascending.  Intended for provenance/lineage
+        views where the full event sequence matters.
+
+        Args:
+            artifact_id: Primary key of the artifact whose provenance is
+                requested.
+            since: Lower bound (inclusive) of the time window in UTC.
+                When ``None``, no lower bound is applied.
+            until: Upper bound (inclusive) of the time window in UTC.
+                When ``None``, no upper bound is applied.
+            ctx: Optional per-request metadata.
+
+        Returns:
+            A (possibly empty) list of
+            :class:`~skillmeat.cache.models.ArtifactHistoryEvent` ordered
+            by ``timestamp`` ascending, then ``id`` ascending.
         """
         raise NotImplementedError

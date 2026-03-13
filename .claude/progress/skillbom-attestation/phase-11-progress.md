@@ -2,66 +2,97 @@
 schema_version: 2
 doc_type: progress
 type: progress
-prd: "skillbom-attestation"
-feature_slug: "skillbom-attestation"
+prd: skillbom-attestation
+feature_slug: skillbom-attestation
 phase: 11
-status: pending
+status: completed
 created: 2026-03-10
-updated: 2026-03-10
-prd_ref: "docs/project_plans/PRDs/features/skillbom-attestation-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/skillbom-attestation-v1/phase-11-validation.md"
+updated: '2026-03-13'
+prd_ref: docs/project_plans/PRDs/features/skillbom-attestation-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/skillbom-attestation-v1/phase-11-validation.md
 commit_refs: []
 pr_refs: []
 owners:
-  - "python-backend-engineer"
-  - "documentation-writer"
+- python-backend-engineer
+- documentation-writer
 contributors: []
 tasks:
-  - id: "TASK-11.1"
-    name: "Unit test suites for all 6 models (CRUD, relationships, constraints, defaults) with >= 80% coverage"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "2 pts"
-  - id: "TASK-11.2"
-    name: "Unit test suites for IArtifactHistoryRepository and IBomRepository implementations (local + enterprise: query filters, pagination, immutability, edge cases)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "3 pts"
-  - id: "TASK-11.3"
-    name: "Unit test suites for BomGenerator, ArtifactHistoryService, AttestationScopeResolver, and signing service (happy paths, error handling, edge cases)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "3 pts"
-  - id: "TASK-11.4"
-    name: "Unit test suites for all 8 BOM API endpoints and all bom/history/attest CLI commands (auth enforcement, request validation, response format, output formatting)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "6 pts"
-  - id: "TASK-11.5"
-    name: "Integration test: end-to-end BOM workflow (deploy → generate → commit hook → history query → attest create → verify signature → time-travel restore)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "2 pts"
-  - id: "TASK-11.6"
-    name: "Integration test: BOM with all 13+ artifact types, RBAC visibility enforcement (cross-user/cross-team/cross-tenant isolation), API/web/CLI data consistency"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "6 pts"
-  - id: "TASK-11.7"
-    name: "Migration tests (SQLite + PostgreSQL fresh schema + data preservation), load tests (BOM gen 50/100/200 artifacts < 2s, history query 100/1000/10000 events < 200ms), feature flag testing, security audit, CI/CD GitHub Actions workflow, and user/API documentation and gradual rollout plan"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "documentation-writer"]
-    dependencies: ["TASK-11.5", "TASK-11.6"]
-    estimate: "13 pts"
+- id: TASK-11.1
+  name: Unit test suites for all 6 models (CRUD, relationships, constraints, defaults)
+    with >= 80% coverage
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 2 pts
+- id: TASK-11.2
+  name: 'Unit test suites for IArtifactHistoryRepository and IBomRepository implementations
+    (local + enterprise: query filters, pagination, immutability, edge cases)'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 3 pts
+- id: TASK-11.3
+  name: Unit test suites for BomGenerator, ArtifactHistoryService, AttestationScopeResolver,
+    and signing service (happy paths, error handling, edge cases)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 3 pts
+- id: TASK-11.4
+  name: Unit test suites for all 8 BOM API endpoints and all bom/history/attest CLI
+    commands (auth enforcement, request validation, response format, output formatting)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 6 pts
+- id: TASK-11.5
+  name: 'Integration test: end-to-end BOM workflow (deploy → generate → commit hook
+    → history query → attest create → verify signature → time-travel restore)'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 2 pts
+- id: TASK-11.6
+  name: 'Integration test: BOM with all 13+ artifact types, RBAC visibility enforcement
+    (cross-user/cross-team/cross-tenant isolation), API/web/CLI data consistency'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 6 pts
+- id: TASK-11.7
+  name: Migration tests (SQLite + PostgreSQL fresh schema + data preservation), load
+    tests (BOM gen 50/100/200 artifacts < 2s, history query 100/1000/10000 events
+    < 200ms), feature flag testing, security audit, CI/CD GitHub Actions workflow,
+    and user/API documentation and gradual rollout plan
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  - documentation-writer
+  dependencies:
+  - TASK-11.5
+  - TASK-11.6
+  estimate: 13 pts
 parallelization:
-  batch_1: ["TASK-11.1", "TASK-11.2", "TASK-11.3", "TASK-11.4"]
-  batch_2: ["TASK-11.5", "TASK-11.6", "TASK-11.7"]
+  batch_1:
+  - TASK-11.1
+  - TASK-11.2
+  - TASK-11.3
+  - TASK-11.4
+  batch_2:
+  - TASK-11.5
+  - TASK-11.6
+  - TASK-11.7
+total_tasks: 7
+completed_tasks: 7
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 100
 ---
 
 # Phase 11 Progress: Validation & Deployment — Testing, Docs, Production

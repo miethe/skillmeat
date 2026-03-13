@@ -1,25 +1,27 @@
 ---
 title: 'PRD: SkillBOM & Attestation System'
-description: Cryptographic tracking and provenance for all AI artifact types, with full lifecycle history, RBAC-scoped attestation metadata, and multi-surface viewing across CLI, web, API, and Backstage IDP.
+description: Cryptographic tracking and provenance for all AI artifact types, with
+  full lifecycle history, RBAC-scoped attestation metadata, and multi-surface viewing
+  across CLI, web, API, and Backstage IDP.
 audience:
-  - ai-agents
-  - developers
-  - security-engineers
+- ai-agents
+- developers
+- security-engineers
 tags:
-  - prd
-  - planning
-  - enhancement
-  - skillbom
-  - security
-  - provenance
-  - versioning
-  - rbac
-  - attestation
-  - backstage
+- prd
+- planning
+- enhancement
+- skillbom
+- security
+- provenance
+- versioning
+- rbac
+- attestation
+- backstage
 created: 2026-02-23
 updated: 2026-03-10
 category: product-planning
-status: draft
+status: inferred_complete
 priority: HIGH
 risk_level: high
 schema_version: 2
@@ -28,27 +30,26 @@ feature_slug: skillbom-attestation
 prd_ref: null
 plan_ref: docs/project_plans/implementation_plans/features/skillbom-attestation-v1.md
 related_documents:
-  - /docs/project_plans/PRDs/features/versioning-merge-system-v1.5-state-tracking.md
-  - /docs/dev/architecture/decisions/004-artifact-version-tracking.md
-  - /docs/ops/security/SIGNING_POLICY.md
-  - /skillmeat/core/deployment.py
-  - /skillmeat/api/routers/idp_integration.py
-  - /plugins/backstage-plugin-scaffolder-backend/
+- /docs/project_plans/PRDs/features/versioning-merge-system-v1.5-state-tracking.md
+- /docs/dev/architecture/decisions/004-artifact-version-tracking.md
+- /docs/ops/security/SIGNING_POLICY.md
+- /skillmeat/core/deployment.py
+- /skillmeat/api/routers/idp_integration.py
+- /plugins/backstage-plugin-scaffolder-backend/
 owner: null
 contributors: []
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/api/schemas/bom.py
-  - skillmeat/api/routers/bom.py
-  - skillmeat/api/routers/idp_integration.py
-  - skillmeat/cache/models.py
-  - skillmeat/core/bom/generator.py
-  - skillmeat/core/bom/history.py
-  - plugins/backstage-plugin-scaffolder-backend/
+- skillmeat/api/schemas/bom.py
+- skillmeat/api/routers/bom.py
+- skillmeat/api/routers/idp_integration.py
+- skillmeat/cache/models.py
+- skillmeat/core/bom/generator.py
+- skillmeat/core/bom/history.py
+- plugins/backstage-plugin-scaffolder-backend/
 ---
-
 # PRD: SkillBOM & Attestation System
 
 **Feature Name:** SkillBOM (Software Bill of Materials for Skills) & Attestation System

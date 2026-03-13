@@ -72,6 +72,53 @@ def _get_artifact_metadata_json(db_path, workflow_id):
 
 **Reference**: `tests/integration/api/test_workflow_roundtrip.py::test_artifact_metadata_links_workflow_id`
 
+## SQLite Schema Cache Staleness After DDL in Migration Tests
+
+SQLite connections cache schema metadata (table/index lists). After running Alembic
+migrations that create indexes via `op.create_index()`, the **same engine connection** may
+return empty results from `inspect(engine).get_indexes(table)` because the SQLite schema
+cache is not invalidated within the same connection pool.
+
+**Fix**: Call `engine.dispose()` before inspecting index names after a migration run:
+
+```python
+def _index_names(engine, table):
+    engine.dispose()  # clears connection pool, forces fresh schema read
+    return {idx["name"] for idx in inspect(engine).get_indexes(table)}
+```
+
+This is needed in any migration test that uses the same engine for both running
+migrations and inspecting the resulting schema on SQLite.
+
+**Affected tables**: Any table created with separate `op.create_index()` calls (not inline
+`sa.Index()` inside `op.create_table()`). The BOM migration creates all indexes separately,
+making this particularly relevant.
+
+**Reference**: `tests/migration/test_alembic_bom.py::_index_names()`
+
+## FastAPI TestClient — 503 When Missing Lifespan (context manager required)
+
+Using `TestClient(app)` without the context manager produces 503 responses because the
+FastAPI lifespan handler (which initializes `AppState`) never runs.
+
+**Wrong**:
+```python
+client = TestClient(app)
+resp = client.get("/some-endpoint")  # Returns 503
+```
+
+**Correct**:
+```python
+with TestClient(app) as client:
+    resp = client.get("/some-endpoint")  # Returns 200
+```
+
+The `with` form triggers `__enter__`/`__exit__` which runs the lifespan startup/shutdown.
+Feature flag tests that only need settings-level checks (no HTTP) can skip the TestClient
+entirely — just assert against the `APISettings` object directly.
+
+**Reference**: `tests/integration/test_feature_flags.py`, `tests/test_workflow_api.py`
+
 ## Workflow YAML Schema — RoleAssignment format
 
 `stages[].roles.primary` requires a `RoleAssignment` dict with `artifact` key — NOT a plain string.

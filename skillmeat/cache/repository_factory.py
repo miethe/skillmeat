@@ -69,6 +69,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from skillmeat.core.interfaces.repositories import (
+    IArtifactActivityRepository,
     IArtifactRepository,
     ICollectionRepository,
 )
@@ -190,6 +191,42 @@ class RepositoryFactory:
             "Valid values are 'local' and 'enterprise'."
         )
 
+    def get_artifact_activity_repository(
+        self,
+        session: Optional[Session] = None,
+    ) -> IArtifactActivityRepository:
+        """Return an ``IArtifactActivityRepository`` for the configured edition.
+
+        Parameters
+        ----------
+        session:
+            An open SQLAlchemy session.  Required for the ``"enterprise"``
+            edition; ignored for ``"local"``.
+
+        Returns
+        -------
+        IArtifactActivityRepository
+
+        Raises
+        ------
+        ValueError
+            When ``edition == "enterprise"`` and no session is provided.
+        NotImplementedError
+            When the edition string is unrecognised.
+        """
+        if self._edition == "local":
+            return self._build_local_artifact_activity_repository()
+        if self._edition == "enterprise":
+            if session is None:
+                raise ValueError(
+                    "An open SQLAlchemy Session is required for enterprise edition."
+                )
+            return self._build_enterprise_artifact_activity_repository(session)
+        raise NotImplementedError(
+            f"Unknown edition '{self._edition}'. "
+            "Valid values are 'local' and 'enterprise'."
+        )
+
     # ------------------------------------------------------------------
     # Private builders — local edition
     # ------------------------------------------------------------------
@@ -237,6 +274,26 @@ class RepositoryFactory:
             collection_manager=collection_manager,
             path_resolver=path_resolver,
         )
+
+    @staticmethod
+    def _build_local_artifact_activity_repository() -> IArtifactActivityRepository:
+        """Instantiate the local (SQLite) artifact activity repository.
+
+        Resolves the default cache DB path (``~/.skillmeat/cache/cache.db``)
+        and opens a session via :func:`~skillmeat.cache.models.get_session`.
+        The caller owns the session lifecycle; commit/rollback should be
+        performed after any mutations.
+        """
+        from pathlib import Path
+
+        from skillmeat.cache.models import get_session
+        from skillmeat.core.repositories.local_artifact_activity import (
+            LocalArtifactActivityRepository,
+        )
+
+        default_db_path = str(Path.home() / ".skillmeat" / "cache" / "cache.db")
+        session = get_session(default_db_path)
+        return LocalArtifactActivityRepository(session=session)
 
     # ------------------------------------------------------------------
     # Private builders — enterprise edition
@@ -295,6 +352,28 @@ class RepositoryFactory:
             "EnterpriseCollectionRepository is not yet implemented. "
             "Use edition='local' or wait for ENT-2.x tasks."
         )
+
+    @staticmethod
+    def _build_enterprise_artifact_activity_repository(
+        session: Session,
+    ) -> IArtifactActivityRepository:
+        """Instantiate the enterprise artifact activity repository (TASK-3.3).
+
+        Uses :class:`~skillmeat.cache.enterprise_repositories.EnterpriseArtifactActivityRepository`
+        backed by PostgreSQL.  Multi-tenant scoping is achieved via the
+        ``owner_type`` column (``ArtifactHistoryEvent`` has no ``tenant_id``).
+        """
+        try:
+            from skillmeat.cache.enterprise_repositories import (
+                EnterpriseArtifactActivityRepository,
+            )
+        except ImportError as exc:
+            raise RuntimeError(
+                "Enterprise repository dependencies are not installed. "
+                "Install the enterprise extras: pip install skillmeat[enterprise]"
+            ) from exc
+
+        return EnterpriseArtifactActivityRepository(session)
 
 
 # ---------------------------------------------------------------------------
