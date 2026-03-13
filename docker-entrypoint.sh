@@ -5,9 +5,9 @@ set -euo pipefail
 # SkillMeat API Container Entrypoint
 #
 # Responsibilities:
-#   1. Detect database backend (Postgres vs SQLite) from DATABASE_URL
-#   2. Run Alembic migrations for Postgres
-#   3. Ensure data directories exist for SQLite
+#   1. Ensure data directories exist (ConfigManager needs ~/.skillmeat)
+#   2. Detect database backend (Postgres vs SQLite) from DATABASE_URL
+#   3. Run Alembic migrations for Postgres
 #   4. Handle SIGTERM for graceful shutdown
 #   5. Pass through to CMD via exec "$@"
 # ──────────────────────────────────────────────────────────────────────
@@ -30,6 +30,17 @@ if [ "${SKILLMEAT_RELOAD:-false}" = "true" ]; then
     echo "[entrypoint] Reload mode is ACTIVE (SKILLMEAT_RELOAD=true)"
 fi
 
+# ── Ensure data directory exists (required for BOTH modes) ──────────
+# ConfigManager always needs ~/.skillmeat to exist, even when using PostgreSQL.
+# SKILLMEAT_COLLECTION_DIR typically points to ~/.skillmeat/collection;
+# we create its parent to cover the config file location.
+SKILLMEAT_DATA_DIR="${SKILLMEAT_COLLECTION_DIR:-/home/app/.skillmeat}"
+if [ -n "${SKILLMEAT_COLLECTION_DIR:-}" ]; then
+    SKILLMEAT_DATA_DIR="$(dirname "$SKILLMEAT_COLLECTION_DIR")"
+fi
+echo "[entrypoint] Ensuring data directory exists: ${SKILLMEAT_DATA_DIR}"
+mkdir -p "$SKILLMEAT_DATA_DIR"
+
 # ── Database detection ───────────────────────────────────────────────
 DATABASE_URL="${DATABASE_URL:-}"
 
@@ -48,18 +59,6 @@ if [[ "$DATABASE_URL" == postgresql://* ]] || [[ "$DATABASE_URL" == postgres://*
     fi
 else
     echo "[entrypoint] Using SQLite database (local edition)"
-
-    # Ensure the data directory exists for SQLite storage.
-    # SKILLMEAT_COLLECTION_DIR typically points to ~/.skillmeat/collection;
-    # we create its parent to cover the DB file location as well.
-    SKILLMEAT_DATA_DIR="${SKILLMEAT_COLLECTION_DIR:-/home/app/.skillmeat}"
-    # If SKILLMEAT_COLLECTION_DIR was set, derive parent; otherwise use default
-    if [ -n "${SKILLMEAT_COLLECTION_DIR:-}" ]; then
-        SKILLMEAT_DATA_DIR="$(dirname "$SKILLMEAT_COLLECTION_DIR")"
-    fi
-
-    echo "[entrypoint] Ensuring data directory exists: ${SKILLMEAT_DATA_DIR}"
-    mkdir -p "$SKILLMEAT_DATA_DIR"
 fi
 
 # ── Hand off to CMD ─────────────────────────────────────────────────
