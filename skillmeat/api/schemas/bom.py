@@ -191,18 +191,70 @@ class BomCardArtifactEntry(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class BomCardRecentEvent(BaseModel):
+    """Lightweight activity event for Backstage BOM card consumption.
+
+    Summarises a single ``ArtifactHistoryEvent`` row.  Heavy fields such as
+    ``diff_json`` are omitted to keep the IDP payload compact.
+    """
+
+    id: int = Field(description="Primary key of the ArtifactHistoryEvent row")
+    artifact_id: str = Field(
+        description="Artifact identifier in 'type:name' format",
+    )
+    event_type: str = Field(
+        description="Event type (e.g. 'create', 'update', 'deploy', 'undeploy', 'sync')",
+    )
+    actor_id: Optional[str] = Field(
+        default=None,
+        description="Identifier of the actor who triggered the event",
+    )
+    timestamp: Optional[str] = Field(
+        default=None,
+        description="ISO-8601 UTC timestamp of the event",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BomCardAttestationSummary(BaseModel):
+    """Aggregated attestation statistics for Backstage BOM card consumption.
+
+    Provides a compact overview of all AttestationRecord rows linked to
+    artifacts in the snapshot.  The ``scope_counts`` dict maps each scope
+    string to the number of attestations that include it.
+    """
+
+    total: int = Field(ge=0, description="Total attestation records for snapshot artifacts")
+    scope_counts: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Map of scope string to count of attestations containing that scope",
+    )
+    latest_at: Optional[str] = Field(
+        default=None,
+        description="ISO-8601 UTC timestamp of the most recent attestation, or null if none",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class BomCardResponse(BaseModel):
     """Backstage-renderable BOM payload for IDP catalog/backend consumers.
 
-    A lightweight summary of the latest BOM snapshot for a project.
-    Intended for use by Backstage software-catalog plugins and scaffolder
-    actions that need artifact inventory metadata without the full BOM JSON.
+    A complete summary of the latest BOM snapshot for a project, intended
+    for Backstage software-catalog plugins and scaffolder actions.  Includes
+    a compact artifact list, recent activity events, and an aggregated
+    attestation summary.
     """
 
     project_id: str = Field(description="Project identifier")
     snapshot_id: int = Field(description="Primary key of the BOM snapshot row")
     generated_at: str = Field(
         description="ISO-8601 UTC timestamp when the snapshot was captured",
+    )
+    schema_version: str = Field(
+        default="1.0.0",
+        description="BOM card payload schema version (semver)",
     )
     artifact_count: int = Field(
         ge=0,
@@ -218,6 +270,13 @@ class BomCardResponse(BaseModel):
     attestation_count: int = Field(
         ge=0,
         description="Number of AttestationRecord rows linked to artifacts in this snapshot",
+    )
+    recent_events: List[BomCardRecentEvent] = Field(
+        default_factory=list,
+        description="Most recent activity events for artifacts in this snapshot (newest-first)",
+    )
+    attestation_summary: BomCardAttestationSummary = Field(
+        description="Aggregated attestation statistics for artifacts in this snapshot",
     )
 
     model_config = ConfigDict(from_attributes=True)

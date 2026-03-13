@@ -30,6 +30,7 @@ import {
   MoreVertical,
   Plus,
   Users,
+  ShieldCheck,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -80,7 +81,12 @@ import {
   useSources,
   useArtifactHistory,
   getArtifactHistoryId,
+  useBomSnapshot,
+  useAttestations,
+  useCreateAttestation,
+  useArtifactActivityHistory,
 } from '@/hooks';
+import { ProvenanceTab } from '@/components/provenance/provenance-tab';
 import { apiRequest } from '@/lib/api';
 import { getCollectionColor } from '@/lib/utils/collection-colors';
 import { getTagColor } from '@/lib/utils/tag-colors';
@@ -107,6 +113,7 @@ export type ArtifactModalTab =
   | 'sync'
   | 'links'
   | 'history'
+  | 'provenance'
   | 'collections'
   | 'sources'
   | 'deployments'
@@ -495,6 +502,91 @@ export function UnifiedEntityModal({
     limit: 500,
   });
   const historyEntries: HistoryEntry[] = artifactHistory?.timelineEntries ?? [];
+
+  // ---------------------------------------------------------------------------
+  // Provenance tab data
+  // ---------------------------------------------------------------------------
+
+  // BOM snapshot — load when the provenance tab is active
+  const {
+    data: bomSnapshotData,
+    isLoading: isBomLoading,
+  } = useBomSnapshot({
+    enabled: !!entity && open && activeTab === 'provenance',
+  });
+
+  // Attestation list — load when provenance tab is active, filtered to this artifact
+  const {
+    data: attestationsData,
+    isLoading: isAttestationsLoading,
+  } = useAttestations({
+    artifactId: entity?.id,
+    enabled: !!entity && open && activeTab === 'provenance',
+    limit: 50,
+  });
+
+  // Flatten attestation pages into a single array
+  const attestationList = attestationsData?.pages.flatMap((page) => page.items) ?? [];
+
+  // Attestation create mutation (used by the ProvenanceTab "Attest" button)
+  const { mutateAsync: createAttestation } = useCreateAttestation();
+
+  // Recent activity — load when provenance tab is active
+  const {
+    data: activityData,
+    isLoading: isActivityLoading,
+  } = useArtifactActivityHistory({
+    artifactId: entity?.id,
+    limit: 5,
+    enabled: !!entity && open && activeTab === 'provenance',
+  });
+
+  const recentActivityEvents = activityData?.pages.flatMap((page) => page.items) ?? [];
+
+  // Overall provenance loading state
+  const isProvenanceLoading = isBomLoading || isAttestationsLoading || isActivityLoading;
+
+  // ---------------------------------------------------------------------------
+  // Provenance handlers
+  // ---------------------------------------------------------------------------
+
+  const handleExportBom = () => {
+    if (!bomSnapshotData) return;
+    const jsonStr = JSON.stringify(bomSnapshotData.bom, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bom-${entity?.name ?? 'snapshot'}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCreateAttestation = async () => {
+    if (!entity) return;
+    try {
+      await createAttestation({
+        artifact_id: entity.id,
+        visibility: 'private',
+      });
+      toast({
+        title: 'Attestation Created',
+        description: `Attestation recorded for ${entity.name}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Attestation Failed',
+        description: error instanceof Error ? error.message : 'Failed to create attestation',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleViewAllActivity = () => {
+    handleTabChange('history');
+  };
 
   // Fetch file list from API
   const {
@@ -1777,6 +1869,13 @@ export function UnifiedEntityModal({
                 History
               </TabsTrigger>
               <TabsTrigger
+                value="provenance"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                <ShieldCheck className="mr-2 h-4 w-4" aria-hidden="true" />
+                Provenance
+              </TabsTrigger>
+              <TabsTrigger
                 value="collections"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
               >
@@ -2264,6 +2363,22 @@ export function UnifiedEntityModal({
                   )}
                 </div>
               </ScrollArea>
+            </TabsContent>
+
+            {/* Provenance Tab */}
+            <TabsContent value="provenance" className="mt-0 flex-1">
+              <div className="h-[calc(90vh-12rem)]">
+                <ProvenanceTab
+                  artifactId={entity.id}
+                  bomData={bomSnapshotData?.bom}
+                  attestations={attestationList}
+                  recentActivity={recentActivityEvents}
+                  isLoading={isProvenanceLoading}
+                  onExportBom={handleExportBom}
+                  onCreateAttestation={handleCreateAttestation}
+                  onViewAllActivity={handleViewAllActivity}
+                />
+              </div>
             </TabsContent>
 
             {/* Collections Tab */}

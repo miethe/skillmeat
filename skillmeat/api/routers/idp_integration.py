@@ -24,7 +24,12 @@ from skillmeat.api.dependencies import (
     require_auth,
 )
 from skillmeat.api.schemas.auth import AuthContext
-from skillmeat.api.schemas.bom import BomCardArtifactEntry, BomCardResponse
+from skillmeat.api.schemas.bom import (
+    BomCardArtifactEntry,
+    BomCardAttestationSummary,
+    BomCardRecentEvent,
+    BomCardResponse,
+)
 from skillmeat.api.schemas.idp_integration import (
     IDPRegisterDeploymentRequest,
     IDPRegisterDeploymentResponse,
@@ -286,10 +291,13 @@ async def get_bom_card(
         HTTPException: 404 if no snapshot exists for the project,
                        500 for unexpected database or parsing errors.
     """
-    from skillmeat.cache.models import AttestationRecord, BomSnapshot
+    from skillmeat.cache.models import ArtifactHistoryEvent, AttestationRecord, BomSnapshot
 
     logger.info("IDP bom-card requested: project_id=%s", project_id)
 
+    # ------------------------------------------------------------------
+    # 1. Fetch the latest BOM snapshot for the project
+    # ------------------------------------------------------------------
     try:
         snapshot = (
             session.query(BomSnapshot)
@@ -315,7 +323,9 @@ async def get_bom_card(
             detail=f"No BOM snapshot found for project '{project_id}'",
         )
 
-    # Parse the stored BOM JSON
+    # ------------------------------------------------------------------
+    # 2. Parse the stored BOM JSON and build a compact artifact list
+    # ------------------------------------------------------------------
     try:
         bom_data: dict = json.loads(snapshot.bom_json)
     except (json.JSONDecodeError, TypeError) as exc:
@@ -330,7 +340,6 @@ async def get_bom_card(
             detail="BOM snapshot contains invalid JSON",
         )
 
-    # Build lightweight artifact list from the parsed BOM
     raw_artifacts: List[dict] = bom_data.get("artifacts", [])
     card_artifacts: List[BomCardArtifactEntry] = [
         BomCardArtifactEntry(
@@ -343,43 +352,100 @@ async def get_bom_card(
         if isinstance(a, dict)
     ]
 
-    # Collect artifact IDs present in the snapshot for attestation count query
+    # Collect artifact IDs present in the snapshot for downstream queries
     artifact_ids: List[str] = [
         f"{a.get('type', '')}:{a.get('name', '')}"
         for a in raw_artifacts
         if isinstance(a, dict) and a.get("name") and a.get("type")
     ]
 
-    # Count attestation records linked to these artifacts
-    try:
-        attestation_count: int = (
-            session.query(AttestationRecord)
-            .filter(AttestationRecord.artifact_id.in_(artifact_ids))
-            .count()
-            if artifact_ids
-            else 0
-        )
-    except Exception as exc:
-        logger.exception(
-            "IDP bom-card: attestation count query failed for project_id=%s: %s",
-            project_id,
-            exc,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to count attestation records",
-        )
+    # ------------------------------------------------------------------
+    # 3. Fetch recent activity events for snapshot artifacts (last 20)
+    # ------------------------------------------------------------------
+    _RECENT_EVENTS_LIMIT = 20
+    recent_events: List[BomCardRecentEvent] = []
+    if artifact_ids:
+        try:
+            raw_events = (
+                session.query(ArtifactHistoryEvent)
+                .filter(ArtifactHistoryEvent.artifact_id.in_(artifact_ids))
+                .order_by(ArtifactHistoryEvent.timestamp.desc())
+                .limit(_RECENT_EVENTS_LIMIT)
+                .all()
+            )
+            recent_events = [
+                BomCardRecentEvent(
+                    id=ev.id,
+                    artifact_id=ev.artifact_id,
+                    event_type=ev.event_type,
+                    actor_id=ev.actor_id,
+                    timestamp=ev.timestamp.isoformat() if ev.timestamp else None,
+                )
+                for ev in raw_events
+            ]
+        except Exception as exc:
+            # Non-fatal: log and continue without events
+            logger.warning(
+                "IDP bom-card: recent events query failed for project_id=%s: %s",
+                project_id,
+                exc,
+            )
 
+    # ------------------------------------------------------------------
+    # 4. Compute attestation summary (total + scope breakdown + latest)
+    # ------------------------------------------------------------------
+    attestation_count: int = 0
+    attestation_summary = BomCardAttestationSummary(total=0)
+
+    if artifact_ids:
+        try:
+            attestation_rows = (
+                session.query(AttestationRecord)
+                .filter(AttestationRecord.artifact_id.in_(artifact_ids))
+                .all()
+            )
+            attestation_count = len(attestation_rows)
+
+            # Build scope-count map and find latest attestation timestamp
+            scope_counts: dict = {}
+            latest_at: str | None = None
+            for rec in attestation_rows:
+                for scope in (rec.scopes or []):
+                    scope_counts[scope] = scope_counts.get(scope, 0) + 1
+                if rec.created_at:
+                    rec_ts = rec.created_at.isoformat()
+                    if latest_at is None or rec_ts > latest_at:
+                        latest_at = rec_ts
+
+            attestation_summary = BomCardAttestationSummary(
+                total=attestation_count,
+                scope_counts=scope_counts,
+                latest_at=latest_at,
+            )
+        except Exception as exc:
+            logger.exception(
+                "IDP bom-card: attestation summary query failed for project_id=%s: %s",
+                project_id,
+                exc,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to compute attestation summary",
+            )
+
+    # ------------------------------------------------------------------
+    # 5. Compose and return the BOM card payload
+    # ------------------------------------------------------------------
     signature_status = "signed" if snapshot.signature else "unsigned"
-    generated_at = (
-        snapshot.created_at.isoformat() if snapshot.created_at else ""
-    )
+    generated_at = snapshot.created_at.isoformat() if snapshot.created_at else ""
 
     logger.info(
-        "IDP bom-card: project_id=%s snapshot_id=%s artifacts=%d attestations=%d signature=%s",
+        "IDP bom-card: project_id=%s snapshot_id=%s artifacts=%d "
+        "events=%d attestations=%d signature=%s",
         project_id,
         snapshot.id,
         len(card_artifacts),
+        len(recent_events),
         attestation_count,
         signature_status,
     )
@@ -392,4 +458,6 @@ async def get_bom_card(
         artifacts=card_artifacts,
         signature_status=signature_status,
         attestation_count=attestation_count,
+        recent_events=recent_events,
+        attestation_summary=attestation_summary,
     )
