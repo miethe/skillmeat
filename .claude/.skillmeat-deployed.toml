@@ -2104,8 +2104,25 @@ deployed_at = "2026-03-12T23:19:28.077602"
 artifact_path = "skills/managing-readmes"
 content_hash = "f3dc7ebaa051abc6f833c01661f2837d16499e5b74ab202e0e5501b1f1b4d852"
 local_modifications = false
+version_lineage = [
+    "f3dc7ebaa051abc6f833c01661f2837d16499e5b74ab202e0e5501b1f1b4d852",
+]
 merge_base_snapshot = "f3dc7ebaa051abc6f833c01661f2837d16499e5b74ab202e0e5501b1f1b4d852"
 deployment_profile_id = "claude_code"
 platform = "claude_code"
 profile_root_dir = ".claude"
 collection_sha = "f3dc7ebaa051abc6f833c01661f2837d16499e5b74ab202e0e5501b1f1b4d852"
+
+[[deployed]]
+artifact_name = "api-designer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-03-13T15:13:08.296890"
+artifact_path = "agents/api-designer.md"
+content_hash = "dc8547318598b6abecfad8d3c5709c9bb21fc38c2e5f5b4f452bb02f668df1be"
+local_modifications = false
+merge_base_snapshot = "dc8547318598b6abecfad8d3c5709c9bb21fc38c2e5f5b4f452bb02f668df1be"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "dc8547318598b6abecfad8d3c5709c9bb21fc38c2e5f5b4f452bb02f668df1be"
