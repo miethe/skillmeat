@@ -259,9 +259,14 @@ def sign_bom(
         private_key = load_signing_key(key_path)
 
     try:
-        key_obj: Ed25519PrivateKey = serialization.load_pem_private_key(
+        loaded_key = serialization.load_pem_private_key(
             private_key, password=None
         )
+        if not isinstance(loaded_key, Ed25519PrivateKey):
+            raise SigningError("Key is not an Ed25519 private key")
+        key_obj = loaded_key
+    except SigningError:
+        raise
     except (ValueError, TypeError, Exception) as exc:
         raise SigningError(f"Failed to deserialize private key: {exc}") from exc
 
@@ -314,7 +319,15 @@ def verify_signature(
             )
 
     try:
-        key_obj: Ed25519PublicKey = serialization.load_pem_public_key(public_key)
+        loaded_pub = serialization.load_pem_public_key(public_key)
+        if not isinstance(loaded_pub, Ed25519PublicKey):
+            return VerificationResult(
+                valid=False,
+                algorithm="ed25519",
+                key_id=None,
+                error="Key is not an Ed25519 public key",
+            )
+        key_obj = loaded_pub
     except (ValueError, TypeError, Exception) as exc:
         return VerificationResult(
             valid=False,
