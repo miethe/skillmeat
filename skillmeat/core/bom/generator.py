@@ -40,6 +40,8 @@ import hashlib
 import json
 import logging
 import mimetypes
+import os
+import tempfile
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
@@ -48,7 +50,12 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from skillmeat.cache.models import Artifact, CompositeMembership
+from skillmeat.cache.models import (
+    Artifact,
+    CompositeMembership,
+    DeploymentSet,
+    MemoryItem,
+)
 from skillmeat.core.hashing import compute_artifact_hash
 
 logger = logging.getLogger(__name__)
@@ -1238,6 +1245,448 @@ class ContextFileAdapter(BaseArtifactAdapter):
 
 
 # ---------------------------------------------------------------------------
+# TASK-2.6: MemoryItemAdapter
+# ---------------------------------------------------------------------------
+
+
+class MemoryItemAdapter(BaseArtifactAdapter):
+    """BOM adapter for memory item pseudo-artifacts.
+
+    Memory items are not stored on the filesystem — they live exclusively in
+    the DB ``memory_items`` table.  The BOM entry captures the item's
+    type/confidence/status/anchors for provenance auditing.
+
+    Content hash
+    ------------
+    The SHA-256 of the item's ``content`` text field is used.  This matches
+    the deduplication hash already computed at insert time (``content_hash``
+    column), so the BOM and DB values will always agree.
+
+    Session access
+    --------------
+    A SQLAlchemy ``Session`` is required to query ``MemoryItem`` rows given
+    only an ``Artifact`` ID.  Pass it via the ``session`` constructor argument.
+    When ``session`` is ``None`` the adapter falls back to any ``content``
+    available on the ``Artifact`` row.
+
+    Args:
+        session: SQLAlchemy session used to load the associated ``MemoryItem``.
+    """
+
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self._session = session
+
+    def get_artifact_type(self) -> str:
+        """Return ``"memory_item"``."""
+        return "memory_item"
+
+    def _load_memory_item(self, artifact: Artifact) -> Optional[MemoryItem]:
+        """Load the ``MemoryItem`` row linked to *artifact*.
+
+        Looks up by ``content_hash`` match or by ``project_id``/``type`` to
+        find the best matching record.  Falls back to querying all items for
+        the artifact's project and matching on name.
+
+        Args:
+            artifact: ORM artifact row.
+
+        Returns:
+            ``MemoryItem`` instance or ``None`` if not found.
+        """
+        if self._session is None:
+            return None
+        try:
+            # Primary strategy: match by content_hash stored on Artifact.
+            if artifact.content_hash:
+                item = (
+                    self._session.query(MemoryItem)
+                    .filter(MemoryItem.content_hash == artifact.content_hash)
+                    .first()
+                )
+                if item is not None:
+                    return item
+            # Secondary strategy: match by project and artifact name.
+            if artifact.project_id and artifact.name:
+                item = (
+                    self._session.query(MemoryItem)
+                    .filter(
+                        MemoryItem.project_id == artifact.project_id,
+                        MemoryItem.id == artifact.name,
+                    )
+                    .first()
+                )
+                return item
+        except Exception as exc:
+            logger.debug(
+                "Failed to load MemoryItem for artifact %r (%s).",
+                artifact.name,
+                exc,
+            )
+        return None
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for a memory item artifact.
+
+        Uses the ``content_hash`` column from the linked ``MemoryItem`` row
+        when available, otherwise hashes the ``Artifact.content`` column.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Unused; present for interface compatibility.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        # Prefer the pre-computed hash on the Artifact row itself.
+        if artifact.content_hash:
+            return artifact.content_hash
+
+        # Try loading from MemoryItem.
+        item = self._load_memory_item(artifact)
+        if item is not None and item.content_hash:
+            return item.content_hash
+        if item is not None and item.content:
+            return _hash_string(item.content)
+
+        # Fall back to Artifact.content.
+        if artifact.content:
+            return _hash_string(artifact.content)
+
+        logger.warning(
+            "Cannot compute content hash for memory_item %r (id=%r): "
+            "no content available.",
+            artifact.name,
+            artifact.id,
+        )
+        return ""
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for a memory item artifact.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Unused; present for interface compatibility.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata (type, confidence, status, anchors).
+        """
+        content_hash = self.compute_content_hash(artifact, project_path)
+        item = self._load_memory_item(artifact)
+
+        memory_type: Optional[str] = None
+        confidence: Optional[float] = None
+        status: Optional[str] = None
+        anchors: List[Any] = []
+
+        if item is not None:
+            memory_type = item.type
+            confidence = item.confidence
+            status = item.status
+            if item.anchors_json:
+                try:
+                    anchors = json.loads(item.anchors_json)
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
+        return {
+            "name": artifact.name,
+            "type": artifact.type,
+            "source": artifact.source,
+            "version": artifact.deployed_version or artifact.upstream_version,
+            "content_hash": content_hash,
+            "metadata": {
+                "memory_type": memory_type,
+                "confidence": confidence,
+                "status": status,
+                "anchors": anchors,
+                "created_at": (
+                    artifact.created_at.isoformat() if artifact.created_at else None
+                ),
+                "updated_at": (
+                    artifact.updated_at.isoformat() if artifact.updated_at else None
+                ),
+            },
+        }
+
+
+# ---------------------------------------------------------------------------
+# TASK-2.6: DeploymentSetAdapter
+# ---------------------------------------------------------------------------
+
+
+class DeploymentSetAdapter(BaseArtifactAdapter):
+    """BOM adapter for deployment set pseudo-artifacts.
+
+    Deployment sets are named, ordered collections of artifacts/groups
+    managed via the ``deployment_sets`` and ``deployment_set_members`` tables.
+    The BOM entry includes a ``members`` list enumerating each member's
+    reference type and identifier.
+
+    Content hash
+    ------------
+    The SHA-256 of the sorted member artifact UUIDs (pipe-delimited) is used
+    so that any membership change produces a different hash.  Falls back to
+    hashing the set name when no session or members are available.
+
+    Session access
+    --------------
+    A SQLAlchemy ``Session`` is required to query ``DeploymentSet`` and
+    ``DeploymentSetMember`` rows.  Pass it via the ``session`` constructor
+    argument.  When ``session`` is ``None`` the adapter logs a warning and
+    returns an empty ``members`` list.
+
+    Args:
+        session: SQLAlchemy session used to load deployment set members.
+    """
+
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self._session = session
+
+    def get_artifact_type(self) -> str:
+        """Return ``"deployment_set"``."""
+        return "deployment_set"
+
+    def _load_deployment_set(self, artifact: Artifact) -> Optional[DeploymentSet]:
+        """Load the ``DeploymentSet`` row linked to *artifact* by name.
+
+        Args:
+            artifact: ORM artifact row.
+
+        Returns:
+            ``DeploymentSet`` instance or ``None`` if not found.
+        """
+        if self._session is None:
+            return None
+        try:
+            return (
+                self._session.query(DeploymentSet)
+                .filter(DeploymentSet.name == artifact.name)
+                .first()
+            )
+        except Exception as exc:
+            logger.debug(
+                "Failed to load DeploymentSet for artifact %r (%s).",
+                artifact.name,
+                exc,
+            )
+            return None
+
+    def compute_content_hash(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> str:
+        """Compute content hash for a deployment set artifact.
+
+        Hashes the sorted member artifact UUIDs for determinism.  Falls back
+        to hashing the set name when no members are found.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Unused; present for interface compatibility.
+
+        Returns:
+            64-character lowercase hex string, or ``""`` on failure.
+        """
+        ds = self._load_deployment_set(artifact)
+        if ds is not None and ds.members:
+            # Collect all non-null references, sort for determinism.
+            refs: List[str] = []
+            for m in ds.members:
+                ref = m.artifact_uuid or m.group_id or m.member_set_id or m.workflow_id
+                if ref:
+                    refs.append(ref)
+            if refs:
+                return _hash_string(f"{ds.name}:{'|'.join(sorted(refs))}")
+
+        # Fall back to hashing the set name.
+        return _hash_string(artifact.name or artifact.id)
+
+    def _build_members_list(self, ds: DeploymentSet) -> List[Dict[str, Any]]:
+        """Build the ``members`` list for a deployment set BOM entry.
+
+        Args:
+            ds: ``DeploymentSet`` ORM row (with ``members`` loaded).
+
+        Returns:
+            List of member dicts with keys: id, ref_type, ref_id, position.
+        """
+        members: List[Dict[str, Any]] = []
+        for m in ds.members:
+            if m.artifact_uuid:
+                ref_type = "artifact"
+                ref_id = m.artifact_uuid
+            elif m.group_id:
+                ref_type = "group"
+                ref_id = m.group_id
+            elif m.member_set_id:
+                ref_type = "deployment_set"
+                ref_id = m.member_set_id
+            elif m.workflow_id:
+                ref_type = "workflow"
+                ref_id = m.workflow_id
+            else:
+                continue
+            members.append(
+                {
+                    "id": m.id,
+                    "ref_type": ref_type,
+                    "ref_id": ref_id,
+                    "position": m.position,
+                }
+            )
+        return members
+
+    def adapt(
+        self,
+        artifact: Artifact,
+        project_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Return a normalised BOM entry for a deployment set artifact.
+
+        Includes a ``members`` list populated by querying
+        ``DeploymentSetMember`` rows for this set.
+
+        Args:
+            artifact: ORM artifact row.
+            project_path: Unused; present for interface compatibility.
+
+        Returns:
+            BOM-entry dict with keys: name, type, source, version,
+            content_hash, metadata, members.
+        """
+        if self._session is None:
+            logger.warning(
+                "DeploymentSetAdapter has no session; members list will be empty "
+                "for deployment_set artifact %r (id=%r).",
+                artifact.name,
+                artifact.id,
+            )
+
+        ds = self._load_deployment_set(artifact)
+        members: List[Dict[str, Any]] = []
+        description: Optional[str] = None
+        tags: List[str] = []
+
+        if ds is not None:
+            members = self._build_members_list(ds)
+            description = ds.description
+            tags = ds.get_tags()
+
+        return {
+            "name": artifact.name,
+            "type": artifact.type,
+            "source": artifact.source,
+            "version": artifact.deployed_version or artifact.upstream_version,
+            "content_hash": self.compute_content_hash(artifact, project_path),
+            "metadata": {
+                "description": description,
+                "tags": tags,
+                "member_count": len(members),
+                "created_at": (
+                    artifact.created_at.isoformat() if artifact.created_at else None
+                ),
+                "updated_at": (
+                    artifact.updated_at.isoformat() if artifact.updated_at else None
+                ),
+            },
+            "members": members,
+        }
+
+
+# ---------------------------------------------------------------------------
+# TASK-2.6: BomSerializer
+# ---------------------------------------------------------------------------
+
+
+class BomSerializer:
+    """Serializer for BOM dicts produced by ``BomGenerator``.
+
+    Provides three output targets:
+
+    * ``to_json`` — serialise to a deterministic JSON string (sorted keys,
+      2-space indent).
+    * ``to_dict`` — identity/validation pass; returns the input dict
+      unchanged.
+    * ``write_file`` — atomically write to a file at the given path using
+      a temp-file + ``os.replace`` pattern.  Sets file permissions to 0o644.
+
+    All methods accept the dict returned by ``BomGenerator.generate()`` and
+    are safe to call on any plain ``dict`` that follows the BOM schema.
+    """
+
+    def to_json(self, bom_dict: Dict[str, Any]) -> str:
+        """Serialise *bom_dict* to a deterministic JSON string.
+
+        Args:
+            bom_dict: BOM dict as returned by ``BomGenerator.generate()``.
+
+        Returns:
+            Pretty-printed JSON string with sorted keys and 2-space indent.
+        """
+        return json.dumps(bom_dict, sort_keys=True, indent=2, default=str)
+
+    def to_dict(self, bom_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate and return *bom_dict* unchanged.
+
+        This method exists as a no-op pass for callers that want an
+        explicit validation step in their pipeline without converting to
+        another format.
+
+        Args:
+            bom_dict: BOM dict as returned by ``BomGenerator.generate()``.
+
+        Returns:
+            The input dict, unchanged.
+        """
+        return bom_dict
+
+    def write_file(self, bom_dict: Dict[str, Any], path: Path) -> None:
+        """Atomically write *bom_dict* as JSON to *path*.
+
+        Uses a temporary file in the same directory as *path* followed by
+        ``os.replace`` to ensure the write is atomic on POSIX systems.
+        Sets the resulting file permissions to ``0o644``.
+
+        Args:
+            bom_dict: BOM dict as returned by ``BomGenerator.generate()``.
+            path: Destination file path (e.g. ``.skillmeat/context.lock``).
+                  Parent directories must already exist.
+
+        Raises:
+            OSError: If the temporary file cannot be created or renamed.
+        """
+        json_content = self.to_json(bom_dict)
+        parent = path.parent
+
+        # Write to a temp file in the same directory for atomic rename.
+        fd, tmp_path = tempfile.mkstemp(dir=parent, prefix=".bom_tmp_", suffix=".json")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(json_content)
+            os.chmod(tmp_path, 0o644)
+            os.replace(tmp_path, path)
+        except Exception:
+            # Clean up temp file on failure.
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+
+        logger.debug("BomSerializer wrote BOM to %r.", str(path))
+
+
+# ---------------------------------------------------------------------------
 # BomGenerator
 # ---------------------------------------------------------------------------
 
@@ -1318,6 +1767,9 @@ class BomGenerator:
         self.register_adapter(SpecAdapter())
         self.register_adapter(RuleAdapter())
         self.register_adapter(ContextFileAdapter())
+        # TASK-2.6
+        self.register_adapter(MemoryItemAdapter(session=self._session))
+        self.register_adapter(DeploymentSetAdapter(session=self._session))
 
     def register_adapter(self, adapter: BaseArtifactAdapter) -> None:
         """Register (or replace) an adapter for its declared artifact type.
