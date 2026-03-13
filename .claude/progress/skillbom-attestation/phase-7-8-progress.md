@@ -5,7 +5,7 @@ type: progress
 prd: skillbom-attestation
 feature_slug: skillbom-attestation
 phase: 7-8
-status: in_progress
+status: completed
 created: 2026-03-10
 updated: '2026-03-13'
 prd_ref: docs/project_plans/PRDs/features/skillbom-attestation-v1.md
@@ -19,7 +19,7 @@ tasks:
 - id: TASK-7.1
   name: 'Implement GET /api/v1/bom/snapshot endpoint: current BOM snapshot with owner-scope
     filtering'
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -27,7 +27,7 @@ tasks:
 - id: TASK-7.2
   name: 'Implement POST /api/v1/bom/generate endpoint: trigger on-demand BOM generation,
     store snapshot, return 201'
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -35,7 +35,7 @@ tasks:
 - id: TASK-7.3
   name: 'Implement GET /api/v1/bom/history endpoint: paginated artifact history with
     event_type/time_range/actor_id filters'
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -43,7 +43,7 @@ tasks:
 - id: TASK-7.4
   name: 'Implement GET /api/v1/attestations endpoint: owner-scoped paginated attestation
     list'
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -51,7 +51,7 @@ tasks:
 - id: TASK-7.5
   name: 'Implement POST /api/v1/attestations endpoint: create manual attestation record
     with artifact validation'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -59,7 +59,7 @@ tasks:
 - id: TASK-7.6
   name: 'Implement GET /api/v1/attestations/{id} endpoint: attestation detail with
     auth verification'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -67,7 +67,7 @@ tasks:
 - id: TASK-7.7
   name: 'Implement POST /api/v1/bom/verify endpoint: verify BOM signature with optional
     multipart signature file upload'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -75,14 +75,14 @@ tasks:
 - id: TASK-7.8
   name: Implement GET /integrations/idp/bom-card/{project_id} endpoint in idp_integration.py
     with enterprise PAT auth, Backstage-compatible payload, < 500ms load time
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
   estimate: 3 pts
 - id: TASK-8.1
   name: Implement skillmeat bom generate CLI command writing .skillmeat/context.lock
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -90,7 +90,7 @@ tasks:
 - id: TASK-8.2
   name: Implement skillmeat bom verify, skillmeat bom restore, and skillmeat bom install-hook
     CLI commands
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -99,7 +99,7 @@ tasks:
 - id: TASK-8.3
   name: Implement skillmeat history <artifact-name> and skillmeat history --all CLI
     commands with table/JSON output
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -107,7 +107,7 @@ tasks:
 - id: TASK-8.4
   name: Implement auth middleware for all BOM endpoints (@require_auth with artifact:read/write/admin:*
     scopes) and cursor-based pagination for list endpoints
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -123,7 +123,7 @@ tasks:
 - id: TASK-8.5
   name: Implement skillmeat attest create, skillmeat attest list, and skillmeat attest
     show CLI commands with signing and formatting
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies: []
@@ -131,7 +131,7 @@ tasks:
 - id: TASK-8.6
   name: Update OpenAPI spec, write integration tests for all 8 endpoints (auth, filtering,
     pagination, errors), write CLI integration tests
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -158,10 +158,10 @@ parallelization:
   - TASK-8.5
   - TASK-8.6
 total_tasks: 14
-completed_tasks: 0
-in_progress_tasks: 4
+completed_tasks: 14
+in_progress_tasks: 0
 blocked_tasks: 0
-progress: 0
+progress: 100
 ---
 
 # Phase 7-8 Progress: API & CLI — HTTP & Command-Line Surfaces
