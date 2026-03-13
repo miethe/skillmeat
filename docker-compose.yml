@@ -2,9 +2,15 @@
 #
 # Three profiles cover local development through enterprise deployment:
 #
-#   local        -- API + Web with SQLite backend (zero-config)
-#   local-auth   -- API + Web with SQLite + Clerk authentication
-#   enterprise   -- API + Web + PostgreSQL with full auth
+#   local          -- API + Web with SQLite backend (zero-config)
+#   local-auth     -- API + Web with SQLite + Clerk authentication
+#   enterprise     -- API + Web + PostgreSQL with full auth
+#
+# Two additional demo profiles add Backstage integration:
+#
+#   full           -- API + Web + Backstage + demo-db (complete demo stack)
+#   api-only       -- API + demo-db (headless demo, Backstage connects externally)
+#   backstage-only -- Backstage + demo-db only (API runs on host)
 #
 # QUICK START
 #   1. Copy the appropriate env example:
@@ -16,6 +22,8 @@
 #        docker compose --profile local up
 #        docker compose --profile local-auth up
 #        docker compose --profile enterprise up
+#        docker compose --profile full up
+#        docker compose --profile backstage-only up
 #
 #   3. Tear down (preserve volumes):
 #        docker compose down
@@ -35,6 +43,8 @@ services:
       - local
       - local-auth
       - enterprise
+      - full
+      - api-only
     ports:
       - "${SKILLMEAT_API_PORT:-8080}:8080"
     env_file:
@@ -70,6 +80,7 @@ services:
       - local
       - local-auth
       - enterprise
+      - full
     ports:
       - "${SKILLMEAT_WEB_PORT:-3000}:3000"
     env_file:
@@ -112,6 +123,57 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  # ===================================================================
+  # DEMO-DB -- PostgreSQL 16 for Backstage (demo profiles)
+  # ===================================================================
+  demo-db:
+    image: docker.io/library/postgres:16-alpine
+    profiles:
+      - full
+      - api-only
+      - backstage-only
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=demo
+      - POSTGRES_PASSWORD=demo_password
+      - POSTGRES_DB=demo_finserv
+    volumes:
+      - demo-db-data:/var/lib/postgresql/data
+      - ./demo/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d demo_finserv"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # ===================================================================
+  # BACKSTAGE -- Backstage app (demo profiles)
+  # ===================================================================
+  backstage:
+    build:
+      context: ./demo/backstage-app
+      dockerfile: ../dockerfile
+    profiles:
+      - full
+      - backstage-only
+    ports:
+      - "7007:7007"
+    environment:
+      - POSTGRES_HOST=demo-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=demo
+      - POSTGRES_PASSWORD=demo_password
+      - POSTGRES_DB=demo_finserv
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - SKILLMEAT_API_URL=${SKILLMEAT_API_URL:-http://skillmeat-api:8080}
+    depends_on:
+      demo-db:
+        condition: service_healthy
+    restart: unless-stopped
+
 # ===================================================================
 # VOLUMES
 # ===================================================================
@@ -119,6 +181,8 @@ volumes:
   skillmeat-data:
     driver: local
   postgres-data:
+    driver: local
+  demo-db-data:
     driver: local
 
 # ===================================================================
@@ -135,6 +199,16 @@ volumes:
 #
 # Enterprise (Postgres + auth):
 #   ./compose.sh --profile enterprise up
+#
+# Full demo stack (API + Web + Backstage + demo-db):
+#   ./compose.sh --profile full up
+#
+# API + demo-db only (Backstage connects externally):
+#   ./compose.sh --profile api-only up
+#
+# Backstage + demo-db only (API runs on host at port 8080):
+#   SKILLMEAT_API_URL=http://host.containers.internal:8080 \
+#     ./compose.sh --profile backstage-only up
 #
 # Build and start fresh:
 #   ./compose.sh --profile local up --build

@@ -29,7 +29,7 @@
  * ```
  */
 
-import { createBackendModule } from '@backstage/backend-plugin-api';
+import { createBackendModule, coreServices } from '@backstage/backend-plugin-api';
 import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node/alpha';
 import { createSkillMeatInjectAction } from './actions/inject';
 import { createSkillMeatRegisterAction } from './actions/register';
@@ -52,11 +52,12 @@ export const skillmeatScaffolderModule = createBackendModule({
     env.registerInit({
       deps: {
         scaffolder: scaffolderActionsExtensionPoint,
+        config: coreServices.rootConfig,
       },
-      async init({ scaffolder }) {
+      async init({ scaffolder, config }) {
         scaffolder.addActions(
-          createSkillMeatInjectAction(),
-          createSkillMeatRegisterAction(),
+          createSkillMeatInjectAction({ config }),
+          createSkillMeatRegisterAction({ config }),
         );
       },
     });

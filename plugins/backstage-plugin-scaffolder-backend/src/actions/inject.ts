@@ -10,10 +10,13 @@
  */
 
 import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
+import { RootConfigService } from '@backstage/backend-plugin-api';
 import fetch from 'node-fetch';
+import { resolve, dirname } from 'path';
+import { mkdir, writeFile } from 'fs/promises';
 import { ScaffoldRequest, ScaffoldResponse } from '../types';
 
-export function createSkillMeatInjectAction() {
+export function createSkillMeatInjectAction({ config }: { config: RootConfigService }) {
   return createTemplateAction<{
     targetId: string;
     variables?: Record<string, string>;
@@ -76,7 +79,7 @@ export function createSkillMeatInjectAction() {
       // that prefer template-level configuration over app-config.yaml.
       const baseUrl =
         inputBaseUrl ??
-        ctx.config?.getOptionalString('skillmeat.baseUrl') ??
+        config.getOptionalString('skillmeat.baseUrl') ??
         '';
 
       if (!baseUrl) {
@@ -88,7 +91,7 @@ export function createSkillMeatInjectAction() {
 
       const token =
         inputToken ??
-        ctx.config?.getOptionalString('skillmeat.token') ??
+        config.getOptionalString('skillmeat.token') ??
         undefined;
 
       // Build request headers.  The Authorization header is omitted entirely
@@ -140,12 +143,14 @@ export function createSkillMeatInjectAction() {
       }
 
       // Write each file into the scaffolder workspace.  Paths from SAM are relative
-      // (e.g. `.claude/CLAUDE.md`) — ctx.createFile() places them relative to the
-      // workspace root, which matches the expected layout.
+      // (e.g. `.claude/CLAUDE.md`) — we resolve them against ctx.workspacePath and
+      // create any intermediate directories before writing.
       for (const file of files) {
         const content = Buffer.from(file.content_base64, 'base64').toString('utf-8');
         ctx.logger.info(`Writing file: ${file.path}`);
-        await ctx.createFile({ path: file.path, content });
+        const filePath = resolve(ctx.workspacePath, file.path);
+        await mkdir(dirname(filePath), { recursive: true });
+        await writeFile(filePath, content, 'utf-8');
       }
 
       ctx.logger.info(

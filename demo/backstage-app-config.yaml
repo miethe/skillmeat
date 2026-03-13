@@ -45,8 +45,8 @@ backend:
 integrations:
   github:
     - host: github.com
-      # TODO: replace with your personal or org GitHub token
-      token: ${GITHUB_TOKEN}
+      # Set GITHUB_TOKEN env var for live catalog integrations
+      # token: ${GITHUB_TOKEN}
 
 # =============================================================================
 # SKILLMEAT API INTEGRATION
@@ -67,15 +67,10 @@ catalog:
   rules:
     - allow: [Component, System, API, Resource, Location, Template]
 
-  locations:
-    # SkillMeat demo catalog entities
-    # TODO: replace with your actual catalog URL or local paths
-    - type: url
-      target: https://github.com/your-org/your-backstage-catalog/blob/main/all.yaml
-
-    # Example: local catalog file (useful during development)
-    # - type: file
-    #   target: ../../catalog-entities/all.yaml
+  locations: []
+    # Uncomment and replace with your catalog URL:
+    # - type: url
+    #   target: https://github.com/your-org/your-backstage-catalog/blob/main/all.yaml
 
 # =============================================================================
 # SCAFFOLDER
