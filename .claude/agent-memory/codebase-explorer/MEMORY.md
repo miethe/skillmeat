@@ -62,3 +62,65 @@
 | AppState | `skillmeat/api/dependencies.py:59+` | AppState container, lifespan |
 | Enterprise Router | `skillmeat/api/routers/enterprise_content.py:40+` | Download endpoint, PAT-protected |
 | Server Lifespan | `skillmeat/api/server.py:72–80` | FastAPI setup, middleware order |
+
+## Manager Dependency Audit (2026-03-12)
+
+### Findings Summary
+
+Complete audit of 9 routers reveals **10+ critical READ operations** using manager deps that must migrate to repository DI, and **5+ WRITE operations** that should keep managers but add cache refresh.
+
+**Critical Issues** (Priority P0):
+- artifacts.py: 3 utilities + 2 endpoints with manager dependency (discovery endpoints broken)
+- marketplace_sources.py: 1 helper + 6 endpoints (duplicate detection fails silently)
+- match.py: 1 endpoint using ArtifactManagerDep (returns empty results)
+
+**Degraded Operations** (Priority P1):
+- tags.py: Multiple endpoints using implicit CollectionManagerDep
+- user_collections.py: Mixed read/write, reads fail in enterprise
+
+**Key Pattern**: Edition-aware factory pattern established in dependencies.py (lines 536–685+). All *RepoDep aliases follow consistent routing: check settings.edition, return Local or Enterprise implementation.
+
+### Audit Documents
+
+- **Main audit**: `manager-dep-audit-detailed.md` - Complete analysis with router-by-router breakdown
+- **Output deliverable**: `/home/miethe/dev/skillmeat/MANAGER_DEPENDENCY_AUDIT.md` - Structured audit for delegation
+- **Quick reference**: `/home/miethe/dev/skillmeat/.claude/findings/MANAGER_MIGRATION_MATRIX.md` - Fast lookup matrix
+
+### Key Files for Implementation
+
+```
+/home/miethe/dev/skillmeat/skillmeat/api/routers/artifacts.py
+/home/miethe/dev/skillmeat/skillmeat/api/routers/marketplace_sources.py
+/home/miethe/dev/skillmeat/skillmeat/api/routers/match.py
+/home/miethe/dev/skillmeat/skillmeat/api/routers/tags.py
+/home/miethe/dev/skillmeat/skillmeat/api/routers/user_collections.py
+/home/miethe/dev/skillmeat/skillmeat/api/dependencies.py (reference)
+/home/miethe/dev/skillmeat/skillmeat/cache/enterprise_repositories.py (reference)
+/home/miethe/dev/skillmeat/skillmeat/api/routers/health.py (template, line 174)
+```
+
+### Migration Strategy
+
+1. **Verify dependencies exist** before implementation:
+   - `DbArtifactHistoryRepoDep` (for version history)
+   - `TagRepoDep` (for tag lookups)
+   - Methods: `ArtifactRepoDep.list_by_collection()`, `ArtifactRepoDep.search()`
+
+2. **Phase 1 (P0)**: Fix broken endpoints (artifacts, marketplace_sources, match)
+   - Replace manager calls with repo DI
+   - Add edition checks to discovery endpoints (501 Not Implemented)
+
+3. **Phase 2 (P1)**: Fix degraded operations (tags, user_collections)
+   - Migrate READs to repo DI
+   - Keep WRITEs but add cache refresh
+
+4. **Phase 3 (P3)**: Polish (health, mcp)
+   - Verify edition-awareness
+   - Decide: disable MCP in enterprise or add DB support
+
+### Invariants
+
+- **Edition-aware routing**: All repository DI uses pattern from dependencies.py (check settings.edition)
+- **Cache refresh required**: All WRITEs must call `cache_service.refresh_*()` after manager operation
+- **Enterprise implementations ready**: All core repos exist in enterprise_repositories.py with tenant filtering
+- **No write-through issues**: Managers handle filesystem; repos handle DB; cache service bridges both
