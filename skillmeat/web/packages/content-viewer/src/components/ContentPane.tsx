@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import {
   FileText,
   AlertCircle,
@@ -16,9 +16,17 @@ import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { Skeleton } from './ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { SplitPreview } from './SplitPreview';
 import { FrontmatterDisplay } from './FrontmatterDisplay';
 import { parseFrontmatter, detectFrontmatter, stripFrontmatter } from '../lib/frontmatter';
+
+/**
+ * SplitPreview is lazy-loaded so that the CodeMirror editor bundle is only fetched
+ * when a user enters edit mode on a markdown file.  Consumers who render ContentPane
+ * in read-only mode (or for non-markdown files) will never download the editor chunk.
+ */
+const SplitPreview = lazy(() =>
+  import('./SplitPreview').then((m) => ({ default: m.SplitPreview }))
+);
 
 // ============================================================================
 // Types
@@ -126,8 +134,36 @@ function pathToBreadcrumbs(path: string): string[] {
 }
 
 // ============================================================================
-// Loading Skeleton
+// Loading Skeletons
 // ============================================================================
+
+/**
+ * Shown inside the Suspense boundary while the SplitPreview (CodeMirror) chunk
+ * is being downloaded.  Mirrors the two-column split layout so the UI does not
+ * shift once the editor mounts.
+ */
+function EditorLoadingSkeleton() {
+  return (
+    <div className="flex h-full min-w-0 flex-col gap-4 overflow-hidden lg:flex-row">
+      {/* Editor panel placeholder */}
+      <div className="min-h-[300px] min-w-0 flex-1 lg:min-h-0">
+        <div className="h-full space-y-2 rounded-md border p-4">
+          {[...Array(12)].map((_, i) => (
+            <Skeleton key={i} className="h-4" style={{ width: `${50 + Math.random() * 50}%` }} />
+          ))}
+        </div>
+      </div>
+      {/* Preview panel placeholder */}
+      <div className="min-h-[300px] min-w-0 flex-1 overflow-hidden lg:min-h-0">
+        <div className="h-full space-y-2 rounded-md border bg-card p-6">
+          {[...Array(12)].map((_, i) => (
+            <Skeleton key={i} className="h-4" style={{ width: `${40 + Math.random() * 60}%` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ContentPaneSkeleton() {
   return (
@@ -303,22 +339,40 @@ function ContentDisplay({ content, showLineNumbers = false }: ContentDisplayProp
  * Displays the contents of a selected file with features like breadcrumb navigation,
  * optional line numbers, and edit functionality for supported file types.
  *
- * Features:
- * - File path displayed in breadcrumb style at top
- * - Scrollable content area for large files
- * - Monospace font for code/text content
- * - Loading state with skeleton
- * - Error state display with alert
- * - Empty state when no file selected
- * - Edit button for editable files (.md, .txt, .json, etc.)
- * - Split-view markdown editor with live preview for .md files
- * - Save and Cancel buttons in edit mode
- * - Optional line numbers (nice to have)
- * - Read-only mode: hides edit controls while keeping viewing functional
+ * ## Bundle cost / optional editor loading
+ *
+ * The CodeMirror editor (via SplitPreview and MarkdownEditor) is **lazy-loaded**.
+ * The editor chunk is only fetched from the network when the component actually
+ * needs to render it — that is, when the file is a Markdown file (`*.md`) and the
+ * component is mounted.  While the chunk loads a skeleton placeholder is shown
+ * via a React `Suspense` boundary.
+ *
+ * - **Read-only mode** (`readOnly={true}`): The SplitPreview/MarkdownEditor module
+ *   is still lazy-imported for markdown files because the preview panel is always
+ *   rendered.  However, callers that pass `readOnly` avoid the full edit bundle
+ *   cost for non-markdown file types entirely — only the markdown renderer
+ *   (react-markdown, which is much lighter) loads in that case.
+ *
+ * - **Edit mode** (`readOnly={false}`, default): CodeMirror loads on first render
+ *   of a markdown file.  Subsequent renders use the cached module.
+ *
+ * - **Non-markdown files** (`.ts`, `.json`, `.py`, …): SplitPreview is never
+ *   rendered; CodeMirror is never loaded regardless of `readOnly`.
+ *
+ * ## Props controlling edit mode
+ *
+ * | Prop           | Purpose                                                              |
+ * |----------------|----------------------------------------------------------------------|
+ * | `readOnly`     | When `true`, hides all edit/save UI and disables edit mode entirely  |
+ * | `isEditing`    | Lifted state — `true` when the user has clicked "Edit"               |
+ * | `onEditStart`  | Called when user clicks the "Edit" button                            |
+ * | `onEditChange` | Called on every keystroke in the editor with the updated content     |
+ * | `onSave`       | Called when the user confirms the save; receives final content       |
+ * | `onCancel`     | Called when the user dismisses the editor without saving             |
  *
  * @example
  * ```tsx
- * // Editable mode (default)
+ * // Editable mode (default) — CodeMirror loads when user opens a .md file
  * <ContentPane
  *   path="src/index.ts"
  *   content={fileContent}
@@ -328,7 +382,8 @@ function ContentDisplay({ content, showLineNumbers = false }: ContentDisplayProp
  *   onSave={(content) => handleSave(content)}
  * />
  *
- * // Read-only mode (no edit controls)
+ * // Read-only mode — no edit controls rendered; CodeMirror NOT loaded for
+ * // non-markdown files; markdown files render preview only (no editor panel)
  * <ContentPane
  *   path="README.md"
  *   content={fileContent}
@@ -536,11 +591,13 @@ export function ContentPane({
             />
           )}
           <div className="min-w-0">
-            <SplitPreview
-              content={isEditing ? editedContent : displayContent}
-              onChange={(newContent) => onEditChange?.(newContent)}
-              isEditing={isEditing}
-            />
+            <Suspense fallback={<EditorLoadingSkeleton />}>
+              <SplitPreview
+                content={isEditing ? editedContent : displayContent}
+                onChange={(newContent) => onEditChange?.(newContent)}
+                isEditing={isEditing}
+              />
+            </Suspense>
           </div>
         </div>
       </div>
