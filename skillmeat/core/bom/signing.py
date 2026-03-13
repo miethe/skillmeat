@@ -9,12 +9,13 @@ Default key location: ~/.skillmeat/keys/skillbom_ed25519 (private)
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
@@ -69,6 +70,18 @@ class VerificationResult:
     algorithm: str  # always "ed25519"
     key_id: Optional[str]  # None when public key unavailable
     error: Optional[str]  # None if valid, error message if invalid
+
+
+@dataclass
+class ChainValidationResult:
+    """Result of validating a chain of signed BOM snapshots."""
+
+    valid: bool
+    chain_length: int
+    verified_count: int  # snapshots with valid signatures
+    unsigned_count: int  # snapshots without signatures
+    first_break_at: Optional[int]  # index where chain breaks, or None if unbroken
+    errors: List[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -461,3 +474,223 @@ def verify_file(
         )
 
     return verify_signature(content, signature, key_path=key_path)
+
+
+# ---------------------------------------------------------------------------
+# Chain Validation
+# ---------------------------------------------------------------------------
+
+
+def validate_signature_chain(
+    snapshots: List[dict],
+    public_key: Optional[bytes] = None,
+    key_path: Optional[Path] = None,
+) -> ChainValidationResult:
+    """Validate a chain of signed BOM snapshots.
+
+    Each snapshot dict should have:
+    - ``bom_json``: str — the BOM payload that was signed.
+    - ``signature``: str | None — hex-encoded Ed25519 signature over ``bom_json``.
+    - ``parent_hash``: str | None — SHA-256 hex of the previous BOM (for lineage).
+    - ``content_hash``: str — SHA-256 hex of this BOM's ``bom_json``.
+
+    Validates:
+    1. Each signature is valid (if present).
+    2. ``parent_hash`` of each snapshot matches ``content_hash`` of the previous one.
+    3. Chain is unbroken from first to last.
+
+    Args:
+        snapshots: Ordered list of snapshot dicts (oldest → newest).
+        public_key: PEM-encoded Ed25519 public key bytes for verification.
+        key_path: Path to a PEM-encoded Ed25519 public key file (used when
+            *public_key* is not supplied).
+
+    Returns:
+        :class:`ChainValidationResult` describing the chain's integrity.
+    """
+    if not snapshots:
+        return ChainValidationResult(
+            valid=True,
+            chain_length=0,
+            verified_count=0,
+            unsigned_count=0,
+            first_break_at=None,
+            errors=[],
+        )
+
+    errors: List[str] = []
+    first_break_at: Optional[int] = None
+    verified_count = 0
+    unsigned_count = 0
+
+    for idx, snapshot in enumerate(snapshots):
+        bom_json: Optional[str] = snapshot.get("bom_json")
+        signature_hex: Optional[str] = snapshot.get("signature")
+        parent_hash: Optional[str] = snapshot.get("parent_hash")
+        content_hash: Optional[str] = snapshot.get("content_hash")
+
+        # --- Signature verification ---
+        if signature_hex:
+            if bom_json is None:
+                err = f"[{idx}] has signature but missing bom_json"
+                errors.append(err)
+                if first_break_at is None:
+                    first_break_at = idx
+            else:
+                bom_bytes = bom_json.encode() if isinstance(bom_json, str) else bom_json
+                try:
+                    sig_bytes = bytes.fromhex(signature_hex)
+                except ValueError:
+                    err = f"[{idx}] signature is not valid hex"
+                    errors.append(err)
+                    if first_break_at is None:
+                        first_break_at = idx
+                else:
+                    result = verify_signature(
+                        bom_bytes, sig_bytes, public_key=public_key, key_path=key_path
+                    )
+                    if result.valid:
+                        verified_count += 1
+                    else:
+                        err = f"[{idx}] signature invalid: {result.error}"
+                        errors.append(err)
+                        if first_break_at is None:
+                            first_break_at = idx
+        else:
+            unsigned_count += 1
+
+        # --- Parent hash linkage ---
+        if idx > 0:
+            prev_snapshot = snapshots[idx - 1]
+            prev_content_hash: Optional[str] = prev_snapshot.get("content_hash")
+            if parent_hash is not None and prev_content_hash is not None:
+                if parent_hash != prev_content_hash:
+                    err = (
+                        f"[{idx}] parent_hash mismatch: expected {prev_content_hash!r}, "
+                        f"got {parent_hash!r}"
+                    )
+                    errors.append(err)
+                    if first_break_at is None:
+                        first_break_at = idx
+            elif parent_hash is not None and prev_content_hash is None:
+                # Previous snapshot has no content_hash to compare against;
+                # record a warning but do not break the chain.
+                errors.append(
+                    f"[{idx}] parent_hash present but previous snapshot has no content_hash"
+                )
+
+        # --- content_hash self-consistency ---
+        if content_hash is not None and bom_json is not None:
+            bom_bytes = bom_json.encode() if isinstance(bom_json, str) else bom_json
+            computed = hashlib.sha256(bom_bytes).hexdigest()
+            if computed != content_hash:
+                err = (
+                    f"[{idx}] content_hash mismatch: declared {content_hash!r}, "
+                    f"computed {computed!r}"
+                )
+                errors.append(err)
+                if first_break_at is None:
+                    first_break_at = idx
+
+    valid = len(errors) == 0
+    return ChainValidationResult(
+        valid=valid,
+        chain_length=len(snapshots),
+        verified_count=verified_count,
+        unsigned_count=unsigned_count,
+        first_break_at=first_break_at,
+        errors=errors,
+    )
+
+
+# ---------------------------------------------------------------------------
+# verify_bom — verify embedded signature in a BOM data dict
+# ---------------------------------------------------------------------------
+
+
+def verify_bom(bom_data: dict) -> VerificationResult:
+    """Verify the embedded signature in a BOM data dict.
+
+    The dict is expected to have a ``"signature"`` key (hex-encoded) and either
+    a ``"bom_json"`` key (str) containing the canonical BOM payload, or the
+    remaining keys will be serialised to JSON for verification.
+
+    Args:
+        bom_data: BOM data dict containing an embedded ``"signature"`` field.
+
+    Returns:
+        :class:`VerificationResult`.  ``valid=True`` if the signature checks
+        out; ``valid=False`` otherwise (including when no signature is present).
+    """
+    signature_hex: Optional[str] = bom_data.get("signature")
+    if not signature_hex:
+        return VerificationResult(
+            valid=False,
+            algorithm="ed25519",
+            key_id=None,
+            error="No signature field found in BOM data.",
+        )
+
+    # Prefer an explicit bom_json payload; fall back to re-serialising the dict
+    # with the signature field excluded (canonical form).
+    bom_json: Optional[str] = bom_data.get("bom_json")
+    if bom_json is not None:
+        bom_bytes = bom_json.encode() if isinstance(bom_json, str) else bom_json
+    else:
+        # Reconstruct canonical payload by removing the signature field.
+        payload = {k: v for k, v in bom_data.items() if k != "signature"}
+        bom_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+
+    try:
+        sig_bytes = bytes.fromhex(signature_hex)
+    except ValueError:
+        return VerificationResult(
+            valid=False,
+            algorithm="ed25519",
+            key_id=None,
+            error="Signature field is not valid hex.",
+        )
+
+    return verify_signature(bom_bytes, sig_bytes)
+
+
+# ---------------------------------------------------------------------------
+# Auto-sign feature flag
+# ---------------------------------------------------------------------------
+
+#: Module-level default for auto-sign (always disabled; use env var to enable).
+SKILLBOM_AUTO_SIGN: bool = False
+
+
+def is_auto_sign_enabled() -> bool:
+    """Return True if auto-signing is enabled via the ``SKILLBOM_AUTO_SIGN`` env var.
+
+    Accepted truthy values (case-insensitive): ``"1"``, ``"true"``, ``"yes"``.
+    """
+    return os.environ.get("SKILLBOM_AUTO_SIGN", "").lower() in ("1", "true", "yes")
+
+
+def auto_sign_bom(
+    bom_content: bytes,
+    key_path: Optional[Path] = None,
+) -> Optional[SignatureResult]:
+    """Sign BOM content if auto-signing is enabled.
+
+    Returns ``None`` silently when auto-signing is disabled or when the
+    signing key cannot be found / signing fails.  This is a best-effort
+    helper — callers must not rely on a non-``None`` return value.
+
+    Args:
+        bom_content: Raw BOM bytes to sign.
+        key_path: Path to a PEM-encoded Ed25519 private key file.  When
+            ``None``, the default key location is used.
+
+    Returns:
+        :class:`SignatureResult` on success, or ``None``.
+    """
+    if not is_auto_sign_enabled():
+        return None
+    try:
+        return sign_bom(bom_content, key_path=key_path)
+    except (KeyNotFoundError, SigningError):
+        return None

@@ -5,23 +5,29 @@ import os
 import platform
 import stat
 from pathlib import Path
+from typing import Optional
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from skillmeat.core.bom.signing import (
+    ChainValidationResult,
     KeyGenerationError,
     KeyNotFoundError,
     SignatureResult,
     SigningError,
     VerificationError,
     VerificationResult,
+    auto_sign_bom,
     generate_signing_keypair,
+    is_auto_sign_enabled,
     load_signing_key,
     load_verify_key,
     sign_bom,
     sign_file,
+    validate_signature_chain,
+    verify_bom,
     verify_file,
     verify_signature,
 )
@@ -444,3 +450,323 @@ class TestVerifyFile:
         generate_signing_keypair(key_dir=other_dir)
         result = verify_file(bom_file, key_path=other_dir / "skillbom_ed25519.pub")
         assert result.valid is False
+
+
+# ---------------------------------------------------------------------------
+# Helpers shared by new test classes
+# ---------------------------------------------------------------------------
+
+
+def _make_snapshot(
+    bom_json: str,
+    parent_hash: Optional[str] = None,
+    sign_with: Optional[bytes] = None,
+) -> dict:
+    """Build a snapshot dict, optionally signing it with a PEM private key."""
+    import hashlib as _hashlib
+
+    content_hash = _hashlib.sha256(bom_json.encode()).hexdigest()
+    signature_hex: Optional[str] = None
+    if sign_with is not None:
+        result = sign_bom(bom_json.encode(), private_key=sign_with)
+        signature_hex = result.signature_hex
+    return {
+        "bom_json": bom_json,
+        "content_hash": content_hash,
+        "parent_hash": parent_hash,
+        "signature": signature_hex,
+    }
+
+
+# ---------------------------------------------------------------------------
+# validate_signature_chain
+# ---------------------------------------------------------------------------
+
+
+class TestValidateSignatureChain:
+    def test_empty_chain_is_valid(self) -> None:
+        result = validate_signature_chain([])
+        assert result.valid is True
+        assert result.chain_length == 0
+        assert result.verified_count == 0
+        assert result.unsigned_count == 0
+        assert result.first_break_at is None
+        assert result.errors == []
+
+    def test_single_unsigned_snapshot(self) -> None:
+        snap = _make_snapshot('{"artifacts": []}')
+        result = validate_signature_chain([snap])
+        assert result.valid is True
+        assert result.chain_length == 1
+        assert result.verified_count == 0
+        assert result.unsigned_count == 1
+        assert result.first_break_at is None
+
+    def test_valid_chain_all_signed(self, tmp_path: Path) -> None:
+        key_dir = tmp_path / "keys"
+        pub_pem, priv_pem = generate_signing_keypair(key_dir=key_dir)
+
+        snap0 = _make_snapshot('{"v": 1}', sign_with=priv_pem)
+        snap1 = _make_snapshot('{"v": 2}', parent_hash=snap0["content_hash"], sign_with=priv_pem)
+        snap2 = _make_snapshot('{"v": 3}', parent_hash=snap1["content_hash"], sign_with=priv_pem)
+
+        result = validate_signature_chain([snap0, snap1, snap2], public_key=pub_pem)
+        assert result.valid is True
+        assert result.chain_length == 3
+        assert result.verified_count == 3
+        assert result.unsigned_count == 0
+        assert result.first_break_at is None
+        assert result.errors == []
+
+    def test_broken_chain_parent_hash_mismatch(self, tmp_path: Path) -> None:
+        key_dir = tmp_path / "keys"
+        pub_pem, priv_pem = generate_signing_keypair(key_dir=key_dir)
+
+        snap0 = _make_snapshot('{"v": 1}', sign_with=priv_pem)
+        # Deliberately wrong parent_hash (not the hash of snap0)
+        snap1 = _make_snapshot('{"v": 2}', parent_hash="deadbeef" * 8, sign_with=priv_pem)
+
+        result = validate_signature_chain([snap0, snap1], public_key=pub_pem)
+        assert result.valid is False
+        assert result.first_break_at == 1
+        assert any("parent_hash mismatch" in e for e in result.errors)
+
+    def test_chain_with_unsigned_snapshots(self, tmp_path: Path) -> None:
+        key_dir = tmp_path / "keys"
+        pub_pem, priv_pem = generate_signing_keypair(key_dir=key_dir)
+
+        snap0 = _make_snapshot('{"v": 1}', sign_with=priv_pem)
+        snap1 = _make_snapshot('{"v": 2}', parent_hash=snap0["content_hash"])  # unsigned
+        snap2 = _make_snapshot('{"v": 3}', parent_hash=snap1["content_hash"], sign_with=priv_pem)
+
+        result = validate_signature_chain([snap0, snap1, snap2], public_key=pub_pem)
+        # Parent hash links are correct, so chain is intact
+        assert result.valid is True
+        assert result.verified_count == 2
+        assert result.unsigned_count == 1
+        assert result.first_break_at is None
+
+    def test_tampered_signature_breaks_chain(self, tmp_path: Path) -> None:
+        key_dir = tmp_path / "keys"
+        pub_pem, priv_pem = generate_signing_keypair(key_dir=key_dir)
+
+        snap0 = _make_snapshot('{"v": 1}', sign_with=priv_pem)
+        snap1 = _make_snapshot('{"v": 2}', parent_hash=snap0["content_hash"], sign_with=priv_pem)
+
+        # Tamper with snap1's signature (flip all bytes via XOR)
+        raw_sig = bytes.fromhex(snap1["signature"])
+        tampered_hex = bytes(b ^ 0xFF for b in raw_sig).hex()
+        snap1_tampered = {**snap1, "signature": tampered_hex}
+
+        result = validate_signature_chain([snap0, snap1_tampered], public_key=pub_pem)
+        assert result.valid is False
+        assert result.first_break_at == 1
+        assert any("signature invalid" in e for e in result.errors)
+
+    def test_content_hash_mismatch_detected(self) -> None:
+        bom_json = '{"v": 1}'
+        snap = {
+            "bom_json": bom_json,
+            "content_hash": "a" * 64,  # wrong hash
+            "parent_hash": None,
+            "signature": None,
+        }
+        result = validate_signature_chain([snap])
+        assert result.valid is False
+        assert any("content_hash mismatch" in e for e in result.errors)
+
+    def test_invalid_signature_hex_detected(self) -> None:
+        snap = _make_snapshot('{"v": 1}')
+        snap["signature"] = "not-valid-hex!!!"
+        result = validate_signature_chain([snap])
+        assert result.valid is False
+        assert any("not valid hex" in e for e in result.errors)
+
+    def test_chain_verified_count_excludes_unsigned(self, tmp_path: Path) -> None:
+        key_dir = tmp_path / "keys"
+        pub_pem, priv_pem = generate_signing_keypair(key_dir=key_dir)
+
+        snaps = [_make_snapshot(f'{{"v": {i}}}') for i in range(5)]
+        # link parent hashes
+        for i in range(1, 5):
+            snaps[i]["parent_hash"] = snaps[i - 1]["content_hash"]
+
+        result = validate_signature_chain(snaps, public_key=pub_pem)
+        assert result.valid is True
+        assert result.unsigned_count == 5
+        assert result.verified_count == 0
+
+
+# ---------------------------------------------------------------------------
+# verify_bom
+# ---------------------------------------------------------------------------
+
+
+class TestVerifyBom:
+    def test_valid_signed_bom_dict(self, tmp_path: Path) -> None:
+        key_dir = tmp_path / "keys"
+        pub_pem, priv_pem = generate_signing_keypair(key_dir=key_dir)
+
+        bom_json = '{"artifacts": [{"name": "foo"}]}'
+        sign_result = sign_bom(bom_json.encode(), private_key=priv_pem)
+
+        bom_data = {
+            "bom_json": bom_json,
+            "signature": sign_result.signature_hex,
+        }
+
+        # Load the public key so default path isn't needed
+        import unittest.mock as mock
+        with mock.patch(
+            "skillmeat.core.bom.signing.load_verify_key",
+            return_value=pub_pem,
+        ):
+            result = verify_bom(bom_data)
+
+        assert result.valid is True
+        assert result.error is None
+
+    def test_missing_signature_field_returns_invalid(self) -> None:
+        bom_data = {"bom_json": '{"v": 1}'}
+        result = verify_bom(bom_data)
+        assert result.valid is False
+        assert "No signature" in (result.error or "")
+
+    def test_tampered_bom_json_fails_verification(self, tmp_path: Path) -> None:
+        key_dir = tmp_path / "keys"
+        pub_pem, priv_pem = generate_signing_keypair(key_dir=key_dir)
+
+        original = '{"artifacts": []}'
+        sign_result = sign_bom(original.encode(), private_key=priv_pem)
+
+        bom_data = {
+            "bom_json": '{"artifacts": [{"name": "injected"}]}',  # tampered
+            "signature": sign_result.signature_hex,
+        }
+
+        import unittest.mock as mock
+        with mock.patch(
+            "skillmeat.core.bom.signing.load_verify_key",
+            return_value=pub_pem,
+        ):
+            result = verify_bom(bom_data)
+
+        assert result.valid is False
+
+    def test_invalid_hex_signature_returns_invalid(self) -> None:
+        bom_data = {
+            "bom_json": '{"v": 1}',
+            "signature": "zzznotvalidhex",
+        }
+        result = verify_bom(bom_data)
+        assert result.valid is False
+        assert "not valid hex" in (result.error or "").lower()
+
+    def test_empty_signature_field_returns_invalid(self) -> None:
+        bom_data = {"bom_json": '{"v": 1}', "signature": ""}
+        result = verify_bom(bom_data)
+        assert result.valid is False
+
+    def test_fallback_payload_serialisation(self, tmp_path: Path) -> None:
+        """verify_bom falls back to serialising non-bom_json fields when no bom_json key."""
+        import json as _json
+
+        key_dir = tmp_path / "keys"
+        pub_pem, priv_pem = generate_signing_keypair(key_dir=key_dir)
+
+        # Build canonical payload (the dict without 'signature', sorted keys)
+        payload = {"artifacts": [], "version": "1.0.0"}
+        canonical = _json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        sign_result = sign_bom(canonical.encode(), private_key=priv_pem)
+
+        bom_data = {**payload, "signature": sign_result.signature_hex}
+
+        import unittest.mock as mock
+        with mock.patch(
+            "skillmeat.core.bom.signing.load_verify_key",
+            return_value=pub_pem,
+        ):
+            result = verify_bom(bom_data)
+
+        assert result.valid is True
+
+
+# ---------------------------------------------------------------------------
+# Auto-sign feature flag
+# ---------------------------------------------------------------------------
+
+
+class TestIsAutoSignEnabled:
+    def test_disabled_by_default(self, monkeypatch) -> None:
+        monkeypatch.delenv("SKILLBOM_AUTO_SIGN", raising=False)
+        assert is_auto_sign_enabled() is False
+
+    def test_enabled_with_1(self, monkeypatch) -> None:
+        monkeypatch.setenv("SKILLBOM_AUTO_SIGN", "1")
+        assert is_auto_sign_enabled() is True
+
+    def test_enabled_with_true(self, monkeypatch) -> None:
+        monkeypatch.setenv("SKILLBOM_AUTO_SIGN", "true")
+        assert is_auto_sign_enabled() is True
+
+    def test_enabled_with_yes(self, monkeypatch) -> None:
+        monkeypatch.setenv("SKILLBOM_AUTO_SIGN", "yes")
+        assert is_auto_sign_enabled() is True
+
+    def test_enabled_case_insensitive(self, monkeypatch) -> None:
+        monkeypatch.setenv("SKILLBOM_AUTO_SIGN", "TRUE")
+        assert is_auto_sign_enabled() is True
+
+    def test_disabled_with_false(self, monkeypatch) -> None:
+        monkeypatch.setenv("SKILLBOM_AUTO_SIGN", "false")
+        assert is_auto_sign_enabled() is False
+
+    def test_disabled_with_empty_string(self, monkeypatch) -> None:
+        monkeypatch.setenv("SKILLBOM_AUTO_SIGN", "")
+        assert is_auto_sign_enabled() is False
+
+    def test_disabled_with_zero(self, monkeypatch) -> None:
+        monkeypatch.setenv("SKILLBOM_AUTO_SIGN", "0")
+        assert is_auto_sign_enabled() is False
+
+
+class TestAutoSignBom:
+    def test_returns_none_when_disabled(self, monkeypatch, bom_content: bytes) -> None:
+        monkeypatch.delenv("SKILLBOM_AUTO_SIGN", raising=False)
+        result = auto_sign_bom(bom_content)
+        assert result is None
+
+    def test_returns_signature_result_when_enabled(
+        self, tmp_path: Path, monkeypatch, bom_content: bytes
+    ) -> None:
+        key_dir = tmp_path / "keys"
+        generate_signing_keypair(key_dir=key_dir)
+        monkeypatch.setenv("SKILLBOM_AUTO_SIGN", "1")
+        result = auto_sign_bom(bom_content, key_path=key_dir / "skillbom_ed25519")
+        assert isinstance(result, SignatureResult)
+        assert result.algorithm == "ed25519"
+
+    def test_returns_none_when_enabled_but_key_missing(
+        self, tmp_path: Path, monkeypatch, bom_content: bytes
+    ) -> None:
+        monkeypatch.setenv("SKILLBOM_AUTO_SIGN", "1")
+        missing_key = tmp_path / "no_key_here"
+        result = auto_sign_bom(bom_content, key_path=missing_key)
+        assert result is None  # swallowed KeyNotFoundError
+
+    def test_signature_is_verifiable(
+        self, tmp_path: Path, monkeypatch, bom_content: bytes
+    ) -> None:
+        key_dir = tmp_path / "keys"
+        pub_pem, _ = generate_signing_keypair(key_dir=key_dir)
+        monkeypatch.setenv("SKILLBOM_AUTO_SIGN", "1")
+
+        sign_result = auto_sign_bom(bom_content, key_path=key_dir / "skillbom_ed25519")
+        assert sign_result is not None
+
+        verify_result = verify_signature(
+            bom_content,
+            sign_result.signature,
+            public_key=pub_pem,
+        )
+        assert verify_result.valid is True

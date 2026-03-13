@@ -5409,6 +5409,7 @@ class BomSnapshot(Base):
         bom_json: Serialised BOM payload (JSON text).
         signature: Optional cryptographic signature over ``bom_json``.
         signature_algorithm: Algorithm used to produce the signature (e.g. 'ed25519').
+        signing_key_id: SHA-256 fingerprint (hex) of the public key used to sign.
         owner_type: Owner context at snapshot time.
         created_at: Timestamp when the snapshot was captured.
 
@@ -5431,7 +5432,10 @@ class BomSnapshot(Base):
 
     # Optional signing
     signature: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    signature_algorithm: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    signature_algorithm: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    signing_key_id: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True, comment="SHA-256 fingerprint (hex) of the signing public key"
+    )
 
     # Owner context
     owner_type: Mapped[str] = mapped_column(
