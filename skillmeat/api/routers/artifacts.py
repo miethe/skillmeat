@@ -157,6 +157,7 @@ from skillmeat.cache.models import (
     get_session,
 )
 from skillmeat.observability.timing import PerfTimer
+from skillmeat.core.bom.event_emitter import emit_activity_event
 
 logger = logging.getLogger(__name__)
 
@@ -2202,6 +2203,13 @@ async def create_artifact(
         artifact_id = f"{artifact.type.value}:{artifact.name}"
         _refresh_cache_safe(artifact_mgr, artifact_id, collection_name)
 
+        # Emit activity event — fire-and-forget, never blocks the response
+        emit_activity_event(
+            artifact_id=artifact_id,
+            event_type="create",
+            actor_id=getattr(auth_context, "user_id", None),
+        )
+
         return ArtifactCreateResponse(
             success=True,
             artifact_id=artifact_id,
@@ -3114,6 +3122,14 @@ async def update_artifact(
             # Refresh DB cache after successful update (non-blocking)
             _refresh_cache_safe(artifact_mgr, artifact_id, collection_name)
 
+            # Emit activity event — fire-and-forget, never blocks the response
+            emit_activity_event(
+                artifact_id=artifact_id,
+                event_type="update",
+                actor_id=getattr(auth_context, "user_id", None),
+                content_hash=content_hash,
+            )
+
             # Invalidate upstream fetch cache — cached diff results are now stale
             try:
                 get_upstream_cache().invalidate_artifact(artifact_id)
@@ -3513,6 +3529,13 @@ async def delete_artifact(
         try:
             artifact_mgr.remove(artifact_name, artifact_type, collection_name)
             logger.info(f"Successfully deleted artifact: {artifact_id}")
+
+            # Emit activity event — fire-and-forget, never blocks the response
+            emit_activity_event(
+                artifact_id=artifact_id,
+                event_type="delete",
+                actor_id=getattr(auth_context, "user_id", None),
+            )
         except ValueError as e:
             # Artifact not found (race condition)
             raise HTTPException(
@@ -3749,6 +3772,13 @@ async def deploy_artifact(
                 artifact_id,
                 collection_name,
                 deployment_profile_id=request.deployment_profile_id,
+            )
+
+            # Emit activity event — fire-and-forget, never blocks the response
+            emit_activity_event(
+                artifact_id=artifact_id,
+                event_type="deploy",
+                actor_id=getattr(auth_context, "user_id", None),
             )
 
             # Invalidate upstream fetch cache — project version has changed
@@ -4284,6 +4314,13 @@ async def sync_artifact(
             if success:
                 _refresh_cache_safe(artifact_mgr, artifact_id, collection_name)
 
+                # Emit activity event — fire-and-forget, never blocks the response
+                emit_activity_event(
+                    artifact_id=artifact_id,
+                    event_type="sync",
+                    actor_id=getattr(auth_context, "user_id", None),
+                )
+
                 # Invalidate upstream fetch cache — collection version has changed
                 try:
                     get_upstream_cache().invalidate_artifact(artifact_id)
@@ -4389,6 +4426,13 @@ async def undeploy_artifact(
             )
 
             logger.info(f"Artifact '{artifact_name}' undeployed successfully")
+
+            # Emit activity event — fire-and-forget, never blocks the response
+            emit_activity_event(
+                artifact_id=artifact_id,
+                event_type="undeploy",
+                actor_id=getattr(auth_context, "user_id", None),
+            )
 
             return ArtifactDeployResponse(
                 success=True,
