@@ -2,62 +2,73 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "enterprise-router-migration"
-feature_slug: "enterprise-router-migration"
+prd: enterprise-router-migration
+feature_slug: enterprise-router-migration
 prd_ref: null
 plan_ref: docs/project_plans/implementation_plans/refactors/enterprise-router-migration-v1.md
 phase: 1
-title: "AppState Edition-Awareness"
-status: "planning"
-started: "2026-03-12"
+title: AppState Edition-Awareness
+status: completed
+started: '2026-03-12'
 completed: null
-commit_refs: []
+commit_refs:
+- e91c3f87
+- 0d1e3baf
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 2
-completed_tasks: 0
+completed_tasks: 2
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
+owners:
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "TASK-1.1"
-    description: "Make AppState managers optional in enterprise mode - wrap collection_manager, artifact_manager, sync_manager, context_sync_service init in edition check"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "TASK-1.2"
-    description: "Guard manager dependency getters - raise HTTPException(501) when manager is None in enterprise mode"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
+- id: TASK-1.1
+  description: Make AppState managers optional in enterprise mode - wrap collection_manager,
+    artifact_manager, sync_manager, context_sync_service init in edition check
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: high
+- id: TASK-1.2
+  description: Guard manager dependency getters - raise HTTPException(501) when manager
+    is None in enterprise mode
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  estimated_effort: 1 pt
+  priority: high
 parallelization:
-  batch_1: ["TASK-1.1"]
-  batch_2: ["TASK-1.2"]
-  critical_path: ["TASK-1.1", "TASK-1.2"]
-  estimated_total_time: "3 pts"
-
+  batch_1:
+  - TASK-1.1
+  batch_2:
+  - TASK-1.2
+  critical_path:
+  - TASK-1.1
+  - TASK-1.2
+  estimated_total_time: 3 pts
 blockers: []
-
 success_criteria:
-  - { id: "SC-1", description: "Enterprise container starts without PermissionError", status: "pending" }
-  - { id: "SC-2", description: "app_state.collection_manager is None in enterprise", status: "pending" }
-  - { id: "SC-3", description: "ManagerDep endpoints return 501 in enterprise (not crash)", status: "pending" }
-
+- id: SC-1
+  description: Enterprise container starts without PermissionError
+  status: pending
+- id: SC-2
+  description: app_state.collection_manager is None in enterprise
+  status: pending
+- id: SC-3
+  description: ManagerDep endpoints return 501 in enterprise (not crash)
+  status: pending
 files_modified:
-  - "skillmeat/api/dependencies.py"
+- skillmeat/api/dependencies.py
+progress: 100
+updated: '2026-03-12'
 ---
 
 # enterprise-router-migration - Phase 1: AppState Edition-Awareness

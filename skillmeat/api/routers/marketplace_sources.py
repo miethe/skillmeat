@@ -53,6 +53,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
+    ArtifactRepoDep,
     CollectionManagerDep,
     MarketplaceCatalogRepoDep,
     MarketplaceSourceConcreteRepoDep,
@@ -602,24 +603,23 @@ def source_to_response(
     )
 
 
-def get_collection_artifact_keys(collection_mgr) -> Set[str]:
+def get_collection_artifact_keys(artifact_repo) -> Set[str]:
     """Get set of 'type:name' keys for all artifacts in active collection.
 
     Used for efficient lookup when enriching catalog entries with in_collection status.
 
     Args:
-        collection_mgr: CollectionManager instance
+        artifact_repo: IArtifactRepository instance (edition-aware: works in both
+            local filesystem mode and enterprise DB-backed mode).
 
     Returns:
         Set of strings in format 'artifact_type:name' for each artifact in collection.
         Returns empty set if collection artifacts cannot be retrieved.
     """
     try:
-        from skillmeat.core.artifact import ArtifactManager
-
-        artifact_mgr = ArtifactManager(collection_mgr)
-        artifacts = artifact_mgr.list_artifacts()
-        return {f"{a.type.value}:{a.name}" for a in artifacts}
+        artifacts = artifact_repo.list(limit=10000)
+        # ArtifactDTO.id is already in 'type:name' format (e.g. 'skill:frontend-design')
+        return {a.id for a in artifacts}
     except Exception as e:
         logger.warning(f"Failed to get collection artifacts: {e}")
         return set()
@@ -3383,7 +3383,7 @@ async def list_artifacts(
     cursor: Optional[str] = Query(
         None, description="Cursor for pagination (from previous response)"
     ),
-    collection_mgr: CollectionManagerDep = None,
+    artifact_repo: ArtifactRepoDep = None,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> CatalogListResponse:
     """List artifacts from a source with optional filters and sorting.
@@ -3539,7 +3539,7 @@ async def list_artifacts(
 
         # Get collection artifact keys for in_collection check
         collection_keys = (
-            get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
+            get_collection_artifact_keys(artifact_repo) if artifact_repo else set()
         )
 
         # Convert to response DTOs
@@ -3607,12 +3607,12 @@ async def update_catalog_entry_name(
     request: UpdateCatalogEntryNameRequest,
     source_repo: MarketplaceSourceConcreteRepoDep,
     catalog_repo: MarketplaceCatalogRepoDep,
-    collection_mgr: CollectionManagerDep = None,
+    artifact_repo: ArtifactRepoDep = None,
     auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> CatalogEntryResponse:
     """Update the name for a catalog entry."""
     collection_keys = (
-        get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
+        get_collection_artifact_keys(artifact_repo) if artifact_repo else set()
     )
 
     normalized_name = request.name.strip()
@@ -4747,7 +4747,7 @@ async def exclude_artifact(
     entry_id: str,
     request: ExcludeArtifactRequest,
     source_repo: MarketplaceSourceRepoDep,
-    collection_mgr: CollectionManagerDep = None,
+    artifact_repo: ArtifactRepoDep = None,
     auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> CatalogEntryResponse:
     """Mark or restore a catalog entry as excluded.
@@ -4760,7 +4760,7 @@ async def exclude_artifact(
         source_id: Unique source identifier
         entry_id: Unique catalog entry identifier
         request: Exclusion request with excluded flag and optional reason
-        collection_mgr: Collection manager for in_collection lookup
+        artifact_repo: Artifact repository for in_collection lookup (edition-aware)
 
     Returns:
         Updated catalog entry with exclusion metadata
@@ -4781,7 +4781,7 @@ async def exclude_artifact(
         >>> assert response.status == "excluded"
     """
     collection_keys = (
-        get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
+        get_collection_artifact_keys(artifact_repo) if artifact_repo else set()
     )
 
     try:
@@ -4872,7 +4872,7 @@ async def restore_excluded_artifact(
     source_id: str,
     entry_id: str,
     source_repo: MarketplaceSourceRepoDep,
-    collection_mgr: CollectionManagerDep = None,
+    artifact_repo: ArtifactRepoDep = None,
     auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> CatalogEntryResponse:
     """Restore an excluded catalog entry to the catalog.
@@ -4883,7 +4883,7 @@ async def restore_excluded_artifact(
     Args:
         source_id: Unique source identifier
         entry_id: Unique catalog entry identifier
-        collection_mgr: Collection manager for in_collection lookup
+        artifact_repo: Artifact repository for in_collection lookup (edition-aware)
 
     Returns:
         Updated catalog entry with exclusion removed (excluded_at=None, excluded_reason=None)
@@ -4901,7 +4901,7 @@ async def restore_excluded_artifact(
         >>> assert response.status == "new"  # or "imported" if previously imported
     """
     collection_keys = (
-        get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
+        get_collection_artifact_keys(artifact_repo) if artifact_repo else set()
     )
 
     try:

@@ -1,41 +1,50 @@
 ---
-title: "Implementation Plan: Enterprise Router Migration"
+title: 'Implementation Plan: Enterprise Router Migration'
 schema_version: 2
 doc_type: implementation_plan
-status: draft
+status: completed
 created: 2026-03-12
-updated: 2026-03-12
-feature_slug: "enterprise-router-migration"
-feature_version: "v1"
+updated: '2026-03-12'
+feature_slug: enterprise-router-migration
+feature_version: v1
 prd_ref: null
 plan_ref: null
-scope: "Migrate 9 routers from filesystem managers to repository DI for enterprise mode compatibility"
-effort_estimate: "21 pts"
-architecture_summary: "Replace CollectionManagerDep/ArtifactManagerDep reads with *RepoDep in all routers; make AppState edition-aware"
+scope: Migrate 9 routers from filesystem managers to repository DI for enterprise
+  mode compatibility
+effort_estimate: 21 pts
+architecture_summary: Replace CollectionManagerDep/ArtifactManagerDep reads with *RepoDep
+  in all routers; make AppState edition-aware
 related_documents:
-  - .claude/agent-memory/codebase-explorer/enterprise_router_miswiring.md
-  - .claude/findings/ENTERPRISE_ROUTER_AUDIT.md
-  - .claude/findings/MANAGER_MIGRATION_MATRIX.md
+- .claude/agent-memory/codebase-explorer/enterprise_router_miswiring.md
+- .claude/findings/ENTERPRISE_ROUTER_AUDIT.md
+- .claude/findings/MANAGER_MIGRATION_MATRIX.md
 owner: python-backend-engineer
-contributors: [refactoring-expert, code-reviewer]
+contributors:
+- refactoring-expert
+- code-reviewer
 priority: high
 risk_level: low
-category: "product-planning"
-tags: [refactoring, enterprise, repository-di, router-migration]
+category: product-planning
+tags:
+- refactoring
+- enterprise
+- repository-di
+- router-migration
 milestone: null
-commit_refs: ["f301e229"]
+commit_refs:
+- f301e229
 pr_refs: []
 files_affected:
-  - skillmeat/api/dependencies.py
-  - skillmeat/api/routers/artifacts.py
-  - skillmeat/api/routers/health.py
-  - skillmeat/api/routers/mcp.py
-  - skillmeat/api/routers/user_collections.py
-  - skillmeat/api/routers/deployment_sets.py
-  - skillmeat/api/routers/tags.py
-  - skillmeat/api/routers/marketplace_sources.py
-  - skillmeat/api/routers/match.py
-  - skillmeat/api/routers/deployments.py
+- skillmeat/api/dependencies.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/api/routers/health.py
+- skillmeat/api/routers/mcp.py
+- skillmeat/api/routers/user_collections.py
+- skillmeat/api/routers/deployment_sets.py
+- skillmeat/api/routers/tags.py
+- skillmeat/api/routers/marketplace_sources.py
+- skillmeat/api/routers/match.py
+- skillmeat/api/routers/deployments.py
 ---
 
 # Implementation Plan: Enterprise Router Migration

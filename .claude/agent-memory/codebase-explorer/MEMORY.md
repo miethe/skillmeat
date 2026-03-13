@@ -63,6 +63,13 @@
 | Enterprise Router | `skillmeat/api/routers/enterprise_content.py:40+` | Download endpoint, PAT-protected |
 | Server Lifespan | `skillmeat/api/server.py:72–80` | FastAPI setup, middleware order |
 
+## Complete DI Pattern Reference (2026-03-12)
+
+Comprehensive guide to the Hexagonal Architecture DI pattern:
+- **File**: `.claude/agent-memory/codebase-explorer/DI_PATTERN_REFERENCE.md`
+- **Covers**: All 19 RepoDep aliases, interface signatures, getter functions, edition-aware routing
+- **Use when**: Adding endpoints, migrating routers, understanding repository contracts
+
 ## Manager Dependency Audit (2026-03-12)
 
 ### Findings Summary

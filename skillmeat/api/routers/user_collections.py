@@ -21,6 +21,7 @@ from skillmeat.api.dependencies import (
     DbUserCollectionRepoDep,
     GroupRepoDep,
     ProjectRepoDep,
+    SettingsDep,
     get_auth_context,
     require_auth,
 )
@@ -863,6 +864,7 @@ async def migrate_to_default_collection(
     collection_repo: DbUserCollectionRepoDep,
     artifact_repo_ca: DbCollectionArtifactRepoDep,
     project_repo: ProjectRepoDep,
+    settings: SettingsDep,
     token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> dict:
@@ -872,12 +874,16 @@ async def migrate_to_default_collection(
     registered in the default database collection, enabling them to use
     Groups and other collection features.
 
+    In enterprise mode this endpoint returns 501 because artifact population
+    is driven by DB-backed sources rather than the local filesystem.
+
     Args:
         artifact_mgr: Artifact manager for listing artifacts
         collection_mgr: Collection manager for listing collections
         collection_repo: DB user collection repository (injected)
         artifact_repo_ca: DB collection artifact repository (injected)
         project_repo: Project repository for deployment scanning (injected)
+        settings: API settings (edition check)
         token: Authentication token
 
     Returns:
@@ -887,6 +893,15 @@ async def migrate_to_default_collection(
         This operation is idempotent - running it multiple times will not
         create duplicate entries.
     """
+    if settings.edition == "enterprise":
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=(
+                "Filesystem-based artifact migration is not available in enterprise "
+                "edition. Artifacts are populated directly from DB-backed sources."
+            ),
+        )
+
     try:
         result = migrate_artifacts_to_default_collection(
             artifact_mgr=artifact_mgr,
@@ -1099,22 +1114,23 @@ def _refresh_single_collection_cache(
 )
 async def refresh_all_collections_cache(
     artifact_mgr: ArtifactManagerDep,
-    collection_mgr: CollectionManagerDep,
     collection_repo: DbUserCollectionRepoDep,
     artifact_repo_ca: DbCollectionArtifactRepoDep,
+    settings: SettingsDep,
     token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> dict:
     """Refresh CollectionArtifact metadata cache across all DB collections.
 
     Iterates all collections in the database and refreshes cached metadata
-    from file-based artifacts.
+    from file-based artifacts.  In enterprise mode the filesystem is not
+    available so this operation returns immediately with empty stats.
 
     Args:
-        artifact_mgr: Artifact manager for listing artifacts
-        collection_mgr: Collection manager for listing collections
+        artifact_mgr: Artifact manager for listing artifacts (local edition only)
         collection_repo: DB user collection repository (injected)
         artifact_repo_ca: DB collection artifact repository (injected)
+        settings: API settings (edition check)
         token: Authentication token
 
     Returns:
@@ -1127,6 +1143,18 @@ async def refresh_all_collections_cache(
     Raises:
         HTTPException: On failure
     """
+    if settings.edition == "enterprise":
+        logger.info(
+            "refresh_all_collections_cache: skipping FS cache refresh in enterprise mode"
+        )
+        return {
+            "success": True,
+            "collections_refreshed": 0,
+            "total_updated": 0,
+            "total_skipped": 0,
+            "errors": [],
+            "duration_seconds": 0.0,
+        }
     import time
 
     start_time = time.time()
@@ -1652,6 +1680,7 @@ async def list_collection_artifacts(
     artifact_mgr: ArtifactManagerDep,
     collection_repo: DbUserCollectionRepoDep,
     artifact_repo_ca: DbCollectionArtifactRepoDep,
+    settings: SettingsDep,
     token: TokenDep,
     limit: int = Query(default=20, ge=1, le=100),
     after: Optional[str] = Query(default=None),
@@ -1815,8 +1844,8 @@ async def list_collection_artifacts(
                 # Resolve source: DB lookup > filesystem > artifact_id fallback
                 db_source = source_lookup.get(resolved_artifact_id)
                 resolved_source = db_source or assoc.source
-                if not resolved_source:
-                    # Last resort: read from filesystem
+                if not resolved_source and settings.edition != "enterprise":
+                    # Last resort: read from filesystem (local edition only)
                     try:
                         artifact_type_enum = None
                         try:
@@ -1860,8 +1889,8 @@ async def list_collection_artifacts(
                 )
                 logger.debug(f"Cache hit for {resolved_artifact_id}")
 
-            # 2. Fallback: Try file-based ArtifactManager on cache miss
-            if artifact_summary is None:
+            # 2. Fallback: Try file-based ArtifactManager on cache miss (local only)
+            if artifact_summary is None and settings.edition != "enterprise":
                 try:
                     # Convert type string to ArtifactType enum
                     artifact_type_enum = None
@@ -2622,9 +2651,9 @@ async def list_collection_entities(
 async def refresh_collection_cache(
     collection_id: str,
     artifact_mgr: ArtifactManagerDep,
-    collection_mgr: CollectionManagerDep,
     collection_repo: DbUserCollectionRepoDep,
     artifact_repo_ca: DbCollectionArtifactRepoDep,
+    settings: SettingsDep,
     token: TokenDep,
     auth_context: AuthContext = Depends(require_auth(scopes=["collection:write"])),
 ) -> dict:
@@ -2634,14 +2663,15 @@ async def refresh_collection_cache(
     file-based collections. This endpoint targets only the DB cache.
 
     Reads current file-based artifact metadata and updates CollectionArtifact
-    cache rows for all artifacts in the specified collection.
+    cache rows for all artifacts in the specified collection.  In enterprise
+    mode the filesystem is not available so this returns empty stats immediately.
 
     Args:
         collection_id: UUID or name of the collection
-        artifact_mgr: Artifact manager for reading file-based metadata
-        collection_mgr: Collection manager for file-based collection access
+        artifact_mgr: Artifact manager for reading file-based metadata (local only)
         collection_repo: DB user collection repository (injected)
         artifact_repo_ca: DB collection artifact repository (injected)
+        settings: API settings (edition check)
         token: Authentication token
 
     Returns:
@@ -2668,7 +2698,21 @@ async def refresh_collection_cache(
             },
         )
 
-    # 2. Delegate to the refactored helper which uses repository DI throughout.
+    # 2. In enterprise mode there is no filesystem to read from; return immediately.
+    if settings.edition == "enterprise":
+        logger.info(
+            "refresh_collection_cache: skipping FS cache refresh in enterprise mode "
+            "for collection '%s'",
+            collection_id,
+        )
+        return {
+            "collection_id": collection_id,
+            "updated_count": 0,
+            "skipped_count": 0,
+            "errors": [],
+        }
+
+    # 3. Delegate to the refactored helper which uses repository DI throughout.
     result = _refresh_single_collection_cache(
         collection_id=collection_id,
         artifact_mgr=artifact_mgr,
@@ -2682,7 +2726,7 @@ async def refresh_collection_cache(
         f"errors={len(result['errors'])}, duration={duration:.2f}s"
     )
 
-    # 3. Return stats
+    # 4. Return stats
     return {
         "collection_id": collection_id,
         "updated_count": result["updated"],
@@ -2743,6 +2787,7 @@ async def refresh_collection_cache(
 async def refresh_collection(
     collection_id: str,
     collection_mgr: CollectionManagerDep,
+    settings: SettingsDep,
     token: TokenDep,
     request: RefreshRequest = Body(...),
     mode: Optional[RefreshModeEnum] = Query(
@@ -2757,11 +2802,15 @@ async def refresh_collection(
     - check_only: Detect available updates without applying changes
     - sync: Full synchronization including version updates (reserved)
 
+    In enterprise mode this endpoint returns 501 because collection refresh
+    operates against the local filesystem which is not available.
+
     Args:
         collection_id: Collection identifier
         request: Refresh request with mode, filters, and dry_run options
         mode: Optional query param to override request body mode
         collection_mgr: Collection manager dependency
+        settings: API settings (edition check)
         token: Authentication token
 
     Returns:
@@ -2770,6 +2819,15 @@ async def refresh_collection(
     Raises:
         HTTPException: If collection not found or on error
     """
+    if settings.edition == "enterprise":
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=(
+                "Filesystem-based collection refresh is not available in enterprise "
+                "edition. Artifact metadata is managed directly in the database."
+            ),
+        )
+
     try:
         logger.info(f"Starting refresh for collection {collection_id}")
 

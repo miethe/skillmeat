@@ -8,7 +8,7 @@ import logging
 import platform
 import sys
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Annotated, Dict, Optional
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
@@ -16,14 +16,28 @@ from sqlalchemy import text
 
 from skillmeat import __version__ as skillmeat_version
 from skillmeat.api.dependencies import (
-    CollectionManagerDep,
+    AppState,
     ConfigManagerDep,
     DbSessionDep,
     SettingsDep,
+    get_app_state,
 )
 from skillmeat.core.services.memory_service import MemoryService
 
 logger = logging.getLogger(__name__)
+
+
+def _get_optional_collection_manager(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> Optional[object]:
+    """Return CollectionManager in local edition; None in enterprise.
+
+    Reads directly from AppState to avoid the 501 that get_collection_manager
+    raises when edition == 'enterprise'.  The health endpoint checks for None
+    and skips filesystem checks accordingly.
+    """
+    return state.collection_manager
+
 
 router = APIRouter(
     prefix="/health",
@@ -154,7 +168,9 @@ async def health_check(settings: SettingsDep) -> HealthStatus:
 async def detailed_health_check(
     settings: SettingsDep,
     config_manager: ConfigManagerDep,
-    collection_manager: CollectionManagerDep,
+    collection_manager: Annotated[
+        Optional[object], Depends(_get_optional_collection_manager)
+    ],
     db_session: DbSessionDep,
 ) -> DetailedHealthStatus:
     """Detailed health check with component status.
@@ -162,7 +178,7 @@ async def detailed_health_check(
     Args:
         settings: API settings dependency
         config_manager: Config manager dependency
-        collection_manager: Collection manager dependency (local edition only)
+        collection_manager: Collection manager (local edition only; None in enterprise)
         db_session: Per-request DB session (used for enterprise DB connectivity check)
 
     Returns:
@@ -186,6 +202,15 @@ async def detailed_health_check(
                 "details": str(e),
             }
             overall_status = "degraded"
+        # Skip filesystem and config checks in enterprise mode — no local FS access
+        components["config_manager"] = {
+            "status": "healthy",
+            "details": "enterprise mode — config managed externally",
+        }
+        components["filesystem"] = {
+            "status": "healthy",
+            "details": "enterprise mode — filesystem not applicable",
+        }
     else:
         # Local mode: check filesystem collections
         try:
@@ -202,44 +227,44 @@ async def detailed_health_check(
             }
             overall_status = "degraded"
 
-    # Check config manager
-    try:
-        config = config_manager.read()
-        components["config_manager"] = {
-            "status": "healthy",
-            "details": "configuration loaded",
-        }
-    except Exception as e:
-        logger.error(f"Config manager health check failed: {e}")
-        components["config_manager"] = {
-            "status": "unhealthy",
-            "details": str(e),
-        }
-        overall_status = "degraded"
-
-    # Check file system access
-    try:
-        collections_dir = config_manager.get_collections_dir()
-        if collections_dir.exists():
-            components["filesystem"] = {
+        # Check config manager
+        try:
+            config_manager.read()
+            components["config_manager"] = {
                 "status": "healthy",
-                "details": f"collections directory accessible: {collections_dir}",
+                "details": "configuration loaded",
             }
-        else:
+        except Exception as e:
+            logger.error(f"Config manager health check failed: {e}")
+            components["config_manager"] = {
+                "status": "unhealthy",
+                "details": str(e),
+            }
+            overall_status = "degraded"
+
+        # Check file system access
+        try:
+            collections_dir = config_manager.get_collections_dir()
+            if collections_dir.exists():
+                components["filesystem"] = {
+                    "status": "healthy",
+                    "details": f"collections directory accessible: {collections_dir}",
+                }
+            else:
+                components["filesystem"] = {
+                    "status": "degraded",
+                    "details": f"collections directory not found: {collections_dir}",
+                }
+                # This is expected for new installations, so only mark as degraded
+                if overall_status == "healthy":
+                    overall_status = "degraded"
+        except Exception as e:
+            logger.error(f"Filesystem health check failed: {e}")
             components["filesystem"] = {
-                "status": "degraded",
-                "details": f"collections directory not found: {collections_dir}",
+                "status": "unhealthy",
+                "details": str(e),
             }
-            # This is expected for new installations, so only mark as degraded
-            if overall_status == "healthy":
-                overall_status = "degraded"
-    except Exception as e:
-        logger.error(f"Filesystem health check failed: {e}")
-        components["filesystem"] = {
-            "status": "unhealthy",
-            "details": str(e),
-        }
-        overall_status = "unhealthy"
+            overall_status = "unhealthy"
 
     # Check memory system
     try:
@@ -297,15 +322,13 @@ async def detailed_health_check(
 )
 async def readiness_check(
     settings: SettingsDep,
-    collection_manager: CollectionManagerDep,
     db_session: DbSessionDep,
 ) -> Dict[str, str]:
     """Readiness check for orchestrators.
 
     Args:
         settings: API settings dependency
-        collection_manager: Collection manager dependency (local edition only)
-        db_session: Per-request DB session (enterprise edition readiness check)
+        db_session: Per-request DB session (enterprise and local edition readiness check)
 
     Returns:
         Readiness status
@@ -316,10 +339,7 @@ async def readiness_check(
     if settings.edition == "enterprise":
         # Enterprise: verify DB connectivity as the readiness gate
         db_session.execute(text("SELECT 1"))
-    else:
-        # Local: service is ready if collection manager is initialized
-        # (dependency injection will raise 503 if AppState is not yet set up)
-        pass
+    # Local: service is ready if the API is responding — no additional FS check needed
     return {
         "status": "ready",
         "timestamp": datetime.utcnow().isoformat() + "Z",
