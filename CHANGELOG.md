@@ -40,6 +40,16 @@ SkillMeat is a personal collection manager for Claude Code artifacts with a web 
   - 14 items covering documentation structure, examples, metadata, and maintenance
   - Integrated skill-creator review process
 
+- **@skillmeat/content-viewer Package**: Extracted reusable content viewing components into a standalone workspace package with adapter-based architecture.
+  - Components: FileTree, ContentPane, FrontmatterDisplay, SplitPreview, MarkdownEditor
+  - Adapter abstraction (ContentViewerAdapter interface) for backend decoupling
+  - ContentViewerProvider context for adapter injection
+  - Frontmatter utilities (parse, strip, detect) and README extraction helpers
+  - 133 tests (78 parity, 55 accessibility) with zero regressions
+  - Consumer documentation with integration examples
+  - 875 lines of duplicate code removed from app, replaced with 3-line re-export stubs
+  - Bundle size: 85.3KB (within 110KB limit)
+
 ### Changed
 
 - **Deployment Cache Invalidation**: Added missing cache refresh operations for deployment mutations.

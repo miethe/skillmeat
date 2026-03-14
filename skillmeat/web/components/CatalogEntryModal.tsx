@@ -57,8 +57,8 @@ import {
   Blocks,
 } from 'lucide-react';
 import { HeuristicScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
-import { FileTree, type FileNode } from '@/components/entity/file-tree';
-import { ContentPane } from '@/components/entity/content-pane';
+import { FileTree, ContentPane, FrontmatterDisplay, parseFrontmatter, detectFrontmatter, type FileNode } from '@skillmeat/content-viewer';
+
 import {
   useCatalogFileTree,
   useCatalogFileContent,
@@ -73,8 +73,8 @@ import type { FileTreeEntry } from '@/lib/api/catalog';
 import type { CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
 import { PathTagReview } from '@/components/marketplace/path-tag-review';
 import { Input } from '@/components/ui/input';
-import { FrontmatterDisplay } from '@/components/entity/frontmatter-display';
-import { parseFrontmatter, detectFrontmatter } from '@/lib/frontmatter';
+
+
 import {
   CompositePreview,
   type CompositePreviewData,

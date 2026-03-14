@@ -24,6 +24,24 @@ web/
 └── tests/            # E2E tests (Playwright)
 ```
 
+## Workspace Packages
+
+### @skillmeat/content-viewer
+
+**Location**: `packages/content-viewer/`
+
+Extracted content viewing components with adapter-based architecture for backend decoupling.
+
+**Exports**: FileTree, ContentPane, FrontmatterDisplay, SplitPreview, MarkdownEditor, ContentViewerProvider, frontmatter utilities
+
+**Import**: `import { FileTree, ContentPane } from '@skillmeat/content-viewer'`
+
+**Adapter Pattern**: Components use injected adapters (via ContentViewerProvider) instead of direct API calls. SkillMeat's adapter implementation is at `lib/content-viewer-adapter.ts`.
+
+**Re-export Stubs**: Legacy import paths (e.g., `components/entity/content-pane.tsx`) re-export from the package for backward compatibility.
+
+**Docs**: See `packages/content-viewer/README.md` for full API reference and integration guide.
+
 ---
 
 ## Development

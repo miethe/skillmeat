@@ -438,6 +438,66 @@ grep -n "export async function" skillmeat/web/lib/api/collections.ts
 grep -n "export function use.*Collection" skillmeat/web/hooks/use-collections.ts
 ```
 
+## Content-Viewer Re-export Stubs
+
+**Package**: `@skillmeat/content-viewer`
+
+Re-export stubs maintain backward compatibility by re-exporting components from the extracted workspace package.
+
+| Stub Path | Re-exports From | Exports | Notes |
+|-----------|-----------------|---------|-------|
+| `components/entity/content-pane.tsx` | `@skillmeat/content-viewer` | ContentPane, ContentPaneProps | Main content display component |
+| `components/entity/file-tree.tsx` | `@skillmeat/content-viewer` | FileTree, FileTreeProps | Hierarchical file/folder view |
+| `components/entity/frontmatter-display.tsx` | `@skillmeat/content-viewer` | FrontmatterDisplay, FrontmatterDisplayProps | YAML frontmatter rendering |
+| `components/editor/split-preview.tsx` | `@skillmeat/content-viewer` | SplitPreview, SplitPreviewProps | Editor with live preview |
+| `components/editor/markdown-editor.tsx` | `@skillmeat/content-viewer` | MarkdownEditor, MarkdownEditorProps | Markdown text editor |
+| `lib/frontmatter.ts` | `@skillmeat/content-viewer` | parseFrontmatter, stripFrontmatter, detectFrontmatter | Frontmatter parsing utilities |
+| `lib/folder-readme-utils.ts` | `@skillmeat/content-viewer` | extractFirstParagraph, extractFolderReadme | README extraction helpers |
+
+### Import Pattern
+
+**Before (local import)**:
+```typescript
+import { ContentPane } from '@/components/entity/content-pane';
+```
+
+**After (via package)**:
+```typescript
+import { ContentPane } from '@skillmeat/content-viewer';
+```
+
+**Legacy path still works** (re-export):
+```typescript
+import { ContentPane } from '@/components/entity/content-pane';  // ✅ Works via re-export
+```
+
+### Adapter Pattern
+
+Content-viewer components use a backend adapter pattern to decouple from specific implementations:
+
+**Adapter Interface** (`packages/content-viewer/`):
+```typescript
+interface ContentViewerAdapter {
+  // File operations, content fetching, etc.
+}
+```
+
+**SkillMeat Adapter** (`lib/content-viewer-adapter.ts`):
+```typescript
+export const skillmeatAdapter: ContentViewerAdapter = {
+  // Implementation for SkillMeat API
+};
+```
+
+**Usage**:
+```typescript
+<ContentViewerProvider adapter={skillmeatAdapter}>
+  <ContentPane artifact={artifact} />
+</ContentViewerProvider>
+```
+
+---
+
 ## Stub Status Summary
 
 ### Collections Domain

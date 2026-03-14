@@ -18,7 +18,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@skillmeat/content-viewer": ["./packages/content-viewer/src/index.ts"]
     },
     "forceConsistentCasingInFileNames": true,
     "noUnusedLocals": true,
